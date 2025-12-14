@@ -58,6 +58,14 @@ class ContextMenuManager {
      * @param {Event} e 事件对象
      */
     static async _handleContextMenu(e) {
+        // 检查是否点击在扫雷窗口中（扫雷游戏需要拦截右键菜单）
+        const minesweeperWindow = e.target.closest && e.target.closest('.minesweeper-window');
+        if (minesweeperWindow) {
+            // 如果点击在扫雷窗口中，不处理菜单，直接返回
+            // 扫雷游戏会在自己的事件处理中处理右键点击
+            return;
+        }
+        
         // 阻止默认右键菜单
         e.preventDefault();
         e.stopPropagation();

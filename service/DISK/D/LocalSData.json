@@ -38,16 +38,6 @@
         "description": "ZeroIDE",
         "position": null,
         "createdAt": 1765609500486
-      },
-      {
-        "id": 8,
-        "type": "file",
-        "targetPath": "C://UH.jpg",
-        "name": "UH.jpg",
-        "icon": "D:/application/filemanager/assets/file-image.svg",
-        "description": "UH.jpg",
-        "position": null,
-        "createdAt": 1765704601687
       }
     ],
     "musicplayer.settings": {

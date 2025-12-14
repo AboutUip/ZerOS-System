@@ -128,6 +128,25 @@ const APPLICATION_ASSETS = {
         }
     },
     
+    // 扫雷游戏
+    // 注意：路径是 D: 盘下的真实路径
+    "minesweeper": {
+        script: "D:/application/minesweeper/minesweeper.js",
+        styles: ["D:/application/minesweeper/minesweeper.css"],
+        icon: "D:/application/minesweeper/minesweeper.svg",
+        metadata: {
+            autoStart: false,
+            priority: 4,
+            description: "扫雷",
+            version: "1.0.0",
+            type: "GUI",
+            alwaysShowInTaskbar: false,
+            allowMultipleInstances: true,
+            supportsPreview: true,  // 支持窗口预览快照
+            category: "game"  // 游戏
+        }
+    },
+    
     // 浏览器
     // 注意：路径是 D: 盘下的真实路径
     "browser": {

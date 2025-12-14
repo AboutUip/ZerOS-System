@@ -1,0 +1,66 @@
+/* 扫雷游戏样式 */
+
+.minesweeper-window {
+    font-family: 'MS Sans Serif', 'Segoe UI', sans-serif;
+    user-select: none;
+}
+
+.minesweeper-menu-bar {
+    flex-shrink: 0;
+    height: 22px;
+    min-height: 22px;
+    max-height: 22px;
+    box-sizing: border-box;
+}
+
+.minesweeper-control-panel {
+    flex-shrink: 0;
+    height: 50px;
+    min-height: 50px;
+    max-height: 50px;
+    box-sizing: border-box;
+}
+
+.minesweeper-board-container {
+    flex: 1;
+    min-height: 0;
+}
+
+.minesweeper-board {
+    margin: 0 auto;
+}
+
+.minesweeper-cell {
+    transition: none;
+}
+
+.minesweeper-cell:active:not(.revealed) {
+    border: 1px inset #808080 !important;
+}
+
+/* 主题适配 */
+.minesweeper-window {
+    background: var(--theme-background-elevated, #c0c0c0);
+}
+
+.minesweeper-menu-bar {
+    background: var(--theme-background, #c0c0c0);
+    color: var(--theme-text, #000);
+}
+
+.minesweeper-control-panel {
+    background: var(--theme-background, #c0c0c0);
+    border-color: var(--theme-border, #808080);
+}
+
+.minesweeper-board-container {
+    background: var(--theme-background, #c0c0c0);
+    border-color: var(--theme-border, #808080);
+}
+
+.minesweeper-cell {
+    background: var(--theme-background-secondary, #c0c0c0);
+    border-color: var(--theme-border, #ffffff);
+    color: var(--theme-text, #000);
+}
+

@@ -39,39 +39,15 @@ ZerOS系统用于教学目的的浏览器虚拟内核开发项目,仅供学习�
 2. **部署 PHP 服务**：
    - 将 `ZerOS/` 整个文件夹设置为网站根目录
    - 确保 PHP 服务正常运行（PHP 7.0+）
-   - 服务器端口建议使用 8898 或 8089（不强制，但需要与配置一致）
+   - 服务器(php服务,推荐使用Apache2)端口必须使用 8898
+   - 网站(web服务)开放端口应该为 8089
 3. **访问系统**：
-   - 使用现代浏览器（Chrome 最佳）访问 `http://localhost:[端口]/test/index.html`
+   - 使用现代浏览器（Chrome 最佳）访问 `http://localhost:8089/test/index.html`
    - 首次加载可能需要几秒钟来初始化内核
 4. **注意事项**：
-   - 确保浏览器支持 localStorage
-   - 建议使用 Chrome 或 Edge 浏览器以获得最佳体验
+   - 浏览器应该支持 localStorage API(非必须)
+   - 建议使用 Chrome 浏览器以获得最佳体验
    - 如果遇到问题，请检查浏览器控制台的错误信息
-
-### 基本命令
-
-```bash
-# 查看当前目录
-pwd
-
-# 列出文件和目录
-ls -l
-
-# 创建目录
-markdir mydir
-
-# 创建文件
-write myfile.txt "Hello, ZerOS!"
-
-# 查看文件内容
-cat myfile.txt
-
-# 查看目录树
-tree
-
-# 内核自检
-check
-```
 
 ## 系统架构概览
 
@@ -124,8 +100,8 @@ ZerOS/
 
 - **浏览器**：支持现代 JavaScript 和 localStorage 的浏览器
 - **分辨率**：推荐最小 800x600，最佳 1920x1080
-- **存储**：浏览器 localStorage 空间（通常 5-10MB）
-- **服务端**（可选）：PHP 服务用于文件系统持久化
+- **存储**：浏览器 localStorage 空间(暂缓区)
+- **服务端**（必须）：PHP 服务用于文件系统持久化
 
 ## 许可证
 
@@ -133,7 +109,11 @@ GNU GENERAL PUBLIC LICENSE VERSION 2.0 (参见 LICENSE)
 
 ## 贡献
 
-欢迎提交 Issue 和 Pull Request 来改进 ZerOS Kernel。
+欢迎提交邮件给我们以获取相关信息。
+
+## 联系我们
+
+Email hacker200714@outlook.com
 
 ## 更新日志
 
