@@ -1,0 +1,9 @@
+{
+    "appName": "音域",
+    "appPackageName": "com.kite.music",
+    "appVersionName": "0.1A",
+    "appVersionCode": 100000,
+    "data": {
+        "enableBar": false
+    }
+}

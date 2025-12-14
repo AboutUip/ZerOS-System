@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="snakeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#8b5cf6"/>
+      <stop offset="100%" stop-color="#0f1555"/>
+    </linearGradient>
+    <filter id="snakeGlow">
+      <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  
+  <!-- 背景 -->
+  <rect width="64" height="64" rx="12" fill="#1a0b2e" opacity="0.8"/>
+  
+  <!-- 游戏区域背景 -->
+  <rect x="8" y="8" width="48" height="48" rx="6" fill="rgba(15, 20, 35, 0.9)" stroke="url(#snakeGrad)" stroke-width="2"/>
+  
+  <!-- 网格线 -->
+  <g opacity="0.2">
+    <line x1="16" y1="16" x2="16" y2="56" stroke="url(#snakeGrad)" stroke-width="1"/>
+    <line x1="32" y1="16" x2="32" y2="56" stroke="url(#snakeGrad)" stroke-width="1"/>
+    <line x1="48" y1="16" x2="48" y2="56" stroke="url(#snakeGrad)" stroke-width="1"/>
+    <line x1="8" y1="24" x2="56" y2="24" stroke="url(#snakeGrad)" stroke-width="1"/>
+    <line x1="8" y1="40" x2="56" y2="40" stroke="url(#snakeGrad)" stroke-width="1"/>
+  </g>
+  
+  <!-- 蛇身 -->
+  <g filter="url(#snakeGlow)">
+    <!-- 蛇头 -->
+    <rect x="20" y="28" width="8" height="8" rx="2" fill="url(#snakeGrad)"/>
+    
+    <!-- 蛇身段1 -->
+    <rect x="28" y="28" width="8" height="8" rx="2" fill="#0f1555" opacity="0.8"/>
+    
+    <!-- 蛇身段2 -->
+    <rect x="36" y="28" width="8" height="8" rx="2" fill="#0f1555" opacity="0.6"/>
+    
+    <!-- 蛇身段3 -->
+    <rect x="44" y="28" width="8" height="8" rx="2" fill="#0f1555" opacity="0.4"/>
+  </g>
+  
+  <!-- 食物 -->
+  <circle cx="20" cy="44" r="4" fill="#ff5f57">
+    <animate attributeName="opacity" values="0.8;1;0.8" dur="1s" repeatCount="indefinite"/>
+  </circle>
+  
+  <!-- 游戏标题 -->
+  <text x="32" y="60" font-family="monospace" font-size="8" fill="url(#snakeGrad)" font-weight="bold" text-anchor="middle" filter="url(#snakeGlow)">SNAKE</text>
+</svg>
+

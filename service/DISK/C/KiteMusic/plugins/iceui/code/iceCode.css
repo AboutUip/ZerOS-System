@@ -1,0 +1,108 @@
+@charset "utf-8";
+/*代码展示*/
+*[class*='iceCode:']{display:none;}
+.iceCode>*::-webkit-scrollbar{height:8px;width:8px;}
+.iceCode>*::-webkit-scrollbar-corner{background-color:transparent;}
+.iceCode>*::-webkit-scrollbar-thumb{background-color:#aeaeae;}
+.iceCode>*::-webkit-scrollbar-track{background-color:transparent;}
+.iceCode{font-family:"Consolas","Bitstream Vera Sans Mono","Courier New",Courier,monospace!important;line-height:20px;font-size:14px;display:none;padding:0;position:relative;overflow-y:auto;tab-size:4;margin-bottom:10px;text-align:left!important;padding: 0 !important;border: none !important;}
+.iceCode .iceCode-title{color:#bbc0c3;font-size:14px;padding:0 10px;margin:0;height:32px;line-height:32px;background:#364048;}
+.iceCode .iceCode-title .iceCode-info{position:absolute;right:10px;top:0;}
+.iceCode .iceCode-title .iceCode-arrow:before{content:'﹀';position:absolute;right:15px;top:4px;font-size:18px;cursor:pointer;font-family:Arial;display:none;}
+.iceCode.iceCode-hide .iceCode-title .iceCode-arrow:before{content:'︿';position:absolute;right:15px;top:-3px;font-size:18px;cursor:pointer;}
+.iceCode .iceCode-line .line{height:20px;line-height:20px;text-align:center;font-size:13px;}
+.iceCode ol{padding:10px 0;background:#f2f4f5;}
+.iceCode-line li{color:#8c8c8c!important;position:relative!important;line-height:20px!important;list-style:none!important;text-align:right!important;padding:0 10px!important;margin:0!important;margin-left: -4px!important;background: #f5f5f5!important;border-right: 1px solid #ececec!important;border-left: 4px solid#b9bdc1!important;font-size: 14px;}
+.iceCode code{box-sizing:content-box;font-family:"Consolas","Microsoft YaHei","Bitstream Vera Sans Mono","Courier New"!important;background-color:transparent;background:none!important;padding:0!important;margin:0!important;font-size:14px!important;border:none!important;}
+.iceCode.iceCode-console{display:block;z-index:999999;position:fixed;top:0;left:0;width:100%;}
+.iceCode.iceCode-console .iceCode-content{max-height:400px;overflow-y:auto;}
+.iceCode .iceCode-close{position:absolute;right:15px;font-size:18px;cursor:pointer;}
+
+/*代码高亮*/
+.iceCode .iceCode-main{border-top:none;}
+.iceCode-main{position:relative;border:1px solid #b9bdc1;background:#fff;display:flex;overflow-y:auto;scrollbar-color:#a8a8a8 white;scrollbar-width:thin;}
+.iceCode-line{height:100%;background:#f5f5f5;border-left:4px solid#b9bdc1;border-right:1px solid #ececec;padding:10px 0;margin: 0!important;}
+.iceCode-line>div{color:#797979;height:20px;line-height:20px;text-align:center;font-size:13px;-webkit-user-select:none;user-select:none;}
+.iceCode-content{width:calc(100% - 50px);height:100%;overflow-x:auto;flex:1;position:relative;border-top:none!important;padding:10px 0!important;margin:0!important;}
+.iceCode-content li{margin: 0!important;padding-left:10px!important;padding-right: 10px!important;line-height:20px!important;margin-left:0!important;min-height:20px!important;list-style:none!important;word-wrap:normal;border-collapse:separate;white-space:pre!important;font-family:"Consolas","Microsoft YaHei","Bitstream Vera Sans Mono","Courier New"!important;tab-size:4;border-spacing:0px;font-variant:normal;letter-spacing:0;text-align:left!important;width: max-content !important;font-size: 14px;}
+
+/* 默认颜色 */
+.iceCode-default li{color:#232323!important;}
+
+/* 代码背景 */
+.iceCode-default .line.light{background-color:#e0e0e0!important;}
+
+/* 普通代码 */
+.iceCode-default .plain{border:none!important;}
+
+/* 备注 */
+.iceCode-default .comments{color:rgb(35,110,37)!important;}
+
+/* 关键字 */
+.iceCode-default .keyword{color:#006699;font-weight:bold!important;}
+
+/* 常量 */
+.iceCode-default .constants{color:#0066cc!important;}
+
+/* 变量 */
+.iceCode-default .variable{color:#aa7700!important;}
+
+/* 函数 */
+.iceCode-default .functions{color:#ff1493!important;font-weight:bold!important;}
+
+/* 字符串 */
+.iceCode-default .string{color:blue!important;}
+
+/* 数字 */
+.iceCode-default .number{color:#e20086!important;}
+
+/* 值 */
+.iceCode-default .value{color:rgb(35,110,37)!important;}
+
+/* 括号 */
+.iceCode-default .bracket{color:#2d2d2d!important;}
+
+/* 运算符 */
+.iceCode-default .operator{color:#484848!important;font-weight:bold!important;}
+
+/* 符号 */
+.iceCode-default .symbol{color:#12009c!important;font-weight:bold!important;}
+
+/* 引号内容 */
+.iceCode-default .quotation{color:blue!important;}
+
+/* 成功 */
+.iceCode-default .success{color:#4CAF50!important;}
+
+/* 信息 */
+.iceCode-default .info{color:#2085b3!important;}
+
+/* 警告 */
+.iceCode-default .warning{color:#F44336!important;}
+
+/* 错误 */
+.iceCode-default .danger{color:#F44336!important;}
+
+/* 默认颜色 */
+.iceCode-default .red{color:#ef5350!important;}
+.iceCode-default .orange{color:#f57e00!important;}
+.iceCode-default .yellow{color:#f1bf00!important;}
+.iceCode-default .green{color:#26a672!important;}
+.iceCode-default .cyan{color:#8cd03d!important;}
+.iceCode-default .blue{color:#1d90ca!important;}
+.iceCode-default .purple{color:#ad5abb!important;}
+.iceCode-default .gray{color:#989898!important;}
+.iceCode-default .black{color:#4a4a4a!important;}
+
+/* html */
+.iceCode-html .attr{color:rgb(153,69,0)!important;}
+.iceCode-html .comments{color:rgb(35,110,37)!important;}
+.iceCode-html .keyword{color:rgb(136,18,128)!important;font-weight:normal!important;}
+.iceCode-html .bracket{color:rgb(136,18,128)!important;}
+.iceCode-html .quotation{color:rgb(26,26,166)!important;}
+
+/* css */
+.iceCode-css .comments{color:rgb(148,148,148)!important;}
+.iceCode-css .keyword{color:#006699!important;}
+.iceCode-css .value{color:rgb(35,110,37)!important;}
+.iceCode-css .constants{color:#0039cc!important;}

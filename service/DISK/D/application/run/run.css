@@ -1,0 +1,28 @@
+/* ZerOS 运行程序样式 */
+
+.run-window {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+.run-content {
+    background: transparent;
+}
+
+.run-input::placeholder {
+    color: rgba(255, 255, 255, 0.4);
+}
+
+.run-input:focus::placeholder {
+    color: rgba(255, 255, 255, 0.3);
+}
+
+.run-ok-button:active {
+    transform: scale(0.98);
+    background: rgba(108, 142, 255, 0.9) !important;
+}
+
+.run-cancel-button:active {
+    transform: scale(0.98);
+    background: rgba(255, 255, 255, 0.2) !important;
+}
+

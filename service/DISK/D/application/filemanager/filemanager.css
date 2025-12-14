@@ -1,0 +1,234 @@
+/* ZerOS 文件管理器样式 - Ubuntu风格 */
+
+.filemanager-window {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+/* 确保窗口内容正确布局 */
+.filemanager-window.zos-gui-window {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.filemanager-content {
+    position: relative;
+    display: flex;
+    flex: 1;
+    min-height: 0;  /* 重要：允许flex子元素收缩 */
+    overflow: hidden;
+}
+
+/* 顶部工具栏 */
+.filemanager-top-toolbar {
+    height: 48px;
+    min-height: 48px;
+    max-height: 48px;
+    flex-shrink: 0;
+    box-sizing: border-box;
+    overflow: hidden;
+}
+
+/* 主内容区 */
+.filemanager-main-content {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+}
+
+/* 侧边栏样式 */
+.filemanager-sidebar {
+    flex-shrink: 0;
+}
+
+.filemanager-sidebar-item {
+    user-select: none;
+}
+
+.filemanager-sidebar-item:hover {
+    background: rgba(255, 255, 255, 0.05) !important;
+}
+
+/* 侧边栏滚动条 */
+.filemanager-sidebar::-webkit-scrollbar {
+    width: 6px;
+}
+
+.filemanager-sidebar::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.filemanager-sidebar::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 3px;
+}
+
+.filemanager-sidebar::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+/* 文件列表容器 */
+.filemanager-filelist {
+    flex: 1;
+    min-width: 0;  /* 允许收缩 */
+    min-height: 0;  /* 允许收缩 */
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+/* 文件列表项选中状态 */
+.filemanager-item.selected {
+    background: rgba(108, 142, 255, 0.25) !important;
+}
+
+/* 文件项图标样式 */
+.filemanager-item-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.filemanager-item-icon img {
+    width: 20px;
+    height: 20px;
+    object-fit: contain;
+    filter: brightness(0.9);
+    transition: filter 0.2s;
+}
+
+.filemanager-item:hover .filemanager-item-icon img {
+    filter: brightness(1.1);
+}
+
+/* 编辑面板动画 */
+.filemanager-editpanel {
+    overflow: hidden;
+}
+
+/* 属性面板样式 */
+.filemanager-propertiespanel {
+    overflow: hidden;
+}
+
+.filemanager-properties-content {
+    line-height: 1.6;
+}
+
+.filemanager-properties-content div {
+    word-break: break-word;
+}
+
+/* 滚动条样式 */
+.filemanager-filelist::-webkit-scrollbar,
+.filemanager-properties-content::-webkit-scrollbar,
+.filemanager-edit-area::-webkit-scrollbar {
+    width: 8px;
+}
+
+.filemanager-filelist::-webkit-scrollbar-track,
+.filemanager-properties-content::-webkit-scrollbar-track,
+.filemanager-edit-area::-webkit-scrollbar-track {
+    background: rgba(15, 20, 35, 0.5);
+    border-radius: 4px;
+}
+
+.filemanager-filelist::-webkit-scrollbar-thumb,
+.filemanager-properties-content::-webkit-scrollbar-thumb,
+.filemanager-edit-area::-webkit-scrollbar-thumb {
+    background: rgba(108, 142, 255, 0.3);
+    border-radius: 4px;
+}
+
+.filemanager-filelist::-webkit-scrollbar-thumb:hover,
+.filemanager-properties-content::-webkit-scrollbar-thumb:hover,
+.filemanager-edit-area::-webkit-scrollbar-thumb:hover {
+    background: rgba(108, 142, 255, 0.5);
+}
+
+/* ========== 选择器模式样式 ========== */
+
+/* 选择器提示信息 */
+.filemanager-selector-hint {
+    padding: 8px 16px;
+    background: rgba(139, 92, 246, 0.1);
+    border-bottom: 1px solid rgba(139, 92, 246, 0.2);
+    color: rgba(215, 224, 221, 0.9);
+    font-size: 13px;
+    flex-shrink: 0;
+    user-select: none;
+}
+
+/* 可选择项样式 */
+.filemanager-item-selectable {
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.filemanager-item-selectable:hover {
+    background: rgba(139, 92, 246, 0.15) !important;
+    transform: translateX(2px);
+}
+
+.filemanager-item-selectable:active {
+    background: rgba(139, 92, 246, 0.25) !important;
+}
+
+/* 禁用项样式（在选择器模式下不可选择的项） */
+.filemanager-item-disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+/* 文件夹选择器模式 */
+.filemanager-window.filemanager-folder-selector-mode .filemanager-item[data-type="file"] {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.filemanager-window.filemanager-folder-selector-mode .filemanager-item[data-type="directory"] {
+    cursor: pointer;
+}
+
+/* 文件选择器模式 */
+.filemanager-window.filemanager-file-selector-mode .filemanager-item[data-type="directory"] {
+    opacity: 0.6;
+    cursor: default;
+}
+
+.filemanager-window.filemanager-file-selector-mode .filemanager-item[data-type="file"] {
+    cursor: pointer;
+}
+
+/* 在选择器模式下隐藏侧边栏（可选，如果需要更简洁的界面） */
+/* .filemanager-window.filemanager-folder-selector-mode .filemanager-sidebar,
+.filemanager-window.filemanager-file-selector-mode .filemanager-sidebar {
+    display: none;
+} */
+
+/* 选择按钮样式 */
+.filemanager-select-button {
+    padding: 6px 16px;
+    background: rgba(139, 92, 246, 0.3);
+    border: 1px solid rgba(139, 92, 246, 0.5);
+    border-radius: 6px;
+    color: rgba(215, 224, 221, 0.9);
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.filemanager-select-button:hover {
+    background: rgba(139, 92, 246, 0.5);
+    border-color: rgba(139, 92, 246, 0.7);
+    transform: translateY(-1px);
+}
+
+.filemanager-select-button:active {
+    transform: translateY(0);
+    background: rgba(139, 92, 246, 0.6);
+}
+

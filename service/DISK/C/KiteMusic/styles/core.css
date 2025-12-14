@@ -1,0 +1,10 @@
+@import url("views/applicationFramework.css");
+@import url("views/search.css");
+@import url("views/player.css");
+@import url("views/userinfo.css");
+@import url("views/setting.css");
+@import url("views/kuozhan.css");
+
+#header{
+  font-size: 16px;
+}

@@ -1,0 +1,162 @@
+.sear-inp-coll{
+    outline: 1px solid black;
+    width: 94%;
+    position: relative;
+    left: 3%;
+    height: 60px;
+    backdrop-filter: blur(20px);
+    border-radius: 0px 0px 15px 15px;
+}
+#searinput{
+    background-color: rgba(0, 0, 0, 0);
+    outline: 1px solid blue;
+    width: 80%;
+    position: relative;
+    top: 5px;
+    height: 50px;
+    left: 5px;
+    border-radius: 15px;
+    float: left;
+}
+.sear-coll{
+    width: 8%;
+    aspect-ratio: 1/1;
+    top: 50%;
+    transform: translateY(-50%);
+    position: relative;
+    float: right;
+    border-right: 50%;
+    overflow: hidden;
+    margin: 0px;
+    right: 10px;
+}
+.sear-coll > img{
+    width: 100%;
+    height: 100%;
+}
+.toggle-coll{
+    width: 8%;
+    aspect-ratio: 1/1;
+    top: 50%;
+    transform: translateY(-50%);
+    position: relative;
+    float: right;
+    border-right: 50%;
+    overflow: hidden;
+    margin: 0px;
+    right: 10px;
+}
+.toggle-coll > img{
+    width: 100%;
+    height: 100%;
+}
+.sear-list-coll{
+    position: relative;
+    width: 100%;
+    top: 10px;
+    height: calc(100% - 100px);
+    overflow-x: hidden;
+    overflow-y: scroll;
+}
+.music-coller{
+    width: 96%;
+    position: relative;
+    left: 2%;
+    height: 50px;
+    margin-top: 10px;
+    border-radius: 10px;
+    outline: 1px solid gray;
+}
+.music-coller > span{
+    left: 5px;
+    line-height: 50px;
+    display: block;
+    height: 40px;
+    width: 65%;
+    position: relative;
+    font-size: 1.7rem;
+    top: 5px;
+    font-weight: 600;
+    float: left;
+    color: white;
+    background-color: rgb(135, 199, 255);
+    overflow: hidden;
+}
+.music-coller > p{
+    width: 30%;
+    overflow: hidden;
+    font-size: 1.4rem;
+    float: right;
+    text-align: right;
+    color: black;
+    transform: translateY(-50%);
+    position: relative;
+    top: 50%;
+}
+.qq-music-coll{
+    position: relative;
+    width: 90%;
+    height: 70px;
+    margin-top: 20px;
+    margin-left: 5%;
+    outline: 1px solid black;
+    border-radius: 10px;
+    overflow: hidden;
+    backdrop-filter: blur(50px);
+}
+.qq-music-coll > img{
+    position: absolute;
+    left: 0px;
+    top: 0px;
+    width: 70px;
+    height: 70px;
+}
+.qq-music-coll > span{
+    position: absolute;
+    left: 90px;
+    font-size: 1.7rem;
+    top: 15%;
+    color: white;
+}
+.qq-music-coll > p{
+    position: absolute;
+    left: 90px;
+    font-size: 1rem;
+    bottom: 2%;
+    color: #c8c8c8;
+}
+.qqm-head{
+    position: relative;
+    width: 100%;
+    height: 200px;
+    background-size:auto;
+    background-position: 50%;
+    background-image: url(../../images/icon/qqlogo.png);
+}
+.qqm-head > p{
+    position: absolute;
+    font-size: 2rem;
+    color: rgb(255, 255, 255);
+    text-align: left;
+    bottom: 10px;
+    left: 10px;
+    width: 100%;
+}
+.slcb{
+    outline: 1px solid gray;
+    position: relative;
+    width: 94%;
+    height: auto;
+    padding: 5px;
+    left: 3%;
+    top: 15px;
+    border-radius: 15px;
+    backdrop-filter: blur(20px);
+    box-shadow: 0 4px 16.1638px 0 rgba(0,0,0,0.14), 0 2px 7.83618px 0 rgba(0,0,0,0.06);
+}
+.slc-data{
+    font-size: 1.4rem;
+    color: rgb(182, 182, 182);
+    line-height: 25px;
+    font-weight: 600;
+}

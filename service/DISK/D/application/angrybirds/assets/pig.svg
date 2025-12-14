@@ -1,0 +1,42 @@
+<svg width="48" height="48" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+  <!-- 绿色猪 -->
+  <defs>
+    <linearGradient id="pigGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#81C784;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#66BB6A;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- 身体 -->
+  <ellipse cx="24" cy="28" rx="20" ry="18" fill="url(#pigGradient)" stroke="#4CAF50" stroke-width="1.5"/>
+  
+  <!-- 肚子 -->
+  <ellipse cx="24" cy="30" rx="16" ry="14" fill="#A5D6A7" opacity="0.7"/>
+  
+  <!-- 鼻子 -->
+  <ellipse cx="24" cy="26" rx="8" ry="6" fill="#66BB6A" stroke="#4CAF50" stroke-width="1"/>
+  <ellipse cx="22" cy="26" rx="1.5" ry="1.5" fill="#212121"/>
+  <ellipse cx="26" cy="26" rx="1.5" ry="1.5" fill="#212121"/>
+  
+  <!-- 鼻孔 -->
+  <ellipse cx="22" cy="27" rx="0.8" ry="0.8" fill="#212121"/>
+  <ellipse cx="26" cy="27" rx="0.8" ry="0.8" fill="#212121"/>
+  
+  <!-- 眼睛 -->
+  <circle cx="16" cy="20" r="4" fill="white"/>
+  <circle cx="16" cy="20" r="2.5" fill="#212121"/>
+  <circle cx="17" cy="19" r="0.8" fill="white"/>
+  
+  <circle cx="32" cy="20" r="4" fill="white"/>
+  <circle cx="32" cy="20" r="2.5" fill="#212121"/>
+  <circle cx="33" cy="19" r="0.8" fill="white"/>
+  
+  <!-- 耳朵 -->
+  <ellipse cx="12" cy="16" rx="5" ry="7" fill="url(#pigGradient)" transform="rotate(-30 12 16)"/>
+  <ellipse cx="36" cy="16" rx="5" ry="7" fill="url(#pigGradient)" transform="rotate(30 36 16)"/>
+  
+  <!-- 尾巴 -->
+  <path d="M 6 32 Q 4 28 6 24" stroke="#4CAF50" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  <circle cx="6" cy="24" r="2" fill="#66BB6A"/>
+</svg>
+

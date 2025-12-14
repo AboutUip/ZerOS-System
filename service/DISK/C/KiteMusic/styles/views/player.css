@@ -1,0 +1,257 @@
+.music-player{
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    background-color: bisque;
+    background-size: cover;
+    background-position: 50% 50%;
+    z-index: 10;
+    transition: all 200ms linear 0ms;
+    display: none;
+}
+.mp-header{
+    backdrop-filter: blur(80px);
+    width: 100%;
+    height: 50px;
+    position: relative;
+}
+.mp-coll{
+    float: left;
+    height: 100%;
+    overflow: hidden;
+}
+.mp-coll > img{
+    width: 100%;
+    height: 100%;
+}
+.back-btn{
+    width: 50px;
+}
+.title-player{
+    width: calc(100% - (50px * 2));
+}
+.title-player > p{
+    text-align: center;
+    line-height: 50px;
+    font-size: 1.7rem;
+}
+.more-btn{
+    width: 50px;
+    position: relative;
+    right: 10px;
+    overflow: hidden;
+}
+.more-btn > img{
+    width: 100%;
+    height: 100%;
+}
+.mp-art{
+    width: 100%;
+    height: calc(100% - 50px - 250px);
+    position: relative;
+}
+.mp-foot{
+    width: 100%;
+    height: 270px;
+    position: relative;
+    backdrop-filter: blur(80px);
+}
+.prog{
+    position: relative;
+    top: 18px;
+    width: 80%;
+    height: 20px;
+    left: 10%;
+}
+.mp-control{
+    width: 100%;
+    height: 160px;
+    position: relative;
+}
+.mp-footer{
+    position: relative;
+    width: 100%;
+    height: 50px;
+    box-sizing: border-box;
+}
+.mp-cor-coll{
+    position: relative;
+    width: 15%;
+    margin-left: 4.16666%;
+    margin-right: 0px;
+    padding: 0px;
+    aspect-ratio: 1/1;
+    float: left;
+    top: 50%;
+    transform: translateY(-50%);
+}
+.mp-cor-coll > img{
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+}
+.mpa-define{
+    width: 100%;
+    height: 100%;
+    position: relative;
+    display: block;
+}
+.mpa-select{
+    width: 100%;
+    height: 100%;
+    position: relative;
+    display: none;
+    backdrop-filter: blur(20px);
+}
+.mpad-cont{
+    display: flex;
+    flex-direction: column;
+    width: 85%;
+    height: 85%;
+    position: relative;
+    top: 50%;
+    transform: translate(-50%,-50%);
+    left: 50%;
+    backdrop-filter: blur(80px);
+    border-radius: 15px;
+    box-shadow: rgba(0,0,0,0.4) 0px 8px 32px 0px;
+}
+.mpadc-fm{
+    width: 100%;
+    aspect-ratio: 1/1;
+    border-radius: 15px 15px 0px 0px;
+    overflow: hidden;
+}
+.mpadc-fm > img{
+    width: 100%;
+    height: 100%;
+}
+.mpadc-song{
+    width: 100%;
+    flex: 1;
+    position: relative;
+}
+.mpadc-song > p{
+    font-weight: 700;
+    font-size: 1.7rem;
+    left: 10px;
+    text-align: left;
+    color: rgb(255, 254, 254);
+    width: 80%;
+    background-image: linear-gradient(to right, #3b3b3b 0%, #21212a 100%);
+    line-height: 30px;
+    position: absolute;
+    bottom: 0px;
+}
+.mpadc-sing{
+    width: 100%;
+    flex: 1;
+    position: relative;
+}
+.mpadc-sing > p{
+    position: absolute;
+    font-size: 1.4rem;
+    text-align: left;
+    left: 10px;
+    top: 10px;
+    color: rgb(208, 208, 208);
+    width: 70%;
+    background-image: linear-gradient(to right, #3b3b3b 0%, #21212a 100%);
+}
+.mpadc-lrc{
+    width: 100%;
+    flex: 1;
+    position: relative;
+    background-color: rgba(122, 110, 110, 0.5);
+    position: relative;
+    bottom: 30px;
+}
+.mpadc-lrc > p{
+    position: relative;
+    left: 10px;
+    font-size: 1.4rem;
+    text-align: left;
+    line-height: 30px;
+    top: 10px;
+}
+.mpas-window{
+    width: 100%;
+    height: 40%;
+    position: absolute;
+    left: 0px;
+    top: 50%;
+    transform: translateY(-50%);
+}
+.music_list_slide{
+    outline: 1px solid gray;
+    border-radius: 15px;
+    position: relative;
+    overflow: hidden;
+}
+.music_list_slide > img{
+    width: 100%;
+    aspect-ratio: 1/1;
+}
+.music_list_slide > p{
+    font-size: 1.4rem;
+}
+.mpad-lrc{
+    display: none;
+    width: 100%;
+    height: 100%;
+    position: relative;
+    top: 0px;
+    left: 0px;
+    padding: 0px;
+    margin: 0px;
+    overflow-x: hidden;
+    overflow-y: scroll;
+    backdrop-filter: blur(30px);
+}
+.js-lrc-text{
+    position: relative;
+    width: 80%;
+    left: 10%;
+    font-size: 1.6rem;
+    line-height: 1.5em;
+    text-align: center;
+    color: #e4e4e4;
+    transition: all 200ms linear 0ms;
+}
+.click-lrc{
+    color: #e10000;
+    line-height: 2em;
+    font-size: 2rem;
+    transition: all 200ms linear 0ms;
+}
+.LP-end{
+    position: absolute;
+    width: 10%;
+    top: 10px;
+    right: 0px;
+    text-align: center;
+    font-size: 1.2rem;
+    color: #ffffff;
+}
+.LP-this{
+    position: absolute;
+    width: 10%;
+    top: 10px;
+    left: 0px;
+    text-align: center;
+    font-size: 1.2rem;
+    color: #ffffff;
+}
+.first-ui{
+    color: #af0000;
+}
+.sende-ui{
+    color: #c4c4c4;
+}
+.mcc-mod{
+    height: 100%;
+    aspect-ratio: 1/1;
+    position: relative;
+    left: 5px;
+    margin-left: 0px;
+}

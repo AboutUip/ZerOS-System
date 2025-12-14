@@ -1,0 +1,297 @@
+/* ZerOS 视频播放器样式 */
+
+.videoplayer-window {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--theme-background, rgba(15, 20, 35, 0.98));
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+}
+
+.videoplayer-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    overflow: hidden;
+    background: #000;
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+}
+
+.videoplayer-video-container {
+    flex: 1;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #000;
+    cursor: pointer;
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    touch-action: none;
+}
+
+.videoplayer-video {
+    max-width: 100%;
+    max-height: 100%;
+    width: auto;
+    height: auto;
+    outline: none;
+}
+
+.videoplayer-file-info {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    padding: 8px 12px;
+    background: rgba(0, 0, 0, 0.7);
+    border-radius: 4px;
+    color: #fff;
+    font-size: 12px;
+    z-index: 10;
+    pointer-events: none;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: calc(100% - 20px);
+}
+
+.videoplayer-controls-bar {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 20px;
+    padding: 12px 16px;
+    padding-right: 24px;
+    background: linear-gradient(
+        180deg,
+        transparent 0%,
+        rgba(0, 0, 0, 0.8) 100%
+    );
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    z-index: 10;
+    transition: opacity 0.3s ease;
+    pointer-events: none;
+}
+
+/* 控制栏内的可交互元素需要 pointer-events: auto */
+.videoplayer-controls-bar > * {
+    pointer-events: auto;
+}
+
+.videoplayer-progress-container {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.videoplayer-progress-bar {
+    flex: 1;
+    height: 6px;
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 3px;
+    position: relative;
+    cursor: pointer;
+    overflow: hidden;
+    transition: height 0.2s;
+}
+
+.videoplayer-progress-bar:hover {
+    height: 8px;
+}
+
+.videoplayer-progress-slider {
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 100%;
+    width: 0%;
+    background: var(--theme-primary, #6C8EFF);
+    border-radius: 3px;
+    transition: width 0.1s linear;
+}
+
+.videoplayer-progress-bar:hover .videoplayer-progress-slider {
+    background: var(--theme-primary-hover, #7C9EFF);
+}
+
+.videoplayer-controls {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.videoplayer-btn-stop,
+.videoplayer-btn-play-pause,
+.videoplayer-btn-fullscreen {
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    font-family: inherit;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+.videoplayer-btn-stop {
+    width: 36px;
+    height: 36px;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
+    border-radius: 50%;
+    font-size: 16px;
+}
+
+.videoplayer-btn-stop:hover {
+    background: rgba(255, 255, 255, 0.2);
+    transform: scale(1.05);
+}
+
+.videoplayer-btn-stop:active {
+    transform: scale(0.95);
+}
+
+.videoplayer-btn-play-pause {
+    width: 48px;
+    height: 48px;
+    border: 2px solid #fff;
+    background: rgba(255, 255, 255, 0.2);
+    color: #fff;
+    border-radius: 50%;
+    font-size: 20px;
+}
+
+.videoplayer-btn-play-pause:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: scale(1.1);
+    box-shadow: 0 4px 12px rgba(255, 255, 255, 0.2);
+}
+
+.videoplayer-btn-play-pause:active {
+    transform: scale(1.05);
+}
+
+.videoplayer-time-display {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.8);
+    min-width: 120px;
+}
+
+.videoplayer-volume-container {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.videoplayer-volume-container > span:first-child {
+    font-size: 16px;
+    color: rgba(255, 255, 255, 0.8);
+    min-width: 24px;
+}
+
+.videoplayer-volume-container > div {
+    width: 80px;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 2px;
+    position: relative;
+    cursor: pointer;
+    transition: height 0.2s;
+}
+
+.videoplayer-volume-container > div:hover {
+    height: 6px;
+}
+
+.videoplayer-volume-slider {
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 100%;
+    width: 70%;
+    background: var(--theme-primary, #6C8EFF);
+    border-radius: 2px;
+    transition: width 0.1s;
+}
+
+.videoplayer-volume-container > div:hover .videoplayer-volume-slider {
+    background: var(--theme-primary-hover, #7C9EFF);
+}
+
+.videoplayer-volume-container > span:last-child {
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.8);
+    min-width: 35px;
+    text-align: right;
+}
+
+.videoplayer-btn-fullscreen {
+    width: 36px;
+    height: 36px;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
+    border-radius: 4px;
+    font-size: 18px;
+}
+
+.videoplayer-btn-fullscreen:hover {
+    background: rgba(255, 255, 255, 0.2);
+    transform: scale(1.05);
+}
+
+.videoplayer-btn-fullscreen:active {
+    transform: scale(0.95);
+}
+
+/* 全屏样式 */
+.videoplayer-video-container:fullscreen,
+.videoplayer-video-container:-webkit-full-screen,
+.videoplayer-video-container:-moz-full-screen {
+    width: 100vw;
+    height: 100vh;
+    background: #000;
+}
+
+.videoplayer-video-container:fullscreen .videoplayer-video,
+.videoplayer-video-container:-webkit-full-screen .videoplayer-video,
+.videoplayer-video-container:-moz-full-screen .videoplayer-video {
+    max-width: 100vw;
+    max-height: 100vh;
+    width: auto;
+    height: auto;
+}
+
+/* 加载状态 */
+.videoplayer-file-info.loading {
+    color: var(--theme-primary, #6C8EFF);
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.6;
+    }
+}
+

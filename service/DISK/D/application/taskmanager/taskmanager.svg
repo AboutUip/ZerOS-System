@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="taskGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#5b21b6"/>
+      <stop offset="100%" stop-color="#8b5cf6"/>
+    </linearGradient>
+    <filter id="taskGlow">
+      <feGaussianBlur stdDeviation="2.5" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  
+  <!-- 背景 -->
+  <rect width="64" height="64" rx="12" fill="#1a0b2e" opacity="0.8"/>
+  
+  <!-- 主容器 -->
+  <rect x="8" y="8" width="48" height="48" rx="6" fill="#2d1b3d" stroke="url(#taskGrad)" stroke-width="2"/>
+  
+  <!-- 进程卡片1 -->
+  <rect x="12" y="14" width="40" height="8" rx="2" fill="#3d1f5d" stroke="#8b5cf6" stroke-width="1"/>
+  <circle cx="16" cy="18" r="2" fill="#8b5cf6"/>
+  <rect x="20" y="16" width="20" height="2" rx="1" fill="#0f1555" opacity="0.8"/>
+  <rect x="20" y="19" width="12" height="1.5" rx="0.5" fill="#0f1555" opacity="0.5"/>
+  <rect x="46" y="17" width="4" height="4" rx="0.5" fill="#8b5cf6" opacity="0.6">
+    <animate attributeName="opacity" values="0.6;1;0.6" dur="2s" repeatCount="indefinite"/>
+  </rect>
+  
+  <!-- 进程卡片2 -->
+  <rect x="12" y="24" width="40" height="8" rx="2" fill="#3d1f5d" stroke="#8b5cf6" stroke-width="1"/>
+  <circle cx="16" cy="28" r="2" fill="#8b5cf6"/>
+  <rect x="20" y="26" width="24" height="2" rx="1" fill="#0f1555" opacity="0.8"/>
+  <rect x="20" y="29" width="16" height="1.5" rx="0.5" fill="#0f1555" opacity="0.5"/>
+  <rect x="46" y="27" width="4" height="4" rx="0.5" fill="#8b5cf6" opacity="0.6">
+    <animate attributeName="opacity" values="0.6;1;0.6" dur="2.5s" repeatCount="indefinite"/>
+  </rect>
+  
+  <!-- 进程卡片3 -->
+  <rect x="12" y="34" width="40" height="8" rx="2" fill="#3d1f5d" stroke="#8b5cf6" stroke-width="1"/>
+  <circle cx="16" cy="38" r="2" fill="#8b5cf6"/>
+  <rect x="20" y="36" width="18" height="2" rx="1" fill="#0f1555" opacity="0.8"/>
+  <rect x="20" y="39" width="10" height="1.5" rx="0.5" fill="#0f1555" opacity="0.5"/>
+  <rect x="46" y="37" width="4" height="4" rx="0.5" fill="#8b5cf6" opacity="0.6">
+    <animate attributeName="opacity" values="0.6;1;0.6" dur="1.8s" repeatCount="indefinite"/>
+  </rect>
+  
+  <!-- 系统监控图表 -->
+  <rect x="12" y="46" width="40" height="6" rx="2" fill="#2d1b3d"/>
+  
+  <!-- CPU使用率条 -->
+  <rect x="14" y="48" width="36" height="1.5" rx="0.5" fill="#1a0b2e"/>
+  <rect x="14" y="48" width="24" height="1.5" rx="0.5" fill="url(#taskGrad)">
+    <animate attributeName="width" values="24;28;24" dur="3s" repeatCount="indefinite"/>
+  </rect>
+  
+  <!-- 内存使用率条 -->
+  <rect x="14" y="50.5" width="36" height="1.5" rx="0.5" fill="#1a0b2e"/>
+  <rect x="14" y="50.5" width="18" height="1.5" rx="0.5" fill="url(#taskGrad)">
+    <animate attributeName="width" values="18;22;18" dur="2.5s" repeatCount="indefinite"/>
+  </rect>
+  
+  <!-- 中心监控图标 -->
+  <circle cx="32" cy="32" r="3" fill="url(#taskGrad)" filter="url(#taskGlow)">
+    <animate attributeName="r" values="3;4;3" dur="2s" repeatCount="indefinite"/>
+  </circle>
+</svg>

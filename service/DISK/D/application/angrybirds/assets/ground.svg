@@ -1,0 +1,21 @@
+<svg width="48" height="48" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+  <!-- 地面/草地 -->
+  <defs>
+    <linearGradient id="groundGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#8BC34A;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#689F38;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- 地面 -->
+  <rect x="0" y="32" width="48" height="16" fill="url(#groundGradient)"/>
+  
+  <!-- 草 -->
+  <path d="M 4 32 Q 6 28 8 32" stroke="#7CB342" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+  <path d="M 12 32 Q 14 28 16 32" stroke="#7CB342" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+  <path d="M 20 32 Q 22 28 24 32" stroke="#7CB342" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+  <path d="M 28 32 Q 30 28 32 32" stroke="#7CB342" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+  <path d="M 36 32 Q 38 28 40 32" stroke="#7CB342" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+  <path d="M 44 32 Q 46 28 48 32" stroke="#7CB342" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+</svg>
+

@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="vimGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#019875"/>
+      <stop offset="100%" stop-color="#00d4aa"/>
+    </linearGradient>
+    <filter id="vimGlow">
+      <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  
+  <!-- 编辑器窗口 -->
+  <rect x="4" y="4" width="56" height="56" rx="6" fill="#1a1a1a" stroke="url(#vimGrad)" stroke-width="2"/>
+  
+  <!-- 标题栏 -->
+  <rect x="4" y="4" width="56" height="10" rx="6" fill="#252525"/>
+  
+  <!-- 控制按钮 -->
+  <circle cx="10" cy="9" r="2.5" fill="#ff5f57"/>
+  <circle cx="18" cy="9" r="2.5" fill="#ffbd2e"/>
+  <circle cx="26" cy="9" r="2.5" fill="#28ca42"/>
+  
+  <!-- 编辑器内容区 -->
+  <rect x="8" y="18" width="48" height="38" rx="2" fill="#0d1117"/>
+  
+  <!-- 行号栏 -->
+  <rect x="8" y="18" width="10" height="38" fill="#161b22"/>
+  <text x="16" y="26" font-family="monospace" font-size="6" fill="#6e7681" text-anchor="end">1</text>
+  <text x="16" y="33" font-family="monospace" font-size="6" fill="#6e7681" text-anchor="end">2</text>
+  <text x="16" y="40" font-family="monospace" font-size="6" fill="#6e7681" text-anchor="end">3</text>
+  <text x="16" y="47" font-family="monospace" font-size="6" fill="#6e7681" text-anchor="end">4</text>
+  
+  <!-- 代码内容（语法高亮效果） -->
+  <text x="20" y="26" font-family="monospace" font-size="6" fill="#79c0ff">function</text>
+  <text x="20" y="33" font-family="monospace" font-size="6" fill="#a5d6ff">  </text>
+  <text x="24" y="33" font-family="monospace" font-size="6" fill="#d2a8ff">hello</text>
+  <text x="20" y="40" font-family="monospace" font-size="6" fill="#7ee787">  </text>
+  <text x="24" y="40" font-family="monospace" font-size="6" fill="#a5d6ff">return</text>
+  <text x="20" y="47" font-family="monospace" font-size="6" fill="#79c0ff">end</text>
+  
+  <!-- 光标（插入模式） -->
+  <rect x="40" y="30" width="1.5" height="5" fill="#00d4aa">
+    <animate attributeName="opacity" values="1;0.3;1" dur="1s" repeatCount="indefinite"/>
+  </rect>
+  
+  <!-- Vim标志 -->
+  <text x="32" y="58" font-family="monospace" font-size="9" fill="url(#vimGrad)" font-weight="bold" text-anchor="middle" filter="url(#vimGlow)">vim</text>
+  
+  <!-- 模式指示器（NORMAL/INSERT） -->
+  <rect x="44" y="50" width="16" height="4" rx="1" fill="#00d4aa" opacity="0.2"/>
+  <text x="52" y="53" font-family="monospace" font-size="4" fill="#00d4aa" text-anchor="middle" font-weight="bold">INSERT</text>
+</svg>

@@ -1,0 +1,209 @@
+/* ZeroIDE 样式 */
+
+.zeroide-window {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    /* 窗口尺寸由 JavaScript 设置，CSS 不强制宽度和高度 */
+}
+
+/* 确保标题栏可见 */
+.zeroide-window .zos-window-titlebar {
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    z-index: 10;
+}
+
+/* 确保窗口控制按钮可见 */
+.zeroide-window .zos-window-controls {
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+.zeroide-window .zos-window-btn {
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+/* 确保全屏时窗口容器高度正确 */
+.zeroide-window.zos-gui-window.zos-window-maximized {
+    height: 100vh !important;
+}
+
+/* 非最大化时，使用固定高度（由 JavaScript 设置，但确保不会超过屏幕） */
+.zeroide-window.zos-gui-window:not(.zos-window-maximized) {
+    max-height: calc(100vh - 40px); /* 减去标题栏高度 */
+}
+
+/* 确保窗口内容区域能够正确填充 */
+.zeroide-window > .zeroide-main {
+    flex: 1;
+    min-height: 0;
+}
+
+.zeroide-toolbar {
+    user-select: none;
+}
+
+.zeroide-toolbar button:hover {
+    background: #3e3e3e !important;
+}
+
+.zeroide-sidebar {
+    user-select: none;
+}
+
+/* 侧边栏标题栏样式 */
+.zeroide-sidebar-header {
+    user-select: none;
+}
+
+.zeroide-sidebar-actions {
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+.zeroide-sidebar-header:hover .zeroide-sidebar-actions {
+    opacity: 1;
+}
+
+/* 文件树节点样式（VSCode 风格） */
+.zeroide-file-tree-node {
+    transition: background 0.1s;
+}
+
+.zeroide-file-tree-node:hover {
+    background: #2a2d2e;
+}
+
+.zeroide-file-tree-node.selected {
+    background: #37373d;
+}
+
+.zeroide-file-tree-node.selected:hover {
+    background: #37373d;
+}
+
+/* 文件树展开器 */
+.zeroide-tree-expander {
+    transition: transform 0.1s;
+}
+
+/* 文件树操作按钮 */
+.zeroide-tree-actions {
+    transition: opacity 0.2s;
+}
+
+.zeroide-tree-actions button {
+    transition: all 0.15s;
+}
+
+/* 空文件夹提示 */
+.zeroide-tree-empty {
+    user-select: none;
+    pointer-events: none;
+}
+
+.zeroide-tabs {
+    user-select: none;
+}
+
+.zeroide-tab {
+    transition: background 0.2s;
+}
+
+.zeroide-tab:hover {
+    background: #37373d !important;
+}
+
+.zeroide-tab.active {
+    background: #1e1e1e !important;
+}
+
+.zeroide-tab span:last-child:hover {
+    background: #3e3e3e;
+}
+
+.zeroide-editor-container {
+    background: #1e1e1e;
+}
+
+.zeroide-statusbar {
+    user-select: none;
+}
+
+.zeroide-settings-panel {
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
+.zeroide-settings-panel input[type="text"],
+.zeroide-settings-panel input[type="number"],
+.zeroide-settings-panel select {
+    font-family: inherit;
+}
+
+.zeroide-settings-panel input[type="text"]:focus,
+.zeroide-settings-panel input[type="number"]:focus,
+.zeroide-settings-panel select:focus {
+    outline: 1px solid #007acc;
+    outline-offset: -1px;
+}
+
+.zeroide-settings-panel button:hover {
+    opacity: 0.9;
+}
+
+/* Ace Editor 自定义样式 */
+.ace_editor {
+    font-family: 'Consolas', 'Courier New', monospace !important;
+}
+
+/* VSCode 风格菜单样式 */
+.zeroide-menu-button {
+    transition: background 0.15s;
+}
+
+.zeroide-menu-button.active {
+    background: #3e3e3e !important;
+}
+
+.zeroide-menu {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+.zeroide-menu-item {
+    transition: background 0.1s;
+}
+
+.zeroide-menu-item:hover:not([disabled]) {
+    background: #37373d !important;
+}
+
+/* 滚动条样式 */
+.zeroide-file-tree::-webkit-scrollbar,
+.zeroide-settings-panel div::-webkit-scrollbar,
+.zeroide-settings-window div::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+.zeroide-file-tree::-webkit-scrollbar-track,
+.zeroide-settings-panel div::-webkit-scrollbar-track,
+.zeroide-settings-window div::-webkit-scrollbar-track {
+    background: #1e1e1e;
+}
+
+.zeroide-file-tree::-webkit-scrollbar-thumb,
+.zeroide-settings-panel div::-webkit-scrollbar-thumb,
+.zeroide-settings-window div::-webkit-scrollbar-thumb {
+    background: #424242;
+    border-radius: 5px;
+}
+
+.zeroide-file-tree::-webkit-scrollbar-thumb:hover,
+.zeroide-settings-panel div::-webkit-scrollbar-thumb:hover,
+.zeroide-settings-window div::-webkit-scrollbar-thumb:hover {
+    background: #4e4e4e;
+}
+

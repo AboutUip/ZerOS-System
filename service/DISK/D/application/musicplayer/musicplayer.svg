@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="musicGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#ec4141;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#d63636;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- 背景圆形 -->
+  <circle cx="32" cy="32" r="30" fill="url(#musicGradient)" opacity="0.2"/>
+  
+  <!-- 音符主体 -->
+  <path d="M 32 12 L 32 28 L 42 28 L 42 32 L 32 32 L 32 48 C 32 52 28 55 24 55 C 20 55 16 52 16 48 C 16 44 20 41 24 41 C 25 41 26 41.2 27 41.5 L 27 20 L 22 20 L 22 16 L 32 16 L 32 12 Z" 
+        fill="url(#musicGradient)"/>
+  
+  <!-- 高光效果 -->
+  <ellipse cx="28" cy="18" rx="3" ry="2" fill="white" opacity="0.3"/>
+</svg>
+

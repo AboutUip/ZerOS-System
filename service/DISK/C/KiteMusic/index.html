@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>KiteMusic</title>
+    <meta charset="utf-8" />
+    <script src="plugins/jquery/jquery-3.7.1.min.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=0.8" />
+    <!-- ICON -->
+    <link rel="icon" href="icon.png" type="images/x-icon" />
+    <!-- 核心样式载入 -->
+    <link rel="stylesheet" href="styles/core.css" />
+    <!-- 默认竖屏样式 -->
+    <link rel="stylesheet" href="styles/mods/Vertical.css" id="SrceenFork" />
+  </head>
+  <body id="header">
+    <!-- 应用程序视图框架 -->
+    <div class="application-framework">
+      <!-- TODO:在此载入必需资源 -->
+      <!-- TODO:全局数据优先载入 -->
+      <script src="resoures/Groups/GroupEnum.js"></script>
+      <script src="resoures/Groups/GroupStatic.js"></script>
+      <script src="resoures/Groups/GroupVariable.js"></script>
+      <script src="resoures/Groups/GroupTips.js"></script>
+      <script src="resoures/models/UserSetting.js"></script>
+      <script src="resoures/models/ThemeConfig.js"></script>
+      <!-- TODO:其次载入必需脚本 -->
+      <script src="scripts/utils/logger.js"></script>
+      <script src="scripts/utils/import.js"></script>
+      <script src="scripts/utils/utils.js"></script>
+      <script src="scripts/utils/view.js"></script>
+      <!-- 这是页面初始化页面 -->
+      <div class="application-load">
+        <!-- TODO:这里写应用加载界面 -->
+        <div class="animate__animated animate__fadeInUp load-text">
+          <h2>&nbsp;正在加载核心资源.....</h2>
+          <hr />
+          <p>
+            KiteMusic是由KitePromiss工作室公益开源开发,获得MIT许可,任何人不可以违反MIT许可,另外,本软件用到的所有API均由CengGuiGui提供,感谢支持.
+          </p>
+          <p>Have A Nice Day.</p>
+          <p>KitePromiss工作室</p>
+        </div>
+        <div class="loader">
+          <span><span></span><span></span><span></span><span></span></span>
+          <div class="base">
+            <span></span>
+            <div class="face"></div>
+          </div>
+        </div>
+        <div class="longfazers">
+          <span></span><span></span><span></span><span></span>
+        </div>
+        <!-- TODO:加载界面载入模块信息 -->
+        <script src="resoures/models/ModInfomation.js"></script>
+        <!-- TODO:这里进行各种初始化操作 -->
+        <script src="plugins/layui/layui.js"></script>
+        <script src="scripts/inits/staticInit.js"></script>
+        <script src="scripts/inits/coreInit.js"></script>
+        <script src="scripts/inits/listenceScreen.js"></script>
+        <script src="scripts/inits/modulesInit.js"></script>
+        <script src="plugins/mui/dist/js/mui.min.js"></script>
+      </div>
+      <!-- 这是应用程序主要页面框架 -->
+      <div class="animate__animated animate__faster application-core">
+        <!-- 主要内容 -->
+        <div class="app-content scrollbar">
+          <div class="swiper" id="colll">
+            <div class="swiper-wrapper sww">
+              <div class="swiper-slide ss more">
+                <!-- 扩展页面有多种容器 -->
+                <!-- QQ音乐 -->
+                <div class="qq-page">
+                  <div class="qqm-head">
+                    <p>QQ音乐每日歌单</p>
+                  </div>
+                  <div class="qqm-coll scrollbar"></div>
+                </div>
+                <!-- 搜索页面 -->
+                <div class="search-page">
+                  <!-- 搜索栏 -->
+                  <div class="sear-inp-coll">
+                    <input
+                      type="text"
+                      class="mui-input-clear"
+                      id="searinput"
+                      placeholder="请输入歌名或者歌手名..."
+                    />
+                    <div class="toggle-coll">
+                      <img src="icons/wangyiyun.svg" />
+                    </div>
+                    <div class="sear-coll">
+                      <img src="images/icon/search.svg" />
+                    </div>
+                  </div>
+                  <!-- 歌曲列表 -->
+                  <div class="sear-list-coll scrollbar"></div>
+                </div>
+                <!-- 设置 -->
+                <div class="setting-page">
+                  <p class="sp-setting">设置Setting</p>
+                  <hr>
+                  <!-- 应用UI设置 -->
+                  <article class="area-set-ui no-swiper scrollbar">
+                    <!-- 文字大小 -->
+                    <div class="set-colltro">
+                      <img src="icons/textsize.svg">
+                      <p>文字大小</p>
+                      <div class="set-coll-cont">
+                        <div id="text-size-slider"></div>
+                      </div>
+                    </div>
+                    <!-- TODO... -->
+                  </article>
+                </div>
+              </div>
+              <div class="swiper-slide ss mod">
+                <div class="a-card">
+                  <div class="a-loader">
+                    <p>Notices:</p>
+                    <div class="a-words">
+                      <span class="a-word"></span>
+                      <span class="a-word">有bug发生,请及时反馈哦~</span>
+                      <span class="a-word">今天你开心了吗?</span>
+                      <span class="a-word">感谢大家支持音域!</span>
+                      <span class="a-word">I L U.</span>
+                    </div>
+                  </div>
+                </div>
+                <!-- 控制中心 -->
+                <div class="controller">
+                  <!-- 搜索 -->
+                  <div class="box-ses searchm" data-car="searchmod">
+                    <p class="searchid">点击进行歌曲搜索</p>
+                    <img src="images/icon/search.svg" class="searchimg">
+                  </div>
+                  <!-- 设置 -->
+                  <div class="box-ses settings" data-car="setting">
+                    <img src="icons/settings.svg" />
+                  </div>
+                </div>
+                <!-- 音乐模式调整 -->
+                <article class="content-music-mod">
+                  <p class="music-title-mod">听歌模式</p>
+                  <div class="putmod no-swiper scrollbar">
+                    <div class="mod-colltrol">
+                      <!-- 网易云模块 -->
+                      <div class="box-ses net showThis" data-car="netmusic">
+                        <img src="images/icon/netmusic.png" />
+                        <span>随机网易云</span>
+                      </div>
+                      <!-- 助眠模块 -->
+                      <div class="box-ses sleep" data-car="sleepmusic">
+                        <img src="images/icon/sleepmusic.png" />
+                        <span>助眠钢琴曲</span>
+                      </div>
+                      <!-- 语录模块 -->
+                      <div class="box-ses notices" data-car="noticemusic">
+                        <img src="images/icon/noticemusic.png" />
+                        <span>随机语录曲</span>
+                      </div>
+                    </div>
+                  </div>
+                </article>
+                <!-- 每日推荐调整 -->
+                <article class="content-music-mod marklet">
+                  <p class="music-title-mod">每日推荐</p>
+                  <div class="putmod scrollbar">
+                    <div class="marklet-colltrol">
+                      <!-- QQ音乐模块 -->
+                      <div class="box-ses qqmus" data-car="qqmusic">
+                        <img src="images/icon/qqmusic.png" />
+                        <span>每日30首</span>
+                      </div>
+                    </div>
+                  </div>
+                </article>
+              </div>
+              <!-- 用户页面 -->
+              <div class="swiper-slide ss user">
+                <!-- 用户信息 -->
+                <div class="user-infomation">
+                  <div class="user-data">
+                    <!-- 用户头像 -->
+                    <div class="ud-img">
+                      <img src="images/img/Header.jpg" />
+                    </div>
+                    <!-- 用户名称 -->
+                    <div class="ud-name">
+                      <p>小萱baibai</p>
+                    </div>
+                    <!-- 用户简介 -->
+                    <div class="ud-title">
+                      <p>这是来自KitePromiss工作室开发的免费音乐软件</p>
+                    </div>
+                    <!-- 用户功能 -->
+                    <div class="ud-noc">
+                      <!-- Like歌单 -->
+                      <div class="udn-coll" data-udnc="like">
+                        <img src="icons/like.svg" />
+                        <p>喜欢的歌曲</p>
+                      </div>
+                      <!-- 听歌数据 -->
+                      <div class="udn-coll" data-udnc="about">
+                        <img src="icons/about.svg" />
+                        <p>关于我们</p>
+                      </div>
+                      <!-- 其他 -->
+                      <div class="udn-coll" data-udnc="heatld">
+                        <img src="icons/loading.svg" />
+                        <p>本地下载</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <!-- 操作界面 -->
+                <div class="user-contin">用户操作</div>
+                <!-- 歌单列表 -->
+                <div class="user-musiclist scrollbar">歌单列表</div>
+              </div>
+              <!-- 右副页扩展 -->
+              <div class="swiper-slide ss fadPage scrollbar">
+                <!-- 喜欢的音乐 -->
+                <div class="like-page scrollbar">
+                  <div class="likem-head">
+                    <p>我喜欢的歌曲</p>
+                  </div>
+                  <div class="likem-coll scrollbar"></div>
+                </div>
+                <!-- 关于我们 -->
+                <div class="aboutus-page scrollbar"></div>
+                <!-- 本地下载 -->
+                <div class="download-page scrollbar">
+                  暂不支持本地下载
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- 导航栏 -->
+        <div class="app-nav">
+          <!-- 音乐容器 -->
+          <div class="music-coll">
+            <div class="mus-coll">
+              <!-- 音乐封面 -->
+              <div class="mus-img">
+                <img class="icon-img" src="icon.png" />
+              </div>
+              <!-- 音乐标题 -->
+              <div class="mus-tit">
+                <div class="swiper" id="tarr">
+                  <div class="swiper-wrapper warr">
+                    <div class="swiper-slide tn">
+                      <p class="mus-name n0">AAA</p>
+                    </div>
+                    <div class="swiper-slide tn">
+                      <p class="mus-name n1">BBB</p>
+                    </div>
+                    <div class="swiper-slide tn">
+                      <p class="mus-name n2">CCC</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <!-- 音乐控件 -->
+              <div class="mus-kbd">
+                <img src="icons/pause.svg" class="icon-img" />
+              </div>
+            </div>
+          </div>
+          <!-- 导航栏主要 -->
+          <div class="nav-core">
+            <div class="ico-mod" data-isa="1">
+              <img class="icon-img" src="images/icon/cli-mod.svg" />
+            </div>
+            <div class="ico-user" data-isa="2">
+              <img class="icon-img" src="images/icon/uns-user.svg" />
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- 音乐播放全屏 -->
+      <div class="animate__animated animate__faster music-player">
+        <!-- 音乐播放器头部 -->
+        <header class="mp-header">
+          <div class="mp-coll back-btn">
+            <img src="images/icon/backbtn.svg" />
+          </div>
+          <div class="mp-coll title-player">
+            <p>当前模式:DEBUGGER-MOD</p>
+          </div>
+          <div class="mp-coll more-btn">
+            <img src="images/icon/morebtn.svg" />
+          </div>
+        </header>
+        <!-- CORE -->
+        <article class="mp-art">
+          <!-- 默认音乐 -->
+          <div class="mpa-define">
+            <!-- 音乐 -->
+            <div class="mpad-cont">
+              <!-- 封面 -->
+              <div class="mpadc-fm">
+                <img src="#" />
+              </div>
+              <!-- 歌名 -->
+              <div class="mpadc-song">
+                <p>#</p>
+              </div>
+              <!-- 歌手 -->
+              <div class="mpadc-sing">
+                <p>#</p>
+              </div>
+              <!-- 歌词预览 -->
+              <div class="mpadc-lrc">
+                <p class="first-ui">暂无歌词</p>
+                <p class="sende-ui"></p>
+              </div>
+            </div>
+            <!-- 歌词 -->
+            <div class="mpad-lrc scrollbar" id="MPAD"></div>
+          </div>
+          <!-- 选择歌曲卡片 -->
+          <div class="mpa-select">
+            <div class="mpas-window">
+              <div class="swiper" id="musicListSwiper">
+                <div class="swiper-wrapper music_list_wrapper"></div>
+              </div>
+            </div>
+          </div>
+        </article>
+        <!-- 控件 -->
+        <footer class="mp-foot">
+          <!-- 进度条 -->
+          <p class="LP-this">00:00</p>
+          <div class="prog">
+            <div id="LoadProgFoor"></div>
+          </div>
+          <p class="LP-end">00:00</p>
+          <!-- 常用控件 -->
+          <div class="mp-control">
+            <!-- 切换喜欢模式-->
+            <div class="mp-cor-coll mcc-like">
+              <img src="icons/like_not.svg" />
+            </div>
+            <!-- 上一首 -->
+            <div class="mp-cor-coll mcc-up">
+              <img src="icons/up.svg" />
+            </div>
+            <!-- 播放暂停 -->
+            <div class="mp-cor-coll mcc-pp">
+              <img class="happy-happy-happy" src="icons/pause.svg" />
+            </div>
+            <!-- 下一首 -->
+            <div class="mp-cor-coll mcc-down">
+              <img src="icons/down.svg" />
+            </div>
+            <!-- 歌曲列表 -->
+            <div class="mp-cor-coll mcc-list">
+              <img src="icons/music_list.svg" />
+            </div>
+          </div>
+          <!-- 非常用控件 -->
+          <div class="mp-footer">
+            <!-- 切换播放模式 -->
+            <div class="mp-cor-coll mcc-mod">
+              <img src="icons/list_loop.svg" />
+            </div>
+          </div>
+        </footer>
+      </div>
+    </div>
+    <script src="scripts/main.js"></script>
+  </body>
+</html>

@@ -1,0 +1,82 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" width="1920" height="1080" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <!-- 温暖风格渐变背景 -->
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2d1b1b"/>
+      <stop offset="25%" stop-color="#3d2b1b"/>
+      <stop offset="50%" stop-color="#2d1b1b"/>
+      <stop offset="75%" stop-color="#4d3b2b"/>
+      <stop offset="100%" stop-color="#2d1b1b"/>
+    </linearGradient>
+    
+    <!-- 温暖纹理 -->
+    <pattern id="warmPattern" x="0" y="0" width="90" height="90" patternUnits="userSpaceOnUse">
+      <circle cx="45" cy="45" r="1.5" fill="rgba(251, 146, 60, 0.08)"/>
+    </pattern>
+    
+    <!-- 温暖光晕 -->
+    <radialGradient id="warmGlow" cx="50%" cy="50%">
+      <stop offset="0%" stop-color="rgba(251, 146, 60, 0.25)"/>
+      <stop offset="40%" stop-color="rgba(234, 88, 12, 0.15)"/>
+      <stop offset="70%" stop-color="rgba(251, 146, 60, 0.08)"/>
+      <stop offset="100%" stop-color="rgba(251, 146, 60, 0)"/>
+    </radialGradient>
+    
+    <!-- 温暖光点 -->
+    <g id="warmPoint">
+      <circle r="3.5" fill="rgba(251, 146, 60, 0.6)">
+        <animate attributeName="opacity" values="0.4;0.8;0.4" dur="3.5s" repeatCount="indefinite"/>
+      </circle>
+    </g>
+  </defs>
+  
+  <!-- 主背景 -->
+  <rect width="1920" height="1080" fill="url(#bgGradient)"/>
+  
+  <!-- 温暖纹理 -->
+  <rect width="1920" height="1080" fill="url(#warmPattern)"/>
+  
+  <!-- 中心温暖光晕 -->
+  <ellipse cx="960" cy="540" rx="750" ry="550" fill="url(#warmGlow)" opacity="0.55">
+    <animate attributeName="opacity" values="0.35;0.65;0.35" dur="9s" repeatCount="indefinite"/>
+  </ellipse>
+  
+  <!-- 温暖光点装饰 -->
+  <g opacity="0.7">
+    <use href="#warmPoint" x="380" y="270">
+      <animate attributeName="opacity" values="0.5;0.9;0.5" dur="4s" repeatCount="indefinite"/>
+    </use>
+    <use href="#warmPoint" x="1540" y="270">
+      <animate attributeName="opacity" values="0.5;0.9;0.5" dur="4.5s" repeatCount="indefinite"/>
+    </use>
+    <use href="#warmPoint" x="380" y="810">
+      <animate attributeName="opacity" values="0.5;0.9;0.5" dur="3.8s" repeatCount="indefinite"/>
+    </use>
+    <use href="#warmPoint" x="1540" y="810">
+      <animate attributeName="opacity" values="0.5;0.9;0.5" dur="4.2s" repeatCount="indefinite"/>
+    </use>
+    <use href="#warmPoint" x="960" y="190">
+      <animate attributeName="opacity" values="0.5;0.9;0.5" dur="4.3s" repeatCount="indefinite"/>
+    </use>
+    <use href="#warmPoint" x="960" y="890">
+      <animate attributeName="opacity" values="0.5;0.9;0.5" dur="4.7s" repeatCount="indefinite"/>
+    </use>
+  </g>
+  
+  <!-- 温暖几何装饰 -->
+  <g opacity="0.1" stroke="rgba(251, 146, 60, 0.35)" stroke-width="1.5" fill="none">
+    <circle cx="280" cy="320" r="110" stroke-dasharray="6,3">
+      <animate attributeName="r" values="110;135;110" dur="13s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="1640" cy="760" r="95" stroke-dasharray="6,3">
+      <animate attributeName="r" values="95;120;95" dur="15s" repeatCount="indefinite"/>
+    </circle>
+    <path d="M 850 220 Q 960 270 1070 220" stroke="rgba(234, 88, 12, 0.25)">
+      <animate attributeName="opacity" values="0.08;0.15;0.08" dur="11s" repeatCount="indefinite"/>
+    </path>
+    <path d="M 850 860 Q 960 810 1070 860" stroke="rgba(234, 88, 12, 0.25)">
+      <animate attributeName="opacity" values="0.08;0.15;0.08" dur="11s" repeatCount="indefinite"/>
+    </path>
+  </g>
+</svg>
+

@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>ZerOS Kernel - Sandbox</title>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <link rel="stylesheet" href="core.css">
+    </head>
+    <body>
+        <!-- 沙盒环境：仅包含内核引导，不包含任何应用程序 -->
+        <!-- 所有应用程序将通过 ProcessManager 动态加载 -->
+
+        <!-- 包含所有GUI的容器 -->
+        <div id="sandbox-container" class="sandbox-container">
+            <!-- 该div用于内核启动时显示loading -->
+            <div id="kernel-loading" class="kernel-loading">
+                <div class="loading-logo-container">
+                    <img src="zeros-logo.svg" alt="ZerOS Logo" class="loading-logo" />
+                    <div class="loading-progress-container">
+                        <div class="loading-progress-bar">
+                            <div class="loading-progress-fill"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="loading-text">正在加载内核...</div>
+                <div class="loading-dots">
+                    <span class="dot"></span>
+                    <span class="dot"></span>
+                    <span class="dot"></span>
+                </div>
+            </div>
+            <!-- 该div用于显示内核加载完成的内容容器 -->
+            <div id="kernel-content" class="kernel-content" style="display: none;">
+                <!-- 这是主容器,所有GUI程序都应当在这个div内渲染GUI -->
+                <div id="gui-container" class="gui-container"></div>
+                <!-- 这是任务栏,用于显示正在运行的程序以及某些常显的程序 -->
+                <div id="taskbar" class="taskbar"></div>
+            </div>
+        </div>
+
+        <!-- 基础核心模块（按顺序加载） -->
+        <!-- 1. 日志系统（最基础，无依赖） -->
+        <script src="../kernel/logger/kernelLogger.js"></script>
+        <!-- 2. 依赖管理器（依赖 KernelLogger） -->
+        <script src="../kernel/signal/dependencyConfig.js"></script>
+        <!-- 3. 对象池（依赖 KernelLogger 和 DependencyConfig） -->
+        <script src="../kernel/signal/pool.js"></script>
+        <!-- 4. BootLoader 将自动加载所有其他内核模块 -->
+        <script src="../kernel/bootloader/starter.js"></script>
+    </body>
+</html>

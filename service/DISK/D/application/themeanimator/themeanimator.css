@@ -1,0 +1,161 @@
+/* 主题与动画管理器样式 */
+
+.themeanimator-window {
+    background: rgba(15, 20, 30, 0.95);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(139, 92, 246, 0.3);
+    border-radius: var(--style-window-border-radius, 12px);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.themeanimator-content {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    overflow: hidden;
+}
+
+.themeanimator-tabs {
+    display: flex;
+    gap: 8px;
+    border-bottom: 2px solid rgba(139, 92, 246, 0.3);
+    padding-bottom: 8px;
+}
+
+.themeanimator-tab {
+    padding: 10px 20px;
+    background: transparent;
+    border: none;
+    color: rgba(215, 224, 221, 0.7);
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    border-radius: 6px 6px 0 0;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.themeanimator-tab:hover {
+    background: rgba(139, 92, 246, 0.05);
+}
+
+.themeanimator-tab.active {
+    color: rgba(139, 92, 246, 1);
+    background: rgba(139, 92, 246, 0.1);
+}
+
+.themeanimator-panels {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-top: 20px;
+}
+
+.themeanimator-panel {
+    display: none;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.themeanimator-panel.active {
+    display: flex;
+}
+
+.themeanimator-section {
+    display: flex;
+    flex-direction: column;
+}
+
+.themeanimator-section h3 {
+    margin: 0 0 12px 0;
+    color: rgba(215, 224, 221, 0.9);
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.themes-list,
+.styles-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 12px;
+}
+
+.theme-card,
+.style-card {
+    padding: 16px;
+    background: rgba(139, 92, 246, 0.05);
+    border: 2px solid rgba(139, 92, 246, 0.2);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.theme-card:hover,
+.style-card:hover {
+    background: rgba(139, 92, 246, 0.1);
+    border-color: rgba(139, 92, 246, 0.4);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(139, 92, 246, 0.2);
+}
+
+.theme-card.active,
+.style-card.active {
+    background: rgba(139, 92, 246, 0.15);
+    border-color: rgba(139, 92, 246, 0.5);
+}
+
+.current-theme-display,
+.current-style-display {
+    padding: 16px;
+    background: rgba(139, 92, 246, 0.1);
+    border-radius: 8px;
+    border: 1px solid rgba(139, 92, 246, 0.3);
+}
+
+/* 滚动条样式 */
+.themeanimator-panels::-webkit-scrollbar {
+    width: 8px;
+}
+
+.themeanimator-panels::-webkit-scrollbar-track {
+    background: rgba(139, 92, 246, 0.05);
+    border-radius: 4px;
+}
+
+.themeanimator-panels::-webkit-scrollbar-thumb {
+    background: rgba(139, 92, 246, 0.3);
+    border-radius: 4px;
+}
+
+.themeanimator-panels::-webkit-scrollbar-thumb:hover {
+    background: rgba(139, 92, 246, 0.5);
+}
+
+/* 选择本地图片按钮样式 */
+.select-local-image-btn,
+.select-local-image-btn-inside {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    position: relative !important;
+    z-index: 1000 !important;
+}
+
+#select-local-image-btn-header {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+#select-local-image-btn-inside {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    width: 100% !important;
+}
+

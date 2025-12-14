@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="fileGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0ea5e9"/>
+      <stop offset="100%" stop-color="#3b82f6"/>
+    </linearGradient>
+    <filter id="fileGlow">
+      <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  
+  <!-- 背景 -->
+  <rect width="64" height="64" rx="12" fill="#0c1222" opacity="0.9"/>
+  
+  <!-- 文件夹图标（主图标） -->
+  <g filter="url(#fileGlow)">
+    <!-- 文件夹主体 -->
+    <path d="M 12 20 L 12 48 L 52 48 L 52 28 L 38 28 L 34 24 L 12 24 Z" fill="url(#fileGrad)" opacity="0.9"/>
+    <path d="M 12 20 L 12 48 L 52 48 L 52 28 L 38 28 L 34 24 L 12 24 Z" fill="none" stroke="#3b82f6" stroke-width="1.5"/>
+    
+    <!-- 文件夹标签 -->
+    <path d="M 12 20 L 28 20 L 34 24 L 12 24 Z" fill="#1e40af" opacity="0.8"/>
+    <path d="M 12 20 L 28 20 L 34 24 L 12 24 Z" fill="none" stroke="#3b82f6" stroke-width="1.5"/>
+  </g>
+  
+  <!-- 文件图标1（文档） -->
+  <g transform="translate(20, 32)">
+    <rect x="0" y="0" width="8" height="10" rx="1" fill="#1e3a8a" opacity="0.7"/>
+    <rect x="0" y="0" width="8" height="10" rx="1" fill="none" stroke="#3b82f6" stroke-width="0.8"/>
+    <line x1="2" y1="3" x2="6" y2="3" stroke="#3b82f6" stroke-width="0.5"/>
+    <line x1="2" y1="5" x2="6" y2="5" stroke="#3b82f6" stroke-width="0.5"/>
+    <line x1="2" y1="7" x2="5" y2="7" stroke="#3b82f6" stroke-width="0.5"/>
+  </g>
+  
+  <!-- 文件图标2（代码） -->
+  <g transform="translate(32, 32)">
+    <rect x="0" y="0" width="8" height="10" rx="1" fill="#1e3a8a" opacity="0.7"/>
+    <rect x="0" y="0" width="8" height="10" rx="1" fill="none" stroke="#3b82f6" stroke-width="0.8"/>
+    <text x="4" y="6" font-family="monospace" font-size="4" fill="#3b82f6" text-anchor="middle">{}</text>
+  </g>
+  
+  <!-- 文件图标3（图片） -->
+  <g transform="translate(44, 32)">
+    <rect x="0" y="0" width="8" height="10" rx="1" fill="#1e3a8a" opacity="0.7"/>
+    <rect x="0" y="0" width="8" height="10" rx="1" fill="none" stroke="#3b82f6" stroke-width="0.8"/>
+    <circle cx="4" cy="4" r="1.5" fill="#3b82f6" opacity="0.6"/>
+    <path d="M 2 7 L 4 5 L 6 7" stroke="#3b82f6" stroke-width="0.5" fill="none"/>
+  </g>
+  
+  <!-- 导航箭头（表示浏览） -->
+  <path d="M 16 16 L 20 20 L 16 24" stroke="#0ea5e9" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity="0.6"/>
+  <path d="M 48 16 L 44 20 L 48 24" stroke="#0ea5e9" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity="0.6"/>
+  
+  <!-- 搜索图标（表示查找功能） -->
+  <circle cx="50" cy="18" r="3" fill="none" stroke="#0ea5e9" stroke-width="1" opacity="0.6"/>
+  <line x1="52" y1="20" x2="54" y2="22" stroke="#0ea5e9" stroke-width="1" stroke-linecap="round" opacity="0.6"/>
+  
+  <!-- 底部装饰线 -->
+  <line x1="12" y1="50" x2="52" y2="50" stroke="url(#fileGrad)" stroke-width="1" opacity="0.4"/>
+</svg>

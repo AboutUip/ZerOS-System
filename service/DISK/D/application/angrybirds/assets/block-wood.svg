@@ -1,0 +1,24 @@
+<svg width="48" height="48" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+  <!-- 木块 -->
+  <defs>
+    <linearGradient id="woodGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#8D6E63;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#A1887F;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#8D6E63;stop-opacity:1" />
+    </linearGradient>
+    <pattern id="woodPattern" x="0" y="0" width="8" height="8" patternUnits="userSpaceOnUse">
+      <line x1="0" y1="0" x2="8" y2="0" stroke="#6D4C41" stroke-width="0.5" opacity="0.3"/>
+      <line x1="0" y1="4" x2="8" y2="4" stroke="#6D4C41" stroke-width="0.5" opacity="0.3"/>
+    </pattern>
+  </defs>
+  
+  <!-- 木块主体 -->
+  <rect x="4" y="8" width="40" height="32" rx="2" fill="url(#woodGradient)" stroke="#6D4C41" stroke-width="1.5"/>
+  <rect x="4" y="8" width="40" height="32" rx="2" fill="url(#woodPattern)" opacity="0.4"/>
+  
+  <!-- 木纹 -->
+  <line x1="8" y1="16" x2="40" y2="16" stroke="#6D4C41" stroke-width="0.8" opacity="0.5"/>
+  <line x1="8" y1="24" x2="40" y2="24" stroke="#6D4C41" stroke-width="0.8" opacity="0.5"/>
+  <line x1="8" y1="32" x2="40" y2="32" stroke="#6D4C41" stroke-width="0.8" opacity="0.5"/>
+</svg>
+

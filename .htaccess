@@ -1,0 +1,18 @@
+# ZerOS Web Server Configuration
+# 配置 MIME 类型，确保浏览器能正确识别文件类型
+
+# WASM 文件
+<IfModule mod_mime.c>
+    AddType application/wasm .wasm
+    AddType application/javascript .mjs
+    AddType application/javascript .cjs
+    AddType application/javascript .js
+</IfModule>
+
+# 启用 CORS（如果需要）
+<IfModule mod_headers.c>
+    Header set Access-Control-Allow-Origin "*"
+    Header set Access-Control-Allow-Methods "GET, POST, OPTIONS"
+    Header set Access-Control-Allow-Headers "Content-Type"
+</IfModule>
+

@@ -1,0 +1,84 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" width="1920" height="1080" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <!-- 自然风格渐变背景 -->
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0a2e3a"/>
+      <stop offset="25%" stop-color="#1a3e4a"/>
+      <stop offset="50%" stop-color="#0f2e3a"/>
+      <stop offset="75%" stop-color="#1a4e5a"/>
+      <stop offset="100%" stop-color="#0a2e3a"/>
+    </linearGradient>
+    
+    <!-- 自然纹理 -->
+    <pattern id="naturePattern" x="0" y="0" width="120" height="120" patternUnits="userSpaceOnUse">
+      <circle cx="60" cy="60" r="2" fill="rgba(34, 197, 94, 0.05)"/>
+      <circle cx="30" cy="30" r="1.5" fill="rgba(34, 197, 94, 0.03)"/>
+      <circle cx="90" cy="90" r="1.5" fill="rgba(34, 197, 94, 0.03)"/>
+    </pattern>
+    
+    <!-- 自然光晕 -->
+    <radialGradient id="natureGlow" cx="50%" cy="50%">
+      <stop offset="0%" stop-color="rgba(34, 197, 94, 0.2)"/>
+      <stop offset="40%" stop-color="rgba(59, 130, 246, 0.15)"/>
+      <stop offset="70%" stop-color="rgba(34, 197, 94, 0.08)"/>
+      <stop offset="100%" stop-color="rgba(34, 197, 94, 0)"/>
+    </radialGradient>
+    
+    <!-- 自然光点 -->
+    <g id="naturePoint">
+      <circle r="3" fill="rgba(34, 197, 94, 0.5)">
+        <animate attributeName="opacity" values="0.3;0.7;0.3" dur="4s" repeatCount="indefinite"/>
+      </circle>
+    </g>
+  </defs>
+  
+  <!-- 主背景 -->
+  <rect width="1920" height="1080" fill="url(#bgGradient)"/>
+  
+  <!-- 自然纹理 -->
+  <rect width="1920" height="1080" fill="url(#naturePattern)"/>
+  
+  <!-- 中心自然光晕 -->
+  <ellipse cx="960" cy="540" rx="750" ry="550" fill="url(#natureGlow)" opacity="0.5">
+    <animate attributeName="opacity" values="0.3;0.6;0.3" dur="9s" repeatCount="indefinite"/>
+  </ellipse>
+  
+  <!-- 自然光点装饰 -->
+  <g opacity="0.6">
+    <use href="#naturePoint" x="350" y="280">
+      <animate attributeName="opacity" values="0.4;0.8;0.4" dur="4.5s" repeatCount="indefinite"/>
+    </use>
+    <use href="#naturePoint" x="1570" y="280">
+      <animate attributeName="opacity" values="0.4;0.8;0.4" dur="5s" repeatCount="indefinite"/>
+    </use>
+    <use href="#naturePoint" x="350" y="800">
+      <animate attributeName="opacity" values="0.4;0.8;0.4" dur="4.2s" repeatCount="indefinite"/>
+    </use>
+    <use href="#naturePoint" x="1570" y="800">
+      <animate attributeName="opacity" values="0.4;0.8;0.4" dur="5.5s" repeatCount="indefinite"/>
+    </use>
+    <use href="#naturePoint" x="960" y="180">
+      <animate attributeName="opacity" values="0.4;0.8;0.4" dur="4.8s" repeatCount="indefinite"/>
+    </use>
+    <use href="#naturePoint" x="960" y="900">
+      <animate attributeName="opacity" values="0.4;0.8;0.4" dur="5.2s" repeatCount="indefinite"/>
+    </use>
+  </g>
+  
+  <!-- 自然几何装饰 -->
+  <g opacity="0.12" stroke="rgba(34, 197, 94, 0.3)" stroke-width="1.5" fill="none">
+    <circle cx="250" cy="350" r="120" stroke-dasharray="5,5">
+      <animate attributeName="r" values="120;140;120" dur="14s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="1670" cy="730" r="100" stroke-dasharray="5,5">
+      <animate attributeName="r" values="100;120;100" dur="16s" repeatCount="indefinite"/>
+    </circle>
+    <path d="M 850 200 Q 960 250 1070 200" stroke="rgba(59, 130, 246, 0.25)">
+      <animate attributeName="opacity" values="0.1;0.2;0.1" dur="11s" repeatCount="indefinite"/>
+    </path>
+    <path d="M 850 880 Q 960 830 1070 880" stroke="rgba(59, 130, 246, 0.25)">
+      <animate attributeName="opacity" values="0.1;0.2;0.1" dur="11s" repeatCount="indefinite"/>
+    </path>
+  </g>
+</svg>
+

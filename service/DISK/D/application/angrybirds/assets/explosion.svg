@@ -1,0 +1,39 @@
+<svg width="64" height="64" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+  <!-- 爆炸效果 -->
+  <defs>
+    <radialGradient id="explosionGradient" cx="50%" cy="50%">
+      <stop offset="0%" style="stop-color:#FF6B00;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#FF4500;stop-opacity:0.8" />
+      <stop offset="100%" style="stop-color:#FF6B00;stop-opacity:0" />
+    </radialGradient>
+  </defs>
+  
+  <!-- 爆炸中心 -->
+  <circle cx="32" cy="32" r="20" fill="url(#explosionGradient)"/>
+  
+  <!-- 爆炸火花 -->
+  <path d="M 32 12 L 34 18 L 40 16 L 36 20 L 42 22 L 36 24 L 40 28 L 34 26 L 32 32" 
+        stroke="#FFD700" 
+        stroke-width="2" 
+        fill="none" 
+        stroke-linecap="round"/>
+  
+  <path d="M 32 52 L 30 46 L 24 48 L 28 44 L 22 42 L 28 40 L 24 36 L 30 38 L 32 32" 
+        stroke="#FFD700" 
+        stroke-width="2" 
+        fill="none" 
+        stroke-linecap="round"/>
+  
+  <path d="M 12 32 L 18 30 L 16 24 L 20 28 L 22 22 L 24 28 L 28 24 L 26 30 L 32 32" 
+        stroke="#FFD700" 
+        stroke-width="2" 
+        fill="none" 
+        stroke-linecap="round"/>
+  
+  <path d="M 52 32 L 46 34 L 48 40 L 44 36 L 42 42 L 40 36 L 36 40 L 38 34 L 32 32" 
+        stroke="#FFD700" 
+        stroke-width="2" 
+        fill="none" 
+        stroke-linecap="round"/>
+</svg>
+

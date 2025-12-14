@@ -1,0 +1,19 @@
+/* ZerOS Timer - 3D时间罗盘样式 */
+
+.timer-window {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+.timer-canvas-container {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+}
+
+.timer-canvas-container canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+

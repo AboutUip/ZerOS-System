@@ -1,0 +1,55 @@
+# 操作系统文件
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# 编辑器文件
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+*.sublime-project
+*.sublime-workspace
+
+# 日志文件
+*.log
+logs/
+*.log.*
+
+# 临时文件
+*.tmp
+*.temp
+*.bak
+*.backup
+*.cache
+
+# 依赖文件（如果有）
+node_modules/
+package-lock.json
+yarn.lock
+
+# 构建文件
+dist/
+build/
+*.min.js.map
+*.min.css.map
+
+# 环境变量文件
+.env
+.env.local
+.env.*.local
+
+# 测试覆盖率
+coverage/
+.nyc_output/
+
+# 其他
+*.orig
+*.rej
+

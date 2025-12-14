@@ -1,0 +1,2506 @@
+/* ZerOS 音乐播放器样式 */
+/* 高仿网易云音乐风格 */
+
+.musicplayer-window {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+}
+
+/* 全屏/最大化时的沉浸式体验 */
+.musicplayer-window.zos-window-maximized {
+    border-radius: 0 !important;
+    border: none !important;
+}
+
+.musicplayer-window.zos-window-maximized .musicplayer-container {
+    border-radius: 0;
+}
+
+/* 沉浸式播放页面 - 完全响应式设计 */
+.immersive-player-view {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 30%, #2d1b3d 60%, #1a1a2e 100%);
+    display: none;
+    flex-direction: column;
+    z-index: 1;
+    overflow: hidden;
+    animation: fadeIn 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    pointer-events: none;
+}
+
+.immersive-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: clamp(20px, 4vh, 60px) clamp(20px, 3vw, 40px) clamp(20px, 3vh, 40px) clamp(20px, 3vw, 40px);
+    overflow: hidden;
+    min-height: 0;
+    gap: clamp(20px, 3vh, 40px);
+    pointer-events: none;
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+/* 主布局容器 - 使用容器查询和响应式布局 */
+.immersive-main-layout {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 500px), 1fr));
+    align-items: start;
+    justify-items: center;
+    gap: clamp(20px, 4vw, 60px);
+    width: 100%;
+    max-width: 100%;
+    flex: 1;
+    min-height: 0;
+    padding: 0 clamp(10px, 2vw, 20px);
+    box-sizing: border-box;
+}
+
+/* 当窗口宽高比 > 1.3 时，使用横向布局 */
+@container (min-aspect-ratio: 4/3) {
+    .immersive-main-layout {
+        grid-template-columns: auto 1fr;
+        align-items: start;
+    }
+}
+
+/* 当窗口宽高比 <= 1.3 时，使用纵向布局 */
+@container (max-aspect-ratio: 4/3) {
+    .immersive-main-layout {
+        grid-template-columns: 1fr;
+        align-items: center;
+    }
+}
+
+.immersive-left-section {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: clamp(15px, 2vh, 30px);
+    width: 100%;
+    max-width: min(500px, 90vw);
+    box-sizing: border-box;
+}
+
+.immersive-right-section {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: clamp(15px, 2vh, 30px);
+    width: 100%;
+    max-width: min(600px, 90vw);
+    min-width: 0;
+    box-sizing: border-box;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+/* 磁盘层叠容器 - 完全响应式 */
+.immersive-cover-stack {
+    position: relative;
+    width: min(500px, 50vw, 50vh);
+    height: min(500px, 50vw, 50vh);
+    aspect-ratio: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: scaleIn 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+    flex-shrink: 0;
+    pointer-events: none;
+    margin: 0 auto;
+}
+
+/* 磁盘层 - 响应式尺寸 */
+.immersive-cover-layer {
+    position: absolute;
+    border-radius: 50%;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    background: linear-gradient(135deg, #2a2a2a 0%, #1a1a1a 100%);
+    box-shadow: 
+        0 20px 60px rgba(0, 0, 0, 0.6),
+        inset 0 0 30px rgba(0, 0, 0, 0.5);
+}
+
+/* 底层磁盘 */
+.immersive-cover-layer-1 {
+    width: 90%;
+    height: 90%;
+    font-size: clamp(40px, 8vw, 100px);
+    transform: translate(3%, 3%);
+    z-index: 1;
+}
+
+/* 中层磁盘 */
+.immersive-cover-layer-2 {
+    width: 96%;
+    height: 96%;
+    font-size: clamp(44px, 8.8vw, 110px);
+    transform: translate(2%, 2%);
+    z-index: 2;
+    background: linear-gradient(135deg, #3a3a3a 0%, #2a2a2a 100%);
+    box-shadow: 
+        0 25px 70px rgba(0, 0, 0, 0.7),
+        inset 0 0 35px rgba(0, 0, 0, 0.4);
+}
+
+/* 顶层磁盘 */
+.immersive-cover-layer-3 {
+    width: 100%;
+    height: 100%;
+    font-size: clamp(48px, 9.6vw, 120px);
+    z-index: 3;
+    background: linear-gradient(135deg, #2a2a2a 0%, #1a1a1a 100%);
+    box-shadow: 
+        0 30px 80px rgba(0, 0, 0, 0.8),
+        0 0 60px rgba(236, 65, 65, 0.2),
+        inset 0 0 40px rgba(0, 0, 0, 0.3);
+}
+
+.immersive-cover-layer img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 50%;
+    display: block;
+}
+
+/* 顶层磁盘（旋转） */
+.immersive-cover-top {
+    animation: coverRotate 20s linear infinite;
+    animation-play-state: paused;
+    transition: animation-play-state 0.3s;
+}
+
+.immersive-cover-top.playing {
+    animation-play-state: running;
+}
+
+@keyframes coverRotate {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@keyframes scaleIn {
+    from {
+        transform: scale(0.8) rotate(-5deg);
+        opacity: 0;
+    }
+    to {
+        transform: scale(1) rotate(0deg);
+        opacity: 1;
+    }
+}
+
+/* 移除旧的封面发光效果，已改用磁盘层叠样式 */
+
+/* 移除旧的封面旋转样式，已移至 .immersive-cover-top */
+
+.immersive-song-info {
+    text-align: center;
+    color: #e0e0e0;
+    width: 100%;
+    animation: fadeInUp 0.6s cubic-bezier(0.4, 0, 0.2, 1) 0.2s both;
+}
+
+.immersive-song-name {
+    font-size: clamp(20px, 4vw, 32px);
+    font-weight: 700;
+    margin-bottom: clamp(8px, 1vh, 12px);
+    color: #ffffff;
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+    letter-spacing: 0.5px;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+}
+
+.immersive-artist-name {
+    font-size: clamp(14px, 2.5vw, 18px);
+    color: rgba(255, 255, 255, 0.8);
+    font-weight: 400;
+    margin-bottom: clamp(12px, 2vh, 20px);
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+}
+
+.immersive-current-song {
+    margin-top: clamp(12px, 2vh, 20px);
+    padding: clamp(8px, 1.5vh, 12px) clamp(12px, 2vw, 20px);
+    background: rgba(236, 65, 65, 0.15);
+    backdrop-filter: blur(10px);
+    border-radius: clamp(8px, 1.5vw, 12px);
+    border: 1px solid rgba(236, 65, 65, 0.3);
+    font-size: clamp(12px, 2vw, 14px);
+    color: #ec4141;
+    font-weight: 500;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+}
+
+.immersive-current-song:hover {
+    background: rgba(236, 65, 65, 0.25);
+    border-color: rgba(236, 65, 65, 0.5);
+    transform: translateY(-2px);
+}
+
+.immersive-lyrics {
+    flex: 1;
+    width: 100%;
+    min-height: clamp(200px, 30vh, 300px);
+    max-height: clamp(300px, 50vh, 500px);
+    overflow-y: auto;
+    text-align: center;
+    padding: clamp(15px, 3vh, 30px) clamp(12px, 2vw, 20px);
+    color: #e0e0e0;
+    font-size: clamp(14px, 2.5vw, 18px);
+    line-height: 2.8;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    pointer-events: auto;
+    background: rgba(0, 0, 0, 0.2);
+    backdrop-filter: blur(10px);
+    border-radius: clamp(12px, 2vw, 16px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    animation: fadeInUp 0.6s cubic-bezier(0.4, 0, 0.2, 1) 0.3s both;
+    box-sizing: border-box;
+}
+
+.immersive-lyrics::-webkit-scrollbar {
+    width: 6px;
+}
+
+.immersive-lyrics::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.immersive-lyrics::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 3px;
+}
+
+.lyric-line {
+    margin: clamp(6px, 1vh, 10px) 0;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    color: #999;
+    font-size: clamp(14px, 2.5vw, 18px);
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    transform: scale(1);
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+}
+
+.lyric-line.active {
+    color: #ec4141;
+    font-size: clamp(18px, 4vw, 24px);
+    font-weight: bold;
+    text-shadow: 0 0 20px rgba(236, 65, 65, 0.6), 0 4px 8px rgba(0, 0, 0, 0.4);
+    transform: scale(1.05);
+    animation: lyricPulse 2s ease-in-out infinite;
+}
+
+@keyframes lyricPulse {
+    0%, 100% {
+        text-shadow: 0 0 20px rgba(236, 65, 65, 0.6), 0 4px 8px rgba(0, 0, 0, 0.4);
+    }
+    50% {
+        text-shadow: 0 0 30px rgba(236, 65, 65, 0.8), 0 6px 12px rgba(0, 0, 0, 0.5);
+    }
+}
+
+.immersive-progress-bar {
+    flex: 1;
+    height: clamp(4px, 0.6vh, 6px);
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: clamp(2px, 0.3vh, 3px);
+    cursor: pointer;
+    position: relative;
+    pointer-events: auto;
+    transition: height 0.2s;
+    min-width: 0;
+}
+
+.immersive-progress-bar:hover {
+    height: clamp(6px, 0.8vh, 8px);
+}
+
+.immersive-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #ec4141 0%, #ff6b6b 100%);
+    border-radius: inherit;
+    width: 0%;
+    transition: width 0.1s;
+    position: relative;
+    box-shadow: 0 0 10px rgba(236, 65, 65, 0.5);
+}
+
+.immersive-progress-bar:hover .immersive-progress-fill {
+    box-shadow: 0 0 15px rgba(236, 65, 65, 0.7);
+}
+
+.immersive-controls {
+    width: 100%;
+    max-width: min(1200px, 90vw);
+    display: flex;
+    flex-direction: column;
+    gap: clamp(12px, 2vh, 20px);
+    padding: clamp(15px, 3vh, 30px) 0;
+    flex-shrink: 0;
+    pointer-events: auto;
+    animation: fadeInUp 0.6s cubic-bezier(0.4, 0, 0.2, 1) 0.4s both;
+    box-sizing: border-box;
+}
+
+.immersive-progress-container {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: clamp(10px, 2vw, 20px);
+    box-sizing: border-box;
+}
+
+.immersive-time {
+    font-size: clamp(11px, 2vw, 14px);
+    color: rgba(255, 255, 255, 0.7);
+    min-width: clamp(40px, 8vw, 50px);
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    flex-shrink: 0;
+}
+
+.immersive-control-buttons {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: clamp(20px, 4vw, 40px);
+    flex-wrap: wrap;
+}
+
+/* 通用控制按钮样式 */
+.immersive-control-btn {
+    width: clamp(40px, 8vw, 50px);
+    height: clamp(40px, 8vw, 50px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    border-radius: 50%;
+    font-size: clamp(18px, 3.5vw, 24px);
+    background: rgba(255, 255, 255, 0.1);
+    color: #e0e0e0;
+    transition: all 0.2s;
+    pointer-events: auto;
+    flex-shrink: 0;
+}
+
+.immersive-control-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+    transform: scale(1.1);
+}
+
+.immersive-play-button {
+    width: clamp(56px, 11vw, 72px) !important;
+    height: clamp(56px, 11vw, 72px) !important;
+    font-size: clamp(24px, 5vw, 32px) !important;
+    background: linear-gradient(135deg, #ec4141 0%, #d63636 100%) !important;
+    color: white !important;
+    box-shadow: 
+        0 8px 24px rgba(236, 65, 65, 0.5),
+        0 0 20px rgba(236, 65, 65, 0.3);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    border: 2px solid rgba(255, 255, 255, 0.1);
+}
+
+.immersive-play-button:hover {
+    background: linear-gradient(135deg, #d63636 0%, #c02e2e 100%) !important;
+    transform: scale(1.1) !important;
+    box-shadow: 
+        0 12px 32px rgba(236, 65, 65, 0.7),
+        0 0 30px rgba(236, 65, 65, 0.5);
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+.immersive-play-button:active {
+    transform: scale(1.05) !important;
+}
+
+.immersive-close-btn {
+    position: absolute;
+    top: clamp(12px, 2vh, 20px);
+    right: clamp(12px, 2vw, 20px);
+    width: clamp(36px, 7vw, 44px);
+    height: clamp(36px, 7vw, 44px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(10px);
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: clamp(16px, 3vw, 20px);
+    color: #e0e0e0;
+    z-index: 10;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    pointer-events: auto;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.immersive-close-btn:hover {
+    background: rgba(236, 65, 65, 0.3);
+    transform: scale(1.1) rotate(90deg);
+    border-color: rgba(236, 65, 65, 0.5);
+}
+
+.immersive-credits {
+    display: flex;
+    flex-direction: column;
+    gap: clamp(6px, 1vh, 8px);
+    padding: clamp(12px, 2.5vw, 20px);
+    background: rgba(0, 0, 0, 0.2);
+    backdrop-filter: blur(10px);
+    border-radius: clamp(8px, 1.5vw, 12px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    font-size: clamp(11px, 2vw, 13px);
+    color: rgba(255, 255, 255, 0.7);
+    pointer-events: auto;
+    animation: fadeInUp 0.6s cubic-bezier(0.4, 0, 0.2, 1) 0.35s both;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-sizing: border-box;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+}
+
+.immersive-credits:hover {
+    background: rgba(0, 0, 0, 0.3);
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+/* 响应式设计 */
+@media (max-width: 1400px) {
+    .immersive-main-layout {
+        gap: 40px;
+    }
+    
+    .immersive-cover-stack {
+        width: 450px;
+        height: 450px;
+    }
+    
+    .immersive-cover-stack .immersive-cover-layer:nth-child(1) {
+        width: 405px;
+        height: 405px;
+        font-size: 90px;
+    }
+    
+    .immersive-cover-stack .immersive-cover-layer:nth-child(2) {
+        width: 432px;
+        height: 432px;
+        font-size: 99px;
+    }
+    
+    .immersive-cover-stack .immersive-cover-layer:nth-child(3) {
+        width: 450px;
+        height: 450px;
+        font-size: 108px;
+    }
+}
+
+@media (max-width: 1200px) {
+    .immersive-main-layout {
+        flex-direction: column;
+        align-items: center;
+        gap: 40px;
+    }
+    
+    .immersive-left-section,
+    .immersive-right-section {
+        max-width: 100%;
+        min-width: auto;
+        width: 100%;
+    }
+    
+    .immersive-cover-stack {
+        width: 400px;
+        height: 400px;
+    }
+    
+    .immersive-cover-stack .immersive-cover-layer:nth-child(1) {
+        width: 360px;
+        height: 360px;
+        font-size: 80px;
+        transform: translate(12px, 12px);
+    }
+    
+    .immersive-cover-stack .immersive-cover-layer:nth-child(2) {
+        width: 384px;
+        height: 384px;
+        font-size: 88px;
+        transform: translate(8px, 8px);
+    }
+    
+    .immersive-cover-stack .immersive-cover-layer:nth-child(3) {
+        width: 400px;
+        height: 400px;
+        font-size: 96px;
+    }
+    
+    .immersive-right-section {
+        min-width: 350px;
+    }
+}
+
+@media (max-width: 900px) {
+    .immersive-content {
+        padding: 40px 20px 30px 20px;
+        gap: 30px;
+    }
+    
+    .immersive-cover-stack {
+        width: 350px;
+        height: 350px;
+    }
+    
+    .immersive-cover-stack .immersive-cover-layer:nth-child(1) {
+        width: 315px;
+        height: 315px;
+        font-size: 70px;
+        transform: translate(10px, 10px);
+    }
+    
+    .immersive-cover-stack .immersive-cover-layer:nth-child(2) {
+        width: 336px;
+        height: 336px;
+        font-size: 77px;
+        transform: translate(7px, 7px);
+    }
+    
+    .immersive-cover-stack .immersive-cover-layer:nth-child(3) {
+        width: 350px;
+        height: 350px;
+        font-size: 84px;
+    }
+    
+    .immersive-song-name {
+        font-size: 28px;
+    }
+    
+    .immersive-artist-name {
+        font-size: 16px;
+    }
+    
+    .immersive-right-section {
+        min-width: 100%;
+    }
+    
+    .immersive-lyrics {
+        min-height: 250px;
+        max-height: 400px;
+        font-size: 16px;
+    }
+    
+    .lyric-line.active {
+        font-size: 22px;
+    }
+    
+    .immersive-controls {
+        max-width: 100%;
+        padding: 20px 0;
+    }
+    
+    .immersive-play-button {
+        width: 60px !important;
+        height: 60px !important;
+        font-size: 28px !important;
+    }
+}
+
+@media (max-width: 600px) {
+    .immersive-content {
+        padding: 30px 15px 20px 15px;
+        gap: 25px;
+    }
+    
+    .immersive-cover-stack {
+        width: 280px;
+        height: 280px;
+    }
+    
+    .immersive-cover-stack .immersive-cover-layer:nth-child(1) {
+        width: 252px;
+        height: 252px;
+        font-size: 56px;
+        transform: translate(8px, 8px);
+    }
+    
+    .immersive-cover-stack .immersive-cover-layer:nth-child(2) {
+        width: 269px;
+        height: 269px;
+        font-size: 62px;
+        transform: translate(5px, 5px);
+    }
+    
+    .immersive-cover-stack .immersive-cover-layer:nth-child(3) {
+        width: 280px;
+        height: 280px;
+        font-size: 67px;
+    }
+    
+    .immersive-song-name {
+        font-size: 24px;
+    }
+    
+    .immersive-artist-name {
+        font-size: 14px;
+    }
+    
+    .immersive-current-song {
+        font-size: 12px;
+        padding: 10px 16px;
+    }
+    
+    .immersive-lyrics {
+        min-height: 200px;
+        max-height: 350px;
+        font-size: 15px;
+        padding: 20px 15px;
+    }
+    
+    .lyric-line {
+        margin: 10px 0;
+        font-size: 15px;
+    }
+    
+    .lyric-line.active {
+        font-size: 20px;
+    }
+    
+    .immersive-credits {
+        font-size: 12px;
+        padding: 15px;
+    }
+    
+    .immersive-progress-container {
+        gap: 12px;
+    }
+    
+    .immersive-time {
+        font-size: 12px;
+        min-width: 40px;
+    }
+    
+    .immersive-control-buttons {
+        gap: 25px;
+    }
+    
+    .immersive-play-button {
+        width: 56px !important;
+        height: 56px !important;
+        font-size: 24px !important;
+    }
+    
+    .immersive-close-btn {
+        width: 36px;
+        height: 36px;
+        font-size: 18px;
+        top: 15px;
+        right: 15px;
+    }
+}
+
+/* 超小屏幕适配 (480px以下) */
+@media (max-width: 480px) {
+    .immersive-content {
+        padding: 20px 12px 15px 12px;
+        gap: 20px;
+    }
+    
+    .immersive-cover-stack {
+        width: 220px;
+        height: 220px;
+    }
+    
+    .immersive-cover-stack .immersive-cover-layer:nth-child(1) {
+        width: 198px;
+        height: 198px;
+        font-size: 44px;
+        transform: translate(6px, 6px);
+    }
+    
+    .immersive-cover-stack .immersive-cover-layer:nth-child(2) {
+        width: 211px;
+        height: 211px;
+        font-size: 49px;
+        transform: translate(4px, 4px);
+    }
+    
+    .immersive-cover-stack .immersive-cover-layer:nth-child(3) {
+        width: 220px;
+        height: 220px;
+        font-size: 53px;
+    }
+    
+    .immersive-song-name {
+        font-size: 20px;
+        margin-bottom: 8px;
+    }
+    
+    .immersive-artist-name {
+        font-size: 13px;
+        margin-bottom: 15px;
+    }
+    
+    .immersive-current-song {
+        font-size: 11px;
+        padding: 8px 12px;
+        margin-top: 15px;
+    }
+    
+    .immersive-lyrics {
+        min-height: 180px;
+        max-height: 300px;
+        font-size: 14px;
+        padding: 15px 12px;
+    }
+    
+    .lyric-line {
+        margin: 8px 0;
+        font-size: 14px;
+        line-height: 1.6;
+    }
+    
+    .lyric-line.active {
+        font-size: 18px;
+        margin: 10px 0;
+    }
+    
+    .immersive-credits {
+        font-size: 11px;
+        padding: 12px;
+        gap: 6px;
+    }
+    
+    .immersive-progress-container {
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+    
+    .immersive-progress-bar {
+        width: 100%;
+        order: 2;
+    }
+    
+    .immersive-time {
+        font-size: 11px;
+        min-width: 35px;
+        order: 1;
+    }
+    
+    .immersive-control-buttons {
+        gap: 20px;
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+    
+    .immersive-control-buttons button {
+        width: 40px !important;
+        height: 40px !important;
+        font-size: 18px !important;
+    }
+    
+    .immersive-play-button {
+        width: 50px !important;
+        height: 50px !important;
+        font-size: 22px !important;
+    }
+    
+    .immersive-close-btn {
+        width: 32px;
+        height: 32px;
+        font-size: 16px;
+        top: 12px;
+        right: 12px;
+    }
+    
+    .immersive-left-section {
+        gap: 20px;
+    }
+    
+    .immersive-right-section {
+        gap: 20px;
+    }
+}
+
+/* 极小屏幕适配 (360px以下) */
+@media (max-width: 360px) {
+    .immersive-content {
+        padding: 15px 10px 12px 10px;
+        gap: 15px;
+    }
+    
+    .immersive-cover-stack {
+        width: 180px;
+        height: 180px;
+    }
+    
+    .immersive-cover-stack .immersive-cover-layer:nth-child(1) {
+        width: 162px;
+        height: 162px;
+        font-size: 36px;
+        transform: translate(5px, 5px);
+    }
+    
+    .immersive-cover-stack .immersive-cover-layer:nth-child(2) {
+        width: 173px;
+        height: 173px;
+        font-size: 40px;
+        transform: translate(3px, 3px);
+    }
+    
+    .immersive-cover-stack .immersive-cover-layer:nth-child(3) {
+        width: 180px;
+        height: 180px;
+        font-size: 43px;
+    }
+    
+    .immersive-song-name {
+        font-size: 18px;
+        margin-bottom: 6px;
+    }
+    
+    .immersive-artist-name {
+        font-size: 12px;
+        margin-bottom: 12px;
+    }
+    
+    .immersive-current-song {
+        font-size: 10px;
+        padding: 6px 10px;
+        margin-top: 12px;
+    }
+    
+    .immersive-lyrics {
+        min-height: 150px;
+        max-height: 250px;
+        font-size: 13px;
+        padding: 12px 10px;
+    }
+    
+    .lyric-line {
+        margin: 6px 0;
+        font-size: 13px;
+        line-height: 1.5;
+    }
+    
+    .lyric-line.active {
+        font-size: 16px;
+        margin: 8px 0;
+    }
+    
+    .immersive-credits {
+        font-size: 10px;
+        padding: 10px;
+        gap: 5px;
+    }
+    
+    .immersive-time {
+        font-size: 10px;
+        min-width: 30px;
+    }
+    
+    .immersive-control-buttons {
+        gap: 15px;
+    }
+    
+    .immersive-control-buttons button {
+        width: 36px !important;
+        height: 36px !important;
+        font-size: 16px !important;
+    }
+    
+    .immersive-play-button {
+        width: 46px !important;
+        height: 46px !important;
+        font-size: 20px !important;
+    }
+    
+    .immersive-close-btn {
+        width: 28px;
+        height: 28px;
+        font-size: 14px;
+        top: 10px;
+        right: 10px;
+    }
+    
+    .immersive-left-section {
+        gap: 15px;
+    }
+    
+    .immersive-right-section {
+        gap: 15px;
+    }
+}
+
+/* 横屏小屏幕适配 */
+@media (max-width: 900px) and (max-height: 500px) {
+    .immersive-content {
+        padding: 20px 15px;
+        gap: 20px;
+    }
+    
+    .immersive-main-layout {
+        flex-direction: row;
+        gap: 30px;
+    }
+    
+    .immersive-cover-stack {
+        width: 200px;
+        height: 200px;
+    }
+    
+    .immersive-cover-stack .immersive-cover-layer:nth-child(1) {
+        width: 180px;
+        height: 180px;
+        font-size: 40px;
+    }
+    
+    .immersive-cover-stack .immersive-cover-layer:nth-child(2) {
+        width: 192px;
+        height: 192px;
+        font-size: 44px;
+    }
+    
+    .immersive-cover-stack .immersive-cover-layer:nth-child(3) {
+        width: 200px;
+        height: 200px;
+        font-size: 48px;
+    }
+    
+    .immersive-lyrics {
+        min-height: 150px;
+        max-height: 200px;
+    }
+}
+
+.musicplayer-container {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    background: #1e1e1e;
+    color: #e0e0e0;
+    overflow: hidden;
+    position: relative;
+}
+
+/* 加载动画 */
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes shimmer {
+    0% {
+        background-position: -1000px 0;
+    }
+    100% {
+        background-position: 1000px 0;
+    }
+}
+
+.loading-spinner {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border: 3px solid rgba(236, 65, 65, 0.3);
+    border-top-color: #ec4141;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+.loading-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(30, 30, 30, 0.9);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    backdrop-filter: blur(5px);
+    animation: fadeIn 0.3s ease;
+}
+
+.loading-content {
+    text-align: center;
+    color: #e0e0e0;
+}
+
+.loading-content .loading-spinner {
+    margin: 0 auto 10px;
+    width: 40px;
+    height: 40px;
+    border-width: 4px;
+}
+
+.skeleton {
+    background: linear-gradient(90deg, #2a2a2a 25%, #333 50%, #2a2a2a 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+    border-radius: 4px;
+}
+
+/* 顶部搜索栏 */
+.musicplayer-topbar {
+    height: 60px;
+    background: linear-gradient(180deg, #2a2a2a 0%, #252525 100%);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    display: flex;
+    align-items: center;
+    padding: 0 20px;
+    gap: 20px;
+    flex-shrink: 0;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* 左侧边栏 */
+.musicplayer-sidebar {
+    width: 200px;
+    background: linear-gradient(180deg, #1a1a1a 0%, #181818 100%);
+    border-right: 1px solid rgba(255, 255, 255, 0.08);
+    display: flex;
+    flex-direction: column;
+    padding: 20px 0;
+    flex-shrink: 0;
+    overflow-y: auto;
+    box-shadow: inset -1px 0 10px rgba(0, 0, 0, 0.3);
+}
+
+.sidebar-menu-item {
+    padding: 12px 20px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 14px;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    color: #b3b3b3;
+    position: relative;
+    overflow: hidden;
+}
+
+.sidebar-menu-item::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 3px;
+    height: 100%;
+    background: #ec4141;
+    transform: scaleY(0);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transform-origin: bottom;
+}
+
+.sidebar-menu-item:hover {
+    background: linear-gradient(90deg, rgba(37, 37, 37, 0.8) 0%, rgba(42, 42, 42, 0.6) 100%);
+    color: #e0e0e0;
+    transform: translateX(3px);
+    padding-left: 23px;
+}
+
+.sidebar-menu-item:hover::before {
+    transform: scaleY(1);
+}
+
+.sidebar-menu-item.active {
+    background: linear-gradient(90deg, rgba(42, 42, 42, 0.9) 0%, rgba(37, 37, 37, 0.7) 100%);
+    color: #ec4141;
+    border-left: 3px solid #ec4141;
+    padding-left: 17px;
+    font-weight: 600;
+    box-shadow: inset 0 0 20px rgba(236, 65, 65, 0.1);
+}
+
+.sidebar-menu-item.active::before {
+    transform: scaleY(1);
+}
+
+.sidebar-menu-item span:first-child {
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    display: inline-block;
+}
+
+.sidebar-menu-item:hover span:first-child,
+.sidebar-menu-item.active span:first-child {
+    transform: scale(1.2) rotate(5deg);
+}
+
+/* 主内容区 */
+.musicplayer-main {
+    flex: 1;
+    overflow-y: auto;
+    background: linear-gradient(180deg, #1e1e1e 0%, #1a1a1a 100%);
+    padding: 20px;
+    position: relative;
+}
+
+/* 歌曲列表项通用样式 */
+.search-item,
+.rank-item,
+.playlist-detail-item,
+.artist-song-item,
+.daily-item {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+}
+
+.search-item::before,
+.rank-item::before,
+.playlist-detail-item::before,
+.artist-song-item::before,
+.daily-item::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 3px;
+    height: 100%;
+    background: #ec4141;
+    transform: scaleY(0);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transform-origin: bottom;
+}
+
+.search-item:hover,
+.rank-item:hover,
+.playlist-detail-item:hover,
+.artist-song-item:hover,
+.daily-item:hover {
+    background: linear-gradient(90deg, rgba(236, 65, 65, 0.1) 0%, rgba(42, 42, 42, 0.8) 100%) !important;
+    transform: translateX(5px);
+    box-shadow: -3px 0 10px rgba(236, 65, 65, 0.2);
+}
+
+.search-item:hover::before,
+.rank-item:hover::before,
+.playlist-detail-item:hover::before,
+.artist-song-item:hover::before,
+.daily-item:hover::before {
+    transform: scaleY(1);
+}
+
+.search-item:active,
+.rank-item:active,
+.playlist-detail-item:active,
+.artist-song-item:active,
+.daily-item:active {
+    transform: translateX(3px) scale(0.98);
+}
+
+/* 热门搜索标签 */
+.hot-search-item {
+    padding: 8px 16px;
+    background: rgba(42, 42, 42, 0.8);
+    border-radius: 20px;
+    cursor: pointer;
+    font-size: 14px;
+    display: inline-block;
+    margin: 5px;
+    border: 1px solid transparent;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    color: #e0e0e0;
+}
+
+.hot-search-item:hover {
+    background: linear-gradient(135deg, #ec4141 0%, #d63636 100%) !important;
+    transform: translateY(-2px) scale(1.05);
+    box-shadow: 0 4px 12px rgba(236, 65, 65, 0.4);
+    color: #ffffff !important;
+    border-color: rgba(236, 65, 65, 0.5);
+}
+
+/* 歌单卡片 */
+.playlist-item {
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+}
+
+.playlist-item::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(180deg, transparent 0%, rgba(0, 0, 0, 0.6) 100%);
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+
+.playlist-item:hover {
+    transform: translateY(-8px) scale(1.02) !important;
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.5);
+}
+
+.playlist-item:hover::after {
+    opacity: 1;
+}
+
+/* 歌手卡片 */
+.artist-item {
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+}
+
+.artist-item img {
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    border: 3px solid transparent;
+}
+
+.artist-item:hover {
+    transform: translateY(-8px) scale(1.05) !important;
+}
+
+.artist-item:hover img {
+    border-color: #ec4141;
+    box-shadow: 0 8px 20px rgba(236, 65, 65, 0.4);
+}
+
+.musicplayer-main::-webkit-scrollbar {
+    width: 8px;
+}
+
+.musicplayer-main::-webkit-scrollbar-track {
+    background: #1a1a1a;
+}
+
+.musicplayer-main::-webkit-scrollbar-thumb {
+    background: #3a3a3a;
+    border-radius: 4px;
+}
+
+    .musicplayer-main::-webkit-scrollbar-thumb:hover {
+        background: #4a4a4a;
+    }
+
+/* 小窗口下的滚动条优化 */
+@media (max-width: 800px) {
+    .musicplayer-sidebar::-webkit-scrollbar {
+        height: 4px;
+        width: auto;
+    }
+    
+    .musicplayer-sidebar::-webkit-scrollbar-thumb {
+        background: #4a4a4a;
+        border-radius: 2px;
+    }
+    
+    .musicplayer-main::-webkit-scrollbar {
+        width: 6px;
+    }
+}
+
+/* 底部播放栏 */
+.musicplayer-playerbar {
+    height: 80px;
+    background: linear-gradient(180deg, #252525 0%, #1f1f1f 100%);
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    display: flex;
+    align-items: center;
+    padding: 0 20px;
+    gap: 20px;
+    flex-shrink: 0;
+    box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.3);
+    backdrop-filter: blur(10px);
+}
+
+.player-cover {
+    width: 60px;
+    height: 60px;
+    background: #2a2a2a;
+    border-radius: 8px;
+    overflow: hidden;
+    flex-shrink: 0;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    cursor: pointer;
+    position: relative;
+}
+
+.player-cover::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: radial-gradient(circle at center, rgba(236, 65, 65, 0.1) 0%, transparent 70%);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    pointer-events: none;
+    z-index: 1;
+}
+
+.player-cover:hover {
+    transform: scale(1.1) rotate(5deg);
+    box-shadow: 0 6px 20px rgba(236, 65, 65, 0.4);
+}
+
+.player-cover:hover::before {
+    opacity: 1;
+}
+
+.player-cover.playing::before {
+    opacity: 0.3;
+    animation: coverPulse 2s ease-in-out infinite;
+}
+
+@keyframes coverPulse {
+    0%, 100% {
+        opacity: 0.3;
+    }
+    50% {
+        opacity: 0.6;
+    }
+}
+
+.player-cover img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.player-cover:hover img {
+    transform: scale(1.1);
+}
+
+.player-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.player-song-name {
+    font-size: 14px;
+    font-weight: 500;
+    color: #e0e0e0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.player-artist-name {
+    font-size: 12px;
+    color: #999;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.player-controls {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+}
+
+.player-controls > div:first-child {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.play-button {
+    width: 42px !important;
+    height: 42px !important;
+    background: linear-gradient(135deg, #ec4141 0%, #d63636 100%) !important;
+    color: white !important;
+    font-size: 20px !important;
+    box-shadow: 0 4px 12px rgba(236, 65, 65, 0.4);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.play-button:hover {
+    background: linear-gradient(135deg, #d63636 0%, #c02e2e 100%) !important;
+}
+
+/* 播放模式按钮 */
+.play-mode-button {
+    width: 32px !important;
+    height: 32px !important;
+    background: rgba(255, 255, 255, 0.1) !important;
+    color: #999 !important;
+    font-size: 16px !important;
+    border: none !important;
+    border-radius: 50% !important;
+    cursor: pointer;
+    transition: all 0.2s ease !important;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.play-mode-button:hover {
+    background: rgba(255, 255, 255, 0.2) !important;
+    color: #e0e0e0 !important;
+    transform: scale(1.1);
+}
+
+/* 音量控制 */
+.volume-container {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 120px;
+}
+
+.volume-bar {
+    flex: 1;
+    height: 4px;
+    background: #3a3a3a;
+    border-radius: 2px;
+    cursor: pointer;
+    position: relative;
+    transition: background 0.2s;
+}
+
+.volume-bar:hover {
+    background: #4a4a4a;
+}
+
+.volume-fill {
+    height: 100%;
+    background: #ec4141;
+    border-radius: 2px;
+    transition: width 0.1s;
+}
+
+.play-button:active {
+    transform: scale(0.95);
+}
+
+.progress-bar {
+    flex: 1;
+    height: 4px;
+    background: rgba(58, 58, 58, 0.6);
+    border-radius: 2px;
+    cursor: pointer;
+    position: relative;
+    transition: height 0.2s;
+}
+
+.progress-bar:hover {
+    height: 6px;
+}
+
+.progress-bar:hover .progress-fill {
+    box-shadow: 0 0 10px rgba(236, 65, 65, 0.6);
+}
+
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #ec4141 0%, #ff6b6b 100%);
+    border-radius: 2px;
+    width: 0%;
+    transition: width 0.1s, box-shadow 0.2s;
+    position: relative;
+}
+
+.progress-fill::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 12px;
+    height: 12px;
+    background: #ec4141;
+    border-radius: 50%;
+    opacity: 0;
+    transition: opacity 0.2s;
+    box-shadow: 0 0 8px rgba(236, 65, 65, 0.8);
+}
+
+.progress-bar:hover .progress-fill::after {
+    opacity: 1;
+}
+
+.time-current,
+.time-total {
+    font-size: 12px;
+    color: #999;
+    min-width: 40px;
+    text-align: center;
+}
+
+.player-volume {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 120px;
+}
+
+.volume-bar {
+    flex: 1;
+    height: 4px;
+    background: #3a3a3a;
+    border-radius: 2px;
+    cursor: pointer;
+    position: relative;
+}
+
+.volume-fill {
+    height: 100%;
+    background: #ec4141;
+    border-radius: 2px;
+    width: 70%;
+}
+
+/* 热门搜索 - 已在上方定义，此处删除重复 */
+
+/* 歌单列表 */
+.playlist-item {
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+
+.playlist-item:hover {
+    transform: translateY(-5px);
+}
+
+/* 排行榜 */
+.rank-list {
+    background: #252525;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.rank-item {
+    display: flex;
+    align-items: center;
+    padding: 12px 20px;
+    border-bottom: 1px solid #333;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.rank-item:hover {
+    background: #2a2a2a;
+}
+
+.rank-item:last-child {
+    border-bottom: none;
+}
+
+/* 歌手列表 */
+.artist-item {
+    cursor: pointer;
+    text-align: center;
+    transition: transform 0.2s;
+}
+
+.artist-item:hover {
+    transform: translateY(-5px);
+}
+
+/* 搜索列表 */
+.search-list,
+.playlist-detail-list,
+.artist-songs-list,
+.daily-list {
+    background: #252525;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.search-item,
+.playlist-detail-item,
+.artist-song-item,
+.daily-item {
+    display: flex;
+    align-items: center;
+    padding: 12px 20px;
+    border-bottom: 1px solid #333;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.search-item:hover,
+.playlist-detail-item:hover,
+.artist-song-item:hover,
+.daily-item:hover {
+    background: #2a2a2a;
+}
+
+.search-item:last-child,
+.playlist-detail-item:last-child,
+.artist-song-item:last-child,
+.daily-item:last-child {
+    border-bottom: none;
+}
+
+/* 返回按钮 */
+.back-button {
+    padding: 8px 16px;
+    background: #2a2a2a;
+    border: none;
+    border-radius: 4px;
+    color: #e0e0e0;
+    cursor: pointer;
+    margin-bottom: 20px;
+    transition: background 0.2s;
+}
+
+.back-button:hover {
+    background: #3a3a3a;
+}
+
+/* 响应式设计 */
+@media (max-width: 1000px) {
+    .musicplayer-sidebar {
+        width: 160px;
+    }
+    
+    .player-volume {
+        min-width: 80px;
+    }
+}
+
+/* 中等窗口适配 (800px以下) */
+@media (max-width: 800px) {
+    .musicplayer-container {
+        flex-direction: column;
+    }
+    
+    .musicplayer-sidebar {
+        width: 100% !important;
+        height: auto;
+        max-height: 200px;
+        border-right: none;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        flex-direction: row;
+        overflow-x: auto;
+        overflow-y: hidden;
+        padding: 10px;
+        box-shadow: inset 0 -1px 10px rgba(0, 0, 0, 0.3);
+    }
+    
+    .musicplayer-sidebar .sidebar-menu-item {
+        white-space: nowrap;
+        padding: 8px 16px !important;
+        margin: 0 4px;
+        min-width: auto;
+        flex-shrink: 0;
+    }
+    
+    .musicplayer-sidebar .sidebar-menu-item::before {
+        display: none;
+    }
+    
+    .musicplayer-sidebar .sidebar-menu-item:hover {
+        transform: translateY(-2px);
+        padding-left: 16px !important;
+    }
+    
+    .musicplayer-sidebar .sidebar-menu-item.active {
+        border-left: none;
+        border-bottom: 3px solid #ec4141;
+        padding-left: 16px !important;
+    }
+    
+    .musicplayer-main {
+        flex: 1;
+        min-height: 0;
+    }
+    
+    .musicplayer-playerbar {
+        height: auto;
+        min-height: 80px;
+        padding: 10px;
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+    
+    .player-cover {
+        width: 50px !important;
+        height: 50px !important;
+        flex-shrink: 0;
+    }
+    
+    .player-info {
+        min-width: 0;
+        flex: 1;
+    }
+    
+    .player-song-name {
+        font-size: 13px !important;
+    }
+    
+    .player-artist-name {
+        font-size: 11px !important;
+    }
+    
+    .player-controls {
+        width: 100%;
+        justify-content: center;
+        order: 3;
+    }
+    
+    .player-progress {
+        width: 100%;
+        order: 2;
+    }
+    
+    .player-volume {
+        order: 4;
+        min-width: 100px;
+    }
+}
+
+/* 小窗口适配 (600px以下) */
+@media (max-width: 600px) {
+    .musicplayer-sidebar {
+        max-height: 150px;
+        padding: 8px;
+    }
+    
+    .musicplayer-sidebar .sidebar-menu-item {
+        padding: 6px 12px;
+        font-size: 13px;
+        margin: 0 2px;
+    }
+    
+    .musicplayer-main {
+        padding: 15px;
+    }
+    
+    .musicplayer-playerbar {
+        padding: 8px;
+        gap: 8px;
+    }
+    
+    .player-cover {
+        width: 40px !important;
+        height: 40px !important;
+    }
+    
+    .player-song-name {
+        font-size: 12px !important;
+    }
+    
+    .player-artist-name {
+        font-size: 10px !important;
+    }
+    
+    .player-controls button {
+        width: 32px !important;
+        height: 32px !important;
+        font-size: 14px !important;
+    }
+    
+    .player-play-button {
+        width: 40px !important;
+        height: 40px !important;
+        font-size: 18px !important;
+    }
+    
+    .player-progress-bar {
+        height: 4px;
+    }
+    
+    .player-time {
+        font-size: 11px;
+    }
+    
+    .player-volume {
+        min-width: 80px;
+    }
+    
+    .volume-bar {
+        width: 60px;
+    }
+}
+
+/* 超小窗口适配 (400px以下) */
+@media (max-width: 400px) {
+    .musicplayer-sidebar {
+        max-height: 120px;
+        padding: 6px;
+    }
+    
+    .musicplayer-sidebar .sidebar-menu-item {
+        padding: 5px 10px;
+        font-size: 12px;
+    }
+    
+    .musicplayer-main {
+        padding: 10px;
+    }
+    
+    .musicplayer-playerbar {
+        padding: 6px;
+        min-height: 70px;
+    }
+    
+    .player-cover {
+        width: 35px !important;
+        height: 35px !important;
+    }
+    
+    .player-info {
+        min-width: 80px;
+    }
+    
+    .player-song-name {
+        font-size: 11px !important;
+    }
+    
+    .player-artist-name {
+        font-size: 9px !important;
+    }
+    
+    .player-controls {
+        gap: 6px;
+    }
+    
+    .player-controls button {
+        width: 28px !important;
+        height: 28px !important;
+        font-size: 12px !important;
+    }
+    
+    .player-play-button {
+        width: 36px !important;
+        height: 36px !important;
+        font-size: 16px !important;
+    }
+    
+    .player-progress {
+        gap: 6px;
+    }
+    
+    .player-time {
+        font-size: 10px;
+        min-width: 35px;
+    }
+    
+    .player-volume {
+        min-width: 60px;
+    }
+    
+    .volume-bar {
+        width: 50px;
+    }
+    
+    .volume-icon {
+        width: 24px !important;
+        height: 24px !important;
+        font-size: 12px !important;
+    }
+}
+
+/* 主内容区域响应式优化 */
+@media (max-width: 800px) {
+    .musicplayer-main {
+        padding: 15px !important;
+    }
+    
+    /* 搜索框优化 */
+    .musicplayer-main input[type="text"] {
+        font-size: 14px;
+        padding: 10px 15px;
+    }
+    
+    /* 列表项优化 */
+    .search-item,
+    .rank-item,
+    .playlist-detail-item,
+    .daily-item,
+    .artist-song-item {
+        padding: 10px !important;
+        gap: 10px !important;
+    }
+    
+    .search-item img,
+    .rank-item img,
+    .playlist-detail-item img,
+    .daily-item img,
+    .artist-song-item img {
+        width: 50px !important;
+        height: 50px !important;
+    }
+    
+    /* 歌单网格优化 */
+    .playlist-item {
+        min-width: 140px;
+    }
+    
+    .playlist-item img {
+        width: 140px;
+        height: 140px;
+    }
+}
+
+@media (max-width: 600px) {
+    .musicplayer-main {
+        padding: 10px !important;
+    }
+    
+    /* 搜索框优化 */
+    .musicplayer-main input[type="text"] {
+        font-size: 13px;
+        padding: 8px 12px;
+    }
+    
+    /* 列表项优化 */
+    .search-item,
+    .rank-item,
+    .playlist-detail-item,
+    .daily-item,
+    .artist-song-item {
+        padding: 8px !important;
+        gap: 8px !important;
+        flex-wrap: wrap;
+    }
+    
+    .search-item img,
+    .rank-item img,
+    .playlist-detail-item img,
+    .daily-item img,
+    .artist-song-item img {
+        width: 45px !important;
+        height: 45px !important;
+    }
+    
+    /* 歌单网格优化 */
+    .playlist-item {
+        min-width: 120px;
+    }
+    
+    .playlist-item img {
+        width: 120px;
+        height: 120px;
+    }
+    
+    /* 标题优化 */
+    .musicplayer-main h2 {
+        font-size: 18px;
+        margin-bottom: 15px;
+    }
+}
+
+@media (max-width: 400px) {
+    .musicplayer-main {
+        padding: 8px !important;
+    }
+    
+    /* 搜索框优化 */
+    .musicplayer-main input[type="text"] {
+        font-size: 12px;
+        padding: 6px 10px;
+    }
+    
+    /* 列表项优化 */
+    .search-item,
+    .rank-item,
+    .playlist-detail-item,
+    .daily-item,
+    .artist-song-item {
+        padding: 6px !important;
+        gap: 6px !important;
+    }
+    
+    .search-item img,
+    .rank-item img,
+    .playlist-detail-item img,
+    .daily-item img,
+    .artist-song-item img {
+        width: 40px !important;
+        height: 40px !important;
+    }
+    
+    /* 歌单网格优化 */
+    .playlist-item {
+        min-width: 100px;
+    }
+    
+    .playlist-item img {
+        width: 100px;
+        height: 100px;
+    }
+    
+    /* 标题优化 */
+    .musicplayer-main h2 {
+        font-size: 16px;
+        margin-bottom: 12px;
+    }
+    
+    /* 文本优化 */
+    .musicplayer-main div[style*="font-size: 14px"] {
+        font-size: 12px !important;
+    }
+    
+    .musicplayer-main div[style*="font-size: 12px"] {
+        font-size: 11px !important;
+    }
+}
+
+/* 小窗口布局样式（窗口宽度 < 800px 或高度 < 600px） */
+.immersive-player-view.immersive-small-layout .immersive-content {
+    padding: 40px 20px 30px 20px;
+    gap: 30px;
+}
+
+.immersive-player-view.immersive-small-layout .immersive-main-layout {
+    flex-direction: column;
+    gap: 30px;
+    align-items: center;
+}
+
+.immersive-player-view.immersive-small-layout .immersive-cover-stack {
+    width: 300px;
+    height: 300px;
+}
+
+.immersive-player-view.immersive-small-layout .immersive-cover-stack .immersive-cover-layer:nth-child(1) {
+    width: 270px;
+    height: 270px;
+    font-size: 60px;
+    transform: translate(8px, 8px);
+}
+
+.immersive-player-view.immersive-small-layout .immersive-cover-stack .immersive-cover-layer:nth-child(2) {
+    width: 288px;
+    height: 288px;
+    font-size: 66px;
+    transform: translate(6px, 6px);
+}
+
+.immersive-player-view.immersive-small-layout .immersive-cover-stack .immersive-cover-layer:nth-child(3) {
+    width: 300px;
+    height: 300px;
+    font-size: 72px;
+}
+
+.immersive-player-view.immersive-small-layout .immersive-song-name {
+    font-size: 24px;
+}
+
+.immersive-player-view.immersive-small-layout .immersive-artist-name {
+    font-size: 14px;
+}
+
+.immersive-player-view.immersive-small-layout .immersive-right-section {
+    width: 100%;
+    max-width: 100%;
+}
+
+.immersive-player-view.immersive-small-layout .immersive-lyrics {
+    min-height: 200px;
+    max-height: 300px;
+    font-size: 15px;
+    padding: 15px;
+}
+
+.immersive-player-view.immersive-small-layout .lyric-line {
+    font-size: 15px;
+    margin: 8px 0;
+}
+
+.immersive-player-view.immersive-small-layout .lyric-line.active {
+    font-size: 18px;
+}
+
+.immersive-player-view.immersive-small-layout .immersive-controls {
+    padding: 15px 0;
+}
+
+.immersive-player-view.immersive-small-layout .immersive-play-button {
+    width: 56px !important;
+    height: 56px !important;
+    font-size: 24px !important;
+}
+
+.immersive-player-view.immersive-small-layout .immersive-control-buttons {
+    gap: 20px;
+}
+
+.immersive-player-view.immersive-small-layout .immersive-control-buttons button {
+    width: 40px !important;
+    height: 40px !important;
+    font-size: 18px !important;
+}
+
+/* 手机布局样式（窗口宽度 < 600px） */
+.immersive-player-view.immersive-mobile-layout .immersive-content {
+    padding: 20px 15px 20px 15px;
+    gap: 20px;
+    justify-content: flex-start;
+    overflow-y: auto;
+}
+
+.immersive-player-view.immersive-mobile-layout .immersive-main-layout {
+    flex-direction: column;
+    gap: 20px;
+    align-items: center;
+    width: 100%;
+}
+
+.immersive-player-view.immersive-mobile-layout .immersive-left-section {
+    width: 100%;
+    max-width: 100%;
+    gap: 15px;
+}
+
+.immersive-player-view.immersive-mobile-layout .immersive-cover-stack {
+    width: 240px;
+    height: 240px;
+}
+
+.immersive-player-view.immersive-mobile-layout .immersive-cover-stack .immersive-cover-layer:nth-child(1) {
+    width: 216px;
+    height: 216px;
+    font-size: 48px;
+    transform: translate(6px, 6px);
+}
+
+.immersive-player-view.immersive-mobile-layout .immersive-cover-stack .immersive-cover-layer:nth-child(2) {
+    width: 230px;
+    height: 230px;
+    font-size: 53px;
+    transform: translate(5px, 5px);
+}
+
+.immersive-player-view.immersive-mobile-layout .immersive-cover-stack .immersive-cover-layer:nth-child(3) {
+    width: 240px;
+    height: 240px;
+    font-size: 58px;
+}
+
+.immersive-player-view.immersive-mobile-layout .immersive-song-info {
+    width: 100%;
+    text-align: center;
+}
+
+.immersive-player-view.immersive-mobile-layout .immersive-song-name {
+    font-size: 20px;
+    margin-bottom: 6px;
+}
+
+.immersive-player-view.immersive-mobile-layout .immersive-artist-name {
+    font-size: 13px;
+    margin-bottom: 12px;
+}
+
+.immersive-player-view.immersive-mobile-layout .immersive-current-song {
+    font-size: 11px;
+    padding: 8px 12px;
+    margin-top: 10px;
+}
+
+.immersive-player-view.immersive-mobile-layout .immersive-right-section {
+    width: 100%;
+    max-width: 100%;
+    gap: 15px;
+    order: 3;
+}
+
+.immersive-player-view.immersive-mobile-layout .immersive-lyrics {
+    min-height: 150px;
+    max-height: 250px;
+    font-size: 14px;
+    padding: 12px;
+    order: 1;
+}
+
+.immersive-player-view.immersive-mobile-layout .lyric-line {
+    font-size: 14px;
+    margin: 6px 0;
+    line-height: 1.5;
+}
+
+.immersive-player-view.immersive-mobile-layout .lyric-line.active {
+    font-size: 16px;
+    margin: 8px 0;
+}
+
+.immersive-player-view.immersive-mobile-layout .immersive-credits {
+    font-size: 11px;
+    padding: 10px;
+    gap: 5px;
+    order: 2;
+}
+
+.immersive-player-view.immersive-mobile-layout .immersive-controls {
+    padding: 12px 0;
+    order: 4;
+    width: 100%;
+}
+
+.immersive-player-view.immersive-mobile-layout .immersive-progress-container {
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+}
+
+.immersive-player-view.immersive-mobile-layout .immersive-progress-bar {
+    width: 100%;
+    order: 2;
+}
+
+.immersive-player-view.immersive-mobile-layout .immersive-time {
+    font-size: 11px;
+    min-width: 35px;
+}
+
+.immersive-player-view.immersive-mobile-layout .immersive-time:first-child {
+    order: 1;
+}
+
+.immersive-player-view.immersive-mobile-layout .immersive-time:last-child {
+    order: 3;
+}
+
+.immersive-player-view.immersive-mobile-layout .immersive-control-buttons {
+    gap: 15px;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.immersive-player-view.immersive-mobile-layout .immersive-control-buttons button {
+    width: 36px !important;
+    height: 36px !important;
+    font-size: 16px !important;
+}
+
+.immersive-player-view.immersive-mobile-layout .immersive-play-button {
+    width: 50px !important;
+    height: 50px !important;
+    font-size: 22px !important;
+}
+
+.immersive-player-view.immersive-mobile-layout .immersive-close-btn {
+    width: 32px;
+    height: 32px;
+    font-size: 16px;
+    top: 10px;
+    right: 10px;
+}
+
+/* 手机布局下的滚动优化 */
+.immersive-player-view.immersive-mobile-layout .immersive-content {
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+}
+
+.immersive-player-view.immersive-mobile-layout .immersive-content::-webkit-scrollbar {
+    width: 4px;
+}
+
+.immersive-player-view.immersive-mobile-layout .immersive-content::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 2px;
+}
+
+/* ========== 沉浸式模式 - 不同宽高比布局 ========== */
+
+/* 超宽屏布局 (宽高比 > 2.0) */
+.immersive-player-view.immersive-ultrawide-layout .immersive-main-layout {
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 40px !important;
+}
+
+.immersive-player-view.immersive-ultrawide-layout .immersive-left-section {
+    max-width: 350px !important;
+    flex: 0 0 auto !important;
+}
+
+.immersive-player-view.immersive-ultrawide-layout .immersive-cover-stack {
+    width: 350px !important;
+    height: 350px !important;
+}
+
+.immersive-player-view.immersive-ultrawide-layout .immersive-cover-stack .immersive-cover-layer:nth-child(1) {
+    width: 315px !important;
+    height: 315px !important;
+    font-size: 70px !important;
+}
+
+.immersive-player-view.immersive-ultrawide-layout .immersive-cover-stack .immersive-cover-layer:nth-child(2) {
+    width: 336px !important;
+    height: 336px !important;
+    font-size: 77px !important;
+}
+
+.immersive-player-view.immersive-ultrawide-layout .immersive-cover-stack .immersive-cover-layer:nth-child(3) {
+    width: 350px !important;
+    height: 350px !important;
+    font-size: 84px !important;
+}
+
+.immersive-player-view.immersive-ultrawide-layout .immersive-right-section {
+    flex: 1 !important;
+    max-width: none !important;
+    min-width: 300px !important;
+}
+
+/* 横屏布局 (宽高比 > 1.3) */
+.immersive-player-view.immersive-landscape-layout .immersive-main-layout {
+    flex-direction: row !important;
+    align-items: flex-start !important;
+    gap: 60px !important;
+}
+
+.immersive-player-view.immersive-landscape-layout .immersive-left-section {
+    max-width: 500px !important;
+    flex: 0 0 auto !important;
+}
+
+.immersive-player-view.immersive-landscape-layout .immersive-right-section {
+    flex: 1 !important;
+    max-width: 600px !important;
+    min-width: 400px !important;
+}
+
+/* 正方形布局 (0.8 <= 宽高比 <= 1.3) */
+.immersive-player-view.immersive-square-layout .immersive-main-layout {
+    flex-direction: column !important;
+    align-items: center !important;
+    gap: 40px !important;
+}
+
+.immersive-player-view.immersive-square-layout .immersive-content {
+    padding: 50px 40px 40px 40px !important;
+}
+
+.immersive-player-view.immersive-square-layout .immersive-left-section {
+    max-width: 450px !important;
+    width: 100% !important;
+}
+
+.immersive-player-view.immersive-square-layout .immersive-cover-stack {
+    width: 450px !important;
+    height: 450px !important;
+}
+
+.immersive-player-view.immersive-square-layout .immersive-cover-stack .immersive-cover-layer:nth-child(1) {
+    width: 405px !important;
+    height: 405px !important;
+    font-size: 90px !important;
+}
+
+.immersive-player-view.immersive-square-layout .immersive-cover-stack .immersive-cover-layer:nth-child(2) {
+    width: 432px !important;
+    height: 432px !important;
+    font-size: 99px !important;
+}
+
+.immersive-player-view.immersive-square-layout .immersive-cover-stack .immersive-cover-layer:nth-child(3) {
+    width: 450px !important;
+    height: 450px !important;
+    font-size: 108px !important;
+}
+
+.immersive-player-view.immersive-square-layout .immersive-right-section {
+    max-width: 600px !important;
+    width: 100% !important;
+    min-width: auto !important;
+}
+
+/* 竖屏布局 (宽高比 < 0.8) */
+.immersive-player-view.immersive-portrait-layout .immersive-main-layout {
+    flex-direction: column !important;
+    align-items: center !important;
+    gap: 30px !important;
+}
+
+.immersive-player-view.immersive-portrait-layout .immersive-content {
+    padding: 40px 30px 30px 30px !important;
+    gap: 30px !important;
+}
+
+.immersive-player-view.immersive-portrait-layout .immersive-left-section {
+    max-width: 400px !important;
+    width: 100% !important;
+}
+
+.immersive-player-view.immersive-portrait-layout .immersive-cover-stack {
+    width: 400px !important;
+    height: 400px !important;
+}
+
+.immersive-player-view.immersive-portrait-layout .immersive-cover-stack .immersive-cover-layer:nth-child(1) {
+    width: 360px !important;
+    height: 360px !important;
+    font-size: 80px !important;
+}
+
+.immersive-player-view.immersive-portrait-layout .immersive-cover-stack .immersive-cover-layer:nth-child(2) {
+    width: 384px !important;
+    height: 384px !important;
+    font-size: 88px !important;
+}
+
+.immersive-player-view.immersive-portrait-layout .immersive-cover-stack .immersive-cover-layer:nth-child(3) {
+    width: 400px !important;
+    height: 400px !important;
+    font-size: 96px !important;
+}
+
+.immersive-player-view.immersive-portrait-layout .immersive-right-section {
+    max-width: 500px !important;
+    width: 100% !important;
+    min-width: auto !important;
+}
+
+.immersive-player-view.immersive-portrait-layout .immersive-lyrics {
+    min-height: 200px !important;
+    max-height: 400px !important;
+}
+

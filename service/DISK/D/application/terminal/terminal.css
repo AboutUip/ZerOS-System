@@ -1,0 +1,624 @@
+/* 黑白高对比度 Bash 风格终端样式 */
+:root {
+  --bg: #0b0f12;
+  --fg: #d7e0dd;
+  --accent: #00ff6a; /* Kali-like green */
+  --muted: #9aa6a0;
+}
+
+#terminal {
+  box-sizing: border-box;
+  height: 100vh;
+  width: 100vw;
+  padding: 12px 12px 16px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow: hidden;
+  /* 视觉增强：圆角、内阴影 */
+  border-radius: 6px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.6) inset, 0 8px 30px rgba(0, 0, 0, 0.6);
+}
+
+/* 顶部标题栏（纯视觉） */
+#terminal .bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 8px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--muted);
+  font-size: 0.95rem;
+  user-select: none;
+}
+#terminal .bar .title {
+  font-weight: 600;
+  color: var(--fg);
+}
+
+/* bash-window 容器 */
+.bash-window {
+  display: flex;
+  flex-direction: column;
+  height: 78vh;
+  width: min(1100px, 96vw);
+  max-width: 1100px;
+  min-width: 480px;
+  min-height: 320px;
+  /* 不透明背景，确保窗口清晰可见 */
+  background: #1e1e1e;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  box-shadow: 0 22px 60px rgba(0, 0, 0, 0.65);
+  overflow: hidden;
+  position: fixed;
+  /* 默认居中，但可以通过JS设置不同的偏移 */
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  transition: border-radius 0.2s ease, z-index 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease,
+              opacity 0.3s ease, transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), scale 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  user-select: none;
+  /* 默认z-index，未激活的窗口 */
+  z-index: 1000;
+}
+
+/* 最小化动画 */
+.bash-window.minimizing {
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.8) translateY(20px);
+  pointer-events: none;
+}
+
+.bash-window.minimized {
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* 恢复动画 */
+.bash-window.restoring {
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.8) translateY(20px);
+  animation: restoreWindow 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+@keyframes restoreWindow {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.8) translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1) translateY(0);
+  }
+}
+
+/* 获得焦点的窗口样式 */
+/* 注意：如果使用GUIManager，焦点管理由GUIManager统一处理 */
+.bash-window.focused:not(.zos-gui-window) {
+  /* 仅在不使用GUIManager时应用（降级方案） */
+  /* 焦点窗口在最上层 */
+  z-index: 10000 !important;
+  /* 增强边框和阴影，突出焦点状态 */
+  border-color: rgba(78, 201, 176, 0.5);
+  box-shadow: 0 22px 60px rgba(0, 0, 0, 0.85), 0 0 20px rgba(78, 201, 176, 0.3);
+}
+
+.bash-window.zos-gui-window.zos-window-focused {
+  /* 使用GUIManager时的焦点样式 */
+  /* z-index由GUIManager管理，不在这里设置 */
+  border-color: rgba(78, 201, 176, 0.5);
+  box-shadow: 0 22px 60px rgba(0, 0, 0, 0.85), 0 0 20px rgba(78, 201, 176, 0.3);
+}
+
+/* 未获得焦点的窗口样式 */
+/* 注意：如果使用GUIManager，焦点管理由GUIManager统一处理 */
+.bash-window:not(.focused):not(.zos-gui-window) {
+  /* 仅在不使用GUIManager时应用（降级方案） */
+  /* 降低未激活窗口的z-index */
+  z-index: 1000;
+  /* 降低未激活窗口的视觉突出度 */
+  opacity: 0.85;
+  border-color: rgba(255, 255, 255, 0.05);
+}
+
+.bash-window.zos-gui-window:not(.zos-window-focused) {
+  /* 使用GUIManager时的未焦点样式 */
+  /* z-index和opacity由GUIManager管理 */
+  border-color: rgba(255, 255, 255, 0.05);
+}
+
+/* 全屏模式 */
+.bash-window.fullscreen {
+  border-radius: 0;
+  box-shadow: none;
+}
+
+/* 窗口resizer */
+.bash-window .window-resizer {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  background: transparent;
+  z-index: 1000;
+}
+
+/* 右下角resizer */
+.bash-window .window-resizer.bottom-right {
+  right: 0;
+  bottom: 0;
+  cursor: se-resize;
+  border-right: 2px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0 0 6px 0;
+}
+
+.bash-window .window-resizer.bottom-right:hover {
+  border-right-color: rgba(255, 255, 255, 0.2);
+  border-bottom-color: rgba(255, 255, 255, 0.2);
+}
+
+/* 右上角resizer */
+.bash-window .window-resizer.top-right {
+  right: 0;
+  top: 0;
+  cursor: ne-resize;
+  border-right: 2px solid rgba(255, 255, 255, 0.1);
+  border-top: 2px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0 6px 0 0;
+}
+
+.bash-window .window-resizer.top-right:hover {
+  border-right-color: rgba(255, 255, 255, 0.2);
+  border-top-color: rgba(255, 255, 255, 0.2);
+}
+
+/* 全屏时隐藏所有resizer */
+.bash-window.fullscreen .window-resizer {
+  display: none;
+}
+
+.controls {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.dot {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.4) inset;
+}
+.dot.close {
+  background: #ff5f57;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+}
+
+.dot.close:hover {
+  opacity: 0.8;
+}
+
+.dot.minimize {
+  background: #ffbd2e;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+}
+
+.dot.minimize:hover {
+  opacity: 0.8;
+}
+
+.dot.maximize {
+  background: #28c840;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+}
+
+.dot.maximize:hover {
+  opacity: 0.8;
+}
+
+/* 输入区域（顶部） */
+.input-area {
+  padding: 12px 14px;
+  background: transparent;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.02);
+}
+.input-area .prompt {
+  font-weight: 700;
+}
+
+/* Kali-like prompt color & blinking caret */
+.prompt {
+  color: var(--accent);
+  font-weight: 700;
+}
+.cmd {
+  position: relative;
+  display: inline-block;
+  min-width: 1ch;
+  line-height: 1.2;
+  white-space: pre-wrap;
+  caret-color: var(--accent);
+  transition: outline 0.2s ease;
+  outline: 1px solid transparent;
+}
+
+.cmd.focused {
+  outline: 1px solid rgba(0, 255, 106, 0.3);
+  outline-offset: 2px;
+}
+
+/* 拖拽手柄 */
+.bar {
+  cursor: grab;
+}
+.bar.dragging {
+  cursor: grabbing;
+}
+
+/* 全屏时禁用拖拽 */
+.bash-window.fullscreen .bar {
+  cursor: default !important;
+}
+
+/* 当窗口变为浮动（拖拽后）移除 transform 以便 left/top 生效 */
+.bash-window.floating {
+  transform: none;
+}
+
+/* 小屏幕回退为全屏，禁用拖拽 */
+@media (max-width: 760px) {
+  .bash-window {
+    position: static;
+    transform: none;
+    width: 100%;
+    height: 100vh;
+    border-radius: 0;
+  }
+  .bar {
+    cursor: default;
+  }
+}
+
+/* resizer handle */
+.resizer {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  width: 18px;
+  height: 18px;
+  cursor: se-resize;
+  background: transparent;
+  border-right: 2px solid rgba(255, 255, 255, 0.04);
+  border-bottom: 2px solid rgba(255, 255, 255, 0.04);
+  border-radius: 2px;
+  z-index: 50;
+}
+
+/* disabled input state */
+.cmd[contenteditable="false"] {
+  opacity: 0.6;
+  caret-color: transparent;
+  pointer-events: none;
+}
+
+/* prompt Kali style */
+.prompt {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+#output {
+  flex: 1 1 auto;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  padding: 12px;
+}
+
+/* Scrollbar styles to mimic modern terminal (thin, high-contrast thumb) */
+.bash-window .output-scrollbar,
+#output {
+  scrollbar-width: thin;
+  scrollbar-color: var(--muted) transparent;
+}
+#output::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+#output::-webkit-scrollbar-track {
+  background: transparent;
+}
+#output::-webkit-scrollbar-thumb {
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.06),
+    rgba(255, 255, 255, 0.02)
+  );
+  border-radius: 6px;
+  border: 2px solid rgba(0, 0, 0, 0);
+}
+#output::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.12),
+    rgba(255, 255, 255, 0.04)
+  );
+}
+
+/* overlay scrollbar optional class */
+.scrollbar-overlay #output::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+}
+.line {
+  /* 输入行 */
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+.prompt {
+  color: var(--accent);
+  user-select: none;
+  white-space: pre;
+}
+.cmd {
+  outline: none;
+  caret-color: var(--accent);
+  color: var(--fg);
+  background: transparent;
+  border: 0;
+  min-width: 8px;
+  white-space: pre;
+}
+.cmd:focus {
+  box-shadow: inset -1px 0 0 0 var(--bg);
+  outline: none;
+}
+
+.cmd.disabled {
+  opacity: 0.6;
+}
+
+/* 简单的光标动画：通过伪元素在 .cmd 内模拟光标会影响编辑体验，使用 caret-color 即可 */
+
+/* 响应式字体大小 */
+html {
+  font-size: 16px;
+}
+@media (max-width: 800px) {
+  html {
+    font-size: 14px;
+  }
+}
+@media (max-width: 420px) {
+  html {
+    font-size: 13px;
+  }
+}
+
+/* 可滚动的输出区域滚动条高对比 */
+#output::-webkit-scrollbar {
+  height: 8px;
+  width: 8px;
+}
+#output::-webkit-scrollbar-thumb {
+  background: var(--muted);
+  border-radius: 4px;
+}
+
+/* 输出行样式与简单入场动画 */
+.out-line {
+  color: var(--muted);
+  padding: 2px 0;
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity 180ms ease, transform 180ms ease;
+}
+.out-line.visible {
+  opacity: 1;
+  transform: none;
+}
+
+.cmd-line .prompt {
+  color: var(--accent);
+  font-weight: 700;
+}
+.cmd-line .cmd {
+  color: var(--fg);
+  font-weight: 600;
+}
+
+/* 小提示样式 */
+.sys-msg {
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+/* 标签页样式 */
+.tabs-container {
+  display: flex;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.02);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  padding: 0 6px;
+  height: 28px; /* 固定高度，更紧凑 */
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.tabs-bar {
+  display: flex;
+  flex: 1;
+  overflow-x: auto;
+  overflow-y: hidden;
+  gap: 2px;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  align-items: center;
+}
+
+.tabs-bar::-webkit-scrollbar {
+  display: none;
+}
+
+.tab {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px; /* 减少padding，使tab更紧凑 */
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-bottom: none;
+  border-radius: 3px 3px 0 0;
+  color: var(--muted);
+  font-size: 12px; /* 稍微减小字体 */
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+  position: relative;
+  min-width: 70px;
+  max-width: 180px;
+  height: 24px; /* 固定高度 */
+  line-height: 1;
+}
+
+.tab:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--fg);
+}
+
+.tab.active {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--fg);
+  border-color: rgba(255, 255, 255, 0.1);
+  border-bottom-color: transparent;
+  z-index: 10;
+}
+
+.tab.active::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--accent);
+}
+
+.tab-title {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tab-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px; /* 稍微减小关闭按钮尺寸 */
+  height: 14px;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-size: 12px; /* 调整关闭按钮字体大小 */
+  line-height: 1;
+  padding: 0;
+  border: none;
+}
+
+.tab-close:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--fg);
+}
+
+.tab-add-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px; /* 减小添加按钮尺寸，与tab高度匹配 */
+  height: 22px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 3px;
+  color: var(--muted);
+  font-size: 14px; /* 减小字体 */
+  line-height: 1;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.tab-add-btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--accent);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+/* 终端容器 */
+.terminals-container {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.terminal-instance {
+  display: none;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+}
+
+.terminal-instance.active {
+  display: flex;
+}
+
+.terminal-instance .output {
+  flex: 1 1 auto;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  padding: 12px;
+}
+
+.terminal-instance .input-line {
+  padding: 12px 14px;
+  background: transparent;
+  border-top: 1px solid rgba(255, 255, 255, 0.02);
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.terminal-instance .resizer {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  width: 18px;
+  height: 18px;
+  cursor: se-resize;
+  background: transparent;
+  border-right: 2px solid rgba(255, 255, 255, 0.04);
+  border-bottom: 2px solid rgba(255, 255, 255, 0.04);
+  border-radius: 2px;
+  z-index: 50;
+}
+

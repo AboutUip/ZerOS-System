@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="handGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#8b5cf6;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#6366f1;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- 手掌 -->
+  <ellipse cx="32" cy="40" rx="12" ry="16" fill="url(#handGradient)" opacity="0.8"/>
+  
+  <!-- 拇指 -->
+  <ellipse cx="20" cy="30" rx="4" ry="8" fill="url(#handGradient)" opacity="0.9"/>
+  <circle cx="18" cy="22" r="3" fill="url(#handGradient)"/>
+  
+  <!-- 食指 -->
+  <ellipse cx="28" cy="20" rx="3" ry="10" fill="url(#handGradient)" opacity="0.9"/>
+  <circle cx="28" cy="12" r="2.5" fill="url(#handGradient)"/>
+  
+  <!-- 中指 -->
+  <ellipse cx="32" cy="18" rx="3" ry="12" fill="url(#handGradient)" opacity="0.9"/>
+  <circle cx="32" cy="8" r="2.5" fill="url(#handGradient)"/>
+  
+  <!-- 无名指 -->
+  <ellipse cx="36" cy="20" rx="3" ry="10" fill="url(#handGradient)" opacity="0.9"/>
+  <circle cx="36" cy="12" r="2.5" fill="url(#handGradient)"/>
+  
+  <!-- 小指 -->
+  <ellipse cx="40" cy="24" rx="2.5" ry="8" fill="url(#handGradient)" opacity="0.9"/>
+  <circle cx="40" cy="18" r="2" fill="url(#handGradient)"/>
+  
+  <!-- 连接线（骨架效果） -->
+  <line x1="32" y1="40" x2="20" y2="30" stroke="#ffffff" stroke-width="1.5" opacity="0.6"/>
+  <line x1="32" y1="40" x2="28" y2="20" stroke="#ffffff" stroke-width="1.5" opacity="0.6"/>
+  <line x1="32" y1="40" x2="32" y2="18" stroke="#ffffff" stroke-width="1.5" opacity="0.6"/>
+  <line x1="32" y1="40" x2="36" y2="20" stroke="#ffffff" stroke-width="1.5" opacity="0.6"/>
+  <line x1="32" y1="40" x2="40" y2="24" stroke="#ffffff" stroke-width="1.5" opacity="0.6"/>
+</svg>
+

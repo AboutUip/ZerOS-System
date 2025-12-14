@@ -1,0 +1,59 @@
+.controller > .settings{
+    width: 60px;
+    height: 60px;
+    position: absolute;
+    right: -10px;
+    top: 0px;
+}
+.sp-setting{
+    font-size: 2rem;
+    color: #d2eaff;
+    font-weight: 600;
+    margin-top: 10px;
+    margin-left: 3%;
+}
+.area-set-ui{
+    outline: 1px solid white;
+    width: 94%;
+    position: relative;
+    left: 3%;
+    height: 400px;
+    border-radius: 15px;
+    backdrop-filter: blur(50px);
+    margin-top: 10px;
+}
+.set-colltro{
+    width: 98%;
+    position: relative;
+    left: 1%;
+    top: 10px;
+    height: 40px;
+    border-bottom: 1px solid white;
+}
+.set-colltro > img{
+    height: 40px;
+    width: 40px;
+    position: absolute;
+    top: 0px;
+    left: 0px;
+}
+.set-colltro > p{
+    position: absolute;
+    left: 50px;
+    top: 0px;
+    color: #d2eaff;
+    font-size: 1.5rem;
+    line-height: 40px;
+}
+.set-coll-cont{
+    width: 40%;
+    height: 40px;
+    position: absolute;
+    top: 0px;
+    right: 0px;
+}
+#text-size-slider{
+    position: relative;
+    top: 50%;
+    transform: translateY(-50%);
+}

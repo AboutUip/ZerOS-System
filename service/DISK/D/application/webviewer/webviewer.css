@@ -1,0 +1,150 @@
+/* ZerOS WebViewer 样式 - Ubuntu风格 */
+
+.webviewer-window {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* 确保标题栏可见 */
+.webviewer-window .zos-window-titlebar {
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    z-index: 10;
+}
+
+/* 确保窗口控制按钮可见 */
+.webviewer-window .zos-window-controls {
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+.webviewer-window .zos-window-btn {
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+/* 确保关闭按钮可见 */
+.webviewer-window .zos-window-btn-close {
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+/* 工具栏 */
+.webviewer-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    background: linear-gradient(180deg, rgba(26, 31, 46, 0.95) 0%, rgba(22, 33, 62, 0.95) 100%);
+    border-bottom: 1px solid rgba(139, 92, 246, 0.2);
+    flex-shrink: 0;
+    height: 56px;
+    min-height: 56px;
+    max-height: 56px;
+    box-sizing: border-box;
+    overflow: hidden;
+}
+
+/* 工具栏按钮 */
+.webviewer-toolbar-btn {
+    width: 36px;
+    height: 36px;
+    border: none;
+    background: rgba(139, 92, 246, 0.1);
+    color: rgba(215, 224, 221, 0.9);
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    user-select: none;
+}
+
+.webviewer-toolbar-btn:hover {
+    background: rgba(139, 92, 246, 0.2);
+    transform: translateY(-1px);
+}
+
+.webviewer-toolbar-btn:active {
+    transform: translateY(0);
+    background: rgba(139, 92, 246, 0.3);
+}
+
+/* 路径显示 */
+.webviewer-path-display {
+    flex: 1;
+    padding: 0 16px;
+    display: flex;
+    align-items: center;
+    color: rgba(215, 224, 221, 0.7);
+    font-size: 13px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* 内容区域 */
+.webviewer-content {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+    background: #ffffff;
+    min-height: 0;
+}
+
+/* iframe容器 */
+.webviewer-iframe-container {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    isolation: isolate;
+    contain: layout style paint;
+}
+
+/* iframe */
+.webviewer-iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+    background: #ffffff;
+}
+
+/* 加载指示器 */
+.webviewer-loading-indicator {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: rgba(26, 31, 46, 0.9);
+    z-index: 1000;
+}
+
+/* 空状态 */
+.webviewer-empty-state {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: rgba(26, 31, 46, 0.95);
+    color: rgba(215, 224, 221, 0.7);
+    font-size: 16px;
+    z-index: 999;
+}
+

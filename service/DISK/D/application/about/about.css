@@ -1,0 +1,99 @@
+/* ZerOS 系统信息 - 样式 */
+
+.about-window {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen", "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    color: var(--theme-text, #d7e0dd);
+    background: var(--theme-background-elevated, rgba(15, 20, 30, 0.95));
+}
+
+.about-content {
+    background: var(--theme-background, rgba(15, 20, 30, 0.6));
+    backdrop-filter: blur(20px);
+}
+
+.about-logo-section {
+    animation: fadeIn 0.6s ease-out;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.about-logo-section img {
+    transition: transform 0.3s ease;
+}
+
+.about-logo-section img:hover {
+    transform: scale(1.05);
+}
+
+.about-system-info,
+.about-developer,
+.about-host-info {
+    animation: slideIn 0.6s ease-out;
+    animation-fill-mode: both;
+}
+
+.about-system-info {
+    animation-delay: 0.1s;
+}
+
+.about-developer {
+    animation-delay: 0.2s;
+}
+
+.about-host-info {
+    animation-delay: 0.3s;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateX(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+.about-system-info h2,
+.about-developer h2,
+.about-host-info h2 {
+    transition: color 0.3s ease;
+}
+
+.about-system-info:hover h2,
+.about-developer:hover h2,
+.about-host-info:hover h2 {
+    color: var(--theme-primary, #6c8eff);
+}
+
+/* 滚动条样式 */
+.about-content::-webkit-scrollbar {
+    width: 8px;
+}
+
+.about-content::-webkit-scrollbar-track {
+    background: var(--theme-background-secondary, rgba(20, 25, 35, 0.3));
+    border-radius: 4px;
+}
+
+.about-content::-webkit-scrollbar-thumb {
+    background: var(--theme-primary, rgba(108, 142, 255, 0.5));
+    border-radius: 4px;
+}
+
+.about-content::-webkit-scrollbar-thumb:hover {
+    background: var(--theme-primary, rgba(108, 142, 255, 0.7));
+}
+

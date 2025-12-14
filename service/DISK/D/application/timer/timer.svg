@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="timerGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#8b5cf6;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#ff6b9d;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#60a5fa;stop-opacity:1" />
+    </linearGradient>
+    <radialGradient id="timerGlow" cx="50%" cy="50%">
+      <stop offset="0%" style="stop-color:#ffffff;stop-opacity:0.8" />
+      <stop offset="100%" style="stop-color:#8b5cf6;stop-opacity:0.3" />
+    </radialGradient>
+  </defs>
+  
+  <!-- 外圈 -->
+  <circle cx="32" cy="32" r="30" fill="none" stroke="url(#timerGradient)" stroke-width="2" opacity="0.8"/>
+  
+  <!-- 中圈 -->
+  <circle cx="32" cy="32" r="24" fill="none" stroke="url(#timerGradient)" stroke-width="1.5" opacity="0.6"/>
+  
+  <!-- 内圈 -->
+  <circle cx="32" cy="32" r="18" fill="url(#timerGlow)" opacity="0.4"/>
+  
+  <!-- 时针 -->
+  <line x1="32" y1="32" x2="32" y2="20" stroke="#8b5cf6" stroke-width="3" stroke-linecap="round"/>
+  
+  <!-- 分针 -->
+  <line x1="32" y1="32" x2="32" y2="16" stroke="#ff6b9d" stroke-width="2" stroke-linecap="round"/>
+  
+  <!-- 秒针 -->
+  <line x1="32" y1="32" x2="32" y2="14" stroke="#60a5fa" stroke-width="1.5" stroke-linecap="round"/>
+  
+  <!-- 中心点 -->
+  <circle cx="32" cy="32" r="2" fill="#ffffff"/>
+  
+  <!-- 装饰点（12个位置） -->
+  <circle cx="32" cy="8" r="1.5" fill="#8b5cf6" opacity="0.8"/>
+  <circle cx="32" cy="56" r="1.5" fill="#8b5cf6" opacity="0.8"/>
+  <circle cx="8" cy="32" r="1.5" fill="#ff6b9d" opacity="0.8"/>
+  <circle cx="56" cy="32" r="1.5" fill="#ff6b9d" opacity="0.8"/>
+  
+  <!-- 小爱心装饰 -->
+  <path d="M 20 20 Q 20 16, 22 16 Q 24 16, 24 20 Q 24 24, 20 28 Q 16 24, 16 20 Q 16 16, 18 16 Q 20 16, 20 20" 
+        fill="#ff6b9d" opacity="0.6" transform="scale(0.3) translate(60, 60)"/>
+  <path d="M 20 20 Q 20 16, 22 16 Q 24 16, 24 20 Q 24 24, 20 28 Q 16 24, 16 20 Q 16 16, 18 16 Q 20 16, 20 20" 
+        fill="#8b5cf6" opacity="0.5" transform="scale(0.25) translate(200, 40)"/>
+</svg>
+

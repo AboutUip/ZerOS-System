@@ -1,0 +1,41 @@
+<svg width="64" height="64" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+  <!-- 弹弓 -->
+  <defs>
+    <linearGradient id="slingshotGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#8D6E63;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#6D4C41;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- 弹弓支架（Y形） -->
+  <path d="M 20 50 L 20 20 L 16 20 L 20 10 L 24 20 L 20 20" 
+        stroke="url(#slingshotGradient)" 
+        stroke-width="4" 
+        fill="none" 
+        stroke-linecap="round" 
+        stroke-linejoin="round"/>
+  
+  <path d="M 44 50 L 44 20 L 40 20 L 44 10 L 48 20 L 44 20" 
+        stroke="url(#slingshotGradient)" 
+        stroke-width="4" 
+        fill="none" 
+        stroke-linecap="round" 
+        stroke-linejoin="round"/>
+  
+  <!-- 弹弓带（左右两条） -->
+  <path d="M 16 20 Q 24 30 32 35" 
+        stroke="#8D6E63" 
+        stroke-width="2.5" 
+        fill="none" 
+        stroke-linecap="round"/>
+  
+  <path d="M 48 20 Q 40 30 32 35" 
+        stroke="#8D6E63" 
+        stroke-width="2.5" 
+        fill="none" 
+        stroke-linecap="round"/>
+  
+  <!-- 弹弓底座 -->
+  <ellipse cx="32" cy="50" rx="12" ry="4" fill="url(#slingshotGradient)" opacity="0.8"/>
+</svg>
+

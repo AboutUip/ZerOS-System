@@ -1,0 +1,82 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" width="1920" height="1080" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <!-- 赛博朋克风格渐变背景 -->
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0a0a1a"/>
+      <stop offset="25%" stop-color="#1a0a2a"/>
+      <stop offset="50%" stop-color="#0a0a1a"/>
+      <stop offset="75%" stop-color="#2a0a3a"/>
+      <stop offset="100%" stop-color="#0a0a1a"/>
+    </linearGradient>
+    
+    <!-- 霓虹网格 -->
+    <pattern id="neonGrid" x="0" y="0" width="100" height="100" patternUnits="userSpaceOnUse">
+      <path d="M 100 0 L 0 0 0 100" fill="none" stroke="rgba(0, 255, 255, 0.15)" stroke-width="1"/>
+    </pattern>
+    
+    <!-- 霓虹光晕 -->
+    <radialGradient id="neonGlow" cx="50%" cy="50%">
+      <stop offset="0%" stop-color="rgba(0, 255, 255, 0.4)"/>
+      <stop offset="30%" stop-color="rgba(255, 0, 255, 0.2)"/>
+      <stop offset="60%" stop-color="rgba(0, 255, 255, 0.1)"/>
+      <stop offset="100%" stop-color="rgba(0, 255, 255, 0)"/>
+    </radialGradient>
+    
+    <!-- 霓虹光点 -->
+    <g id="neonPoint">
+      <circle r="4" fill="rgba(0, 255, 255, 0.8)">
+        <animate attributeName="opacity" values="0.4;1;0.4" dur="2s" repeatCount="indefinite"/>
+      </circle>
+      <circle r="2" fill="rgba(255, 0, 255, 0.6)">
+        <animate attributeName="opacity" values="0.6;1;0.6" dur="1.5s" repeatCount="indefinite"/>
+      </circle>
+    </g>
+  </defs>
+  
+  <!-- 主背景 -->
+  <rect width="1920" height="1080" fill="url(#bgGradient)"/>
+  
+  <!-- 霓虹网格 -->
+  <rect width="1920" height="1080" fill="url(#neonGrid)"/>
+  
+  <!-- 中心霓虹光晕 -->
+  <ellipse cx="960" cy="540" rx="700" ry="500" fill="url(#neonGlow)" opacity="0.5">
+    <animate attributeName="opacity" values="0.3;0.6;0.3" dur="6s" repeatCount="indefinite"/>
+  </ellipse>
+  
+  <!-- 霓虹光点装饰 -->
+  <g opacity="0.8">
+    <use href="#neonPoint" x="400" y="250">
+      <animate attributeName="opacity" values="0.5;1;0.5" dur="3s" repeatCount="indefinite"/>
+    </use>
+    <use href="#neonPoint" x="1520" y="250">
+      <animate attributeName="opacity" values="0.5;1;0.5" dur="3.5s" repeatCount="indefinite"/>
+    </use>
+    <use href="#neonPoint" x="400" y="830">
+      <animate attributeName="opacity" values="0.5;1;0.5" dur="4s" repeatCount="indefinite"/>
+    </use>
+    <use href="#neonPoint" x="1520" y="830">
+      <animate attributeName="opacity" values="0.5;1;0.5" dur="2.5s" repeatCount="indefinite"/>
+    </use>
+    <use href="#neonPoint" x="960" y="200">
+      <animate attributeName="opacity" values="0.5;1;0.5" dur="3.2s" repeatCount="indefinite"/>
+    </use>
+    <use href="#neonPoint" x="960" y="880">
+      <animate attributeName="opacity" values="0.5;1;0.5" dur="3.8s" repeatCount="indefinite"/>
+    </use>
+  </g>
+  
+  <!-- 霓虹线条装饰 -->
+  <g opacity="0.2" stroke="rgba(0, 255, 255, 0.4)" stroke-width="2" fill="none">
+    <line x1="200" y1="300" x2="400" y2="200">
+      <animate attributeName="opacity" values="0.1;0.3;0.1" dur="5s" repeatCount="indefinite"/>
+    </line>
+    <line x1="1720" y1="780" x2="1520" y2="880">
+      <animate attributeName="opacity" values="0.1;0.3;0.1" dur="6s" repeatCount="indefinite"/>
+    </line>
+    <circle cx="960" cy="540" r="200" stroke="rgba(255, 0, 255, 0.3)">
+      <animate attributeName="r" values="200;250;200" dur="8s" repeatCount="indefinite"/>
+    </circle>
+  </g>
+</svg>
+

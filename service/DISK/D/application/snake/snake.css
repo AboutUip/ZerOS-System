@@ -1,0 +1,46 @@
+/* 贪吃蛇游戏样式 */
+
+.snake-window {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+}
+
+.snake-info-bar {
+    flex-shrink: 0;
+}
+
+.snake-canvas-container {
+    position: relative;
+}
+
+.snake-canvas {
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+}
+
+.snake-status-overlay {
+    pointer-events: none;
+}
+
+.snake-control-bar {
+    flex-shrink: 0;
+}
+
+/* 按钮样式增强 */
+.snake-control-bar button {
+    outline: none;
+}
+
+.snake-control-bar button:focus {
+    outline: 2px solid rgba(139, 92, 246, 0.5);
+    outline-offset: 2px;
+}
+
+/* 画布动画 */
+.snake-canvas {
+    transition: box-shadow 0.3s ease;
+}
+
+.snake-window.zos-window-focused .snake-canvas {
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4), 0 0 0 2px rgba(139, 92, 246, 0.3);
+}
+

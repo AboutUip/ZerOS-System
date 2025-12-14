@@ -1,0 +1,23 @@
+<svg width="48" height="48" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+  <!-- 石块 -->
+  <defs>
+    <linearGradient id="stoneGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#9E9E9E;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#757575;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#616161;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- 石块主体 -->
+  <rect x="4" y="8" width="40" height="32" rx="3" fill="url(#stoneGradient)" stroke="#424242" stroke-width="1.5"/>
+  
+  <!-- 石头纹理 -->
+  <circle cx="12" cy="16" r="2" fill="#616161" opacity="0.6"/>
+  <circle cx="28" cy="20" r="1.5" fill="#616161" opacity="0.6"/>
+  <circle cx="36" cy="28" r="2.5" fill="#616161" opacity="0.6"/>
+  <circle cx="18" cy="32" r="1.8" fill="#616161" opacity="0.6"/>
+  
+  <!-- 高光 -->
+  <ellipse cx="12" cy="12" rx="3" ry="2" fill="#BDBDBD" opacity="0.4"/>
+</svg>
+

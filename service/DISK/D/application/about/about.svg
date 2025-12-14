@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="aboutGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#8b5cf6"/>
+      <stop offset="50%" stop-color="#6c8eff"/>
+      <stop offset="100%" stop-color="#8da6ff"/>
+    </linearGradient>
+    <filter id="aboutGlow">
+      <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  
+  <!-- 背景 -->
+  <rect width="64" height="64" rx="12" fill="#1a0b2e" opacity="0.8"/>
+  
+  <!-- 主圆形背景 -->
+  <circle cx="32" cy="32" r="24" fill="url(#aboutGrad)" opacity="0.9" filter="url(#aboutGlow)"/>
+  
+  <!-- 内圈 -->
+  <circle cx="32" cy="32" r="18" fill="#0f1555" opacity="0.7"/>
+  
+  <!-- Z字母（ZerOS的首字母） -->
+  <g transform="translate(32, 32)">
+    <path d="M -12 -8 L 12 -8 L 12 -5 L -5 -5 L 12 5 L 12 8 L -12 8 L -12 5 L 5 5 L -12 -5 Z" 
+          fill="#ffffff" 
+          opacity="0.95"
+          filter="url(#aboutGlow)"/>
+  </g>
+  
+  <!-- 装饰性信息图标 -->
+  <circle cx="32" cy="12" r="3" fill="url(#aboutGrad)" opacity="0.8">
+    <animate attributeName="opacity" values="0.8;1;0.8" dur="2s" repeatCount="indefinite"/>
+  </circle>
+  
+  <circle cx="52" cy="32" r="3" fill="url(#aboutGrad)" opacity="0.8">
+    <animate attributeName="opacity" values="0.8;1;0.8" dur="2.5s" repeatCount="indefinite"/>
+  </circle>
+  
+  <circle cx="32" cy="52" r="3" fill="url(#aboutGrad)" opacity="0.8">
+    <animate attributeName="opacity" values="0.8;1;0.8" dur="1.8s" repeatCount="indefinite"/>
+  </circle>
+  
+  <circle cx="12" cy="32" r="3" fill="url(#aboutGrad)" opacity="0.8">
+    <animate attributeName="opacity" values="0.8;1;0.8" dur="2.2s" repeatCount="indefinite"/>
+  </circle>
+</svg>
+

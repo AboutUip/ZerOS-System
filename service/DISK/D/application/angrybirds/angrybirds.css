@@ -1,0 +1,248 @@
+/* 愤怒的小鸟游戏样式 */
+.angrybirds-window {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: linear-gradient(180deg, #87CEEB 0%, #98D8E8 50%, #B0E0E6 100%);
+    min-width: 900px;
+    min-height: 600px;
+    width: 900px;
+    height: 600px;
+}
+
+.angrybirds-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    overflow: hidden;
+    min-height: 0; /* 确保flex子元素可以正确收缩 */
+}
+
+.angrybirds-game-area {
+    flex: 1;
+    position: relative;
+    background: linear-gradient(180deg, #87CEEB 0%, #98D8E8 50%, #B0E0E6 100%);
+    overflow: hidden;
+    min-height: 0; /* 确保flex子元素可以正确收缩 */
+    min-width: 0; /* 确保flex子元素可以正确收缩 */
+}
+
+.angrybirds-game-area canvas {
+    display: block;
+    width: 100% !important;
+    height: 100% !important;
+}
+
+.angrybirds-ui {
+    padding: 12px 16px;
+    background: rgba(0, 0, 0, 0.3);
+    backdrop-filter: blur(10px);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    color: white;
+    font-weight: bold;
+    font-size: 14px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.angrybirds-ui-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.angrybirds-ui-label {
+    font-size: 12px;
+    opacity: 0.8;
+}
+
+.angrybirds-ui-value {
+    font-size: 16px;
+    color: #FFD700;
+}
+
+.angrybirds-birds-container {
+    position: absolute;
+    bottom: 20px;
+    left: 20px;
+    display: flex;
+    gap: 10px;
+    z-index: 10;
+}
+
+.angrybirds-bird-preview {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    border: 2px solid rgba(255, 255, 255, 0.5);
+    background: rgba(255, 255, 255, 0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.angrybirds-bird-preview:hover {
+    transform: scale(1.1);
+    border-color: rgba(255, 255, 255, 0.8);
+    background: rgba(255, 255, 255, 0.3);
+}
+
+.angrybirds-bird-preview.active {
+    border-color: #FFD700;
+    background: rgba(255, 215, 0, 0.3);
+    box-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+}
+
+.angrybirds-bird-icon {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+}
+
+.angrybirds-level-selector {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(0, 0, 0, 0.8);
+    backdrop-filter: blur(20px);
+    border-radius: 16px;
+    padding: 24px;
+    z-index: 1000;
+    display: none;
+    flex-direction: column;
+    gap: 16px;
+    min-width: 300px;
+}
+
+.angrybirds-level-selector.show {
+    display: flex;
+}
+
+.angrybirds-level-title {
+    color: white;
+    font-size: 20px;
+    font-weight: bold;
+    text-align: center;
+    margin-bottom: 8px;
+}
+
+.angrybirds-level-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 12px;
+}
+
+.angrybirds-level-btn {
+    width: 50px;
+    height: 50px;
+    border-radius: 8px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.angrybirds-level-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+    border-color: rgba(255, 255, 255, 0.5);
+    transform: scale(1.05);
+}
+
+.angrybirds-level-btn.completed {
+    background: rgba(76, 175, 80, 0.3);
+    border-color: #4CAF50;
+}
+
+.angrybirds-level-btn.locked {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background: rgba(0, 0, 0, 0.3);
+}
+
+.angrybirds-game-over {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(0, 0, 0, 0.9);
+    backdrop-filter: blur(20px);
+    border-radius: 16px;
+    padding: 32px;
+    z-index: 1001;
+    display: none;
+    flex-direction: column;
+    gap: 16px;
+    align-items: center;
+    min-width: 300px;
+}
+
+.angrybirds-game-over.show {
+    display: flex;
+}
+
+.angrybirds-game-over-title {
+    color: white;
+    font-size: 24px;
+    font-weight: bold;
+    text-align: center;
+}
+
+.angrybirds-game-over-message {
+    color: #FFD700;
+    font-size: 18px;
+    text-align: center;
+}
+
+.angrybirds-game-over-buttons {
+    display: flex;
+    gap: 12px;
+    margin-top: 8px;
+}
+
+.angrybirds-btn {
+    padding: 10px 20px;
+    border-radius: 8px;
+    border: none;
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.angrybirds-btn:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: scale(1.05);
+}
+
+.angrybirds-btn.primary {
+    background: #4CAF50;
+}
+
+.angrybirds-btn.primary:hover {
+    background: #45a049;
+}
+
+.angrybirds-trajectory {
+    position: absolute;
+    pointer-events: none;
+    z-index: 5;
+}
+
+.angrybirds-slingshot {
+    position: absolute;
+    bottom: 100px;
+    left: 100px;
+    z-index: 10;
+}
+

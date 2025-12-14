@@ -1,0 +1,167 @@
+/* ZerOS 图片查看器样式 */
+
+.imageviewer-window {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--theme-background, rgba(15, 20, 35, 0.98));
+}
+
+.imageviewer-container {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+    background: 
+        repeating-conic-gradient(
+            var(--theme-background-secondary, rgba(20, 25, 40, 0.5)) 0% 25%,
+            var(--theme-background, rgba(15, 20, 35, 0.5)) 0% 50%
+        ) 50% / 20px 20px,
+        var(--theme-background, rgba(15, 20, 35, 0.95));
+    cursor: grab;
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+}
+
+.imageviewer-container:active {
+    cursor: grabbing;
+}
+
+.imageviewer-image {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    max-width: none;
+    max-height: none;
+    user-select: none;
+    pointer-events: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    image-rendering: auto;
+    -webkit-image-rendering: auto;
+    filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.3));
+    transition: transform 0.1s ease-out;
+}
+
+.imageviewer-info-bar {
+    height: 44px;
+    min-height: 44px;
+    max-height: 44px;
+    padding: 10px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: linear-gradient(
+        180deg,
+        var(--theme-background-elevated, rgba(37, 43, 53, 0.98)) 0%,
+        var(--theme-background, rgba(30, 35, 50, 0.98)) 100%
+    );
+    border-top: 1px solid var(--theme-border, rgba(108, 142, 255, 0.25));
+    box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.2);
+    color: var(--theme-text, #d7e0dd);
+    font-size: 13px;
+    flex-shrink: 0;
+    overflow: hidden;
+    box-sizing: border-box;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+}
+
+.imageviewer-info-left,
+.imageviewer-info-right {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.imageviewer-info-bar button {
+    padding: 6px 14px;
+    height: 28px;
+    border: 1px solid var(--theme-border, rgba(108, 142, 255, 0.3));
+    background: var(--theme-primary, rgba(108, 142, 255, 0.15));
+    color: var(--theme-text, #d7e0dd);
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    font-family: inherit;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.imageviewer-info-bar button:hover {
+    background: var(--theme-primary-hover, rgba(108, 142, 255, 0.25));
+    border-color: var(--theme-primary, rgba(108, 142, 255, 0.6));
+    box-shadow: 0 2px 6px rgba(108, 142, 255, 0.2);
+    transform: translateY(-1px);
+}
+
+.imageviewer-info-bar button:active {
+    background: var(--theme-primary-active, rgba(108, 142, 255, 0.35));
+    transform: translateY(0);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+/* 图片加载动画 */
+.imageviewer-image[src=""] {
+    opacity: 0;
+}
+
+.imageviewer-image:not([src=""]) {
+    opacity: 1;
+    transition: opacity 0.3s ease-in-out;
+}
+
+/* 空状态提示 */
+.imageviewer-container:has(.imageviewer-image[src=""])::after {
+    content: '拖放图片文件或通过命令行参数打开图片';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: var(--theme-text-secondary, rgba(215, 224, 221, 0.5));
+    font-size: 14px;
+    pointer-events: none;
+    white-space: nowrap;
+}
+
+/* 加载状态 */
+.imageviewer-container.loading::after {
+    content: '加载中...';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: var(--theme-text-secondary, rgba(215, 224, 221, 0.6));
+    font-size: 14px;
+    pointer-events: none;
+}
+
+/* 信息文本样式 */
+.imageviewer-info-left span,
+.imageviewer-info-right span {
+    color: var(--theme-text, #d7e0dd);
+    font-weight: 500;
+    letter-spacing: 0.3px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.imageviewer-info-left {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.imageviewer-info-left span {
+    display: block;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+

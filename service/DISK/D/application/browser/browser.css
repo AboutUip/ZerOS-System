@@ -1,0 +1,245 @@
+/* ZerOS 浏览器样式 - Ubuntu风格 */
+
+.browser-window {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* 工具栏 */
+.browser-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    background: linear-gradient(180deg, rgba(26, 31, 46, 0.95) 0%, rgba(22, 33, 62, 0.95) 100%);
+    border-bottom: 1px solid rgba(139, 92, 246, 0.2);
+    flex-shrink: 0;
+    height: 56px;
+    min-height: 56px;
+    max-height: 56px;
+    box-sizing: border-box;
+    overflow: hidden;
+}
+
+/* 导航按钮组 */
+.browser-nav-group {
+    display: flex;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+/* 工具栏按钮 */
+.browser-toolbar-btn {
+    width: 36px;
+    height: 36px;
+    border: none;
+    background: rgba(139, 92, 246, 0.1);
+    color: rgba(215, 224, 221, 0.9);
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    user-select: none;
+}
+
+.browser-toolbar-btn:hover {
+    background: rgba(139, 92, 246, 0.2);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+}
+
+.browser-toolbar-btn:active {
+    transform: translateY(0);
+    background: rgba(139, 92, 246, 0.3);
+}
+
+.browser-toolbar-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+.browser-toolbar-btn:disabled:hover {
+    transform: none;
+    background: rgba(139, 92, 246, 0.1);
+    box-shadow: none;
+}
+
+/* 地址栏容器 */
+.browser-address-container {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+    min-width: 0;
+}
+
+/* 地址栏 */
+.browser-address-bar {
+    flex: 1;
+    height: 36px;
+    padding: 0 16px;
+    border: 1px solid rgba(139, 92, 246, 0.2);
+    background: rgba(20, 25, 35, 0.8);
+    color: rgba(215, 224, 221, 0.95);
+    border-radius: 8px;
+    font-size: 14px;
+    font-family: inherit;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    outline: none;
+}
+
+.browser-address-bar:focus {
+    border-color: rgba(139, 92, 246, 0.5);
+    background: rgba(20, 25, 35, 0.95);
+    box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.2);
+}
+
+.browser-address-bar::placeholder {
+    color: rgba(215, 224, 221, 0.5);
+}
+
+/* 书签栏 */
+.browser-bookmarks-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    background: rgba(20, 25, 35, 0.6);
+    border-bottom: 1px solid rgba(139, 92, 246, 0.1);
+    flex-shrink: 0;
+    height: 40px;
+    min-height: 40px;
+    max-height: 40px;
+    box-sizing: border-box;
+    overflow-x: auto;
+    overflow-y: hidden;
+}
+
+.browser-bookmarks-bar::-webkit-scrollbar {
+    height: 4px;
+}
+
+.browser-bookmarks-bar::-webkit-scrollbar-track {
+    background: rgba(139, 92, 246, 0.05);
+}
+
+.browser-bookmarks-bar::-webkit-scrollbar-thumb {
+    background: rgba(139, 92, 246, 0.3);
+    border-radius: 2px;
+}
+
+.browser-bookmarks-bar::-webkit-scrollbar-thumb:hover {
+    background: rgba(139, 92, 246, 0.5);
+}
+
+/* 书签项 */
+.browser-bookmark-item {
+    padding: 6px 14px;
+    border: none;
+    background: rgba(139, 92, 246, 0.1);
+    color: rgba(215, 224, 221, 0.9);
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    white-space: nowrap;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    user-select: none;
+    animation: bookmarkSlideIn 0.3s ease-out backwards;
+}
+
+@keyframes bookmarkSlideIn {
+    from {
+        opacity: 0;
+        transform: translateX(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+.browser-bookmark-item:hover {
+    background: rgba(139, 92, 246, 0.2);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+}
+
+.browser-bookmark-item:active {
+    transform: translateY(0);
+    background: rgba(139, 92, 246, 0.3);
+}
+
+/* 内容区域 */
+.browser-content {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+    background: #ffffff;
+    min-height: 0;
+}
+
+/* iframe */
+.browser-iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+    background: #ffffff;
+    transition: opacity 0.3s ease;
+}
+
+.browser-iframe.loading {
+    opacity: 0.5;
+}
+
+/* 加载指示器 */
+.browser-loading-indicator {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: rgba(20, 25, 35, 0.95);
+    z-index: 10;
+    gap: 16px;
+    animation: loadingFadeIn 0.3s ease-out;
+}
+
+@keyframes loadingFadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+.browser-loading-spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid rgba(139, 92, 246, 0.2);
+    border-top-color: rgba(139, 92, 246, 0.8);
+    border-radius: 50%;
+    animation: browserSpin 1s linear infinite;
+}
+
+@keyframes browserSpin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.browser-loading-text {
+    color: rgba(215, 224, 221, 0.8);
+    font-size: 14px;
+    font-weight: 500;
+}
+
