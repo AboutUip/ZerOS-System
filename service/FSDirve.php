@@ -159,14 +159,21 @@ function createDirectory($path, $name) {
     
     // 检查目录是否已存在
     if (is_dir($newDirPath)) {
-        sendResponse(false, '目录已存在: ' . $name, null, 409);
+        // 目录已存在，返回成功（而不是 409 错误）
+        sendResponse(true, '目录已存在', [
+            'path' => $path . '/' . $name,
+            'name' => $name,
+            'existed' => true
+        ]);
+        return;
     }
     
     // 创建目录
     if (mkdir($newDirPath, 0755, true)) {
         sendResponse(true, '目录创建成功', [
             'path' => $path . '/' . $name,
-            'name' => $name
+            'name' => $name,
+            'existed' => false
         ]);
     } else {
         sendResponse(false, '目录创建失败', null, 500);
@@ -340,7 +347,7 @@ function readFileContent($path, $fileName) {
 /**
  * 写入文件
  */
-function writeFile($path, $fileName, $content, $writeMod = 'overwrite') {
+function writeFile($path, $fileName, $content, $writeMod = 'overwrite', $isBase64 = false) {
     $dirPath = getDirPath($path);
     if (!$dirPath) {
         sendResponse(false, '无效的路径格式', null, 400);
@@ -359,6 +366,15 @@ function writeFile($path, $fileName, $content, $writeMod = 'overwrite') {
     $filePath = $dirPath . '/' . $fileName;
     $fileExists = file_exists($filePath);
     
+    // 如果内容是 base64 编码，则解码
+    if ($isBase64) {
+        $decoded = base64_decode($content, true);
+        if ($decoded === false) {
+            sendResponse(false, 'Base64 解码失败', null, 400);
+        }
+        $content = $decoded;
+    }
+    
     // 处理写入模式
     if ($writeMod === 'append' && $fileExists) {
         // 追加模式
@@ -371,8 +387,8 @@ function writeFile($path, $fileName, $content, $writeMod = 'overwrite') {
     }
     // overwrite 模式直接覆盖
     
-    // 写入文件
-    if (file_put_contents($filePath, $content) !== false) {
+    // 写入文件（使用二进制模式）
+    if (file_put_contents($filePath, $content, LOCK_EX) !== false) {
         sendResponse(true, '文件写入成功', [
             'path' => $path . '/' . $fileName,
             'fileName' => $fileName,
@@ -954,6 +970,7 @@ switch ($action) {
         $path = $_GET['path'] ?? '';
         $fileName = $_GET['fileName'] ?? '';
         $writeMod = $_GET['writeMod'] ?? 'overwrite';
+        $isBase64 = isset($_GET['isBase64']) && ($_GET['isBase64'] === 'true' || $_GET['isBase64'] === '1');
         $content = $_GET['content'] ?? '';
         // 支持 POST 请求传递内容
         if (empty($content) && $_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -961,12 +978,16 @@ switch ($action) {
             $postData = json_decode($rawInput, true);
             if ($postData && isset($postData['content'])) {
                 $content = $postData['content'];
+                // 如果 POST 数据中有 isBase64 参数，使用它
+                if (isset($postData['isBase64'])) {
+                    $isBase64 = $postData['isBase64'] === true || $postData['isBase64'] === 'true' || $postData['isBase64'] === '1';
+                }
             }
         }
         if (empty($path) || empty($fileName)) {
             sendResponse(false, '缺少必要参数: path, fileName', null, 400);
         }
-        writeFile($path, $fileName, $content, $writeMod);
+        writeFile($path, $fileName, $content, $writeMod, $isBase64);
         break;
         
     case 'delete_file':

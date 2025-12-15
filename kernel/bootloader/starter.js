@@ -962,6 +962,14 @@
                 KernelLogger.error("BootLoader", "ProcessManager 未加载");
             }
             
+            // 清理过期缓存（在文件系统初始化后执行）
+            try {
+                await cleanupExpiredCache();
+            } catch (e) {
+                KernelLogger.warn("BootLoader", `清理过期缓存失败: ${e.message}`);
+                // 不阻塞系统启动
+            }
+            
             // 验证文件系统初始化
             if (typeof Disk !== 'undefined') {
                 // 等待文件系统初始化完成（最多等待2秒）

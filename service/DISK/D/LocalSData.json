@@ -251,7 +251,7 @@
         "lyrics": null
       }
     },
-    "system.desktopBackground": "local_C___back2_png",
+    "system.desktopBackground": "local_D__cache_random_anime_bg_1765805484088_jpg",
     "system.localDesktopBackgrounds": [
       {
         "id": "local_C___back2_png",
@@ -270,6 +270,30 @@
         "name": "backcore.mp4",
         "description": "本地视频: C://backcore.mp4（静音循环播放）",
         "path": "C://backcore.mp4"
+      },
+      {
+        "id": "local_D__cache_random_anime_bg_1765804845224_jpg",
+        "name": "random_anime_bg_1765804845224.jpg",
+        "description": "本地图片: D:/cache/random_anime_bg_1765804845224.jpg",
+        "path": "D:/cache/random_anime_bg_1765804845224.jpg"
+      },
+      {
+        "id": "local_D__cache_random_anime_bg_1765805226196_jpg",
+        "name": "random_anime_bg_1765805226196.jpg",
+        "description": "本地图片: D:/cache/random_anime_bg_1765805226196.jpg",
+        "path": "D:/cache/random_anime_bg_1765805226196.jpg"
+      },
+      {
+        "id": "local_D__cache_random_anime_bg_1765805321072_jpg",
+        "name": "random_anime_bg_1765805321072.jpg",
+        "description": "本地图片: D:/cache/random_anime_bg_1765805321072.jpg",
+        "path": "D:/cache/random_anime_bg_1765805321072.jpg"
+      },
+      {
+        "id": "local_D__cache_random_anime_bg_1765805484088_jpg",
+        "name": "random_anime_bg_1765805484088.jpg",
+        "description": "本地图片: D:/cache/random_anime_bg_1765805484088.jpg",
+        "path": "D:/cache/random_anime_bg_1765805484088.jpg"
       }
     ],
     "taskbarPosition": "bottom",
@@ -289,7 +313,8 @@
     ],
     "taskbar.pinnedPrograms": [
       "terminal"
-    ]
+    ],
+    "system.randomAnimeBgStatus": "success"
   },
   "programs": {}
 }

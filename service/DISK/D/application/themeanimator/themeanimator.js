@@ -14,6 +14,7 @@
         themeChangeUnsubscribe: null,
         styleChangeUnsubscribe: null,
         animationPresetChangeUnsubscribe: null,
+        _loadingRandomAnimeBg: false,  // 防止重复请求标志
         
         __init__: async function(pid, initArgs) {
             console.log('[themeanimator] __init__ 被调用, PID:', pid);
@@ -490,6 +491,86 @@
             currentBackgroundDisplay.appendChild(selectLocalImageBtnInside);
             console.log('[themeanimator] 内部按钮已添加到DOM:', selectLocalImageBtnInside, '父元素:', currentBackgroundDisplay);
             
+            // 添加随机二次元背景按钮
+            const randomAnimeBgBtn = document.createElement('button');
+            randomAnimeBgBtn.textContent = '🎨 随机二次元背景';
+            randomAnimeBgBtn.id = 'random-anime-bg-btn';
+            randomAnimeBgBtn.className = 'random-anime-bg-btn';
+            randomAnimeBgBtn.style.cssText = `
+                width: 100% !important;
+                padding: 10px 16px !important;
+                background: rgba(108, 142, 255, 0.2) !important;
+                border: 2px solid rgba(108, 142, 255, 0.5) !important;
+                border-radius: 6px !important;
+                color: rgba(215, 224, 221, 0.95) !important;
+                font-size: 14px !important;
+                font-weight: 600 !important;
+                cursor: pointer !important;
+                transition: all 0.2s ease;
+                margin-top: 8px !important;
+                display: block !important;
+                visibility: visible !important;
+                opacity: 1 !important;
+                box-sizing: border-box !important;
+                position: relative !important;
+            `;
+            randomAnimeBgBtn.addEventListener('mouseenter', () => {
+                randomAnimeBgBtn.style.background = 'rgba(108, 142, 255, 0.3) !important';
+                randomAnimeBgBtn.style.borderColor = 'rgba(108, 142, 255, 0.7) !important';
+                randomAnimeBgBtn.style.transform = 'translateY(-1px)';
+            });
+            randomAnimeBgBtn.addEventListener('mouseleave', () => {
+                randomAnimeBgBtn.style.background = 'rgba(108, 142, 255, 0.2) !important';
+                randomAnimeBgBtn.style.borderColor = 'rgba(108, 142, 255, 0.5) !important';
+                randomAnimeBgBtn.style.transform = 'translateY(0)';
+            });
+            randomAnimeBgBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                this._loadRandomAnimeBackground();
+            });
+            currentBackgroundDisplay.appendChild(randomAnimeBgBtn);
+            
+            // 添加取消随机二次元背景按钮
+            const cancelRandomAnimeBgBtn = document.createElement('button');
+            cancelRandomAnimeBgBtn.textContent = '❌ 取消随机二次元背景';
+            cancelRandomAnimeBgBtn.id = 'cancel-random-anime-bg-btn';
+            cancelRandomAnimeBgBtn.className = 'cancel-random-anime-bg-btn';
+            cancelRandomAnimeBgBtn.style.cssText = `
+                width: 100% !important;
+                padding: 10px 16px !important;
+                background: rgba(239, 68, 68, 0.2) !important;
+                border: 2px solid rgba(239, 68, 68, 0.5) !important;
+                border-radius: 6px !important;
+                color: rgba(215, 224, 221, 0.95) !important;
+                font-size: 14px !important;
+                font-weight: 600 !important;
+                cursor: pointer !important;
+                transition: all 0.2s ease;
+                margin-top: 8px !important;
+                display: block !important;
+                visibility: visible !important;
+                opacity: 1 !important;
+                box-sizing: border-box !important;
+                position: relative !important;
+            `;
+            cancelRandomAnimeBgBtn.addEventListener('mouseenter', () => {
+                cancelRandomAnimeBgBtn.style.background = 'rgba(239, 68, 68, 0.3) !important';
+                cancelRandomAnimeBgBtn.style.borderColor = 'rgba(239, 68, 68, 0.7) !important';
+                cancelRandomAnimeBgBtn.style.transform = 'translateY(-1px)';
+            });
+            cancelRandomAnimeBgBtn.addEventListener('mouseleave', () => {
+                cancelRandomAnimeBgBtn.style.background = 'rgba(239, 68, 68, 0.2) !important';
+                cancelRandomAnimeBgBtn.style.borderColor = 'rgba(239, 68, 68, 0.5) !important';
+                cancelRandomAnimeBgBtn.style.transform = 'translateY(0)';
+            });
+            cancelRandomAnimeBgBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                this._cancelRandomAnimeBackground();
+            });
+            currentBackgroundDisplay.appendChild(cancelRandomAnimeBgBtn);
+            
             currentSection.appendChild(currentBackgroundDisplay);
             
             panel.appendChild(currentSection);
@@ -639,6 +720,29 @@
                         if (currentPreset) {
                             this._updateCurrentAnimationPresetDisplay(currentPreset);
                         }
+                    }
+                }
+                
+                // 检查随机二次元背景的刷新逻辑
+                // 如果上次请求失败，刷新时自动再次尝试请求
+                // 如果已禁用，则不自动请求
+                if (typeof LStorage !== 'undefined') {
+                    try {
+                        const lastRequestStatus = await LStorage.getSystemStorage('system.randomAnimeBgStatus');
+                        if (lastRequestStatus === 'failed') {
+                            // 如果上次请求失败，刷新时自动再次尝试请求
+                            console.log('[themeanimator] 检测到上次请求失败，刷新时自动再次尝试请求');
+                            // 延迟执行，确保UI已完全加载
+                            setTimeout(() => {
+                                this._loadRandomAnimeBackground();
+                            }, 1000);
+                        } else if (lastRequestStatus === 'disabled') {
+                            // 如果已禁用，不自动请求
+                            console.log('[themeanimator] 随机二次元背景功能已禁用，跳过自动请求');
+                        }
+                        // 如果上次请求成功，刷新时不再次请求（保持当前背景）
+                    } catch (e) {
+                        console.warn('[themeanimator] 读取请求状态失败:', e);
                     }
                 }
             } catch (e) {
@@ -1540,6 +1644,266 @@
                 container.innerHTML = html;
             } catch (e) {
                 container.innerHTML = `<p style="color: rgba(255, 95, 87, 0.8);">加载动画信息失败: ${e.message}</p>`;
+            }
+        },
+        
+        /**
+         * 加载随机二次元背景
+         */
+        _loadRandomAnimeBackground: async function() {
+            const btn = this.window.querySelector('#random-anime-bg-btn');
+            if (!btn) return;
+            
+            // 防止重复请求
+            if (this._loadingRandomAnimeBg) {
+                if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
+                    await GUIManager.showAlert('正在加载中，请稍候...', '提示', 'info');
+                }
+                return;
+            }
+            
+            // 设置加载标志
+            this._loadingRandomAnimeBg = true;
+            
+            // 禁用按钮并显示加载状态
+            const originalText = btn.textContent;
+            btn.disabled = true;
+            btn.textContent = '⏳ 正在加载...';
+            btn.style.opacity = '0.6';
+            btn.style.cursor = 'not-allowed';
+            
+            try {
+                // 通过 PHP 代理请求随机二次元背景图片（避免 CORS 问题）
+                const proxyUrl = new URL('/service/ImageProxy.php', window.location.origin);
+                proxyUrl.searchParams.set('url', 'https://api-v1.cenguigui.cn/api/pic/');
+                const response = await fetch(proxyUrl.toString());
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                // 检查响应类型
+                const contentType = response.headers.get('content-type');
+                if (!contentType || !contentType.includes('image/')) {
+                    throw new Error('响应不是图片类型');
+                }
+                
+                // 获取图片 blob
+                const blob = await response.blob();
+                
+                // 将 blob 转换为 base64
+                const reader = new FileReader();
+                const base64Promise = new Promise((resolve, reject) => {
+                    reader.onloadend = () => {
+                        const base64 = reader.result;
+                        resolve(base64);
+                    };
+                    reader.onerror = reject;
+                });
+                reader.readAsDataURL(blob);
+                const base64 = await base64Promise;
+                
+                // 生成文件名（使用时间戳）
+                const timestamp = Date.now();
+                const fileName = `random_anime_bg_${timestamp}.jpg`;
+                const filePath = `D:/cache/${fileName}`;
+                
+                // 确保目录存在（直接尝试创建，409 表示已存在，忽略即可）
+                const createDirUrl = new URL('/service/FSDirve.php', window.location.origin);
+                createDirUrl.searchParams.set('action', 'create_dir');
+                createDirUrl.searchParams.set('path', 'D:/');
+                createDirUrl.searchParams.set('name', 'cache');
+                
+                try {
+                    const createDirResponse = await fetch(createDirUrl.toString());
+                    // 409 表示目录已存在，这是正常情况，完全忽略
+                    // 其他错误才记录警告
+                    if (!createDirResponse.ok && createDirResponse.status !== 409) {
+                        const errorResult = await createDirResponse.json().catch(() => ({}));
+                        console.warn('[themeanimator] 创建目录失败:', errorResult.message || `HTTP ${createDirResponse.status}`);
+                    }
+                } catch (e) {
+                    // 网络错误，忽略（目录可能已存在）
+                    console.debug('[themeanimator] 创建目录时出错:', e);
+                }
+                
+                // 清理旧的随机二次元背景图
+                try {
+                    await this._cleanupOldRandomAnimeBackgrounds();
+                } catch (e) {
+                    // 清理失败不影响新图片的保存
+                    console.warn('[themeanimator] 清理旧背景图失败:', e);
+                }
+                
+                // 保存图片到本地（使用 base64 编码，FSDirve.php 会解码为二进制）
+                const url = new URL('/service/FSDirve.php', window.location.origin);
+                url.searchParams.set('action', 'write_file');
+                url.searchParams.set('path', 'D:/cache/');
+                url.searchParams.set('fileName', fileName);
+                url.searchParams.set('writeMod', 'overwrite');
+                
+                // 提取 base64 数据部分（去掉 data:image/jpeg;base64, 前缀）
+                const base64Data = base64.split(',')[1] || base64;
+                
+                const saveResponse = await fetch(url.toString(), {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ 
+                        content: base64Data,
+                        isBase64: true  // 告诉 FSDirve.php 这是 base64 编码，需要解码
+                    })
+                });
+                
+                if (!saveResponse.ok) {
+                    throw new Error(`保存文件失败: HTTP ${saveResponse.status}`);
+                }
+                
+                const saveResult = await saveResponse.json();
+                if (saveResult.status !== 'success') {
+                    throw new Error(`保存文件失败: ${saveResult.message || '未知错误'}`);
+                }
+                
+                // 使用 ThemeManager 设置背景
+                // 注意：FSDirve.php 已经支持 base64 解码，会将 base64 数据解码为二进制文件保存
+                if (typeof ThemeManager !== 'undefined') {
+                    const result = await ThemeManager.setLocalImageAsBackground(filePath, true);
+                    
+                    if (result) {
+                        // 保存请求状态为成功
+                        if (typeof LStorage !== 'undefined') {
+                            try {
+                                await LStorage.setSystemStorage('system.randomAnimeBgStatus', 'success');
+                            } catch (e) {
+                                console.warn('[themeanimator] 保存请求状态失败:', e);
+                            }
+                        }
+                        
+                        // 更新当前背景显示
+                        const currentBackground = ThemeManager._desktopBackgrounds.get(ThemeManager._currentDesktopBackgroundId);
+                        if (currentBackground) {
+                            this._updateCurrentBackgroundDisplay({
+                                id: currentBackground.id,
+                                name: '随机二次元背景',
+                                description: '来自 api-v1.cenguigui.cn 的随机二次元图片'
+                            });
+                        }
+                        
+                        // 成功时不显示弹窗，静默完成
+                    } else {
+                        throw new Error('设置背景失败');
+                    }
+                } else {
+                    throw new Error('ThemeManager 不可用');
+                }
+            } catch (e) {
+                console.error('[themeanimator] 加载随机二次元背景失败:', e);
+                
+                // 保存请求状态为失败
+                if (typeof LStorage !== 'undefined') {
+                    try {
+                        await LStorage.setSystemStorage('system.randomAnimeBgStatus', 'failed');
+                    } catch (storageError) {
+                        console.warn('[themeanimator] 保存请求状态失败:', storageError);
+                    }
+                }
+                
+                // 显示错误消息
+                if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
+                    await GUIManager.showAlert(`加载随机二次元背景失败: ${e.message}`, '错误', 'error');
+                } else {
+                    alert(`加载随机二次元背景失败: ${e.message}`);
+                }
+            } finally {
+                // 恢复按钮状态
+                btn.disabled = false;
+                btn.textContent = originalText;
+                btn.style.opacity = '1';
+                btn.style.cursor = 'pointer';
+                
+                // 清除加载标志
+                this._loadingRandomAnimeBg = false;
+            }
+        },
+        
+        /**
+         * 取消随机二次元背景功能
+         */
+        _cancelRandomAnimeBackground: async function() {
+            // 清除请求状态，禁用自动请求
+            if (typeof LStorage !== 'undefined') {
+                try {
+                    await LStorage.setSystemStorage('system.randomAnimeBgStatus', 'disabled');
+                    console.log('[themeanimator] 已禁用随机二次元背景功能');
+                } catch (e) {
+                    console.warn('[themeanimator] 保存禁用状态失败:', e);
+                }
+            }
+            
+            // 显示提示消息
+            if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
+                await GUIManager.showAlert('已取消随机二次元背景功能。刷新时将不再自动请求。', '提示', 'info');
+            } else {
+                alert('已取消随机二次元背景功能。刷新时将不再自动请求。');
+            }
+        },
+        
+        /**
+         * 清理旧的随机二次元背景图
+         */
+        _cleanupOldRandomAnimeBackgrounds: async function() {
+            try {
+                // 列出 D:/cache/ 目录下的所有文件
+                const listUrl = new URL('/service/FSDirve.php', window.location.origin);
+                listUrl.searchParams.set('action', 'list_dir');
+                listUrl.searchParams.set('path', 'D:/cache/');
+                
+                const listResponse = await fetch(listUrl.toString());
+                if (!listResponse.ok) {
+                    // 如果目录不存在或无法访问，直接返回
+                    return;
+                }
+                
+                const listResult = await listResponse.json();
+                if (listResult.status !== 'success' || !listResult.data || !Array.isArray(listResult.data)) {
+                    return;
+                }
+                
+                // 查找所有 random_anime_bg_*.jpg 文件
+                const oldBackgroundFiles = listResult.data.filter(item => 
+                    item.type === 'file' && 
+                    item.name.startsWith('random_anime_bg_') && 
+                    item.name.endsWith('.jpg')
+                );
+                
+                // 删除所有旧的背景图文件
+                for (const file of oldBackgroundFiles) {
+                    try {
+                        const deleteUrl = new URL('/service/FSDirve.php', window.location.origin);
+                        deleteUrl.searchParams.set('action', 'delete_file');
+                        deleteUrl.searchParams.set('path', 'D:/cache/');
+                        deleteUrl.searchParams.set('fileName', file.name);
+                        
+                        const deleteResponse = await fetch(deleteUrl.toString());
+                        if (deleteResponse.ok) {
+                            const deleteResult = await deleteResponse.json();
+                            if (deleteResult.status === 'success') {
+                                console.log(`[themeanimator] 已删除旧背景图: ${file.name}`);
+                            }
+                        }
+                    } catch (e) {
+                        // 单个文件删除失败不影响其他文件的删除
+                        console.warn(`[themeanimator] 删除文件 ${file.name} 失败:`, e);
+                    }
+                }
+                
+                if (oldBackgroundFiles.length > 0) {
+                    console.log(`[themeanimator] 已清理 ${oldBackgroundFiles.length} 个旧背景图文件`);
+                }
+            } catch (e) {
+                console.warn('[themeanimator] 清理旧背景图时出错:', e);
+                // 不抛出错误，允许继续执行
             }
         }
     };

@@ -3863,20 +3863,8 @@
                             icon: '🗑️',
                             danger: true,
                             action: async () => {
-                                if (typeof GUIManager !== 'undefined' && typeof GUIManager.showConfirm === 'function') {
-                                    const confirmed = await GUIManager.showConfirm(
-                                        `确定要删除 "${itemName}" 吗？`,
-                                        '确认删除',
-                                        'danger'
-                                    );
-                                    if (confirmed) {
-                                        await self._deleteItem(itemPath, itemType);
-                                    }
-                                } else {
-                                    if (confirm(`确定要删除 "${itemName}" 吗？`)) {
-                                        await self._deleteItem(itemPath, itemType);
-                                    }
-                                }
+                                // 直接执行删除，不显示确认弹窗
+                                await self._deleteItem(itemPath, itemType);
                             }
                         });
                         
@@ -4310,11 +4298,7 @@
                 
             } catch (error) {
                 console.error('删除失败:', error);
-                if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                    await GUIManager.showAlert(`删除失败: ${error.message}`, '错误', 'error');
-                } else {
-                    alert(`删除失败: ${error.message}`);
-                }
+                // 移除删除失败的错误弹窗，只记录日志
             }
         },
         

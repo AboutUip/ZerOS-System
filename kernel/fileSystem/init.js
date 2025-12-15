@@ -90,6 +90,89 @@ async function init() {
     if (typeof DependencyConfig !== 'undefined' && DependencyConfig && typeof DependencyConfig.publishSignal === 'function') {
         DependencyConfig.publishSignal("../kernel/fileSystem/init.js");
     }
+    
+    // 清理过期缓存（异步执行，不阻塞初始化）
+    cleanupExpiredCache().catch(e => {
+        KernelLogger.warn("FSInit", `清理过期缓存失败: ${e.message}`);
+    });
+}
+
+/**
+ * 清理过期缓存
+ */
+async function cleanupExpiredCache() {
+    try {
+        // 检查 fetch 是否可用
+        if (typeof fetch === 'undefined') {
+            KernelLogger.debug("FSInit", "fetch 不可用，跳过缓存清理");
+            return;
+        }
+        
+        // 定义过期时间（1天，单位：毫秒）
+        const EXPIRY_TIME = 24 * 60 * 60 * 1000;
+        const now = Date.now();
+        
+        // 列出 D:/cache/ 目录下的所有文件
+        const listUrl = new URL('/service/FSDirve.php', window.location.origin);
+        listUrl.searchParams.set('action', 'list_dir');
+        listUrl.searchParams.set('path', 'D:/cache/');
+        
+        const listResponse = await fetch(listUrl.toString());
+        if (!listResponse.ok) {
+            // 如果目录不存在或无法访问，直接返回
+            KernelLogger.debug("FSInit", "缓存目录不存在或无法访问，跳过清理");
+            return;
+        }
+        
+        const listResult = await listResponse.json();
+        if (listResult.status !== 'success' || !listResult.data || !Array.isArray(listResult.data)) {
+            return;
+        }
+        
+        // 查找所有过期文件
+        const expiredFiles = [];
+        for (const item of listResult.data) {
+            if (item.type === 'file' && item.modified) {
+                // 解析修改时间
+                const modifiedTime = new Date(item.modified).getTime();
+                const age = now - modifiedTime;
+                
+                // 如果文件超过过期时间，标记为过期
+                if (age > EXPIRY_TIME) {
+                    expiredFiles.push(item);
+                }
+            }
+        }
+        
+        // 删除所有过期文件
+        let deletedCount = 0;
+        for (const file of expiredFiles) {
+            try {
+                const deleteUrl = new URL('/service/FSDirve.php', window.location.origin);
+                deleteUrl.searchParams.set('action', 'delete_file');
+                deleteUrl.searchParams.set('path', 'D:/cache/');
+                deleteUrl.searchParams.set('fileName', file.name);
+                
+                const deleteResponse = await fetch(deleteUrl.toString());
+                if (deleteResponse.ok) {
+                    const deleteResult = await deleteResponse.json();
+                    if (deleteResult.status === 'success') {
+                        deletedCount++;
+                    }
+                }
+            } catch (e) {
+                // 单个文件删除失败不影响其他文件的删除
+                KernelLogger.debug("FSInit", `删除过期文件 ${file.name} 失败: ${e.message}`);
+            }
+        }
+        
+        if (deletedCount > 0) {
+            KernelLogger.info("FSInit", `已清理 ${deletedCount} 个过期缓存文件`);
+        }
+    } catch (e) {
+        KernelLogger.warn("FSInit", `清理过期缓存时出错: ${e.message}`);
+        // 不抛出错误，允许系统继续启动
+    }
 }
 
 // 自动初始化（如果DOM已就绪）
