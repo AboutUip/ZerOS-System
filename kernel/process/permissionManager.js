@@ -55,6 +55,9 @@ class PermissionManager {
         DRAG_ELEMENT: 'DRAG_ELEMENT',                   // 元素拖拽
         DRAG_FILE: 'DRAG_FILE',                         // 文件拖拽
         DRAG_WINDOW: 'DRAG_WINDOW',                     // 窗口拖拽
+        
+        // 地理位置权限
+        GEOGRAPHY_LOCATION: 'GEOGRAPHY_LOCATION',       // 获取地理位置信息
     };
     
     /**
@@ -97,6 +100,9 @@ class PermissionManager {
         [PermissionManager.PERMISSION.DRAG_ELEMENT]: PermissionManager.PERMISSION_LEVEL.NORMAL,
         [PermissionManager.PERMISSION.DRAG_FILE]: PermissionManager.PERMISSION_LEVEL.NORMAL,
         [PermissionManager.PERMISSION.DRAG_WINDOW]: PermissionManager.PERMISSION_LEVEL.NORMAL,
+        
+        // 地理位置权限（特殊权限，需要用户确认）
+        [PermissionManager.PERMISSION.GEOGRAPHY_LOCATION]: PermissionManager.PERMISSION_LEVEL.SPECIAL,
         
         // 危险权限（需要明确授权）
         [PermissionManager.PERMISSION.PROCESS_MANAGE]: PermissionManager.PERMISSION_LEVEL.DANGEROUS,

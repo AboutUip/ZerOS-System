@@ -33,6 +33,8 @@
 - [AnimateManager.md](./AnimateManager.md) - 动画管理 ✅
 - [NetworkManager.md](./NetworkManager.md) - 网络管理 ✅
 - [LStorage.md](./LStorage.md) - 本地存储 ✅
+- [DragDrive.md](./DragDrive.md) - 拖拽驱动 ✅
+- [GeographyDrive.md](./GeographyDrive.md) - 地理位置驱动 ✅
 
 ### PHP 服务
 - [FSDirve.md](./FSDirve.md) - 文件系统驱动服务（PHP 后端） ✅
@@ -89,6 +91,8 @@
 - NetworkManager
 - LStorage
 - PermissionManager
+- DragDrive
+- GeographyDrive
 - FSDirve (PHP 服务)
 
 **基础设施**

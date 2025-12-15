@@ -44,6 +44,9 @@ class TaskbarManager {
         expireTime: 30 * 60 * 1000  // 缓存过期时间（30分钟）
     };
     
+    // 正在进行的天气数据加载请求（用于防止并发重复请求）
+    static _pendingWeatherRequest = null;
+    
     /**
      * 初始化任务栏
      */
@@ -4367,38 +4370,98 @@ class TaskbarManager {
                 weatherData = cache.data;
                 cityName = cache.cityName;
             } else {
-                // 缓存无效或强制刷新，从API获取
-                KernelLogger.debug("TaskbarManager", "从API获取天气数据");
-                
-                // 先获取城市信息
-                const cityResponse = await fetch('https://api-v1.cenguigui.cn/api/UserInfo/apilet.php');
-                if (!cityResponse.ok) {
-                    throw new Error(`获取城市信息失败: ${cityResponse.status}`);
+                // 检查是否有正在进行的请求，如果有则等待该请求完成（防止并发重复请求）
+                if (TaskbarManager._pendingWeatherRequest) {
+                    KernelLogger.debug("TaskbarManager", "检测到正在进行的天气数据请求，等待其完成");
+                    try {
+                        const result = await TaskbarManager._pendingWeatherRequest;
+                        weatherData = result.weatherData;
+                        cityName = result.cityName;
+                    } catch (error) {
+                        // 如果之前的请求失败，继续执行新的请求
+                        KernelLogger.debug("TaskbarManager", "之前的天气数据请求失败，继续执行新请求");
+                        // 继续执行下面的代码
+                    }
                 }
                 
-                const cityData = await cityResponse.json();
-                if (!cityData || cityData.code !== '200' || !cityData.data || cityData.data.length === 0) {
-                    throw new Error('城市信息数据无效');
+                // 如果没有缓存且没有正在进行的请求，发起新请求
+                if (!weatherData) {
+                    // 创建新的请求 Promise
+                    const requestPromise = (async () => {
+                        // 缓存无效或强制刷新，从API获取
+                        KernelLogger.debug("TaskbarManager", "从API获取天气数据");
+                        
+                        let requestCityName = null;
+                        
+                        // 使用 GeographyDrive 获取城市名称（低精度定位，不触发浏览器权限请求）
+                        try {
+                            if (typeof GeographyDrive !== 'undefined') {
+                                KernelLogger.debug("TaskbarManager", "使用 GeographyDrive 获取城市名称");
+                                const location = await GeographyDrive.getCurrentPosition({
+                                    enableHighAccuracy: false  // 使用低精度定位，不触发浏览器权限请求
+                                });
+                                
+                                if (location && location.name) {
+                                    requestCityName = location.name;
+                                    KernelLogger.info("TaskbarManager", `从 GeographyDrive 获取城市名称: ${requestCityName}`);
+                                } else {
+                                    throw new Error('GeographyDrive 返回的城市名称为空');
+                                }
+                            } else {
+                                throw new Error('GeographyDrive 未加载');
+                            }
+                        } catch (geoError) {
+                            // GeographyDrive 失败，降级到直接调用 API
+                            KernelLogger.warn("TaskbarManager", `GeographyDrive 获取城市名称失败: ${geoError.message}，降级到直接调用 API`);
+                            
+                            const cityResponse = await fetch('https://api-v1.cenguigui.cn/api/UserInfo/apilet.php');
+                            if (!cityResponse.ok) {
+                                throw new Error(`获取城市信息失败: ${cityResponse.status}`);
+                            }
+                            
+                            const cityData = await cityResponse.json();
+                            if (!cityData || cityData.code !== '200' || !cityData.data || cityData.data.length === 0) {
+                                throw new Error('城市信息数据无效');
+                            }
+                            
+                            // 获取城市名称（使用第一个结果）
+                            requestCityName = cityData.data[0].name;
+                        }
+                        
+                        // 获取天气信息
+                        const weatherResponse = await fetch(`https://api-v1.cenguigui.cn/api/WeatherInfo/?city=${encodeURIComponent(requestCityName)}`);
+                        if (!weatherResponse.ok) {
+                            throw new Error(`获取天气信息失败: ${weatherResponse.status}`);
+                        }
+                        
+                        const requestWeatherData = await weatherResponse.json();
+                        if (!requestWeatherData || requestWeatherData.code !== 200 || !requestWeatherData.data) {
+                            throw new Error('天气数据无效');
+                        }
+                        
+                        // 更新缓存
+                        cache.data = requestWeatherData;
+                        cache.timestamp = now;
+                        cache.cityName = requestCityName;
+                        
+                        return { weatherData: requestWeatherData, cityName: requestCityName };
+                    })();
+                    
+                    // 保存请求 Promise，以便并发调用可以等待
+                    TaskbarManager._pendingWeatherRequest = requestPromise;
+                    
+                    try {
+                        const result = await requestPromise;
+                        weatherData = result.weatherData;
+                        cityName = result.cityName;
+                        // 请求成功，清除 pending 状态
+                        TaskbarManager._pendingWeatherRequest = null;
+                    } catch (error) {
+                        // 请求失败，清除 pending 状态
+                        TaskbarManager._pendingWeatherRequest = null;
+                        throw error;
+                    }
                 }
-                
-                // 获取城市名称（使用第一个结果）
-                cityName = cityData.data[0].name;
-                
-                // 获取天气信息
-                const weatherResponse = await fetch(`https://api-v1.cenguigui.cn/api/WeatherInfo/?city=${encodeURIComponent(cityName)}`);
-                if (!weatherResponse.ok) {
-                    throw new Error(`获取天气信息失败: ${weatherResponse.status}`);
-                }
-                
-                weatherData = await weatherResponse.json();
-                if (!weatherData || weatherData.code !== 200 || !weatherData.data) {
-                    throw new Error('天气数据无效');
-                }
-                
-                // 更新缓存
-                cache.data = weatherData;
-                cache.timestamp = now;
-                cache.cityName = cityName;
             }
             
             // 更新UI

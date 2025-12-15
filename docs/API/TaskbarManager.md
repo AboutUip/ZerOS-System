@@ -12,6 +12,7 @@
 - `ThemeManager` - 主题管理器（用于系统图标）
 - `NotificationManager` - 通知管理器（用于通知徽章）
 - `LStorage` - 本地存储（用于保存任务栏位置和固定程序列表）
+- `GeographyDrive` - 地理位置驱动（用于天气组件的城市名称获取，可选依赖）
 
 ## 初始化
 
@@ -143,8 +144,18 @@ await TaskbarManager.setPinnedPrograms(['filemanager', 'browser', 'musicplayer']
 - **自动刷新**：每30分钟自动刷新天气数据
 
 **天气数据来源**：
-- 城市信息：`https://api-v1.cenguigui.cn/api/UserInfo/apilet.php`
+- 城市信息：优先使用 `GeographyDrive` 低精度定位获取城市名称（不触发浏览器权限请求），失败时降级到直接调用 API
 - 天气信息：`https://api-v1.cenguigui.cn/api/WeatherInfo/?city={城市名}`
+
+**城市名称获取策略**：
+1. **优先使用 GeographyDrive**：使用低精度定位（`enableHighAccuracy: false`）获取城市名称，不会触发浏览器权限请求
+2. **降级方案**：如果 GeographyDrive 未加载或获取失败，自动降级到直接调用 `https://api-v1.cenguigui.cn/api/UserInfo/apilet.php` API
+
+**并发请求处理**：
+- 天气组件实现了并发控制机制，防止多个同时请求导致重复的 API 调用
+- 如果多个地方同时请求天气数据（如用户快速点击刷新），只有第一个请求会发起网络调用
+- 其他并发请求会等待第一个请求完成，并共享其结果
+- 这确保了即使响应时间有差异，也不会导致重复请求第三方定位 API
 
 ### 程序状态指示
 

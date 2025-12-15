@@ -93,6 +93,11 @@
         "../kernel/drive/dragDrive.js": [
             "../kernel/process/processManager.js"
         ],
+        
+        // 第十二层：地理位置驱动器（依赖进程管理器，用于权限检查）
+        "../kernel/drive/geographyDrive.js": [
+            "../kernel/process/processManager.js"
+        ],
     };
     
     // 加载脚本的 Promise 缓存
@@ -733,6 +738,14 @@
             check('DragDrive.disableDrag', typeof DragDrive.disableDrag === 'function');
             check('DragDrive.registerDropZone', typeof DragDrive.registerDropZone === 'function');
             check('DragDrive.cleanupProcessDrags', typeof DragDrive.cleanupProcessDrags === 'function');
+        }
+        
+        check('GeographyDrive', typeof GeographyDrive !== 'undefined');
+        if (typeof GeographyDrive !== 'undefined') {
+            check('GeographyDrive.getCurrentPosition', typeof GeographyDrive.getCurrentPosition === 'function');
+            check('GeographyDrive.clearCache', typeof GeographyDrive.clearCache === 'function');
+            check('GeographyDrive.isSupported', typeof GeographyDrive.isSupported === 'function');
+            check('GeographyDrive.getCachedLocation', typeof GeographyDrive.getCachedLocation === 'function');
         }
         
         // ========== 8. 浏览器环境检查 ==========

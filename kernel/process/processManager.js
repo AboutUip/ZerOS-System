@@ -1759,6 +1759,12 @@ class ProcessManager {
             'Drag.createFileDrag': PermissionManager.PERMISSION.DRAG_FILE,
             'Drag.createWindowDrag': PermissionManager.PERMISSION.DRAG_WINDOW,
             'Drag.getProcessDrags': PermissionManager.PERMISSION.DRAG_ELEMENT,
+            
+            // 地理位置API
+            'Geography.getCurrentPosition': PermissionManager.PERMISSION.GEOGRAPHY_LOCATION,
+            'Geography.clearCache': PermissionManager.PERMISSION.GEOGRAPHY_LOCATION,
+            'Geography.isSupported': null, // 检查支持性不需要权限
+            'Geography.getCachedLocation': PermissionManager.PERMISSION.GEOGRAPHY_LOCATION,
         };
         
         return apiPermissionMap[apiName] || null;
@@ -2561,6 +2567,36 @@ class ProcessManager {
                     throw new Error('Drag.getProcessDrags: pid 必须是数字');
                 }
                 return DragDrive.getProcessDrags(pid);
+            },
+            
+            // 地理位置API
+            'Geography.getCurrentPosition': async (options = {}) => {
+                if (typeof GeographyDrive === 'undefined') {
+                    throw new Error('GeographyDrive 模块未加载');
+                }
+                if (options && typeof options !== 'object') {
+                    throw new Error('Geography.getCurrentPosition: options 必须是对象');
+                }
+                return await GeographyDrive.getCurrentPosition(options);
+            },
+            'Geography.clearCache': async () => {
+                if (typeof GeographyDrive === 'undefined') {
+                    throw new Error('GeographyDrive 模块未加载');
+                }
+                GeographyDrive.clearCache();
+                return true;
+            },
+            'Geography.isSupported': async () => {
+                if (typeof GeographyDrive === 'undefined') {
+                    throw new Error('GeographyDrive 模块未加载');
+                }
+                return GeographyDrive.isSupported();
+            },
+            'Geography.getCachedLocation': async () => {
+                if (typeof GeographyDrive === 'undefined') {
+                    throw new Error('GeographyDrive 模块未加载');
+                }
+                return GeographyDrive.getCachedLocation();
             },
             
             // 其他API可以在这里添加
