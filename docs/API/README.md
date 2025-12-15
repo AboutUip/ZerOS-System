@@ -38,6 +38,7 @@
 
 ### PHP 服务
 - [FSDirve.md](./FSDirve.md) - 文件系统驱动服务（PHP 后端） ✅
+- [CompressionDrive.md](./CompressionDrive.md) - 压缩驱动服务（ZIP/RAR 压缩解压缩） ✅
 
 ### 信号系统
 - [Pool.md](./Pool.md) - 全局对象池 ✅
