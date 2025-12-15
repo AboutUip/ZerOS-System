@@ -47,8 +47,13 @@
             // 检查是否是文件选择器模式
             this._isFileSelectorMode = initArgs && initArgs.mode === 'file-selector';
             this._isFolderSelectorMode = initArgs && initArgs.mode === 'folder-selector';
+            this._multiSelect = initArgs && initArgs.multiSelect === true; // 多选模式
             this._onFileSelected = initArgs && initArgs.onFileSelected;
             this._onFolderSelected = initArgs && initArgs.onFolderSelected;
+            this._onMultipleSelected = initArgs && initArgs.onMultipleSelected; // 多选回调
+            
+            // 多选模式下的已选项目列表
+            this._selectedItems = [];
             
             // 初始化内存管理
             this._initMemory(pid);
@@ -212,15 +217,45 @@
                 `;
                 
                 const hintText = document.createElement('span');
-                if (this._isFolderSelectorMode) {
-                    hintText.textContent = '📁 双击文件夹进入，单击选中后点击"选择"按钮';
-                } else if (this._isFileSelectorMode) {
-                    hintText.textContent = '📄 请选择一个文件（单击或双击文件进行选择）';
+                if (this._multiSelect) {
+                    if (this._isFolderSelectorMode) {
+                        hintText.textContent = '📁 多选模式：勾选多个文件夹后点击"确认选择"';
+                    } else if (this._isFileSelectorMode) {
+                        hintText.textContent = '📄 多选模式：勾选多个文件/文件夹后点击"确认选择"';
+                    }
+                } else {
+                    if (this._isFolderSelectorMode) {
+                        hintText.textContent = '📁 双击文件夹进入，单击选中后点击"选择"按钮';
+                    } else if (this._isFileSelectorMode) {
+                        hintText.textContent = '📄 请选择一个文件（单击或双击文件进行选择）';
+                    }
                 }
                 selectorHint.appendChild(hintText);
                 
-                // 文件夹选择器模式下添加选择按钮
-                if (this._isFolderSelectorMode) {
+                // 多选模式下的确认按钮
+                if (this._multiSelect) {
+                    const confirmButton = document.createElement('button');
+                    confirmButton.className = 'filemanager-select-button';
+                    confirmButton.textContent = `确认选择 (0)`;
+                    confirmButton.style.cssText = `
+                        padding: 6px 16px;
+                        background: rgba(139, 92, 246, 0.3);
+                        border: 1px solid rgba(139, 92, 246, 0.5);
+                        border-radius: 6px;
+                        color: rgba(215, 224, 221, 0.9);
+                        font-size: 13px;
+                        cursor: pointer;
+                        transition: all 0.2s;
+                        opacity: 0.5;
+                        pointer-events: none;
+                    `;
+                    confirmButton.addEventListener('click', () => {
+                        this._confirmMultipleSelection();
+                    });
+                    selectorHint.appendChild(confirmButton);
+                    this.multiSelectConfirmButton = confirmButton;
+                } else if (this._isFolderSelectorMode) {
+                    // 文件夹选择器模式下添加选择按钮（单选）
                     const selectButton = document.createElement('button');
                     selectButton.className = 'filemanager-select-button';
                     selectButton.textContent = '选择文件夹';
@@ -2130,6 +2165,7 @@
             const imageExts = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'svg', 'webp', 'ico'];
             const audioExts = ['mp3', 'wav', 'flac', 'ogg', 'aac', 'm4a', 'wma', 'opus'];
             const videoExts = ['mp4', 'webm', 'avi', 'mov', 'mkv', 'flv', 'wmv', 'm4v', '3gp'];
+            const archiveExts = ['zip', 'rar', '7z', 'tar', 'gz'];
             
             if (textExts.includes(ext)) return 'TEXT';
             if (codeExts.includes(ext)) return 'CODE';
@@ -2137,6 +2173,7 @@
             if (audioExts.includes(ext)) return 'AUDIO';
             if (videoExts.includes(ext)) return 'VIDEO';
             if (ext === 'md' || ext === 'markdown') return 'MARKDOWN';
+            if (archiveExts.includes(ext)) return 'ZIP'; // ZIP 类型包括所有压缩文件格式
             
             return 'BINARY';
         },
@@ -2155,23 +2192,97 @@
             itemElement._fileManagerItem = item;
             
             // 在选择器模式下添加特殊样式类
-            if (this._isFolderSelectorMode && item.type === 'directory') {
-                itemElement.classList.add('filemanager-item-selectable');
-            } else if (this._isFileSelectorMode && item.type === 'file') {
-                itemElement.classList.add('filemanager-item-selectable');
-            } else if ((this._isFolderSelectorMode && item.type === 'file') || 
-                       (this._isFileSelectorMode && item.type === 'directory')) {
-                itemElement.classList.add('filemanager-item-disabled');
+            if (this._multiSelect) {
+                // 多选模式下，根据可选择性添加样式
+                // 文件夹选择器模式：只能选择文件夹
+                // 文件选择器模式：可以选择文件和文件夹
+                if (this._isFolderSelectorMode) {
+                    if (item.type === 'directory') {
+                        itemElement.classList.add('filemanager-item-selectable');
+                    } else {
+                        itemElement.classList.add('filemanager-item-disabled');
+                    }
+                } else if (this._isFileSelectorMode) {
+                    // 文件选择器模式下，多选时允许同时选择文件和文件夹
+                    if (item.type === 'file' || item.type === 'directory') {
+                        itemElement.classList.add('filemanager-item-selectable');
+                    }
+                }
+            } else {
+                // 单选模式下的原有逻辑
+                if (this._isFolderSelectorMode && item.type === 'directory') {
+                    itemElement.classList.add('filemanager-item-selectable');
+                } else if (this._isFileSelectorMode && item.type === 'file') {
+                    itemElement.classList.add('filemanager-item-selectable');
+                } else if (this._isFolderSelectorMode && item.type === 'file') {
+                    // 文件夹选择器模式下，文件被禁用
+                    itemElement.classList.add('filemanager-item-disabled');
+                } else if (this._isFileSelectorMode && item.type === 'directory') {
+                    // 文件选择器模式下，目录不能直接选择，但可以双击进入
+                    // 不添加 disabled 类，只添加一个视觉提示类
+                    itemElement.classList.add('filemanager-item-navigable');
+                }
+            }
+            
+            // 多选模式下添加选择框
+            let checkbox = null;
+            if (this._multiSelect) {
+                // 多选模式下：
+                // - 文件夹选择器模式：只能选择文件夹
+                // - 文件选择器模式：可以选择文件和文件夹（用于压缩等场景）
+                // - 正常模式：可以选择所有类型
+                let isSelectable = false;
+                if (this._isFolderSelectorMode) {
+                    isSelectable = item.type === 'directory';
+                } else if (this._isFileSelectorMode) {
+                    // 文件选择器模式下，多选时允许同时选择文件和文件夹
+                    isSelectable = item.type === 'file' || item.type === 'directory';
+                } else {
+                    // 正常模式下，可以选择所有类型
+                    isSelectable = true;
+                }
+                
+                if (isSelectable) {
+                    checkbox = document.createElement('input');
+                    checkbox.type = 'checkbox';
+                    checkbox.className = 'filemanager-item-checkbox';
+                    checkbox.style.cssText = `
+                        width: 18px;
+                        height: 18px;
+                        margin-right: 8px;
+                        cursor: pointer;
+                        flex-shrink: 0;
+                    `;
+                    checkbox.addEventListener('change', (e) => {
+                        e.stopPropagation(); // 阻止事件冒泡
+                        this._toggleItemSelection(item, checkbox.checked);
+                    });
+                    checkbox.addEventListener('click', (e) => {
+                        e.stopPropagation(); // 阻止事件冒泡
+                    });
+                }
             }
             
             // 点击事件
             itemElement.addEventListener('click', (e) => {
+                // 如果点击的是选择框，不处理
+                if (e.target === checkbox || e.target.closest('.filemanager-item-checkbox')) {
+                    return;
+                }
+                
                 if (e.detail === 2) {
                     // 双击
                     this._openItem(item);
                 } else {
                     // 单击
-                    if (this._isFolderSelectorMode && item.type === 'directory') {
+                    if (this._multiSelect) {
+                        // 多选模式下，切换选择状态
+                        // 如果项目有选择框，说明是可选择的
+                        if (checkbox) {
+                            checkbox.checked = !checkbox.checked;
+                            this._toggleItemSelection(item, checkbox.checked);
+                        }
+                    } else if (this._isFolderSelectorMode && item.type === 'directory') {
                         // 在文件夹选择器模式下，单击文件夹选中（不立即触发选择）
                         this._selectFolderForSelection(item, itemElement);
                     } else if (this._isFileSelectorMode && item.type === 'file') {
@@ -2222,6 +2333,10 @@
                     case 'VIDEO':
                         iconUrl = 'D:/application/filemanager/assets/file-video.svg';
                         break;
+                    case 'ZIP':
+                        // ZIP 压缩文件图标（使用 ziper 程序的图标或通用文件图标）
+                        iconUrl = 'D:/application/ziper/ziper.svg';
+                        break;
                     default:
                         iconUrl = 'D:/application/filemanager/assets/file.svg';
                 }
@@ -2252,6 +2367,10 @@
                 size.textContent = '';
             }
             
+            // 多选模式下，在选择框之后添加图标
+            if (checkbox) {
+                itemElement.appendChild(checkbox);
+            }
             itemElement.appendChild(icon);
             itemElement.appendChild(name);
             itemElement.appendChild(size);
@@ -2526,6 +2645,74 @@
         },
         
         /**
+         * 切换项目选择状态（多选模式）
+         */
+        _toggleItemSelection: function(item, isSelected) {
+            const itemIndex = this._selectedItems.findIndex(selected => selected.path === item.path);
+            
+            if (isSelected) {
+                // 添加到选择列表
+                if (itemIndex === -1) {
+                    this._selectedItems.push(item);
+                }
+            } else {
+                // 从选择列表移除
+                if (itemIndex !== -1) {
+                    this._selectedItems.splice(itemIndex, 1);
+                }
+            }
+            
+            // 更新确认按钮状态
+            this._updateMultiSelectButton();
+        },
+        
+        /**
+         * 更新多选确认按钮状态
+         */
+        _updateMultiSelectButton: function() {
+            if (this.multiSelectConfirmButton) {
+                const count = this._selectedItems.length;
+                this.multiSelectConfirmButton.textContent = `确认选择 (${count})`;
+                
+                if (count > 0) {
+                    this.multiSelectConfirmButton.style.opacity = '1';
+                    this.multiSelectConfirmButton.style.pointerEvents = 'auto';
+                    this.multiSelectConfirmButton.style.background = 'rgba(139, 92, 246, 0.4)';
+                } else {
+                    this.multiSelectConfirmButton.style.opacity = '0.5';
+                    this.multiSelectConfirmButton.style.pointerEvents = 'none';
+                    this.multiSelectConfirmButton.style.background = 'rgba(139, 92, 246, 0.3)';
+                }
+            }
+        },
+        
+        /**
+         * 确认多选
+         */
+        _confirmMultipleSelection: async function() {
+            if (this._selectedItems.length === 0) {
+                return;
+            }
+            
+            if (this._onMultipleSelected && typeof this._onMultipleSelected === 'function') {
+                try {
+                    await this._onMultipleSelected(this._selectedItems);
+                    // 选择完成后关闭文件管理器
+                    if (typeof ProcessManager !== 'undefined') {
+                        ProcessManager.killProgram(this.pid);
+                    }
+                } catch (err) {
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.error('FileManager', `多选回调失败: ${err.message}`);
+                    }
+                    if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
+                        await GUIManager.showAlert(`选择失败: ${err.message}`, '错误', 'error');
+                    }
+                }
+            }
+        },
+        
+        /**
          * 确认文件夹选择
          */
         _confirmFolderSelection: async function() {
@@ -2620,8 +2807,12 @@
                 const extension = fileName.split('.').pop()?.toLowerCase() || '';
                 const isSvg = extension === 'svg';
                 
+                // ZIP 压缩文件默认用 ziper 打开
+                if (fileType === 'ZIP') {
+                    await this._openFileWithZiper(item);
+                }
                 // 视频文件默认用视频播放器打开
-                if (fileType === 'VIDEO') {
+                else if (fileType === 'VIDEO') {
                     await this._openFileWithVideoPlayer(item);
                 }
                 // 音频文件默认用音频播放器打开
@@ -2783,6 +2974,50 @@
                     await GUIManager.showAlert(`启动图片查看器失败: ${error.message}`, '错误', 'error');
                 } else {
                     alert(`启动图片查看器失败: ${error.message}`);
+                }
+            }
+        },
+        
+        /**
+         * 使用 ziper 打开 ZIP 文件
+         */
+        _openFileWithZiper: async function(item) {
+            try {
+                if (typeof ProcessManager === 'undefined') {
+                    if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
+                        await GUIManager.showAlert('ProcessManager 不可用', '错误', 'error');
+                    } else {
+                        alert('ProcessManager 不可用');
+                    }
+                    return;
+                }
+                
+                // 确保item.path存在且有效
+                if (!item || !item.path) {
+                    if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
+                        await GUIManager.showAlert('文件路径无效', '错误', 'error');
+                    } else {
+                        alert('文件路径无效');
+                    }
+                    return;
+                }
+                
+                // 获取当前路径（用于cwd）
+                const currentPath = this._getCurrentPath();
+                const cwd = currentPath || 'C:';
+                
+                // 启动 ziper 程序，传递 ZIP 文件路径作为参数
+                await ProcessManager.startProgram('ziper', {
+                    args: [item.path], // 传递 ZIP 文件路径作为参数
+                    cwd: cwd
+                });
+                
+            } catch (error) {
+                console.error('启动 ziper 失败:', error);
+                if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
+                    await GUIManager.showAlert(`启动 ziper 失败: ${error.message}`, '错误', 'error');
+                } else {
+                    alert(`启动 ziper 失败: ${error.message}`);
                 }
             }
         },

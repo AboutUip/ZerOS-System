@@ -6,6 +6,38 @@
  * 访问地址: http://localhost:8089/service/CompressionDirve.php?action=xxx&...
  */
 
+// 设置错误处理，确保所有错误都返回 JSON
+set_error_handler(function($errno, $errstr, $errfile, $errline) {
+    // 忽略某些错误类型
+    if (!(error_reporting() & $errno)) {
+        return false;
+    }
+    
+    // 发送 JSON 错误响应
+    http_response_code(500);
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode([
+        'status' => 'error',
+        'message' => '服务器内部错误: ' . $errstr,
+        'timestamp' => date('Y-m-d H:i:s'),
+        'timestamp_unix' => time()
+    ], JSON_UNESCAPED_UNICODE);
+    exit;
+});
+
+// 设置异常处理
+set_exception_handler(function($exception) {
+    http_response_code(500);
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode([
+        'status' => 'error',
+        'message' => '未捕获的异常: ' . $exception->getMessage(),
+        'timestamp' => date('Y-m-d H:i:s'),
+        'timestamp_unix' => time()
+    ], JSON_UNESCAPED_UNICODE);
+    exit;
+});
+
 // 设置响应头
 header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: *');
@@ -127,28 +159,37 @@ function getFileExtension($filename) {
 }
 
 /**
- * ZIP 压缩
- * @param string $sourcePath 源路径（文件或目录）
+ * ZIP 压缩（支持多个源路径）
+ * @param string|array $sourcePath 源路径（文件或目录），可以是单个路径字符串或路径数组
  * @param string $targetPath 目标压缩文件路径
  * @param array $options 选项（可选）
  *   - exclude: 排除的文件/目录列表
  *   - compressionLevel: 压缩级别 (0-9, 默认 6)
  */
 function compressZip($sourcePath, $targetPath, $options = []) {
+    // 支持单个路径或路径数组
+    $sourcePaths = is_array($sourcePath) ? $sourcePath : [$sourcePath];
     if (!checkZipSupport()) {
         sendResponse(false, 'ZIP 扩展未安装，无法进行 ZIP 压缩', null, 500);
     }
     
-    $sourceRealPath = getRealPath($sourcePath);
     $targetRealPath = getRealPath($targetPath);
     
-    if (!$sourceRealPath || !$targetRealPath) {
-        sendResponse(false, '无效的路径格式', null, 400);
+    if (!$targetRealPath) {
+        sendResponse(false, '无效的目标路径格式', null, 400);
     }
     
-    // 检查源路径是否存在
-    if (!file_exists($sourceRealPath)) {
-        sendResponse(false, '源路径不存在: ' . $sourcePath, null, 404);
+    // 验证所有源路径
+    $sourceRealPaths = [];
+    foreach ($sourcePaths as $path) {
+        $realPath = getRealPath($path);
+        if (!$realPath) {
+            sendResponse(false, '无效的源路径格式: ' . $path, null, 400);
+        }
+        if (!file_exists($realPath)) {
+            sendResponse(false, '源路径不存在: ' . $path, null, 404);
+        }
+        $sourceRealPaths[] = $realPath;
     }
     
     // 检查目标目录是否存在
@@ -177,43 +218,50 @@ function compressZip($sourcePath, $targetPath, $options = []) {
     // 如果需要控制压缩级别，需要使用外部工具或第三方库
     
     try {
-        // 递归添加文件
-        if (is_file($sourceRealPath)) {
-            // 单个文件
-            $zip->addFile($sourceRealPath, basename($sourceRealPath));
-        } else {
-            // 目录
-            $sourceDir = $sourceRealPath;
-            $iterator = new RecursiveIteratorIterator(
-                new RecursiveDirectoryIterator($sourceDir, RecursiveDirectoryIterator::SKIP_DOTS),
-                RecursiveIteratorIterator::SELF_FIRST
-            );
-            
-            foreach ($iterator as $file) {
-                $filePath = $file->getRealPath();
-                // 规范化路径分隔符，确保使用正斜杠
-                $normalizedSourceDir = str_replace('\\', '/', $sourceDir);
-                $normalizedFilePath = str_replace('\\', '/', $filePath);
-                $relativePath = str_replace($normalizedSourceDir . '/', '', $normalizedFilePath);
+        // 处理多个源路径
+        foreach ($sourceRealPaths as $sourceRealPath) {
+            if (is_file($sourceRealPath)) {
+                // 单个文件：添加到 ZIP 根目录，使用文件名
+                $zip->addFile($sourceRealPath, basename($sourceRealPath));
+            } else {
+                // 目录：递归添加所有文件
+                $sourceDir = $sourceRealPath;
+                $baseName = basename($sourceDir);
+                $iterator = new RecursiveIteratorIterator(
+                    new RecursiveDirectoryIterator($sourceDir, RecursiveDirectoryIterator::SKIP_DOTS),
+                    RecursiveIteratorIterator::SELF_FIRST
+                );
                 
-                // 检查是否在排除列表中
-                $shouldExclude = false;
-                foreach ($exclude as $pattern) {
-                    // 规范化排除模式
-                    $normalizedPattern = str_replace('\\', '/', $pattern);
-                    if (strpos($relativePath, $normalizedPattern) === 0 || $relativePath === $normalizedPattern) {
-                        $shouldExclude = true;
-                        break;
+                foreach ($iterator as $file) {
+                    $filePath = $file->getRealPath();
+                    // 规范化路径分隔符，确保使用正斜杠
+                    $normalizedSourceDir = str_replace('\\', '/', $sourceDir);
+                    $normalizedFilePath = str_replace('\\', '/', $filePath);
+                    $relativePath = str_replace($normalizedSourceDir . '/', '', $normalizedFilePath);
+                    
+                    // 如果只有一个源路径，保持原有行为（相对路径）
+                    // 如果有多个源路径，使用目录名作为前缀以避免冲突
+                    $zipPath = count($sourceRealPaths) > 1 ? $baseName . '/' . $relativePath : $relativePath;
+                    
+                    // 检查是否在排除列表中
+                    $shouldExclude = false;
+                    foreach ($exclude as $pattern) {
+                        // 规范化排除模式
+                        $normalizedPattern = str_replace('\\', '/', $pattern);
+                        if (strpos($relativePath, $normalizedPattern) === 0 || $relativePath === $normalizedPattern) {
+                            $shouldExclude = true;
+                            break;
+                        }
                     }
-                }
-                if ($shouldExclude) {
-                    continue;
-                }
-                
-                if ($file->isDir()) {
-                    $zip->addEmptyDir($relativePath);
-                } else {
-                    $zip->addFile($filePath, $relativePath);
+                    if ($shouldExclude) {
+                        continue;
+                    }
+                    
+                    if ($file->isDir()) {
+                        $zip->addEmptyDir($zipPath);
+                    } else {
+                        $zip->addFile($filePath, $zipPath);
+                    }
                 }
             }
         }
@@ -222,10 +270,12 @@ function compressZip($sourcePath, $targetPath, $options = []) {
         
         $fileSize = filesize($targetRealPath);
         sendResponse(true, 'ZIP 压缩成功', [
-            'sourcePath' => $sourcePath,
+            'sourcePaths' => $sourcePaths,
+            'sourcePath' => count($sourcePaths) === 1 ? $sourcePaths[0] : null, // 兼容性：单个路径时提供
             'targetPath' => $targetPath,
             'size' => $fileSize,
-            'compressionLevel' => $compressionLevel
+            'compressionLevel' => $compressionLevel,
+            'sourceCount' => count($sourcePaths)
         ]);
     } catch (Exception $e) {
         if ($zip->close() === false) {
@@ -363,12 +413,17 @@ function listZip($sourcePath) {
     $files = [];
     for ($i = 0; $i < $zip->numFiles; $i++) {
         $stat = $zip->statIndex($i);
+        if ($stat === false) {
+            continue; // 跳过无效的条目
+        }
+        
+        // 安全地获取所有字段，使用默认值
         $files[] = [
-            'name' => $stat['name'],
-            'size' => $stat['size'],
-            'compressedSize' => $stat['compressed_size'],
-            'isDir' => substr($stat['name'], -1) === '/',
-            'modified' => date('Y-m-d H:i:s', $stat['mtime'])
+            'name' => $stat['name'] ?? '',
+            'size' => $stat['size'] ?? 0,
+            'compressedSize' => $stat['compressed_size'] ?? ($stat['size'] ?? 0), // 如果压缩大小不存在，使用原始大小
+            'isDir' => substr($stat['name'] ?? '', -1) === '/',
+            'modified' => isset($stat['mtime']) && $stat['mtime'] > 0 ? date('Y-m-d H:i:s', $stat['mtime']) : null
         ];
     }
     
@@ -600,23 +655,46 @@ function checkSupport() {
 }
 
 // 主处理逻辑
-$action = $_GET['action'] ?? '';
+try {
+    $action = $_GET['action'] ?? '';
 
-switch ($action) {
+    if (empty($action)) {
+        sendResponse(false, '缺少 action 参数', null, 400);
+    }
+
+    switch ($action) {
     // ZIP 操作
     case 'compress_zip':
-        $sourcePath = $_GET['sourcePath'] ?? '';
         $targetPath = $_GET['targetPath'] ?? '';
         $options = [];
+        $sourcePath = null;
+        $sourcePaths = null;
         
-        // 解析选项（从 POST 或 GET）
+        // 解析选项和源路径（从 POST 或 GET）
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $rawInput = file_get_contents('php://input');
             $postData = json_decode($rawInput, true);
-            if ($postData && isset($postData['options'])) {
-                $options = $postData['options'];
+            if ($postData) {
+                // 支持 sourcePaths（数组）或 sourcePath（单个）
+                if (isset($postData['sourcePaths']) && is_array($postData['sourcePaths'])) {
+                    $sourcePaths = $postData['sourcePaths'];
+                } else if (isset($postData['sourcePath'])) {
+                    $sourcePath = $postData['sourcePath'];
+                }
+                if (isset($postData['options'])) {
+                    $options = $postData['options'];
+                }
             }
         } else {
+            // GET 方式：支持 sourcePath（单个）或 sourcePaths（JSON 字符串）
+            if (isset($_GET['sourcePaths'])) {
+                $decoded = json_decode($_GET['sourcePaths'], true);
+                if (is_array($decoded)) {
+                    $sourcePaths = $decoded;
+                }
+            } else if (isset($_GET['sourcePath'])) {
+                $sourcePath = $_GET['sourcePath'];
+            }
             if (isset($_GET['exclude'])) {
                 $options['exclude'] = is_array($_GET['exclude']) ? $_GET['exclude'] : explode(',', $_GET['exclude']);
             }
@@ -625,10 +703,21 @@ switch ($action) {
             }
         }
         
-        if (empty($sourcePath) || empty($targetPath)) {
-            sendResponse(false, '缺少必要参数: sourcePath, targetPath', null, 400);
+        // 确定使用的源路径
+        $finalSourcePath = $sourcePaths !== null ? $sourcePaths : ($sourcePath !== null ? $sourcePath : '');
+        
+        // 检查源路径：如果是数组，检查是否为空数组；如果是字符串，检查是否为空
+        $isSourcePathEmpty = false;
+        if (is_array($finalSourcePath)) {
+            $isSourcePathEmpty = empty($finalSourcePath);
+        } else {
+            $isSourcePathEmpty = empty($finalSourcePath);
         }
-        compressZip($sourcePath, $targetPath, $options);
+        
+        if ($isSourcePathEmpty || empty($targetPath)) {
+            sendResponse(false, '缺少必要参数: sourcePath/sourcePaths, targetPath', null, 400);
+        }
+        compressZip($finalSourcePath, $targetPath, $options);
         break;
         
     case 'extract_zip':
@@ -730,5 +819,12 @@ switch ($action) {
     default:
         sendResponse(false, '未知的操作: ' . $action, null, 400);
         break;
+}
+} catch (Exception $e) {
+    // 捕获所有未处理的异常
+    sendResponse(false, '服务器错误: ' . $e->getMessage(), null, 500);
+} catch (Error $e) {
+    // 捕获 PHP 7+ 的致命错误
+    sendResponse(false, '服务器错误: ' . $e->getMessage(), null, 500);
 }
 

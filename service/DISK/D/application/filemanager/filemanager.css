@@ -183,6 +183,12 @@
     pointer-events: none;
 }
 
+/* 可导航但不可选择的项（文件选择器模式下的目录） */
+.filemanager-item-navigable {
+    opacity: 0.7;
+    cursor: pointer;
+}
+
 /* 文件夹选择器模式 */
 .filemanager-window.filemanager-folder-selector-mode .filemanager-item[data-type="file"] {
     opacity: 0.5;

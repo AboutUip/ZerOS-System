@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="zipGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f59e0b"/>
+      <stop offset="100%" stop-color="#d97706"/>
+    </linearGradient>
+    <filter id="zipGlow">
+      <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  
+  <!-- 背景 -->
+  <rect width="64" height="64" rx="12" fill="#0c1222" opacity="0.9"/>
+  
+  <!-- ZIP 压缩包图标 -->
+  <g filter="url(#zipGlow)">
+    <!-- 压缩包主体 -->
+    <path d="M 16 18 L 16 46 L 48 46 L 48 28 L 36 28 L 32 24 L 16 24 Z" fill="url(#zipGrad)" opacity="0.9"/>
+    <path d="M 16 18 L 16 46 L 48 46 L 48 28 L 36 28 L 32 24 L 16 24 Z" fill="none" stroke="#f59e0b" stroke-width="1.5"/>
+    
+    <!-- 压缩包标签 -->
+    <path d="M 16 18 L 32 18 L 36 24 L 16 24 Z" fill="#92400e" opacity="0.8"/>
+    <path d="M 16 18 L 32 18 L 36 24 L 16 24 Z" fill="none" stroke="#f59e0b" stroke-width="1.5"/>
+    
+    <!-- ZIP 文字标识 -->
+    <text x="32" y="22" font-family="Arial, sans-serif" font-size="6" font-weight="bold" fill="#ffffff" text-anchor="middle">ZIP</text>
+  </g>
+  
+  <!-- 压缩带（表示压缩状态） -->
+  <g transform="translate(20, 30)">
+    <rect x="0" y="0" width="24" height="12" rx="1" fill="#78350f" opacity="0.5"/>
+    <rect x="0" y="0" width="24" height="12" rx="1" fill="none" stroke="#f59e0b" stroke-width="1"/>
+    <!-- 压缩带纹理 -->
+    <line x1="4" y1="2" x2="20" y2="2" stroke="#f59e0b" stroke-width="0.5" opacity="0.6"/>
+    <line x1="4" y1="6" x2="20" y2="6" stroke="#f59e0b" stroke-width="0.5" opacity="0.6"/>
+    <line x1="4" y1="10" x2="20" y2="10" stroke="#f59e0b" stroke-width="0.5" opacity="0.6"/>
+  </g>
+  
+  <!-- 文件图标（表示压缩内容） -->
+  <g transform="translate(28, 36)">
+    <rect x="0" y="0" width="8" height="10" rx="1" fill="#92400e" opacity="0.7"/>
+    <rect x="0" y="0" width="8" height="10" rx="1" fill="none" stroke="#f59e0b" stroke-width="0.8"/>
+    <line x1="2" y1="3" x2="6" y2="3" stroke="#f59e0b" stroke-width="0.5"/>
+    <line x1="2" y1="5" x2="6" y2="5" stroke="#f59e0b" stroke-width="0.5"/>
+  </g>
+  
+  <!-- 压缩/解压箭头 -->
+  <path d="M 10 32 L 14 28 L 10 24" stroke="#f59e0b" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity="0.8"/>
+  <path d="M 54 32 L 50 28 L 54 24" stroke="#f59e0b" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity="0.8"/>
+  
+  <!-- 底部装饰线 -->
+  <line x1="16" y1="48" x2="48" y2="48" stroke="url(#zipGrad)" stroke-width="1" opacity="0.4"/>
+</svg>
+

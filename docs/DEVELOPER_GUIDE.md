@@ -919,9 +919,637 @@ await Disk.writeFile('C:/Users/username/data.json', JSON.stringify(data));
 await LStorage.setProgramStorage(this.pid, 'settings', { theme: 'dark' });
 ```
 
+### Q: 如何在程序中使用文件管理器选择文件或文件夹？
+
+A: 使用 `ProcessManager.startProgram` 启动文件管理器，并传入选择器模式参数：
+
+```javascript
+// 选择单个文件
+await ProcessManager.startProgram('filemanager', {
+    args: [],
+    mode: 'file-selector',
+    onFileSelected: async (fileItem) => {
+        if (fileItem && fileItem.path) {
+            console.log('选择的文件:', fileItem.path);
+            // 处理选择的文件
+        }
+    }
+});
+
+// 选择单个文件夹
+await ProcessManager.startProgram('filemanager', {
+    args: [],
+    mode: 'folder-selector',
+    onFolderSelected: async (folderItem) => {
+        if (folderItem && folderItem.path) {
+            console.log('选择的文件夹:', folderItem.path);
+            // 处理选择的文件夹
+        }
+    }
+});
+
+// 多选文件/文件夹（支持同时选择多个文件和文件夹）
+await ProcessManager.startProgram('filemanager', {
+    args: [],
+    mode: 'file-selector', // 或 'folder-selector'
+    multiSelect: true, // 启用多选
+    onMultipleSelected: async (selectedItems) => {
+        // selectedItems 是一个数组，包含所有选中的项目
+        console.log('选择了', selectedItems.length, '个项目');
+        selectedItems.forEach(item => {
+            console.log('-', item.path, item.type); // type: 'file' 或 'directory'
+        });
+        // 处理选中的多个项目
+    }
+});
+```
+
+**注意事项**：
+- 在 `file-selector` 模式下，多选时可以选择文件和文件夹
+- 在 `folder-selector` 模式下，多选时只能选择文件夹
+- 选择完成后，文件管理器会自动关闭
+- 如果用户取消选择，回调函数不会被调用
+
 ### Q: 程序支持多实例吗？
 
 A: 在 `__info__` 的 `metadata` 中设置 `allowMultipleInstances: true`。注意：每个实例都有独立的 PID。
+
+### Q: 如何获取程序的 PID？
+
+A: PID 在 `__init__` 方法中作为第一个参数传入，应该保存到 `this.pid`：
+
+```javascript
+__init__: async function(pid, initArgs) {
+    this.pid = pid; // 保存 PID
+    // ...
+}
+```
+
+### Q: 如何检查某个内核模块是否可用？
+
+A: 使用 `typeof` 检查：
+
+```javascript
+if (typeof GUIManager !== 'undefined') {
+    // GUIManager 可用
+    await GUIManager.registerWindow(this.pid, this.window);
+} else {
+    console.warn('GUIManager 不可用');
+}
+```
+
+### Q: 如何处理异步操作的错误？
+
+A: 始终使用 try-catch 包裹异步操作：
+
+```javascript
+try {
+    const result = await Disk.readFile('C:/data.txt');
+    console.log(result);
+} catch (error) {
+    console.error('读取文件失败:', error);
+    // 显示用户友好的错误提示
+    if (typeof GUIManager !== 'undefined') {
+        await GUIManager.showAlert('读取文件失败: ' + error.message, '错误', 'error');
+    }
+}
+```
+
+### Q: 如何创建自定义主题变量？
+
+A: 使用 CSS 变量，并在主题切换时更新：
+
+```css
+.my-element {
+    background: var(--theme-bg-primary);
+    color: var(--theme-text-primary);
+    border: 1px solid var(--theme-border-color);
+}
+```
+
+主题变量由 ThemeManager 管理，程序无需手动设置。
+
+### Q: 如何实现窗口拖拽功能？
+
+A: 使用 GUIManager 的窗口管理功能，窗口标题栏自动支持拖拽。如果需要自定义拖拽区域，可以监听鼠标事件：
+
+```javascript
+let isDragging = false;
+let dragOffset = { x: 0, y: 0 };
+
+element.addEventListener('mousedown', (e) => {
+    isDragging = true;
+    dragOffset.x = e.clientX - element.offsetLeft;
+    dragOffset.y = e.clientY - element.offsetTop;
+});
+
+document.addEventListener('mousemove', (e) => {
+    if (isDragging) {
+        element.style.left = (e.clientX - dragOffset.x) + 'px';
+        element.style.top = (e.clientY - dragOffset.y) + 'px';
+    }
+});
+
+document.addEventListener('mouseup', () => {
+    isDragging = false;
+});
+```
+
+### Q: 如何读取和写入文件？
+
+A: 使用 Disk API 或 FSDirve.php 服务：
+
+```javascript
+// 使用 Disk API（推荐）
+const content = await Disk.readFile('D:/data.txt');
+await Disk.writeFile('D:/data.txt', '新内容');
+
+// 使用 FSDirve.php 服务
+const url = new URL('/service/FSDirve.php', window.location.origin);
+url.searchParams.set('action', 'read_file');
+url.searchParams.set('path', 'D:/');
+url.searchParams.set('fileName', 'data.txt');
+
+const response = await fetch(url.toString());
+const result = await response.json();
+if (result.status === 'success') {
+    console.log(result.data.content);
+}
+```
+
+### Q: 如何压缩和解压缩文件？
+
+A: 使用 CompressionDrive API：
+
+```javascript
+// 压缩单个文件或目录
+await CompressionDrive.compressZip(
+    'D:/source/file.txt',
+    'D:/backup/archive.zip'
+);
+
+// 压缩多个文件/目录
+await CompressionDrive.compressZip(
+    ['D:/file1.txt', 'D:/dir1', 'D:/dir2'],
+    'D:/backup/multi.zip'
+);
+
+// 解压缩
+await CompressionDrive.extractZip(
+    'D:/backup/archive.zip',
+    'D:/extracted',
+    { overwrite: true }
+);
+
+// 查看 ZIP 内容
+const list = await CompressionDrive.listZip('D:/backup/archive.zip');
+console.log(`包含 ${list.fileCount} 个文件`);
+```
+
+### Q: 如何检查文件是否存在？
+
+A: 使用 FSDirve.php 的 `check_path_exists` 操作：
+
+```javascript
+const url = new URL('/service/FSDirve.php', window.location.origin);
+url.searchParams.set('action', 'check_path_exists');
+url.searchParams.set('path', 'D:/data.txt');
+
+const response = await fetch(url.toString());
+const result = await response.json();
+if (result.status === 'success' && result.data.exists) {
+    console.log('文件存在');
+}
+```
+
+### Q: 如何创建和删除目录？
+
+A: 使用 FSDirve.php 服务：
+
+```javascript
+// 创建目录
+const url = new URL('/service/FSDirve.php', window.location.origin);
+url.searchParams.set('action', 'create_dir');
+url.searchParams.set('path', 'D:/newdir');
+
+await fetch(url.toString());
+
+// 删除目录
+url.searchParams.set('action', 'delete_dir');
+url.searchParams.set('path', 'D:/newdir');
+await fetch(url.toString());
+```
+
+### Q: 如何列出目录内容？
+
+A: 使用 FSDirve.php 的 `list_dir` 操作：
+
+```javascript
+const url = new URL('/service/FSDirve.php', window.location.origin);
+url.searchParams.set('action', 'list_dir');
+url.searchParams.set('path', 'D:/application');
+
+const response = await fetch(url.toString());
+const result = await response.json();
+if (result.status === 'success') {
+    result.data.files.forEach(file => {
+        console.log(file.name, file.type); // type: 'file' 或 'directory'
+    });
+}
+```
+
+### Q: 如何处理 ZIP 文件打开？
+
+A: 文件管理器会自动识别 ZIP 文件，双击会使用 ziper 程序打开。在程序中也可以手动启动：
+
+```javascript
+await ProcessManager.startProgram('ziper', {
+    args: ['D:/archive.zip'] // ZIP 文件路径
+});
+```
+
+### Q: 如何显示通知？
+
+A: 使用 NotificationManager：
+
+```javascript
+if (typeof NotificationManager !== 'undefined') {
+    await NotificationManager.show({
+        title: '操作完成',
+        message: '文件已成功保存',
+        type: 'success', // 'info', 'success', 'warning', 'error'
+        duration: 3000
+    });
+}
+```
+
+### Q: 如何显示确认对话框？
+
+A: 使用 GUIManager：
+
+```javascript
+if (typeof GUIManager !== 'undefined') {
+    const confirmed = await GUIManager.showConfirm(
+        '确定要删除这个文件吗？',
+        '确认删除',
+        'warning'
+    );
+    if (confirmed) {
+        // 执行删除操作
+    }
+}
+```
+
+### Q: 如何获取当前主题信息？
+
+A: 使用 ThemeManager：
+
+```javascript
+if (typeof ThemeManager !== 'undefined') {
+    const theme = ThemeManager.getCurrentTheme();
+    console.log('当前主题:', theme.name);
+    console.log('主题变量:', theme.variables);
+}
+```
+
+### Q: 如何处理大文件操作？
+
+A: 对于大文件，建议：
+
+1. 显示进度提示
+2. 使用异步操作，避免阻塞 UI
+3. 考虑分块处理
+
+```javascript
+// 显示加载状态
+button.disabled = true;
+button.textContent = '处理中...';
+
+try {
+    // 执行大文件操作
+    await processLargeFile('D:/largefile.zip');
+    
+    button.textContent = '完成';
+} catch (error) {
+    button.textContent = '失败';
+    console.error(error);
+} finally {
+    button.disabled = false;
+}
+```
+
+### Q: 如何实现文件拖拽上传？
+
+A: 监听拖拽事件：
+
+```javascript
+element.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    element.classList.add('drag-over');
+});
+
+element.addEventListener('drop', async (e) => {
+    e.preventDefault();
+    element.classList.remove('drag-over');
+    
+    const files = e.dataTransfer.files;
+    for (const file of files) {
+        // 读取文件内容
+        const reader = new FileReader();
+        reader.onload = async (event) => {
+            const content = event.target.result;
+            // 保存到虚拟文件系统
+            await Disk.writeFile(`D:/uploads/${file.name}`, content);
+        };
+        reader.readAsText(file);
+    }
+});
+```
+
+### Q: 如何实现程序间的数据共享？
+
+A: 使用 POOL 共享空间：
+
+```javascript
+// 程序 A：设置共享数据
+const sharedSpace = ProcessManager.getSharedSpace();
+sharedSpace.setData('MYAPP_DATA', { key: 'value' });
+
+// 程序 B：获取共享数据
+const sharedSpace = ProcessManager.getSharedSpace();
+const data = sharedSpace.getData('MYAPP_DATA');
+```
+
+### Q: 如何处理网络请求错误？
+
+A: 检查响应状态和内容类型：
+
+```javascript
+try {
+    const response = await fetch(url.toString());
+    
+    // 检查响应类型
+    const contentType = response.headers.get('content-type') || '';
+    let result;
+    
+    if (contentType.includes('application/json')) {
+        result = await response.json();
+    } else {
+        const text = await response.text();
+        throw new Error(`服务端返回非 JSON 响应: ${text.substring(0, 100)}`);
+    }
+    
+    // 检查 HTTP 状态码
+    if (!response.ok) {
+        throw new Error(result.message || `HTTP ${response.status}`);
+    }
+    
+    if (result.status === 'success') {
+        // 处理成功响应
+    } else {
+        throw new Error(result.message || '操作失败');
+    }
+} catch (error) {
+    console.error('请求失败:', error);
+    // 显示错误提示
+}
+```
+
+### Q: 如何优化程序性能？
+
+A: 建议：
+
+1. **延迟加载**：只在需要时加载资源
+2. **事件委托**：使用事件委托减少事件监听器数量
+3. **防抖节流**：对频繁触发的操作使用防抖或节流
+4. **虚拟滚动**：对于长列表使用虚拟滚动
+5. **内存管理**：及时清理不需要的引用
+
+```javascript
+// 防抖示例
+function debounce(func, wait) {
+    let timeout;
+    return function(...args) {
+        clearTimeout(timeout);
+        timeout = setTimeout(() => func.apply(this, args), wait);
+    };
+}
+
+const debouncedSearch = debounce((query) => {
+    performSearch(query);
+}, 300);
+```
+
+### Q: 如何调试内存泄漏？
+
+A: 检查以下几点：
+
+1. 确保所有事件监听器在 `__exit__` 中被移除
+2. 确保所有定时器被清除
+3. 确保所有 DOM 元素引用被设置为 null
+4. 使用浏览器开发者工具的 Memory 面板检查内存使用
+
+```javascript
+__exit__: async function() {
+    // 清理事件监听器
+    this._eventHandlers.forEach(({element, event, handler}) => {
+        element.removeEventListener(event, handler);
+    });
+    
+    // 清理定时器
+    if (this._timers) {
+        this._timers.forEach(timer => clearTimeout(timer));
+    }
+    
+    // 清理引用
+    this.window = null;
+    this._eventHandlers = null;
+    this._timers = null;
+}
+```
+
+### Q: 如何处理路径转换？
+
+A: 使用 ProcessManager 的路径转换功能：
+
+```javascript
+// 虚拟路径转实际 URL
+if (typeof ProcessManager !== 'undefined' && 
+    typeof ProcessManager.convertVirtualPathToUrl === 'function') {
+    const url = ProcessManager.convertVirtualPathToUrl('D:/application/icon.svg');
+    // 返回: http://localhost:8089/service/DISK/D/application/icon.svg
+}
+```
+
+### Q: 如何实现右键菜单？
+
+A: 使用 ContextMenuManager：
+
+```javascript
+if (typeof ContextMenuManager !== 'undefined') {
+    ContextMenuManager.registerContextMenu(this.pid, {
+        selector: '.my-element',
+        items: [
+            {
+                label: '复制',
+                icon: 'copy.svg',
+                action: () => {
+                    console.log('复制');
+                }
+            },
+            {
+                label: '删除',
+                icon: 'trash.svg',
+                action: () => {
+                    console.log('删除');
+                }
+            }
+        ]
+    });
+}
+```
+
+### Q: 如何实现窗口最小化/最大化？
+
+A: 使用 GUIManager 的窗口管理功能：
+
+```javascript
+// 注册窗口时设置回调
+GUIManager.registerWindow(this.pid, this.window, {
+    onMinimize: () => {
+        console.log('窗口已最小化');
+    },
+    onMaximize: (isMaximized) => {
+        console.log('窗口状态:', isMaximized ? '最大化' : '还原');
+    }
+});
+```
+
+### Q: 如何处理程序崩溃？
+
+A: 使用 try-catch 和错误边界：
+
+```javascript
+__init__: async function(pid, initArgs) {
+    try {
+        // 初始化代码
+        await this._initialize();
+    } catch (error) {
+        console.error('初始化失败:', error);
+        
+        // 显示错误提示
+        if (typeof GUIManager !== 'undefined') {
+            await GUIManager.showAlert(
+                `程序初始化失败: ${error.message}`,
+                '错误',
+                'error'
+            );
+        }
+        
+        // 清理已创建的资源
+        await this.__exit__();
+        
+        // 退出程序
+        if (typeof ProcessManager !== 'undefined') {
+            ProcessManager.killProgram(this.pid);
+        }
+    }
+}
+```
+
+### Q: 如何实现程序更新检查？
+
+A: 可以通过网络请求检查版本：
+
+```javascript
+async function checkUpdate() {
+    try {
+        const response = await fetch('https://api.example.com/version');
+        const latestVersion = await response.json();
+        const currentVersion = this.__info__().version;
+        
+        if (latestVersion > currentVersion) {
+            if (typeof GUIManager !== 'undefined') {
+                const update = await GUIManager.showConfirm(
+                    `发现新版本 ${latestVersion}，是否更新？`,
+                    '更新提示',
+                    'info'
+                );
+                if (update) {
+                    // 执行更新逻辑
+                }
+            }
+        }
+    } catch (error) {
+        console.error('检查更新失败:', error);
+    }
+}
+```
+
+### Q: 如何实现程序设置持久化？
+
+A: 使用 LStorage API：
+
+```javascript
+// 保存设置
+await LStorage.setProgramStorage(this.pid, 'settings', {
+    theme: 'dark',
+    language: 'zh-CN',
+    autoSave: true
+});
+
+// 读取设置
+const settings = await LStorage.getProgramStorage(this.pid, 'settings') || {
+    theme: 'light',
+    language: 'zh-CN',
+    autoSave: false
+};
+```
+
+### Q: 如何处理文件类型识别？
+
+A: 文件管理器会根据扩展名自动识别文件类型。在程序中也可以手动识别：
+
+```javascript
+function getFileType(fileName) {
+    const ext = fileName.split('.').pop()?.toLowerCase() || '';
+    const imageExts = ['jpg', 'jpeg', 'png', 'gif', 'svg'];
+    const codeExts = ['js', 'ts', 'html', 'css', 'json'];
+    
+    if (imageExts.includes(ext)) return 'IMAGE';
+    if (codeExts.includes(ext)) return 'CODE';
+    if (ext === 'zip' || ext === 'rar') return 'ZIP';
+    return 'BINARY';
+}
+```
+
+### Q: 如何实现程序日志记录？
+
+A: 使用 KernelLogger：
+
+```javascript
+if (typeof KernelLogger !== 'undefined') {
+    KernelLogger.info('MYAPP', '程序启动');
+    KernelLogger.warn('MYAPP', '警告信息');
+    KernelLogger.error('MYAPP', '错误信息', error);
+}
+```
+
+### Q: 如何处理程序权限请求？
+
+A: 权限系统会自动处理。首次使用需要权限的 API 时，系统会提示用户授权：
+
+```javascript
+// 使用需要权限的 API
+try {
+    await Disk.writeFile('C:/system/file.txt', 'content');
+} catch (error) {
+    if (error.message.includes('权限')) {
+        // 权限被拒绝
+        console.log('用户拒绝了权限请求');
+    }
+}
+```
 
 ---
 
@@ -930,8 +1558,9 @@ A: 在 `__info__` 的 `metadata` 中设置 `allowMultipleInstances: true`。注�
 - **示例程序**: 查看 `service/DISK/D/application/` 目录下的示例程序
   - `terminal/`: 终端程序示例
   - `vim/`: 文本编辑器示例
-  - `filemanager/`: 文件管理器示例
+  - `filemanager/`: 文件管理器示例（支持选择器模式、多选功能）
   - `browser/`: 浏览器示例
+  - `ziper/`: ZIP 压缩工具示例（支持多文件/目录压缩、ZIP 内容查看）
 
 - **内核模块**: 查看 `kernel/` 目录下的内核模块实现
 

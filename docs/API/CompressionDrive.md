@@ -54,7 +54,10 @@ Body: { "options": { ... } }
 **操作名**: `compress_zip`
 
 **参数**:
-- `sourcePath` (string, 必需): 源路径（文件或目录，如 `D:/application/mydir`）
+- `sourcePath` (string, 可选): 单个源路径（文件或目录，如 `D:/application/mydir`）
+- `sourcePaths` (array, 可选): 多个源路径（文件或目录数组，如 `['D:/file1.txt', 'D:/dir1']`）
+  - **注意**: `sourcePath` 和 `sourcePaths` 二选一，如果同时提供，优先使用 `sourcePaths`
+  - 当使用多个源路径时，每个文件/目录会以其基本名称作为前缀添加到 ZIP 中，避免路径冲突
 - `targetPath` (string, 必需): 目标压缩文件路径（如 `D:/backup/archive.zip`）
 - `options` (object, 可选): 压缩选项
   - `exclude` (array, 可选): 排除的文件/目录列表
@@ -73,11 +76,10 @@ const response = await fetch(url.toString());
 const result = await response.json();
 ```
 
-**示例** (POST):
+**示例** (POST - 单个路径):
 ```javascript
 const url = new URL('/service/CompressionDirve.php', window.location.origin);
 url.searchParams.set('action', 'compress_zip');
-url.searchParams.set('sourcePath', 'D:/application/mydir');
 url.searchParams.set('targetPath', 'D:/backup/archive.zip');
 
 const response = await fetch(url.toString(), {
@@ -86,6 +88,7 @@ const response = await fetch(url.toString(), {
         'Content-Type': 'application/json'
     },
     body: JSON.stringify({
+        sourcePath: 'D:/application/mydir',
         options: {
             exclude: ['node_modules', '.git'],
             compressionLevel: 9
@@ -95,13 +98,58 @@ const response = await fetch(url.toString(), {
 const result = await response.json();
 ```
 
-**响应**:
+**示例** (POST - 多个路径):
+```javascript
+const url = new URL('/service/CompressionDirve.php', window.location.origin);
+url.searchParams.set('action', 'compress_zip');
+url.searchParams.set('targetPath', 'D:/backup/archive.zip');
+
+const response = await fetch(url.toString(), {
+    method: 'POST',
+    headers: {
+        'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+        sourcePaths: [
+            'D:/application/file1.txt',
+            'D:/application/dir1',
+            'D:/application/dir2'
+        ],
+        options: {
+            exclude: ['node_modules', '.git'],
+            compressionLevel: 9
+        }
+    })
+});
+const result = await response.json();
+```
+
+**响应** (单个路径):
 ```json
 {
     "status": "success",
     "message": "ZIP 压缩成功",
     "data": {
         "sourcePath": "D:/application/mydir",
+        "targetPath": "D:/backup/archive.zip",
+        "size": 1048576,
+        "compressionLevel": 9
+    }
+}
+```
+
+**响应** (多个路径):
+```json
+{
+    "status": "success",
+    "message": "ZIP 压缩成功",
+    "data": {
+        "sourcePaths": [
+            "D:/application/file1.txt",
+            "D:/application/dir1",
+            "D:/application/dir2"
+        ],
+        "sourceCount": 3,
         "targetPath": "D:/backup/archive.zip",
         "size": 1048576,
         "compressionLevel": 9
@@ -432,14 +480,24 @@ class CompressionDrive {
     
     /**
      * ZIP 压缩
+     * @param {string|string[]} sourcePath - 单个源路径或源路径数组
+     * @param {string} targetPath - 目标压缩文件路径
+     * @param {object} options - 压缩选项
      */
     static async compressZip(sourcePath, targetPath, options = {}) {
-        return await this.request('compress_zip', {
-            sourcePath,
-            targetPath
-        }, {
+        const params = { targetPath };
+        const body = { options };
+        
+        // 支持单个路径或路径数组
+        if (Array.isArray(sourcePath)) {
+            body.sourcePaths = sourcePath;
+        } else {
+            body.sourcePath = sourcePath;
+        }
+        
+        return await this.request('compress_zip', params, {
             method: 'POST',
-            body: { options }
+            body
         });
     }
     
@@ -516,6 +574,20 @@ await CompressionDrive.compressZip(
     'D:/backup/file.zip'
 );
 
+// ZIP 压缩多个文件/目录
+await CompressionDrive.compressZip(
+    [
+        'D:/application/file1.txt',
+        'D:/application/dir1',
+        'D:/application/dir2'
+    ],
+    'D:/backup/multi-archive.zip',
+    {
+        exclude: ['node_modules', '.git'],
+        compressionLevel: 9
+    }
+);
+
 // ZIP 解压缩
 const result = await CompressionDrive.extractZip(
     'D:/backup/archive.zip',
@@ -570,6 +642,8 @@ try {
 5. **RAR 限制**: RAR 压缩功能当前不支持，请使用 ZIP 格式
 6. **扩展检查**: 使用前建议先调用 `check_support` 检查格式支持情况
 7. **路径验证**: 根路径（`C:` 或 `D:`）会自动转换为 `C:/` 或 `D:/` 格式
+8. **多路径压缩**: 当使用 `sourcePaths` 压缩多个文件/目录时，每个项目会以其基本名称作为前缀添加到 ZIP 中，避免路径冲突
+9. **错误响应**: 服务端已增强错误处理，所有错误都会返回 JSON 格式，包括 PHP 错误和异常
 
 ## 相关文档
 

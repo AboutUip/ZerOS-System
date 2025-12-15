@@ -360,6 +360,25 @@ const APPLICATION_ASSETS = {
         }
     },
     
+    // Ziper - Zip压缩工具
+    // 注意：路径是 D: 盘下的真实路径
+    "ziper": {
+        script: "D:/application/ziper/ziper.js",
+        styles: ["D:/application/ziper/ziper.css"],
+        icon: "D:/application/ziper/ziper.svg",
+        metadata: {
+            autoStart: false,
+            priority: 3,
+            description: "Zip压缩工具",
+            version: "1.0.0",
+            type: "GUI",
+            alwaysShowInTaskbar: false,
+            allowMultipleInstances: true,
+            supportsPreview: true,  // 支持窗口预览快照
+            category: "utility"  // 工具类应用
+        }
+    },
+    
     // Timer - 3D时间罗盘
     // 注意：路径是 D: 盘下的真实路径
     "timer": {
