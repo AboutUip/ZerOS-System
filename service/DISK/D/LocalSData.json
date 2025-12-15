@@ -9,7 +9,10 @@
         "name": "文件管理器",
         "icon": "D:/application/filemanager/filemanager.svg",
         "description": "文件管理器",
-        "position": null,
+        "position": {
+          "x": 2047.15283203125,
+          "y": 298.15277099609375
+        },
         "createdAt": 1765486731837
       },
       {
@@ -18,7 +21,10 @@
         "name": "browser",
         "icon": "D:/application/browser/browser.svg",
         "description": "浏览器",
-        "position": null,
+        "position": {
+          "x": 787.0694580078125,
+          "y": 645.4055786132812
+        },
         "createdAt": 1765485244257
       },
       {
@@ -27,7 +33,10 @@
         "name": "音乐Music",
         "icon": "D:/application/musicplayer/musicplayer.svg",
         "description": "音乐Music",
-        "position": null,
+        "position": {
+          "x": 586,
+          "y": 542.1972045898438
+        },
         "createdAt": 1765486941047
       },
       {
@@ -36,7 +45,10 @@
         "name": "ZeroIDE",
         "icon": "D:/application/zeroide/zeroide.svg",
         "description": "ZeroIDE",
-        "position": null,
+        "position": {
+          "x": 489,
+          "y": 753.3916625976562
+        },
         "createdAt": 1765609500486
       }
     ],

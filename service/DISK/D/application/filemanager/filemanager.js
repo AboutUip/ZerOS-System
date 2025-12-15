@@ -27,6 +27,20 @@
         // 拖拽处理标志（防止重复调用）
         _isHandlingDrop: false,
         
+        // 视图模式：'details' | 'large-icons' | 'small-icons' | 'list' | 'tiles'
+        _viewMode: 'details',
+        
+        // 导航历史记录
+        _navigationHistory: [],
+        _historyIndex: -1,
+        
+        // 搜索相关
+        _searchQuery: '',
+        _filteredFileList: null,
+        
+        // 历史记录导航标志（防止在前进/后退时重复添加历史记录）
+        _isNavigatingHistory: false,
+        
         __init__: async function(pid, initArgs) {
             this.pid = pid;
             
@@ -158,9 +172,28 @@
                 min-width: 0;
             `;
             
-            // 创建地址栏（Ubuntu风格，在主内容区顶部）
+            // 创建地址栏和搜索框容器（Windows 风格）
+            const addressBarContainer = document.createElement('div');
+            addressBarContainer.className = 'filemanager-addressbar-container';
+            addressBarContainer.style.cssText = `
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                padding: 8px 12px;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+                background: rgba(40, 40, 40, 0.5);
+                flex-shrink: 0;
+            `;
+            
+            // 创建地址栏（Windows 风格，面包屑导航）
             const addressBar = this._createAddressBar();
-            mainContent.appendChild(addressBar);
+            addressBarContainer.appendChild(addressBar);
+            
+            // 创建搜索框
+            const searchBox = this._createSearchBox();
+            addressBarContainer.appendChild(searchBox);
+            
+            mainContent.appendChild(addressBarContainer);
             
             // 在选择器模式下添加提示信息和选择按钮
             if (this._isFolderSelectorMode || this._isFileSelectorMode) {
@@ -219,6 +252,10 @@
             const fileList = this._createFileList();
             mainContent.appendChild(fileList);
             
+            // 创建状态栏（Windows 风格，在主内容区底部）
+            const statusBar = this._createStatusBar();
+            mainContent.appendChild(statusBar);
+            
             content.appendChild(mainContent);
             
             // 创建属性面板（初始隐藏，Ubuntu风格在右侧）
@@ -258,12 +295,20 @@
                 }
             });
             
+            // 初始化历史记录（添加初始路径）
+            const initialPath = this._getCurrentPath();
+            this._navigationHistory = [];
+            this._historyIndex = -1;
+            this._addToHistory(initialPath);
+            
+            // 初始化视图模式按钮状态
+            this._updateViewModeButtonState();
+            
             // 加载当前目录（如果是null，则加载根目录视图）
-            const currentPath = this._getCurrentPath();
-            if (currentPath === null || currentPath === '') {
+            if (initialPath === null || initialPath === '') {
                 await this._loadRootDirectory();
             } else {
-                await this._loadDirectory(currentPath);
+                await this._loadDirectory(initialPath);
             }
             
             // 如果使用GUIManager，窗口已自动居中并获得焦点
@@ -295,15 +340,17 @@
             `;
             
             // 后退按钮
-            const backBtn = this._createToolbarButton('←', '后退', () => {
-                // TODO: 实现后退历史
+            const backBtn = this._createToolbarButton('←', '后退 (Alt+←)', () => {
+                this._goBack();
             });
+            this.backBtn = backBtn;  // 保存引用以便更新状态
             toolbar.appendChild(backBtn);
             
             // 前进按钮
-            const forwardBtn = this._createToolbarButton('→', '前进', () => {
-                // TODO: 实现前进历史
+            const forwardBtn = this._createToolbarButton('→', '前进 (Alt+→)', () => {
+                this._goForward();
             });
+            this.forwardBtn = forwardBtn;  // 保存引用以便更新状态
             forwardBtn.style.opacity = '0.5';
             forwardBtn.style.cursor = 'not-allowed';
             toolbar.appendChild(forwardBtn);
@@ -385,6 +432,55 @@
                 pasteBtn.style.cursor = 'not-allowed';
                 this.pasteBtn = pasteBtn;  // 保存引用以便更新状态
                 toolbar.appendChild(pasteBtn);
+                
+                // 分隔符
+                const separator4 = document.createElement('div');
+                separator4.style.cssText = separator1.style.cssText;
+                toolbar.appendChild(separator4);
+                
+                // 视图模式切换按钮组
+                const viewModeGroup = document.createElement('div');
+                viewModeGroup.style.cssText = `
+                    display: flex;
+                    gap: 2px;
+                    align-items: center;
+                    padding: 2px;
+                    background: rgba(255, 255, 255, 0.05);
+                    border-radius: 6px;
+                `;
+                
+                // 详细信息视图按钮
+                const detailsViewBtn = this._createViewModeButton('详细信息', 'details', '≡');
+                viewModeGroup.appendChild(detailsViewBtn);
+                
+                // 大图标视图按钮
+                const largeIconsViewBtn = this._createViewModeButton('大图标', 'large-icons', '⊞');
+                viewModeGroup.appendChild(largeIconsViewBtn);
+                
+                // 小图标视图按钮
+                const smallIconsViewBtn = this._createViewModeButton('小图标', 'small-icons', '⊟');
+                viewModeGroup.appendChild(smallIconsViewBtn);
+                
+                // 列表视图按钮
+                const listViewBtn = this._createViewModeButton('列表', 'list', '☰');
+                viewModeGroup.appendChild(listViewBtn);
+                
+                // 平铺视图按钮
+                const tilesViewBtn = this._createViewModeButton('平铺', 'tiles', '▦');
+                viewModeGroup.appendChild(tilesViewBtn);
+                
+                this.viewModeButtons = {
+                    'details': detailsViewBtn,
+                    'large-icons': largeIconsViewBtn,
+                    'small-icons': smallIconsViewBtn,
+                    'list': listViewBtn,
+                    'tiles': tilesViewBtn
+                };
+                
+                // 更新当前视图模式按钮状态
+                this._updateViewModeButtonState();
+                
+                toolbar.appendChild(viewModeGroup);
             }
             
             return toolbar;
@@ -447,6 +543,99 @@
             });
             btn.addEventListener('click', onClick);
             return btn;
+        },
+        
+        /**
+         * 创建视图模式切换按钮
+         */
+        _createViewModeButton: function(title, mode, icon) {
+            const btn = document.createElement('button');
+            btn.title = title;
+            btn.dataset.viewMode = mode;
+            btn.style.cssText = `
+                width: 28px;
+                height: 28px;
+                min-width: 28px;
+                min-height: 28px;
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                background: rgba(255, 255, 255, 0.05);
+                color: #e8ecf0;
+                border-radius: 4px;
+                cursor: pointer;
+                font-size: 14px;
+                transition: all 0.2s;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                box-sizing: border-box;
+            `;
+            btn.textContent = icon;
+            
+            btn.addEventListener('mouseenter', () => {
+                if (!btn.classList.contains('active')) {
+                    btn.style.background = 'rgba(255, 255, 255, 0.1)';
+                    btn.style.borderColor = 'rgba(255, 255, 255, 0.2)';
+                }
+            });
+            btn.addEventListener('mouseleave', () => {
+                if (!btn.classList.contains('active')) {
+                    btn.style.background = 'rgba(255, 255, 255, 0.05)';
+                    btn.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+                }
+            });
+            btn.addEventListener('click', () => {
+                this._setViewMode(mode);
+            });
+            
+            return btn;
+        },
+        
+        /**
+         * 设置视图模式
+         */
+        _setViewMode: function(mode) {
+            if (this._viewMode === mode) return;
+            
+            this._viewMode = mode;
+            this._updateViewModeButtonState();
+            
+            // 更新文件列表容器的类名以应用不同的视图样式
+            if (this.fileListElement) {
+                // 移除所有视图模式类
+                this.fileListElement.classList.remove(
+                    'view-details',
+                    'view-large-icons',
+                    'view-small-icons',
+                    'view-list',
+                    'view-tiles'
+                );
+                // 添加当前视图模式类
+                this.fileListElement.classList.add(`view-${mode}`);
+            }
+            
+            this._renderFileList();  // 重新渲染以应用新视图模式
+        },
+        
+        /**
+         * 更新视图模式按钮状态
+         */
+        _updateViewModeButtonState: function() {
+            if (!this.viewModeButtons) return;
+            
+            Object.keys(this.viewModeButtons).forEach(mode => {
+                const btn = this.viewModeButtons[mode];
+                if (mode === this._viewMode) {
+                    btn.classList.add('active');
+                    btn.style.background = 'rgba(108, 142, 255, 0.3)';
+                    btn.style.borderColor = 'rgba(108, 142, 255, 0.5)';
+                    btn.style.color = '#6c8eff';
+                } else {
+                    btn.classList.remove('active');
+                    btn.style.background = 'rgba(255, 255, 255, 0.05)';
+                    btn.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+                    btn.style.color = '#e8ecf0';
+                }
+            });
         },
         
         /**
@@ -827,10 +1016,335 @@
                     }
                 }
             });
+            
             this.addressInput = addressInput;
             addressBar.appendChild(addressInput);
             
             return addressBar;
+        },
+        
+        /**
+         * 更新面包屑导航
+         */
+        _updateBreadcrumb: function() {
+            if (!this.breadcrumbContainer) return;
+            
+            this.breadcrumbContainer.innerHTML = '';
+            
+            const currentPath = this._getCurrentPath();
+            
+            // 根目录
+            const rootItem = document.createElement('span');
+            rootItem.className = 'breadcrumb-item';
+            rootItem.textContent = '此电脑';
+            rootItem.style.cssText = `
+                padding: 4px 8px;
+                cursor: pointer;
+                color: #e8ecf0;
+                font-size: 13px;
+                border-radius: 3px;
+                transition: background 0.2s;
+                white-space: nowrap;
+            `;
+            rootItem.addEventListener('mouseenter', () => {
+                rootItem.style.background = 'rgba(255, 255, 255, 0.1)';
+            });
+            rootItem.addEventListener('mouseleave', () => {
+                rootItem.style.background = 'transparent';
+            });
+            rootItem.addEventListener('click', () => {
+                this._loadRootDirectory();
+            });
+            this.breadcrumbContainer.appendChild(rootItem);
+            
+            if (!currentPath || currentPath === '\\' || currentPath === '') {
+                return;  // 根目录，只显示"此电脑"
+            }
+            
+            // 分隔符
+            const separator = document.createElement('span');
+            separator.textContent = '›';
+            separator.style.cssText = `
+                color: rgba(255, 255, 255, 0.4);
+                font-size: 13px;
+                margin: 0 2px;
+            `;
+            this.breadcrumbContainer.appendChild(separator);
+            
+            // 解析路径并创建面包屑项
+            const pathParts = currentPath.split('/').filter(p => p);
+            if (pathParts.length === 0) return;
+            
+            // 处理盘符（如 C:）
+            const diskPart = pathParts[0];
+            if (/^[CD]:$/.test(diskPart)) {
+                const diskItem = document.createElement('span');
+                diskItem.className = 'breadcrumb-item';
+                diskItem.textContent = diskPart;
+                diskItem.style.cssText = rootItem.style.cssText;
+                diskItem.addEventListener('mouseenter', () => {
+                    diskItem.style.background = 'rgba(255, 255, 255, 0.1)';
+                });
+                diskItem.addEventListener('mouseleave', () => {
+                    diskItem.style.background = 'transparent';
+                });
+                diskItem.addEventListener('click', () => {
+                    this._loadDirectory(diskPart);
+                });
+                this.breadcrumbContainer.appendChild(diskItem);
+                
+                // 处理子路径
+                for (let i = 1; i < pathParts.length; i++) {
+                    const separator2 = document.createElement('span');
+                    separator2.textContent = '›';
+                    separator2.style.cssText = separator.style.cssText;
+                    this.breadcrumbContainer.appendChild(separator2);
+                    
+                    const part = pathParts[i];
+                    const partPath = pathParts.slice(0, i + 1).join('/');
+                    
+                    const partItem = document.createElement('span');
+                    partItem.className = 'breadcrumb-item';
+                    partItem.textContent = part;
+                    partItem.style.cssText = rootItem.style.cssText;
+                    partItem.addEventListener('mouseenter', () => {
+                        partItem.style.background = 'rgba(255, 255, 255, 0.1)';
+                    });
+                    partItem.addEventListener('mouseleave', () => {
+                        partItem.style.background = 'transparent';
+                    });
+                    partItem.addEventListener('click', () => {
+                        this._loadDirectory(diskPart + '/' + pathParts.slice(1, i + 1).join('/'));
+                    });
+                    this.breadcrumbContainer.appendChild(partItem);
+                }
+            }
+        },
+        
+        /**
+         * 创建搜索框
+         */
+        _createSearchBox: function() {
+            const searchContainer = document.createElement('div');
+            searchContainer.className = 'filemanager-search-box';
+            searchContainer.style.cssText = `
+                width: 200px;
+                height: 32px;
+                display: flex;
+                align-items: center;
+                gap: 6px;
+                padding: 4px 8px;
+                background: rgba(255, 255, 255, 0.05);
+                border: 1px solid rgba(255, 255, 255, 0.15);
+                border-radius: 4px;
+                transition: all 0.2s;
+            `;
+            
+            // 搜索图标
+            const searchIcon = document.createElement('span');
+            searchIcon.textContent = '🔍';
+            searchIcon.style.cssText = `
+                font-size: 14px;
+                opacity: 0.6;
+                flex-shrink: 0;
+            `;
+            searchContainer.appendChild(searchIcon);
+            
+            // 搜索输入框
+            const searchInput = document.createElement('input');
+            searchInput.type = 'text';
+            searchInput.placeholder = '搜索...';
+            searchInput.className = 'filemanager-search-input';
+            searchInput.style.cssText = `
+                flex: 1;
+                height: 24px;
+                padding: 0;
+                background: transparent;
+                border: none;
+                color: #e8ecf0;
+                font-size: 13px;
+                outline: none;
+            `;
+            
+            // 清除按钮（初始隐藏）
+            const clearBtn = document.createElement('button');
+            clearBtn.textContent = '×';
+            clearBtn.title = '清除搜索';
+            clearBtn.style.cssText = `
+                width: 18px;
+                height: 18px;
+                padding: 0;
+                border: none;
+                background: transparent;
+                color: #e8ecf0;
+                cursor: pointer;
+                font-size: 16px;
+                opacity: 0.6;
+                display: none;
+                transition: opacity 0.2s;
+                flex-shrink: 0;
+            `;
+            clearBtn.addEventListener('mouseenter', () => {
+                clearBtn.style.opacity = '1';
+            });
+            clearBtn.addEventListener('mouseleave', () => {
+                clearBtn.style.opacity = '0.6';
+            });
+            clearBtn.addEventListener('click', () => {
+                searchInput.value = '';
+                this._searchQuery = '';
+                this._filteredFileList = null;
+                clearBtn.style.display = 'none';
+                this._renderFileList();
+                this._updateStatusBar();
+            });
+            
+            // 搜索事件处理
+            let searchTimeout = null;
+            searchInput.addEventListener('input', (e) => {
+                const query = e.target.value.trim();
+                
+                if (query) {
+                    clearBtn.style.display = 'block';
+                } else {
+                    clearBtn.style.display = 'none';
+                }
+                
+                // 防抖处理
+                if (searchTimeout) {
+                    clearTimeout(searchTimeout);
+                }
+                
+                searchTimeout = setTimeout(() => {
+                    this._performSearch(query);
+                }, 300);
+            });
+            
+            searchInput.addEventListener('focus', () => {
+                searchContainer.style.borderColor = 'rgba(108, 142, 255, 0.5)';
+                searchContainer.style.background = 'rgba(255, 255, 255, 0.08)';
+            });
+            
+            searchInput.addEventListener('blur', () => {
+                searchContainer.style.borderColor = 'rgba(255, 255, 255, 0.15)';
+                searchContainer.style.background = 'rgba(255, 255, 255, 0.05)';
+            });
+            
+            this.searchInput = searchInput;
+            searchContainer.appendChild(searchInput);
+            searchContainer.appendChild(clearBtn);
+            
+            return searchContainer;
+        },
+        
+        /**
+         * 执行搜索
+         */
+        _performSearch: function(query) {
+            this._searchQuery = query;
+            
+            if (!query) {
+                this._filteredFileList = null;
+                this._renderFileList();
+                this._updateStatusBar();
+                return;
+            }
+            
+            const fileList = this._getFileList();
+            const lowerQuery = query.toLowerCase();
+            
+            this._filteredFileList = fileList.filter(item => {
+                return item.name.toLowerCase().includes(lowerQuery);
+            });
+            
+            this._renderFileList();
+            this._updateStatusBar();
+        },
+        
+        /**
+         * 创建状态栏
+         */
+        _createStatusBar: function() {
+            const statusBar = document.createElement('div');
+            statusBar.className = 'filemanager-statusbar';
+            statusBar.style.cssText = `
+                height: 24px;
+                min-height: 24px;
+                padding: 4px 12px;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                border-top: 1px solid rgba(255, 255, 255, 0.1);
+                background: rgba(30, 30, 30, 0.6);
+                font-size: 12px;
+                color: rgba(255, 255, 255, 0.7);
+                flex-shrink: 0;
+            `;
+            
+            // 左侧：选中项信息
+            const statusLeft = document.createElement('div');
+            statusLeft.className = 'filemanager-status-left';
+            statusLeft.style.cssText = `
+                display: flex;
+                align-items: center;
+                gap: 16px;
+            `;
+            
+            const statusText = document.createElement('span');
+            statusText.className = 'filemanager-status-text';
+            this.statusText = statusText;
+            statusLeft.appendChild(statusText);
+            
+            // 右侧：文件数量、大小等信息
+            const statusRight = document.createElement('div');
+            statusRight.className = 'filemanager-status-right';
+            statusRight.style.cssText = `
+                display: flex;
+                align-items: center;
+                gap: 16px;
+            `;
+            
+            const fileCountText = document.createElement('span');
+            fileCountText.className = 'filemanager-status-count';
+            this.fileCountText = fileCountText;
+            statusRight.appendChild(fileCountText);
+            
+            statusBar.appendChild(statusLeft);
+            statusBar.appendChild(statusRight);
+            
+            // 初始化状态栏
+            this._updateStatusBar();
+            
+            return statusBar;
+        },
+        
+        /**
+         * 更新状态栏
+         */
+        _updateStatusBar: function() {
+            if (!this.statusText || !this.fileCountText) return;
+            
+            const fileList = this._filteredFileList || this._getFileList();
+            const selectedItem = this._getSelectedItem();
+            
+            // 更新选中项信息
+            if (selectedItem) {
+                const size = selectedItem.type === 'file' ? this._formatFileSize(selectedItem.size || 0) : '';
+                this.statusText.textContent = selectedItem.name + (size ? ` (${size})` : '');
+            } else {
+                this.statusText.textContent = '';
+            }
+            
+            // 更新文件数量
+            const totalCount = fileList.length;
+            const fileCount = fileList.filter(item => item.type === 'file').length;
+            const folderCount = fileList.filter(item => item.type === 'directory').length;
+            
+            if (this._searchQuery) {
+                this.fileCountText.textContent = `找到 ${totalCount} 项 (${fileCount} 个文件, ${folderCount} 个文件夹)`;
+            } else {
+                this.fileCountText.textContent = `${totalCount} 项 (${fileCount} 个文件, ${folderCount} 个文件夹)`;
+            }
         },
         
         /**
@@ -849,6 +1363,15 @@
             // 添加滚动条样式
             fileList.style.scrollbarWidth = 'thin';
             fileList.style.scrollbarColor = 'rgba(108, 142, 255, 0.3) rgba(15, 20, 35, 0.5)';
+            
+            // 应用初始视图模式类
+            if (this._viewMode) {
+                fileList.classList.add(`view-${this._viewMode}`);
+            } else {
+                // 默认使用详细信息视图
+                fileList.classList.add('view-details');
+                this._viewMode = 'details';
+            }
             
             this.fileListElement = fileList;
             return fileList;
@@ -1322,9 +1845,17 @@
             }
             
             try {
+                // 添加到历史记录（如果不是历史记录导航）
+                if (!this._isNavigatingHistory) {
+                    this._addToHistory(null);
+                }
+                
                 this._setCurrentPath(null);
                 if (this.addressInput) {
                     this.addressInput.value = '\\';
+                }
+                if (this.breadcrumbContainer) {
+                    this._updateBreadcrumb();
                 }
                 
                 // 获取所有磁盘分区
@@ -1407,6 +1938,9 @@
                 // 更新侧边栏选中状态
                 this._updateSidebarSelection();
                 
+                // 更新状态栏
+                this._updateStatusBar();
+                
             } catch (error) {
                 console.error('加载根目录失败:', error);
                 if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
@@ -1452,9 +1986,17 @@
                     return;
                 }
                 
+                // 添加到历史记录（如果不是历史记录导航）
+                if (!this._isNavigatingHistory) {
+                    this._addToHistory(path);
+                }
+                
                 this._setCurrentPath(path);
                 if (this.addressInput) {
                     this.addressInput.value = path;
+                }
+                if (this.breadcrumbContainer) {
+                    this._updateBreadcrumb();
                 }
                 
                 // 确保路径格式正确
@@ -1561,6 +2103,12 @@
                 
                 // 更新工具栏按钮状态
                 this._updateToolbarButtons();
+                
+                // 更新状态栏
+                this._updateStatusBar();
+                
+                // 更新侧边栏选中状态
+                this._updateSidebarSelection();
                 
             } catch (error) {
                 console.error('[FileManager] 加载目录异常:', error);
@@ -1708,14 +2256,9 @@
             itemElement.appendChild(name);
             itemElement.appendChild(size);
             
-            // 样式
+            // 基础样式（视图模式特定的样式由 CSS 类控制）
             itemElement.style.cssText = `
-                display: flex;
-                align-items: center;
-                gap: 12px;
-                padding: 8px 12px;
                 cursor: pointer;
-                border-radius: 4px;
                 transition: background-color 0.2s;
             `;
             
@@ -1877,6 +2420,11 @@
                 fileList = this._getFileList();
             }
             
+            // 应用搜索过滤
+            if (this._searchQuery && this._filteredFileList) {
+                fileList = this._filteredFileList;
+            }
+            
             // 确保 fileList 是数组
             if (!Array.isArray(fileList)) {
                 console.warn('fileList 不是数组:', fileList);
@@ -1887,7 +2435,7 @@
             if (fileList.length === 0) {
                 const emptyMsg = document.createElement('div');
                 emptyMsg.className = 'filemanager-empty';
-                emptyMsg.textContent = '此目录为空';
+                emptyMsg.textContent = this._searchQuery ? '未找到匹配的文件' : '此目录为空';
                 emptyMsg.style.cssText = `
                     padding: 40px;
                     text-align: center;
@@ -1896,6 +2444,18 @@
                 `;
                 this.fileListElement.appendChild(emptyMsg);
                 return;
+            }
+            
+            // 应用视图模式类
+            if (this._viewMode) {
+                this.fileListElement.classList.remove(
+                    'view-details',
+                    'view-large-icons',
+                    'view-small-icons',
+                    'view-list',
+                    'view-tiles'
+                );
+                this.fileListElement.classList.add(`view-${this._viewMode}`);
             }
             
             // 渲染每个文件/目录项
@@ -1932,9 +2492,13 @@
             this._setSelectedItem(item);
             element.style.background = 'rgba(108, 142, 255, 0.25)';
             this.selectedItemData = element; // DOM元素引用保留在变量中
+            this.selectedItem = element; // 保存引用以便取消选择
             
             // 更新工具栏按钮状态
             this._updateToolbarButtons();
+            
+            // 更新状态栏
+            this._updateStatusBar();
             
             // 不再自动显示属性面板，只有通过"文件属性"菜单才会显示
         },
@@ -2929,82 +3493,115 @@
                 selector: '.filemanager-item',
                 priority: 100,
                 items: (target) => {
-                const itemElement = target.closest('.filemanager-item');
-                if (!itemElement) {
-                    return null;
-                }
-                
-                // 从 dataset 或保存的对象引用获取信息
-                const itemType = itemElement.dataset.type;
-                const itemPath = itemElement.dataset.path;
-                // 优先使用 dataset 中的 itemName，如果没有则从保存的对象引用获取
-                let itemName = itemElement.dataset.itemName;
-                if (!itemName && itemElement._fileManagerItem) {
-                    itemName = String(itemElement._fileManagerItem.name || '');
-                }
-                // 如果仍然没有，尝试从子元素中获取
-                if (!itemName) {
-                    const nameElement = itemElement.querySelector('div[data-item-name]');
-                    if (nameElement) {
-                        itemName = nameElement.dataset.itemName || nameElement.textContent.trim();
-                    } else {
-                        itemName = itemElement.textContent.trim();
+                    const itemElement = target.closest('.filemanager-item');
+                    if (!itemElement) {
+                        return null;
                     }
-                }
-                
-                const items = [];
-                
-                if (itemType === 'directory') {
-                    items.push({
-                        label: '打开',
-                        icon: '📂',
-                        action: () => {
-                            self._openItem({ type: 'directory', path: itemPath, name: itemName });
+                    
+                    // 从 dataset 或保存的对象引用获取信息
+                    const itemType = itemElement.dataset.type;
+                    const itemPath = itemElement.dataset.path;
+                    // 优先使用 dataset 中的 itemName，如果没有则从保存的对象引用获取
+                    let itemName = itemElement.dataset.itemName;
+                    if (!itemName && itemElement._fileManagerItem) {
+                        itemName = String(itemElement._fileManagerItem.name || '');
+                    }
+                    // 如果仍然没有，尝试从子元素中获取
+                    if (!itemName) {
+                        const nameElement = itemElement.querySelector('div[data-item-name]');
+                        if (nameElement) {
+                            itemName = nameElement.dataset.itemName || nameElement.textContent.trim();
+                        } else {
+                            itemName = itemElement.textContent.trim();
                         }
-                    });
-                    items.push({
-                        label: '在新窗口打开',
-                        icon: '🪟',
-                        action: async () => {
-                            if (typeof ProcessManager !== 'undefined') {
-                                await ProcessManager.startProgram('filemanager', {
-                                    args: [itemPath]
-                                });
+                    }
+                    
+                    const items = [];
+                    
+                    // 在选择器模式下，禁用某些操作
+                    const isSelectorMode = self._isFileSelectorMode || self._isFolderSelectorMode;
+                    
+                    if (itemType === 'directory') {
+                        // 文件夹选择器模式下，文件夹可以打开
+                        if (!self._isFileSelectorMode) {
+                            items.push({
+                                label: '打开',
+                                icon: '📂',
+                                action: () => {
+                                    self._openItem({ type: 'directory', path: itemPath, name: itemName });
+                                }
+                            });
+                        }
+                        
+                        // 文件夹选择器模式下，文件夹可以选择
+                        if (self._isFolderSelectorMode) {
+                            items.push({
+                                label: '选择',
+                                icon: '✓',
+                                action: () => {
+                                    const itemElement = target.closest('.filemanager-item');
+                                    if (itemElement) {
+                                        const item = itemElement._fileManagerItem || {
+                                            type: 'directory',
+                                            path: itemPath,
+                                            name: itemName
+                                        };
+                                        self._selectFolderForSelection(item, itemElement);
+                                        // 立即确认选择
+                                        setTimeout(() => {
+                                            self._confirmFolderSelection();
+                                        }, 100);
+                                    }
+                                }
+                            });
+                        }
+                        
+                        // 非选择器模式下显示其他选项
+                        if (!isSelectorMode) {
+                            items.push({
+                                label: '在新窗口打开',
+                            icon: '🪟',
+                            action: async () => {
+                                if (typeof ProcessManager !== 'undefined') {
+                                    await ProcessManager.startProgram('filemanager', {
+                                        args: [itemPath]
+                                    });
+                                }
                             }
-                        }
-                    });
-                    items.push({ type: 'separator' });
-                    items.push({
-                        label: '新建文件',
-                        icon: '📄',
-                        action: async () => {
-                            // 临时切换到该目录，创建文件，然后切换回来
-                            const currentPath = self._getCurrentPath();
-                            await self._loadDirectory(itemPath);
-                            await self._createNewFile();
-                            // 如果之前不在该目录，切换回去
-                            if (currentPath !== itemPath) {
-                                await self._loadDirectory(currentPath);
+                            });
+                            items.push({ type: 'separator' });
+                            items.push({
+                                label: '新建文件',
+                            icon: '📄',
+                            action: async () => {
+                                // 临时切换到该目录，创建文件，然后切换回来
+                                const currentPath = self._getCurrentPath();
+                                await self._loadDirectory(itemPath);
+                                await self._createNewFile();
+                                // 如果之前不在该目录，切换回去
+                                if (currentPath !== itemPath) {
+                                    await self._loadDirectory(currentPath);
+                                }
                             }
-                        }
-                    });
-                    items.push({
-                        label: '新建文件夹',
-                        icon: '📁',
-                        action: async () => {
-                            // 临时切换到该目录，创建文件夹，然后切换回来
-                            const currentPath = self._getCurrentPath();
-                            await self._loadDirectory(itemPath);
-                            await self._createNewDirectory();
-                            // 如果之前不在该目录，切换回去
-                            if (currentPath !== itemPath) {
-                                await self._loadDirectory(currentPath);
+                            });
+                            items.push({
+                                label: '新建文件夹',
+                            icon: '📁',
+                            action: async () => {
+                                // 临时切换到该目录，创建文件夹，然后切换回来
+                                const currentPath = self._getCurrentPath();
+                                await self._loadDirectory(itemPath);
+                                await self._createNewDirectory();
+                                // 如果之前不在该目录，切换回去
+                                if (currentPath !== itemPath) {
+                                    await self._loadDirectory(currentPath);
+                                }
                             }
+                            });
                         }
-                    });
-                } else {
-                    // 获取文件类型（从保存的对象引用中获取）
-                    let fileType = 'TEXT';
+                    } else {
+                        // 获取文件类型（从保存的对象引用中获取）
+                        let fileType = 'TEXT';
                     if (itemElement._fileManagerItem && itemElement._fileManagerItem.fileType) {
                         fileType = itemElement._fileManagerItem.fileType;
                     } else {
@@ -3028,234 +3625,275 @@
                         KernelLogger.debug("FileManager", `右键菜单 - 文件: ${itemName}, 类型: ${fileType}, 扩展名: ${extension}`);
                     }
                     
+                    // 文件选择器模式下，文件可以选择
+                    if (self._isFileSelectorMode) {
+                        items.push({
+                            label: '选择',
+                            icon: '✓',
+                            action: () => {
+                                if (self._onFileSelected && typeof self._onFileSelected === 'function') {
+                                    const item = itemElement._fileManagerItem || {
+                                        type: 'file',
+                                        path: itemPath,
+                                        name: itemName,
+                                        fileType: fileType
+                                    };
+                                    self._onFileSelected(item).then(() => {
+                                        // 选择完成后关闭文件管理器
+                                        if (typeof ProcessManager !== 'undefined') {
+                                            ProcessManager.killProgram(self.pid);
+                                        }
+                                    }).catch(err => {
+                                        console.error('[FileManager] 文件选择回调执行失败:', err);
+                                    });
+                                }
+                            }
+                        });
+                        items.push({ type: 'separator' });
+                    }
+                    
                     // 视频文件：用视频播放器打开
                     if (isVideo) {
-                        items.push({
-                            label: '打开',
-                            icon: '🎬',
-                            action: () => {
-                                self._openFileWithVideoPlayer({ type: 'file', path: itemPath, name: itemName, fileType: fileType });
-                            }
-                        });
-                        items.push({
-                            label: '用视频播放器打开',
-                            icon: '🎬',
-                            action: () => {
-                                self._openFileWithVideoPlayer({ type: 'file', path: itemPath, name: itemName, fileType: fileType });
-                            }
-                        });
-                        items.push({
-                            type: 'separator'
-                        });
-                        items.push({
-                            label: '用 Vim 打开',
-                            icon: '✏️',
-                            action: () => {
-                                self._openFileWithVim({ type: 'file', path: itemPath, name: itemName, fileType: fileType });
-                            }
-                        });
+                        if (!isSelectorMode) {
+                            items.push({
+                                label: '打开',
+                                icon: '🎬',
+                                action: () => {
+                                    self._openFileWithVideoPlayer({ type: 'file', path: itemPath, name: itemName, fileType: fileType });
+                                }
+                            });
+                            items.push({
+                                label: '用视频播放器打开',
+                                icon: '🎬',
+                                action: () => {
+                                    self._openFileWithVideoPlayer({ type: 'file', path: itemPath, name: itemName, fileType: fileType });
+                                }
+                            });
+                            items.push({
+                                type: 'separator'
+                            });
+                            items.push({
+                                label: '用 Vim 打开',
+                                icon: '✏️',
+                                action: () => {
+                                    self._openFileWithVim({ type: 'file', path: itemPath, name: itemName, fileType: fileType });
+                                }
+                            });
+                        }
                     }
                     // 音频文件：用音频播放器打开
                     else if (isAudio) {
-                        items.push({
-                            label: '打开',
-                            icon: '🎵',
-                            action: () => {
-                                self._openFileWithAudioPlayer({ type: 'file', path: itemPath, name: itemName, fileType: fileType });
-                            }
-                        });
-                        items.push({
-                            label: '用音频播放器打开',
-                            icon: '🎵',
-                            action: () => {
-                                self._openFileWithAudioPlayer({ type: 'file', path: itemPath, name: itemName, fileType: fileType });
-                            }
-                        });
-                        items.push({
-                            type: 'separator'
-                        });
-                        items.push({
-                            label: '用 Vim 打开',
-                            icon: '✏️',
-                            action: () => {
-                                self._openFileWithVim({ type: 'file', path: itemPath, name: itemName, fileType: fileType });
-                            }
-                        });
+                        if (!isSelectorMode) {
+                            items.push({
+                                label: '打开',
+                                icon: '🎵',
+                                action: () => {
+                                    self._openFileWithAudioPlayer({ type: 'file', path: itemPath, name: itemName, fileType: fileType });
+                                }
+                            });
+                            items.push({
+                                label: '用音频播放器打开',
+                                icon: '🎵',
+                                action: () => {
+                                    self._openFileWithAudioPlayer({ type: 'file', path: itemPath, name: itemName, fileType: fileType });
+                                }
+                            });
+                            items.push({
+                                type: 'separator'
+                            });
+                            items.push({
+                                label: '用 Vim 打开',
+                                icon: '✏️',
+                                action: () => {
+                                    self._openFileWithVim({ type: 'file', path: itemPath, name: itemName, fileType: fileType });
+                                }
+                            });
+                        }
                     }
                     // SVG 文件：提供图片查看和 Vim 打开两种方式
                     else if (isSvg && isImage) {
-                        items.push({
-                            label: '用图片查看器打开',
-                            icon: '🖼️',
-                            action: () => {
-                                self._openFileWithImageViewer({ type: 'file', path: itemPath, name: itemName, fileType: fileType });
-                            }
-                        });
-                        items.push({
-                            label: '用 Vim 打开',
-                            icon: '✏️',
-                            action: () => {
-                                self._openFileWithVim({ type: 'file', path: itemPath, name: itemName, fileType: fileType });
-                            }
-                        });
+                        if (!isSelectorMode) {
+                            items.push({
+                                label: '用图片查看器打开',
+                                icon: '🖼️',
+                                action: () => {
+                                    self._openFileWithImageViewer({ type: 'file', path: itemPath, name: itemName, fileType: fileType });
+                                }
+                            });
+                            items.push({
+                                label: '用 Vim 打开',
+                                icon: '✏️',
+                                action: () => {
+                                    self._openFileWithVim({ type: 'file', path: itemPath, name: itemName, fileType: fileType });
+                                }
+                            });
+                        }
                     }
                     // 其他图片文件：提供"打开"（默认用图片查看器）和"用图片查看器打开"选项
                     else if (isImage && !isSvg) {
-                        items.push({
-                            label: '打开',
-                            icon: '🖼️',
-                            action: () => {
-                                self._openFileWithImageViewer({ type: 'file', path: itemPath, name: itemName, fileType: fileType });
-                            }
-                        });
-                        items.push({
-                            label: '用图片查看器打开',
-                            icon: '🖼️',
-                            action: () => {
-                                self._openFileWithImageViewer({ type: 'file', path: itemPath, name: itemName, fileType: fileType });
-                            }
-                        });
+                        if (!isSelectorMode) {
+                            items.push({
+                                label: '打开',
+                                icon: '🖼️',
+                                action: () => {
+                                    self._openFileWithImageViewer({ type: 'file', path: itemPath, name: itemName, fileType: fileType });
+                                }
+                            });
+                            items.push({
+                                label: '用图片查看器打开',
+                                icon: '🖼️',
+                                action: () => {
+                                    self._openFileWithImageViewer({ type: 'file', path: itemPath, name: itemName, fileType: fileType });
+                                }
+                            });
+                        }
                     }
                     // 文本文件："打开"就是"用 Vim 打开"
                     else if (isTextFile) {
-                        items.push({
-                            label: '用 Vim 打开',
-                            icon: '✏️',
-                            action: () => {
-                                self._openFileWithVim({ type: 'file', path: itemPath, name: itemName, fileType: fileType });
-                            }
-                        });
+                        if (!isSelectorMode) {
+                            items.push({
+                                label: '用 Vim 打开',
+                                icon: '✏️',
+                                action: () => {
+                                    self._openFileWithVim({ type: 'file', path: itemPath, name: itemName, fileType: fileType });
+                                }
+                            });
+                        }
                     }
                     // 其他类型文件：提供"打开"选项（会提示用户）
                     else {
-                        items.push({
-                            label: '打开',
-                            icon: '📄',
-                            action: () => {
-                                self._openItem({ type: 'file', path: itemPath, name: itemName, fileType: fileType });
-                            }
-                        });
-                        items.push({
-                            label: '用 Vim 打开',
-                            icon: '✏️',
-                            action: () => {
-                                self._openFileWithVim({ type: 'file', path: itemPath, name: itemName, fileType: fileType });
-                            }
-                        });
-                    }
-                }
-                
-                items.push({ type: 'separator' });
-                
-                // 复制选项
-                items.push({
-                    label: '复制',
-                    icon: '📋',
-                    action: () => {
-                        // 设置选中项（如果还没有选中）
-                        if (!self._getSelectedItem() || self._getSelectedItem().path !== itemPath) {
-                            const itemElement = target.closest('.filemanager-item');
-                            if (itemElement) {
-                                const item = itemElement._fileManagerItem || {
-                                    type: itemType,
-                                    path: itemPath,
-                                    name: itemName
-                                };
-                                self._selectItem(itemElement, item);
-                            }
-                        }
-                        self._copySelectedItems();
-                    }
-                });
-                
-                // 剪切选项
-                items.push({
-                    label: '剪切',
-                    icon: '✂️',
-                    action: () => {
-                        // 设置选中项（如果还没有选中）
-                        if (!self._getSelectedItem() || self._getSelectedItem().path !== itemPath) {
-                            const itemElement = target.closest('.filemanager-item');
-                            if (itemElement) {
-                                const item = itemElement._fileManagerItem || {
-                                    type: itemType,
-                                    path: itemPath,
-                                    name: itemName
-                                };
-                                self._selectItem(itemElement, item);
-                            }
-                        }
-                        self._cutSelectedItems();
-                    }
-                });
-                
-                // 粘贴选项（如果有剪贴板内容）
-                if (self._clipboard && self._clipboard.items && self._clipboard.items.length > 0) {
-                    items.push({
-                        label: '粘贴',
-                        icon: '📄',
-                        action: async () => {
-                            await self._pasteItems();
-                        }
-                    });
-                }
-                
-                items.push({ type: 'separator' });
-                
-                items.push({
-                    label: '重命名',
-                    icon: '✏️',
-                    action: async () => {
-                        if (typeof GUIManager !== 'undefined' && typeof GUIManager.showPrompt === 'function') {
-                            const newName = await GUIManager.showPrompt('请输入新名称:', '重命名', itemName);
-                            if (newName && newName !== itemName) {
-                                await self._renameItem(itemPath, newName);
-                            }
-                        } else {
-                            const newName = prompt('请输入新名称:', itemName);
-                            if (newName && newName !== itemName) {
-                                await self._renameItem(itemPath, newName);
-                            }
-                        }
-                    }
-                });
-                
-                items.push({
-                    label: '删除',
-                    icon: '🗑️',
-                    danger: true,
-                    action: async () => {
-                        if (typeof GUIManager !== 'undefined' && typeof GUIManager.showConfirm === 'function') {
-                            const confirmed = await GUIManager.showConfirm(
-                                `确定要删除 "${itemName}" 吗？`,
-                                '确认删除',
-                                'danger'
-                            );
-                            if (confirmed) {
-                                await self._deleteItem(itemPath, itemType);
-                            }
-                        } else {
-                            if (confirm(`确定要删除 "${itemName}" 吗？`)) {
-                                await self._deleteItem(itemPath, itemType);
-                            }
-                        }
-                    }
-                });
-                
-                items.push({ type: 'separator' });
-                
-                // 发送到桌面选项
-                items.push({
-                    label: '发送到桌面',
-                    icon: '🖥️',
-                    action: async () => {
-                        try {
-                            if (typeof DesktopManager === 'undefined') {
-                                if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                                    await GUIManager.showAlert('DesktopManager 不可用', '错误', 'error');
+                        if (!isSelectorMode) {
+                            items.push({
+                                label: '打开',
+                                icon: '📄',
+                                action: () => {
+                                    self._openItem({ type: 'file', path: itemPath, name: itemName, fileType: fileType });
                                 }
-                                return;
+                            });
+                            items.push({
+                                label: '用 Vim 打开',
+                                icon: '✏️',
+                                action: () => {
+                                    self._openFileWithVim({ type: 'file', path: itemPath, name: itemName, fileType: fileType });
+                                }
+                            });
+                        }
+                    }
+                    }
+                    
+                    // 非选择器模式下显示文件操作菜单
+                    if (!isSelectorMode) {
+                        items.push({ type: 'separator' });
+                        
+                        // 复制选项
+                        items.push({
+                            label: '复制',
+                            icon: '📋',
+                            action: () => {
+                                // 设置选中项（如果还没有选中）
+                                if (!self._getSelectedItem() || self._getSelectedItem().path !== itemPath) {
+                                    const itemElement = target.closest('.filemanager-item');
+                                    if (itemElement) {
+                                        const item = itemElement._fileManagerItem || {
+                                            type: itemType,
+                                            path: itemPath,
+                                            name: itemName
+                                        };
+                                        self._selectItem(itemElement, item);
+                                    }
+                                }
+                                self._copySelectedItems();
                             }
+                        });
+                        
+                        // 剪切选项
+                        items.push({
+                            label: '剪切',
+                            icon: '✂️',
+                            action: () => {
+                                // 设置选中项（如果还没有选中）
+                                if (!self._getSelectedItem() || self._getSelectedItem().path !== itemPath) {
+                                    const itemElement = target.closest('.filemanager-item');
+                                    if (itemElement) {
+                                        const item = itemElement._fileManagerItem || {
+                                            type: itemType,
+                                            path: itemPath,
+                                            name: itemName
+                                        };
+                                        self._selectItem(itemElement, item);
+                                    }
+                                }
+                                self._cutSelectedItems();
+                            }
+                        });
+                        
+                        // 粘贴选项（如果有剪贴板内容）
+                        if (self._clipboard && self._clipboard.items && self._clipboard.items.length > 0) {
+                            items.push({
+                                label: '粘贴',
+                                icon: '📄',
+                                action: async () => {
+                                    await self._pasteItems();
+                                }
+                            });
+                        }
+                        
+                        items.push({ type: 'separator' });
+                        
+                        items.push({
+                            label: '重命名',
+                            icon: '✏️',
+                            action: async () => {
+                                if (typeof GUIManager !== 'undefined' && typeof GUIManager.showPrompt === 'function') {
+                                    const newName = await GUIManager.showPrompt('请输入新名称:', '重命名', itemName);
+                                    if (newName && newName !== itemName) {
+                                        await self._renameItem(itemPath, newName);
+                                    }
+                                } else {
+                                    const newName = prompt('请输入新名称:', itemName);
+                                    if (newName && newName !== itemName) {
+                                        await self._renameItem(itemPath, newName);
+                                    }
+                                }
+                            }
+                        });
+                        
+                        items.push({
+                            label: '删除',
+                            icon: '🗑️',
+                            danger: true,
+                            action: async () => {
+                                if (typeof GUIManager !== 'undefined' && typeof GUIManager.showConfirm === 'function') {
+                                    const confirmed = await GUIManager.showConfirm(
+                                        `确定要删除 "${itemName}" 吗？`,
+                                        '确认删除',
+                                        'danger'
+                                    );
+                                    if (confirmed) {
+                                        await self._deleteItem(itemPath, itemType);
+                                    }
+                                } else {
+                                    if (confirm(`确定要删除 "${itemName}" 吗？`)) {
+                                        await self._deleteItem(itemPath, itemType);
+                                    }
+                                }
+                            }
+                        });
+                        
+                        items.push({ type: 'separator' });
+                        
+                        // 发送到桌面选项
+                        items.push({
+                            label: '发送到桌面',
+                            icon: '🖥️',
+                            action: async () => {
+                                try {
+                                    if (typeof DesktopManager === 'undefined') {
+                                        if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
+                                            await GUIManager.showAlert('DesktopManager 不可用', '错误', 'error');
+                                        }
+                                        return;
+                                    }
                             
                             // 规范化路径（用于比较）
                             const normalizePath = (path) => {
@@ -3378,81 +4016,85 @@
                     }
                 });
                 
-                items.push({ type: 'separator' });
-                
-                // 文件属性选项
-                items.push({
-                    label: '文件属性',
-                    icon: '📋',
-                    action: () => {
-                        // 隐藏右键菜单（使用内核API）
-                        if (typeof ContextMenuManager !== 'undefined' && typeof ContextMenuManager._hideMenu === 'function') {
-                            ContextMenuManager._hideMenu();
-                        }
+                    // 非选择器模式下显示属性和其他选项
+                    if (!isSelectorMode) {
+                        items.push({ type: 'separator' });
                         
-                        // 获取完整的项目信息
-                        let item = itemElement._fileManagerItem;
-                        if (!item) {
-                            // 如果没有保存的项目信息，构建基本项目对象
-                            item = {
-                                type: itemType,
-                                path: itemPath,
-                                name: itemName
-                            };
-                            // 如果是文件，尝试获取文件类型
-                            if (itemType === 'file') {
-                                // 从扩展名推断文件类型
-                                const extension = itemName.split('.').pop()?.toLowerCase() || '';
-                                if (extension && typeof self._getFileTypeFromExtension === 'function') {
-                                    item.fileType = self._getFileTypeFromExtension(extension);
+                        // 文件属性选项
+                        items.push({
+                                label: '文件属性',
+                                icon: '📋',
+                                action: () => {
+                                    // 隐藏右键菜单（使用内核API）
+                                    if (typeof ContextMenuManager !== 'undefined' && typeof ContextMenuManager._hideMenu === 'function') {
+                                        ContextMenuManager._hideMenu();
+                                    }
+                                    
+                                    // 获取完整的项目信息
+                                    let item = itemElement._fileManagerItem;
+                                    if (!item) {
+                                        // 如果没有保存的项目信息，构建基本项目对象
+                                        item = {
+                                            type: itemType,
+                                            path: itemPath,
+                                            name: itemName
+                                        };
+                                        // 如果是文件，尝试获取文件类型
+                                        if (itemType === 'file') {
+                                            // 从扩展名推断文件类型
+                                            const extension = itemName.split('.').pop()?.toLowerCase() || '';
+                                            if (extension && typeof self._getFileTypeFromExtension === 'function') {
+                                                item.fileType = self._getFileTypeFromExtension(extension);
+                                            }
+                                        }
+                                    }
+                                    
+                                    // 直接显示属性面板（同步执行，不阻塞UI）
+                                    // 不使用 await，避免阻塞，也不显示弹窗
+                                    self._showProperties(item);
                                 }
-                            }
+                            });
+                            
+                            // 复制路径选项
+                            items.push({
+                                label: '复制路径',
+                                icon: '📋',
+                                action: async () => {
+                                    try {
+                                        // 复制路径到剪贴板
+                                        if (navigator.clipboard && navigator.clipboard.writeText) {
+                                            await navigator.clipboard.writeText(itemPath);
+                                            if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
+                                                await GUIManager.showAlert('路径已复制到剪贴板', '提示', 'success');
+                                            }
+                                        } else {
+                                            // 降级方案：使用临时文本区域
+                                            const textArea = document.createElement('textarea');
+                                            textArea.value = itemPath;
+                                            textArea.style.position = 'fixed';
+                                            textArea.style.opacity = '0';
+                                            document.body.appendChild(textArea);
+                                            textArea.select();
+                                            document.execCommand('copy');
+                                            document.body.removeChild(textArea);
+                                            if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
+                                                await GUIManager.showAlert('路径已复制到剪贴板', '提示', 'success');
+                                            }
+                                        }
+                                    } catch (error) {
+                                        console.error('复制路径失败:', error);
+                                        if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
+                                            await GUIManager.showAlert('复制路径失败', '错误', 'error');
+                                        }
+                                    }
+                                }
+                            });
                         }
-                        
-                        // 直接显示属性面板（同步执行，不阻塞UI）
-                        // 不使用 await，避免阻塞，也不显示弹窗
-                        self._showProperties(item);
                     }
-                });
-                
-                // 复制路径选项
-                items.push({
-                    label: '复制路径',
-                    icon: '📋',
-                    action: async () => {
-                        try {
-                            // 复制路径到剪贴板
-                            if (navigator.clipboard && navigator.clipboard.writeText) {
-                                await navigator.clipboard.writeText(itemPath);
-                                if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                                    await GUIManager.showAlert('路径已复制到剪贴板', '提示', 'success');
-                                }
-                            } else {
-                                // 降级方案：使用临时文本区域
-                                const textArea = document.createElement('textarea');
-                                textArea.value = itemPath;
-                                textArea.style.position = 'fixed';
-                                textArea.style.opacity = '0';
-                                document.body.appendChild(textArea);
-                                textArea.select();
-                                document.execCommand('copy');
-                                document.body.removeChild(textArea);
-                                if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                                    await GUIManager.showAlert('路径已复制到剪贴板', '提示', 'success');
-                                }
-                            }
-                        } catch (error) {
-                            console.error('复制路径失败:', error);
-                            if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                                await GUIManager.showAlert('复制路径失败', '错误', 'error');
-                            }
-                        }
-                    }
-                });
-                
-                // 返回菜单项数组
-                return items;
-            }
+                    
+                    // 返回菜单项数组
+                    return items;
+                }
             });
             
             // 注册空白区域的右键菜单（在文件列表的空白区域右键）
@@ -3634,8 +4276,8 @@
                 const url = new URL('/service/FSDirve.php', window.location.origin);
                 
                 if (itemType === 'directory') {
-                    // 删除目录
-                    url.searchParams.set('action', 'delete_dir');
+                    // 删除目录（使用递归删除，支持非空目录）
+                    url.searchParams.set('action', 'delete_dir_recursive');
                     url.searchParams.set('path', itemPath);
                 } else {
                     // 删除文件
@@ -4187,6 +4829,128 @@
         _setEditContent: function(value) {
             if (typeof MemoryUtils !== 'undefined' && this.pid) {
                 MemoryUtils.storeString(this.pid, this._editContentKey, value || '');
+            }
+        },
+        
+        /**
+         * 添加到导航历史记录
+         */
+        _addToHistory: function(path) {
+            // 如果当前路径与历史记录中的最后一个路径相同，不添加
+            if (this._navigationHistory.length > 0 && 
+                this._navigationHistory[this._historyIndex] === path) {
+                return;
+            }
+            
+            // 如果不在历史记录末尾，删除后面的记录
+            if (this._historyIndex < this._navigationHistory.length - 1) {
+                this._navigationHistory = this._navigationHistory.slice(0, this._historyIndex + 1);
+            }
+            
+            // 添加到历史记录
+            this._navigationHistory.push(path);
+            this._historyIndex = this._navigationHistory.length - 1;
+            
+            // 限制历史记录长度（最多50条）
+            if (this._navigationHistory.length > 50) {
+                this._navigationHistory.shift();
+                this._historyIndex--;
+            }
+            
+            // 更新前进/后退按钮状态
+            this._updateNavigationButtons();
+        },
+        
+        /**
+         * 后退
+         */
+        _goBack: async function() {
+            if (this._historyIndex > 0) {
+                this._historyIndex--;
+                const path = this._navigationHistory[this._historyIndex];
+                
+                // 设置标志，防止在加载目录时重复添加到历史记录
+                this._isNavigatingHistory = true;
+                
+                try {
+                    this._setCurrentPath(path);
+                    if (this.addressInput) {
+                        this.addressInput.value = path || '\\';
+                    }
+                    if (this.breadcrumbContainer) {
+                        this._updateBreadcrumb();
+                    }
+                    
+                    if (path === null || path === '\\' || path === '') {
+                        await this._loadRootDirectory();
+                    } else {
+                        await this._loadDirectory(path);
+                    }
+                    
+                    this._updateNavigationButtons();
+                } finally {
+                    // 清除标志
+                    this._isNavigatingHistory = false;
+                }
+            }
+        },
+        
+        /**
+         * 前进
+         */
+        _goForward: async function() {
+            if (this._historyIndex < this._navigationHistory.length - 1) {
+                this._historyIndex++;
+                const path = this._navigationHistory[this._historyIndex];
+                
+                // 设置标志，防止在加载目录时重复添加到历史记录
+                this._isNavigatingHistory = true;
+                
+                try {
+                    this._setCurrentPath(path);
+                    if (this.addressInput) {
+                        this.addressInput.value = path || '\\';
+                    }
+                    if (this.breadcrumbContainer) {
+                        this._updateBreadcrumb();
+                    }
+                    
+                    if (path === null || path === '\\' || path === '') {
+                        await this._loadRootDirectory();
+                    } else {
+                        await this._loadDirectory(path);
+                    }
+                    
+                    this._updateNavigationButtons();
+                } finally {
+                    // 清除标志
+                    this._isNavigatingHistory = false;
+                }
+            }
+        },
+        
+        /**
+         * 更新前进/后退按钮状态
+         */
+        _updateNavigationButtons: function() {
+            if (this.backBtn) {
+                if (this._historyIndex > 0) {
+                    this.backBtn.style.opacity = '1';
+                    this.backBtn.style.cursor = 'pointer';
+                } else {
+                    this.backBtn.style.opacity = '0.5';
+                    this.backBtn.style.cursor = 'not-allowed';
+                }
+            }
+            
+            if (this.forwardBtn) {
+                if (this._historyIndex < this._navigationHistory.length - 1) {
+                    this.forwardBtn.style.opacity = '1';
+                    this.forwardBtn.style.cursor = 'pointer';
+                } else {
+                    this.forwardBtn.style.opacity = '0.5';
+                    this.forwardBtn.style.cursor = 'not-allowed';
+                }
             }
         },
         
