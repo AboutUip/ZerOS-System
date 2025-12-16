@@ -132,6 +132,19 @@ const DYNAMIC_MODULES = {
         }
     },
 
+    // jsencrypt.js - 加密库
+    "jsencrypt": {
+        script: "../kernel/dynamicModule/libs/jsencrypt-3.5.4/bin/jsencrypt.min.js",
+        metadata: {
+            name: "jsencrypt",
+            version: "3.5.4",
+            description: "jsencrypt.js - 加密库",
+            globalName: "JSEncrypt",
+            autoLoad: false,
+            dependencies: []
+        }
+    },
+
     // mediapipe (vision tasks) - 手势识别和视觉任务
     // 使用示例（本地文件）：
     // const vision = await DynamicManager.loadModule('mediapipe');

@@ -1167,7 +1167,11 @@
     } else {
         // DOM 已就绪，立即启动
         start_init().catch(error => {
-            console.error("[内核][BootLoader] 启动失败", error);
+            if (typeof KernelLogger !== 'undefined') {
+                KernelLogger.error("BootLoader", "启动失败", error);
+            } else {
+                console.error("[内核][BootLoader] 启动失败", error);
+            }
         });
     }
     

@@ -693,6 +693,36 @@ html, body {
     border-top-color: var(--theme-primary-light, rgba(108, 142, 255, 0.3));
 }
 
+/* 左上角拉伸器 */
+.zos-window-resizer-top-left {
+    left: 0;
+    top: 0;
+    cursor: nw-resize;
+    border-left: 2px solid transparent;
+    border-top: 2px solid transparent;
+    border-radius: 16px 0 0 0;
+}
+
+.zos-window-resizer-top-left:hover {
+    border-left-color: var(--theme-primary-light, rgba(108, 142, 255, 0.3));
+    border-top-color: var(--theme-primary-light, rgba(108, 142, 255, 0.3));
+}
+
+/* 左下角拉伸器 */
+.zos-window-resizer-bottom-left {
+    left: 0;
+    bottom: 0;
+    cursor: sw-resize;
+    border-left: 2px solid transparent;
+    border-bottom: 2px solid transparent;
+    border-radius: 0 0 0 16px;
+}
+
+.zos-window-resizer-bottom-left:hover {
+    border-left-color: var(--theme-primary-light, rgba(108, 142, 255, 0.3));
+    border-bottom-color: var(--theme-primary-light, rgba(108, 142, 255, 0.3));
+}
+
 /* 最大化时隐藏拉伸器 */
 .zos-window-maximized .zos-window-resizer {
     display: none;

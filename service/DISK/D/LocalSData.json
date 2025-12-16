@@ -1,12 +1,6 @@
 {
   "system": {
-    "permissionManager.permissions": {
-      "10005": [
-        "GUI_WINDOW_CREATE",
-        "KERNEL_DISK_READ",
-        "KERNEL_DISK_LIST"
-      ]
-    },
+    "permissionManager.permissions": {},
     "system.style": "macos",
     "desktop.icons": [
       {

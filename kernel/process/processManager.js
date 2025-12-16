@@ -721,13 +721,11 @@ class ProcessManager {
      */
     static async startProgram(programName, initArgs = {}) {
         ProcessManager._log(2, `[启动程序] 开始启动: ${programName}`, initArgs);
-        console.log(`[ProcessManager] 启动程序: ${programName}`, initArgs);
         
         // 优先使用 ApplicationAssetManager 获取程序信息和元数据
         let asset = null;
         let programMetadata = null;
         ProcessManager._log(2, `[启动程序] 查找程序资源: ${programName}`);
-        console.log(`[ProcessManager] 查找程序资源: ${programName}`);
         
         if (typeof ApplicationAssetManager !== 'undefined' && typeof ApplicationAssetManager.getProgramInfo === 'function') {
             try {
@@ -741,18 +739,14 @@ class ProcessManager {
                     };
                     programMetadata = programInfo.metadata || {};
                     ProcessManager._log(2, `[启动程序] 从ApplicationAssetManager获取资源成功`, asset);
-                    console.log(`[ProcessManager] 从ApplicationAssetManager获取资源成功`, asset);
                 } else {
                     ProcessManager._log(2, `[启动程序] ApplicationAssetManager未找到程序: ${programName}`);
-                    console.log(`[ProcessManager] ApplicationAssetManager未找到程序: ${programName}`);
                 }
             } catch (e) {
                 ProcessManager._log(1, `从ApplicationAssetManager获取程序信息失败: ${e.message}`);
-                console.error(`[ProcessManager] 从ApplicationAssetManager获取程序信息失败:`, e);
             }
         } else {
             ProcessManager._log(2, `[启动程序] ApplicationAssetManager不可用，使用降级方案`);
-            console.log(`[ProcessManager] ApplicationAssetManager不可用，使用降级方案`);
         }
         
         // 降级方案：直接从POOL获取
@@ -762,20 +756,18 @@ class ProcessManager {
                 try {
                     applicationAssets = POOL.__GET__("KERNEL_GLOBAL_POOL", "APPLICATION_ASSETS");
                 } catch (e) {
-                    console.error(`[ProcessManager] 从POOL获取APPLICATION_ASSETS失败:`, e);
+                    ProcessManager._log(1, `从POOL获取APPLICATION_ASSETS失败: ${e.message}`);
                 }
             }
             
             if (!applicationAssets) {
                 ProcessManager._log(1, `应用程序资源映射不可用`);
-                console.error(`[ProcessManager] 应用程序资源映射不可用`);
                 throw new Error(`Application assets not available`);
             }
             
             // 检查应用程序资源映射
             if (!applicationAssets[programName]) {
                 ProcessManager._log(1, `程序 ${programName} 未在应用程序资源映射中找到`);
-                console.error(`[ProcessManager] 程序 ${programName} 未在应用程序资源映射中找到`);
                 throw new Error(`Program ${programName} not found in application assets`);
             }
             
@@ -783,7 +775,6 @@ class ProcessManager {
             asset = ProcessManager._parseAsset(applicationAssets[programName]);
             programMetadata = asset.metadata || {};
             ProcessManager._log(2, `[启动程序] 从POOL获取资源成功`, asset);
-            console.log(`[ProcessManager] 从POOL获取资源成功`, asset);
         }
         
         // 尝试从程序对象获取元数据（如果程序已加载）
@@ -802,11 +793,9 @@ class ProcessManager {
                     if (programInfo && programInfo.metadata) {
                         programMetadata = { ...programMetadata, ...programInfo.metadata };
                         ProcessManager._log(2, `[启动程序] 从程序对象获取元数据`, programMetadata);
-                        console.log(`[ProcessManager] 从程序对象获取元数据`, programMetadata);
                     }
                 } catch (e) {
                     ProcessManager._log(2, `获取程序元数据失败: ${e.message}`);
-                    console.warn(`[ProcessManager] 获取程序元数据失败:`, e);
                 }
             }
         }
@@ -819,18 +808,17 @@ class ProcessManager {
             for (const [pid, processInfo] of ProcessManager.PROCESS_TABLE) {
                 if (processInfo.programName === programName && processInfo.status === 'running') {
                     ProcessManager._log(1, `程序 ${programName} 已在运行 (PID: ${pid})，且不支持多开`);
-                    console.warn(`[ProcessManager] 程序 ${programName} 已在运行 (PID: ${pid})，且不支持多开`);
                     throw new Error(`Program ${programName} is already running (PID: ${pid}) and does not support multiple instances`);
                 }
             }
         } else {
             ProcessManager._log(2, `程序 ${programName} 支持多开，将创建新实例`);
-            console.log(`[ProcessManager] 程序 ${programName} 支持多开，将创建新实例`);
+            // 日志已通过 ProcessManager._log 输出
         }
         
         if (!asset.script) {
             ProcessManager._log(1, `程序 ${programName} 的脚本路径未定义`);
-            console.error(`[ProcessManager] 程序 ${programName} 的脚本路径未定义`);
+            ProcessManager._log(1, `程序 ${programName} 的脚本路径未定义`);
             throw new Error(`Program ${programName} script path is not defined`);
         }
         
@@ -842,7 +830,6 @@ class ProcessManager {
         const programNameUpper = programName.toUpperCase();
         
         ProcessManager._log(2, `[启动程序] 分配PID: ${pid}, 脚本路径: ${scriptPath}`);
-        console.log(`[ProcessManager] 分配PID: ${pid}, 脚本路径: ${scriptPath}`);
         
         // 创建进程信息
         const processInfo = {
@@ -907,10 +894,8 @@ class ProcessManager {
             
             // 异步加载程序脚本
             ProcessManager._log(2, `[启动程序] 加载程序脚本: ${scriptPath}`);
-            console.log(`[ProcessManager] 加载程序脚本: ${scriptPath}`);
             await ProcessManager._loadScript(scriptPath);
             ProcessManager._log(2, `[启动程序] 脚本加载完成，等待程序对象出现: ${programNameUpper}`);
-            console.log(`[ProcessManager] 脚本加载完成，等待程序对象出现: ${programNameUpper}`);
             
             // 等待程序通过依赖管理器注册加载完成
             // 程序应该调用 DependencyConfig.publishSignal() 来通知加载完成
@@ -929,13 +914,11 @@ class ProcessManager {
                     if (typeof window !== 'undefined' && window[programNameUpper]) {
                         programLoaded = true;
                         ProcessManager._log(2, `[启动程序] 在window中找到程序对象: ${programNameUpper}`);
-                        console.log(`[ProcessManager] 在window中找到程序对象: ${programNameUpper}`);
                         break;
                     }
                     if (typeof globalThis !== 'undefined' && globalThis[programNameUpper]) {
                         programLoaded = true;
                         ProcessManager._log(2, `[启动程序] 在globalThis中找到程序对象: ${programNameUpper}`);
-                        console.log(`[ProcessManager] 在globalThis中找到程序对象: ${programNameUpper}`);
                         break;
                     }
                     
@@ -946,7 +929,6 @@ class ProcessManager {
                             if (poolObj && poolObj !== undefined) {
                                 programLoaded = true;
                                 ProcessManager._log(2, `[启动程序] 在POOL中找到程序对象: ${programNameUpper}`);
-                                console.log(`[ProcessManager] 在POOL中找到程序对象: ${programNameUpper}`);
                                 // 同时设置到 window 以便后续访问
                                 if (typeof window !== 'undefined') {
                                     window[programNameUpper] = poolObj;
@@ -960,7 +942,6 @@ class ProcessManager {
                 } catch (e) {
                     // 如果检查失败，停止等待
                     ProcessManager._log(1, `检查程序加载状态失败: ${e.message}`);
-                    console.error(`[ProcessManager] 检查程序加载状态失败:`, e);
                     break;
                 }
                 
@@ -970,12 +951,10 @@ class ProcessManager {
             
             if (!programLoaded) {
                 ProcessManager._log(1, `程序 ${programName} 加载超时，未找到对象: ${programNameUpper}`);
-                console.error(`[ProcessManager] 程序 ${programName} 加载超时，未找到对象: ${programNameUpper}`);
                 throw new Error(`Program ${programName} failed to load within timeout`);
             }
             
             ProcessManager._log(2, `[启动程序] 程序 ${programName} 加载完成，调用 __init__`);
-            console.log(`[ProcessManager] 程序 ${programName} 加载完成，调用 __init__`);
             
             // 调用程序的 __init__ 方法
             const programClass = (typeof window !== 'undefined' && window[programNameUpper]) || 
@@ -983,12 +962,10 @@ class ProcessManager {
             
             if (!programClass) {
                 ProcessManager._log(1, `程序对象 ${programNameUpper} 不存在`);
-                console.error(`[ProcessManager] 程序对象 ${programNameUpper} 不存在`);
                 throw new Error(`Program class ${programNameUpper} not found`);
             }
             
             ProcessManager._log(2, `[启动程序] 找到程序对象，检查类型`);
-            console.log(`[ProcessManager] 找到程序对象，检查类型`);
             
             // 检查程序类型（CLI或GUI）
             let programType = null;
@@ -997,14 +974,11 @@ class ProcessManager {
                     const programInfo = programClass.__info__();
                     programType = programInfo.type || null;
                     ProcessManager._log(2, `[启动程序] 程序类型: ${programType}`);
-                    console.log(`[ProcessManager] 程序类型: ${programType}`);
                 } catch (e) {
                     ProcessManager._log(1, `获取程序类型失败: ${e.message}`);
-                    console.error(`[ProcessManager] 获取程序类型失败:`, e);
                 }
             } else {
                 ProcessManager._log(2, `[启动程序] 程序没有__info__方法`);
-                console.log(`[ProcessManager] 程序没有__info__方法`);
             }
             
             // 如果是CLI程序，处理终端环境
@@ -1127,7 +1101,7 @@ class ProcessManager {
                     };
                     
                     ProcessManager._log(2, `[启动程序] 调用 __init__ 方法`, standardizedInitArgs);
-                    console.log(`[ProcessManager] 调用 __init__ 方法`, standardizedInitArgs);
+                    ProcessManager._log(2, `[启动程序] 调用 __init__ 方法`, standardizedInitArgs);
                     
                     await programClass.__init__(pid, standardizedInitArgs);
                     processInfo.status = 'running';
@@ -1140,7 +1114,7 @@ class ProcessManager {
                     ProcessManager._log(2, `[启动程序] 程序 ${programName} (PID: ${pid}) 初始化完成`, {
                         args: standardizedInitArgs.args
                     });
-                    console.log(`[ProcessManager] 程序 ${programName} (PID: ${pid}) 初始化完成`);
+                    ProcessManager._log(2, `[启动程序] 程序 ${programName} (PID: ${pid}) 初始化完成`);
                     
                     // 通知任务栏更新（延迟更新，确保程序状态已保存）
                     if (typeof TaskbarManager !== 'undefined' && typeof TaskbarManager.update === 'function') {
@@ -1152,12 +1126,10 @@ class ProcessManager {
                     processInfo.status = 'exited';
                     processInfo.exitTime = Date.now();
                     ProcessManager._log(1, `程序 ${programName} (PID: ${pid}) 初始化失败: ${e.message}`);
-                    console.error(`[ProcessManager] 程序 ${programName} (PID: ${pid}) 初始化失败:`, e);
                     throw e;
                 }
             } else {
                 ProcessManager._log(1, `程序 ${programName} 没有 __init__ 方法，跳过初始化`);
-                console.warn(`[ProcessManager] 程序 ${programName} 没有 __init__ 方法，跳过初始化`);
                 processInfo.status = 'running';
                 
                 // 即使没有 __init__ 方法，也尝试标记元素

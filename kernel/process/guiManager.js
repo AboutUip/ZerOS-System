@@ -800,6 +800,8 @@ class GUIManager {
             EventManager.unregisterDrag(`zos-window-drag-${windowId}`);
             EventManager.unregisterResizer(`zos-window-resize-bottom-right-${windowId}`);
             EventManager.unregisterResizer(`zos-window-resize-top-right-${windowId}`);
+            EventManager.unregisterResizer(`zos-window-resize-top-left-${windowId}`);
+            EventManager.unregisterResizer(`zos-window-resize-bottom-left-${windowId}`);
         }
         
         // 移除窗口类
@@ -2859,6 +2861,50 @@ class GUIManager {
         resizerTopRight.setAttribute('data-resizer', 'top-right');
         windowElement.appendChild(resizerTopRight);
         
+        // 左上角拉伸器
+        const resizerTopLeft = document.createElement('div');
+        resizerTopLeft.className = 'zos-window-resizer zos-window-resizer-top-left';
+        resizerTopLeft.style.cssText = `
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 20px;
+            height: 20px;
+            cursor: nw-resize;
+            z-index: 1000;
+            background: transparent;
+            pointer-events: auto;
+            user-select: none;
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+        `;
+        // 确保拉伸器可以接收鼠标事件
+        resizerTopLeft.setAttribute('data-resizer', 'top-left');
+        windowElement.appendChild(resizerTopLeft);
+        
+        // 左下角拉伸器
+        const resizerBottomLeft = document.createElement('div');
+        resizerBottomLeft.className = 'zos-window-resizer zos-window-resizer-bottom-left';
+        resizerBottomLeft.style.cssText = `
+            position: absolute;
+            left: 0;
+            bottom: 0;
+            width: 20px;
+            height: 20px;
+            cursor: sw-resize;
+            z-index: 1000;
+            background: transparent;
+            pointer-events: auto;
+            user-select: none;
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+        `;
+        // 确保拉伸器可以接收鼠标事件
+        resizerBottomLeft.setAttribute('data-resizer', 'bottom-left');
+        windowElement.appendChild(resizerBottomLeft);
+        
         // 注册拉伸事件
         if (typeof EventManager !== 'undefined') {
             // 右下角拉伸
@@ -3059,6 +3105,240 @@ class GUIManager {
                         windowElement.style.width = `${newWidth}px`;
                         windowElement.style.height = `${newHeight}px`;
                         windowElement.style.top = `${newTop}px`;
+                    }
+                },
+                (e) => {
+                    // 拉伸结束
+                    windowInfo.windowState.isResizing = false;
+                    windowInfo.windowState.resizeAnchor = null;
+                }
+            );
+            
+            // 左上角拉伸
+            EventManager.registerResizer(
+                `zos-window-resize-top-left-${windowId}`,
+                resizerTopLeft,
+                windowElement,
+                windowInfo.windowState,
+                (e) => {
+                    // 拉伸开始
+                    if (windowInfo.isMaximized || windowInfo.isMinimized) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        return;
+                    }
+                    
+                    GUIManager.focusWindow(windowId);
+                    
+                    const rect = windowElement.getBoundingClientRect();
+                    windowInfo.windowState.isResizing = true;
+                    windowInfo.windowState.resizeStartX = e.clientX;
+                    windowInfo.windowState.resizeStartY = e.clientY;
+                    windowInfo.windowState.resizeStartWidth = rect.width;
+                    windowInfo.windowState.resizeStartHeight = rect.height;
+                    windowInfo.windowState.resizeStartTop = rect.top;
+                    windowInfo.windowState.resizeStartLeft = rect.left;
+                    windowInfo.windowState.resizeAnchor = 'top-left';
+                    
+                    // 确保使用固定定位
+                    const computedStyle = window.getComputedStyle(windowElement);
+                    if (computedStyle.transform && computedStyle.transform !== 'none') {
+                        windowElement.style.transform = 'none';
+                        windowElement.style.position = 'fixed';
+                        windowElement.style.left = rect.left + 'px';
+                        windowElement.style.top = rect.top + 'px';
+                    }
+                    
+                    e.preventDefault();
+                    e.stopPropagation();
+                },
+                (e) => {
+                    // 拉伸中
+                    if (!windowInfo.windowState.isResizing || windowInfo.windowState.resizeAnchor !== 'top-left') {
+                        return;
+                    }
+                    
+                    const deltaX = e.clientX - windowInfo.windowState.resizeStartX;
+                    const deltaY = e.clientY - windowInfo.windowState.resizeStartY;
+                    
+                    const minWidth = 300;
+                    const minHeight = 200;
+                    // 向左上拉伸：宽度和高度增加，left和top减小
+                    let newWidth = Math.max(minWidth, windowInfo.windowState.resizeStartWidth - deltaX);
+                    let newHeight = Math.max(minHeight, windowInfo.windowState.resizeStartHeight - deltaY);
+                    
+                    // 计算宽度和高度变化量
+                    const widthDelta = newWidth - windowInfo.windowState.resizeStartWidth;
+                    const heightDelta = newHeight - windowInfo.windowState.resizeStartHeight;
+                    
+                    // 获取容器边界（使用初始位置，避免累积误差）
+                    const guiContainer = document.getElementById('gui-container');
+                    const resizeStartLeftValue = windowInfo.windowState.resizeStartLeft || 0;
+                    const resizeStartTopValue = windowInfo.windowState.resizeStartTop || 0;
+                    
+                    if (guiContainer) {
+                        const containerRect = guiContainer.getBoundingClientRect();
+                        // 使用初始位置计算相对于容器的位置
+                        const relativeLeft = resizeStartLeftValue - containerRect.left;
+                        const relativeTop = resizeStartTopValue - containerRect.top;
+                        
+                        // 计算最大尺寸（确保窗口不超出容器）
+                        const maxWidth = Math.max(minWidth, relativeLeft + windowInfo.windowState.resizeStartWidth);
+                        const maxHeight = Math.max(minHeight, relativeTop + windowInfo.windowState.resizeStartHeight);
+                        
+                        newWidth = Math.min(newWidth, maxWidth);
+                        newHeight = Math.min(newHeight, maxHeight);
+                        
+                        // 重新计算宽度和高度变化量（因为可能被限制）
+                        const actualWidthDelta = newWidth - windowInfo.windowState.resizeStartWidth;
+                        const actualHeightDelta = newHeight - windowInfo.windowState.resizeStartHeight;
+                        
+                        // 计算新的left和top位置（向左上拉伸时，宽度和高度增加，left和top应该减小）
+                        // 使用绝对位置（相对于视口），因为窗口使用 position: fixed
+                        const newLeft = Math.max(containerRect.left, resizeStartLeftValue - actualWidthDelta);
+                        const newTop = Math.max(containerRect.top, resizeStartTopValue - actualHeightDelta);
+                        
+                        windowElement.style.width = `${newWidth}px`;
+                        windowElement.style.height = `${newHeight}px`;
+                        windowElement.style.left = `${newLeft}px`;
+                        windowElement.style.top = `${newTop}px`;
+                    } else {
+                        // 没有容器，使用视口边界
+                        const viewportWidth = window.innerWidth || document.documentElement.clientWidth;
+                        const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
+                        
+                        // 计算最大尺寸（确保窗口不超出视口，使用初始位置）
+                        const maxWidth = Math.max(minWidth, resizeStartLeftValue + windowInfo.windowState.resizeStartWidth);
+                        const maxHeight = Math.max(minHeight, resizeStartTopValue + windowInfo.windowState.resizeStartHeight);
+                        
+                        newWidth = Math.min(newWidth, maxWidth);
+                        newHeight = Math.min(newHeight, maxHeight);
+                        
+                        // 重新计算宽度和高度变化量（因为可能被限制）
+                        const actualWidthDelta = newWidth - windowInfo.windowState.resizeStartWidth;
+                        const actualHeightDelta = newHeight - windowInfo.windowState.resizeStartHeight;
+                        
+                        // 计算新的left和top位置（向左上拉伸时，宽度和高度增加，left和top应该减小）
+                        const newLeft = Math.max(0, resizeStartLeftValue - actualWidthDelta);
+                        const newTop = Math.max(0, resizeStartTopValue - actualHeightDelta);
+                        
+                        windowElement.style.width = `${newWidth}px`;
+                        windowElement.style.height = `${newHeight}px`;
+                        windowElement.style.left = `${newLeft}px`;
+                        windowElement.style.top = `${newTop}px`;
+                    }
+                },
+                (e) => {
+                    // 拉伸结束
+                    windowInfo.windowState.isResizing = false;
+                    windowInfo.windowState.resizeAnchor = null;
+                }
+            );
+            
+            // 左下角拉伸
+            EventManager.registerResizer(
+                `zos-window-resize-bottom-left-${windowId}`,
+                resizerBottomLeft,
+                windowElement,
+                windowInfo.windowState,
+                (e) => {
+                    // 拉伸开始
+                    if (windowInfo.isMaximized || windowInfo.isMinimized) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        return;
+                    }
+                    
+                    GUIManager.focusWindow(windowId);
+                    
+                    const rect = windowElement.getBoundingClientRect();
+                    windowInfo.windowState.isResizing = true;
+                    windowInfo.windowState.resizeStartX = e.clientX;
+                    windowInfo.windowState.resizeStartY = e.clientY;
+                    windowInfo.windowState.resizeStartWidth = rect.width;
+                    windowInfo.windowState.resizeStartHeight = rect.height;
+                    windowInfo.windowState.resizeStartTop = rect.top;
+                    windowInfo.windowState.resizeStartLeft = rect.left;
+                    windowInfo.windowState.resizeAnchor = 'bottom-left';
+                    
+                    // 确保使用固定定位
+                    const computedStyle = window.getComputedStyle(windowElement);
+                    if (computedStyle.transform && computedStyle.transform !== 'none') {
+                        windowElement.style.transform = 'none';
+                        windowElement.style.position = 'fixed';
+                        windowElement.style.left = rect.left + 'px';
+                        windowElement.style.top = rect.top + 'px';
+                    }
+                    
+                    e.preventDefault();
+                    e.stopPropagation();
+                },
+                (e) => {
+                    // 拉伸中
+                    if (!windowInfo.windowState.isResizing || windowInfo.windowState.resizeAnchor !== 'bottom-left') {
+                        return;
+                    }
+                    
+                    const deltaX = e.clientX - windowInfo.windowState.resizeStartX;
+                    const deltaY = e.clientY - windowInfo.windowState.resizeStartY;
+                    
+                    const minWidth = 300;
+                    const minHeight = 200;
+                    // 向左下拉伸：宽度增加（left减小），高度增加（top不变）
+                    let newWidth = Math.max(minWidth, windowInfo.windowState.resizeStartWidth - deltaX);
+                    let newHeight = Math.max(minHeight, windowInfo.windowState.resizeStartHeight + deltaY);
+                    
+                    // 计算宽度变化量
+                    const widthDelta = newWidth - windowInfo.windowState.resizeStartWidth;
+                    
+                    // 获取容器边界（使用初始位置，避免累积误差）
+                    const guiContainer = document.getElementById('gui-container');
+                    const resizeStartLeftValue = windowInfo.windowState.resizeStartLeft || 0;
+                    
+                    if (guiContainer) {
+                        const containerRect = guiContainer.getBoundingClientRect();
+                        // 使用初始位置计算相对于容器的位置
+                        const relativeLeft = resizeStartLeftValue - containerRect.left;
+                        const relativeTop = windowInfo.windowState.resizeStartTop - containerRect.top;
+                        
+                        // 计算最大尺寸（确保窗口不超出容器）
+                        const maxWidth = Math.max(minWidth, relativeLeft + windowInfo.windowState.resizeStartWidth);
+                        const maxHeight = Math.max(minHeight, containerRect.height - relativeTop);
+                        
+                        newWidth = Math.min(newWidth, maxWidth);
+                        newHeight = Math.min(newHeight, maxHeight);
+                        
+                        // 重新计算宽度变化量（因为可能被maxWidth限制）
+                        const actualWidthDelta = newWidth - windowInfo.windowState.resizeStartWidth;
+                        
+                        // 计算新的left位置（向左拉伸时，宽度增加，left应该减小）
+                        // 使用绝对位置（相对于视口），因为窗口使用 position: fixed
+                        const newLeft = Math.max(containerRect.left, resizeStartLeftValue - actualWidthDelta);
+                        
+                        windowElement.style.width = `${newWidth}px`;
+                        windowElement.style.height = `${newHeight}px`;
+                        windowElement.style.left = `${newLeft}px`;
+                    } else {
+                        // 没有容器，使用视口边界
+                        const viewportWidth = window.innerWidth || document.documentElement.clientWidth;
+                        const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
+                        
+                        // 计算最大尺寸（确保窗口不超出视口，使用初始位置）
+                        const maxWidth = Math.max(minWidth, resizeStartLeftValue + windowInfo.windowState.resizeStartWidth);
+                        const maxHeight = Math.max(minHeight, viewportHeight - windowInfo.windowState.resizeStartTop);
+                        
+                        newWidth = Math.min(newWidth, maxWidth);
+                        newHeight = Math.min(newHeight, maxHeight);
+                        
+                        // 重新计算宽度变化量（因为可能被maxWidth限制）
+                        const actualWidthDelta = newWidth - windowInfo.windowState.resizeStartWidth;
+                        
+                        // 计算新的left位置（向左拉伸时，宽度增加，left应该减小）
+                        const newLeft = Math.max(0, resizeStartLeftValue - actualWidthDelta);
+                        
+                        windowElement.style.width = `${newWidth}px`;
+                        windowElement.style.height = `${newHeight}px`;
+                        windowElement.style.left = `${newLeft}px`;
                     }
                 },
                 (e) => {

@@ -17,7 +17,9 @@
         _loadingRandomAnimeBg: false,  // 防止重复请求标志
         
         __init__: async function(pid, initArgs) {
-            console.log('[themeanimator] __init__ 被调用, PID:', pid);
+            if (typeof KernelLogger !== 'undefined') {
+                KernelLogger.debug('ThemeAnimator', `__init__ 被调用, PID: ${pid}`);
+            }
             this.pid = pid;
             
             // 获取 GUI 容器
@@ -48,7 +50,9 @@
                         // 这会触发 __exit__ 方法并清理所有资源
                         if (typeof ProcessManager !== 'undefined' && this.pid) {
                             ProcessManager.killProgram(this.pid).catch(e => {
-                                console.error('[themeanimator] 关闭程序失败:', e);
+                                if (typeof KernelLogger !== 'undefined') {
+                                    KernelLogger.error('ThemeAnimator', '关闭程序失败', e);
+                                }
                             });
                         } else {
                             // 降级：直接调用 __exit__
@@ -95,9 +99,13 @@
             panelsContainer.appendChild(stylePanel);
             
             // 创建背景图管理面板
-            console.log('[themeanimator] 准备创建背景面板');
+            if (typeof KernelLogger !== 'undefined') {
+                KernelLogger.debug('ThemeAnimator', '准备创建背景面板');
+            }
             const backgroundPanel = this._createBackgroundPanel();
-            console.log('[themeanimator] 背景面板创建完成:', backgroundPanel);
+            if (typeof KernelLogger !== 'undefined') {
+                KernelLogger.debug('ThemeAnimator', '背景面板创建完成', backgroundPanel);
+            }
             panelsContainer.appendChild(backgroundPanel);
             
             // 创建动画管理面板
@@ -286,9 +294,11 @@
                                 insideBtn.style.visibility = 'visible';
                                 insideBtn.style.opacity = '1';
                             }
-                            console.log('[themeanimator] 背景面板显示，按钮状态:', {
-                                insideBtn: insideBtn ? '存在且可见' : '不存在'
-                            });
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.debug('ThemeAnimator', '背景面板显示，按钮状态', {
+                                    insideBtn: insideBtn ? '存在且可见' : '不存在'
+                                });
+                            }
                         }, 50);
                     }
                 } else {
@@ -400,7 +410,9 @@
          * 创建背景图管理面板
          */
         _createBackgroundPanel: function() {
-            console.log('[themeanimator] 开始创建背景面板');
+            if (typeof KernelLogger !== 'undefined') {
+                KernelLogger.debug('ThemeAnimator', '开始创建背景面板');
+            }
             const panel = document.createElement('div');
             panel.className = 'themeanimator-panel';
             panel.dataset.panel = 'background';
@@ -485,11 +497,15 @@
             selectLocalImageBtnInside.addEventListener('click', (e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                console.log('[themeanimator] 点击内部按钮');
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.debug('ThemeAnimator', '点击内部按钮');
+                }
                 this._openFileSelector();
             });
             currentBackgroundDisplay.appendChild(selectLocalImageBtnInside);
-            console.log('[themeanimator] 内部按钮已添加到DOM:', selectLocalImageBtnInside, '父元素:', currentBackgroundDisplay);
+            if (typeof KernelLogger !== 'undefined') {
+                KernelLogger.debug('ThemeAnimator', '内部按钮已添加到DOM', { button: selectLocalImageBtnInside, parent: currentBackgroundDisplay });
+            }
             
             // 添加随机二次元背景按钮
             const randomAnimeBgBtn = document.createElement('button');
@@ -579,19 +595,21 @@
             setTimeout(() => {
                 const insideBtn = panel.querySelector('#select-local-image-btn-inside');
                 const currentDisplay = panel.querySelector('.current-background-display');
-                console.log('[themeanimator] 面板创建完成，检查按钮:', {
-                    insideBtn: insideBtn ? {
-                        exists: true,
-                        text: insideBtn.textContent,
-                        display: window.getComputedStyle(insideBtn).display,
-                        visibility: window.getComputedStyle(insideBtn).visibility,
-                        opacity: window.getComputedStyle(insideBtn).opacity,
-                        parent: currentDisplay ? 'currentDisplay存在' : 'currentDisplay不存在'
-                    } : '不存在',
-                    panelDisplay: panel.style.display,
-                    panelVisible: window.getComputedStyle(panel).display,
-                    panelInDOM: panel.parentElement ? '已添加到DOM' : '未添加到DOM'
-                });
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.debug('ThemeAnimator', '面板创建完成，检查按钮', {
+                        insideBtn: insideBtn ? {
+                            exists: true,
+                            text: insideBtn.textContent,
+                            display: window.getComputedStyle(insideBtn).display,
+                            visibility: window.getComputedStyle(insideBtn).visibility,
+                            opacity: window.getComputedStyle(insideBtn).opacity,
+                            parent: currentDisplay ? 'currentDisplay存在' : 'currentDisplay不存在'
+                        } : '不存在',
+                        panelDisplay: panel.style.display,
+                        panelVisible: window.getComputedStyle(panel).display,
+                        panelInDOM: panel.parentElement ? '已添加到DOM' : '未添加到DOM'
+                    });
+                }
             }, 100);
             
             // 背景图列表
@@ -731,22 +749,30 @@
                         const lastRequestStatus = await LStorage.getSystemStorage('system.randomAnimeBgStatus');
                         if (lastRequestStatus === 'failed') {
                             // 如果上次请求失败，刷新时自动再次尝试请求
-                            console.log('[themeanimator] 检测到上次请求失败，刷新时自动再次尝试请求');
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.debug('ThemeAnimator', '检测到上次请求失败，刷新时自动再次尝试请求');
+                            }
                             // 延迟执行，确保UI已完全加载
                             setTimeout(() => {
                                 this._loadRandomAnimeBackground();
                             }, 1000);
                         } else if (lastRequestStatus === 'disabled') {
                             // 如果已禁用，不自动请求
-                            console.log('[themeanimator] 随机二次元背景功能已禁用，跳过自动请求');
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.debug('ThemeAnimator', '随机二次元背景功能已禁用，跳过自动请求');
+                            }
                         }
                         // 如果上次请求成功，刷新时不再次请求（保持当前背景）
                     } catch (e) {
-                        console.warn('[themeanimator] 读取请求状态失败:', e);
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('ThemeAnimator', '读取请求状态失败', e);
+                        }
                     }
                 }
             } catch (e) {
-                console.error('加载当前设置失败:', e);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('ThemeAnimator', '加载当前设置失败', e);
+                }
             }
         },
         
@@ -767,7 +793,9 @@
                 };
                 this.themeChangeUnsubscribe = ProcessManager.onThemeChange(themeChangeListener, this.pid);
             } catch (e) {
-                console.error('注册主题变更监听器失败:', e);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('ThemeAnimator', '注册主题变更监听器失败', e);
+                }
             }
             
             // 监听风格变更
@@ -779,7 +807,9 @@
                 };
                 this.styleChangeUnsubscribe = ProcessManager.onStyleChange(styleChangeListener, this.pid);
             } catch (e) {
-                console.error('注册风格变更监听器失败:', e);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('ThemeAnimator', '注册风格变更监听器失败', e);
+                }
             }
             
             // 监听动画预设变更
@@ -795,7 +825,9 @@
                     };
                     this.animationPresetChangeUnsubscribe = ThemeManager.onAnimationPresetChange(animationPresetChangeListener);
                 } catch (e) {
-                    console.error('注册动画预设变更监听器失败:', e);
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.error('ThemeAnimator', '注册动画预设变更监听器失败', e);
+                    }
                 }
             }
         },
@@ -902,17 +934,25 @@
                 card.addEventListener('click', async (e) => {
                     e.stopPropagation();
                     try {
-                        console.log(`[themeanimator] 切换主题: ${theme.id}`);
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.debug('ThemeAnimator', `切换主题: ${theme.id}`);
+                        }
                         const result = await ProcessManager.setTheme(theme.id, this.pid);
                         if (!result) {
-                            console.error(`[themeanimator] 切换主题失败: 主题 ${theme.id} 不存在或无法应用`);
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.error('ThemeAnimator', `切换主题失败: 主题 ${theme.id} 不存在或无法应用`);
+                            }
                             alert(`切换主题失败: 主题 ${theme.id} 不存在或无法应用`);
                         } else {
-                            console.log(`[themeanimator] 主题切换成功: ${theme.id}`);
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.debug('ThemeAnimator', `主题切换成功: ${theme.id}`);
+                            }
                             // 成功时，监听器会自动更新UI
                         }
                     } catch (e) {
-                        console.error('[themeanimator] 切换主题失败:', e);
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.error('ThemeAnimator', '切换主题失败', e);
+                        }
                         alert(`切换主题失败: ${e.message}`);
                     }
                 });
@@ -1040,17 +1080,25 @@
                 card.addEventListener('click', async (e) => {
                     e.stopPropagation();
                     try {
-                        console.log(`[themeanimator] 切换风格: ${style.id}`);
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.debug('ThemeAnimator', `切换风格: ${style.id}`);
+                        }
                         const result = await ProcessManager.setStyle(style.id, this.pid);
                         if (!result) {
-                            console.error(`[themeanimator] 切换风格失败: 风格 ${style.id} 不存在或无法应用`);
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.error('ThemeAnimator', `切换风格失败: 风格 ${style.id} 不存在或无法应用`);
+                            }
                             alert(`切换风格失败: 风格 ${style.id} 不存在或无法应用`);
                         } else {
-                            console.log(`[themeanimator] 风格切换成功: ${style.id}`);
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.debug('ThemeAnimator', `风格切换成功: ${style.id}`);
+                            }
                             // 成功时，监听器会自动更新UI
                         }
                     } catch (e) {
-                        console.error('[themeanimator] 切换风格失败:', e);
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.error('ThemeAnimator', '切换风格失败', e);
+                        }
                         alert(`切换风格失败: ${e.message}`);
                     }
                 });
@@ -1281,20 +1329,28 @@
                 card.addEventListener('click', async (e) => {
                     e.stopPropagation();
                     try {
-                        console.log(`[themeanimator] 切换桌面背景: ${background.id}`);
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.debug('ThemeAnimator', `切换桌面背景: ${background.id}`);
+                        }
                         const result = await ProcessManager.setDesktopBackground(background.id, this.pid);
                         if (!result) {
-                            console.error(`[themeanimator] 切换桌面背景失败: 背景 ${background.id} 不存在或无法应用`);
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.error('ThemeAnimator', `切换桌面背景失败: 背景 ${background.id} 不存在或无法应用`);
+                            }
                             alert(`切换桌面背景失败: 背景 ${background.id} 不存在或无法应用`);
                         } else {
-                            console.log(`[themeanimator] 桌面背景切换成功: ${background.id}`);
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.debug('ThemeAnimator', `桌面背景切换成功: ${background.id}`);
+                            }
                             // 更新当前背景显示
                             this._updateCurrentBackgroundDisplay(background);
                             // 更新背景列表
                             this._updateBackgroundsList();
                         }
                     } catch (e) {
-                        console.error('[themeanimator] 切换桌面背景失败:', e);
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.error('ThemeAnimator', '切换桌面背景失败', e);
+                        }
                         alert(`切换桌面背景失败: ${e.message}`);
                     }
                 });
@@ -1411,7 +1467,9 @@
                                     }
                                 }
                             } catch (e) {
-                                console.error('[themeanimator] 设置本地背景失败:', e);
+                                if (typeof KernelLogger !== 'undefined') {
+                                    KernelLogger.error('ThemeAnimator', '设置本地背景失败', e);
+                                }
                                 if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
                                     await GUIManager.showAlert(`设置背景失败: ${e.message}`, '错误', 'error');
                                 } else {
@@ -1436,7 +1494,9 @@
                     }
                 }
             } catch (e) {
-                console.error('[themeanimator] 打开文件选择器失败:', e);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('ThemeAnimator', '打开文件选择器失败', e);
+                }
                 if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
                     await GUIManager.showAlert(`打开文件选择器失败: ${e.message}`, '错误', 'error');
                 } else {
@@ -1553,17 +1613,25 @@
                 card.addEventListener('click', async (e) => {
                     e.stopPropagation();
                     try {
-                        console.log(`[themeanimator] 切换动画预设: ${preset.id}`);
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.debug('ThemeAnimator', `切换动画预设: ${preset.id}`);
+                        }
                         const result = await ThemeManager.setAnimationPreset(preset.id, true);
                         if (!result) {
-                            console.error(`[themeanimator] 切换动画预设失败: 预设 ${preset.id} 不存在或无法应用`);
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.error('ThemeAnimator', `切换动画预设失败: 预设 ${preset.id} 不存在或无法应用`);
+                            }
                             alert(`切换动画预设失败: 预设 ${preset.id} 不存在或无法应用`);
                         } else {
-                            console.log(`[themeanimator] 动画预设切换成功: ${preset.id}`);
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.debug('ThemeAnimator', `动画预设切换成功: ${preset.id}`);
+                            }
                             // 成功时，监听器会自动更新UI
                         }
                     } catch (e) {
-                        console.error('[themeanimator] 切换动画预设失败:', e);
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.error('ThemeAnimator', '切换动画预设失败', e);
+                        }
                         alert(`切换动画预设失败: ${e.message}`);
                     }
                 });
@@ -1720,11 +1788,15 @@
                     // 其他错误才记录警告
                     if (!createDirResponse.ok && createDirResponse.status !== 409) {
                         const errorResult = await createDirResponse.json().catch(() => ({}));
-                        console.warn('[themeanimator] 创建目录失败:', errorResult.message || `HTTP ${createDirResponse.status}`);
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('ThemeAnimator', `创建目录失败: ${errorResult.message || `HTTP ${createDirResponse.status}`}`);
+                        }
                     }
                 } catch (e) {
                     // 网络错误，忽略（目录可能已存在）
-                    console.debug('[themeanimator] 创建目录时出错:', e);
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.debug('ThemeAnimator', '创建目录时出错', e);
+                    }
                 }
                 
                 // 清理旧的随机二次元背景图
@@ -1732,7 +1804,9 @@
                     await this._cleanupOldRandomAnimeBackgrounds();
                 } catch (e) {
                     // 清理失败不影响新图片的保存
-                    console.warn('[themeanimator] 清理旧背景图失败:', e);
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.warn('ThemeAnimator', '清理旧背景图失败', e);
+                    }
                 }
                 
                 // 保存图片到本地（使用 base64 编码，FSDirve.php 会解码为二进制）
@@ -1776,7 +1850,9 @@
                             try {
                                 await LStorage.setSystemStorage('system.randomAnimeBgStatus', 'success');
                             } catch (e) {
-                                console.warn('[themeanimator] 保存请求状态失败:', e);
+                                if (typeof KernelLogger !== 'undefined') {
+                                    KernelLogger.warn('ThemeAnimator', '保存请求状态失败', e);
+                                }
                             }
                         }
                         
@@ -1798,14 +1874,18 @@
                     throw new Error('ThemeManager 不可用');
                 }
             } catch (e) {
-                console.error('[themeanimator] 加载随机二次元背景失败:', e);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('ThemeAnimator', '加载随机二次元背景失败', e);
+                }
                 
                 // 保存请求状态为失败
                 if (typeof LStorage !== 'undefined') {
                     try {
                         await LStorage.setSystemStorage('system.randomAnimeBgStatus', 'failed');
                     } catch (storageError) {
-                        console.warn('[themeanimator] 保存请求状态失败:', storageError);
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('ThemeAnimator', '保存请求状态失败', storageError);
+                        }
                     }
                 }
                 
@@ -1835,9 +1915,13 @@
             if (typeof LStorage !== 'undefined') {
                 try {
                     await LStorage.setSystemStorage('system.randomAnimeBgStatus', 'disabled');
-                    console.log('[themeanimator] 已禁用随机二次元背景功能');
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.debug('ThemeAnimator', '已禁用随机二次元背景功能');
+                    }
                 } catch (e) {
-                    console.warn('[themeanimator] 保存禁用状态失败:', e);
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.warn('ThemeAnimator', '保存禁用状态失败', e);
+                    }
                 }
             }
             
@@ -1889,20 +1973,28 @@
                         if (deleteResponse.ok) {
                             const deleteResult = await deleteResponse.json();
                             if (deleteResult.status === 'success') {
-                                console.log(`[themeanimator] 已删除旧背景图: ${file.name}`);
+                                if (typeof KernelLogger !== 'undefined') {
+                                    KernelLogger.debug('ThemeAnimator', `已删除旧背景图: ${file.name}`);
+                                }
                             }
                         }
                     } catch (e) {
                         // 单个文件删除失败不影响其他文件的删除
-                        console.warn(`[themeanimator] 删除文件 ${file.name} 失败:`, e);
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('ThemeAnimator', `删除文件 ${file.name} 失败`, e);
+                        }
                     }
                 }
                 
                 if (oldBackgroundFiles.length > 0) {
-                    console.log(`[themeanimator] 已清理 ${oldBackgroundFiles.length} 个旧背景图文件`);
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.debug('ThemeAnimator', `已清理 ${oldBackgroundFiles.length} 个旧背景图文件`);
+                    }
                 }
             } catch (e) {
-                console.warn('[themeanimator] 清理旧背景图时出错:', e);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.warn('ThemeAnimator', '清理旧背景图时出错', e);
+                }
                 // 不抛出错误，允许继续执行
             }
         }

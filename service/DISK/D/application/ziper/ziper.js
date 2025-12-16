@@ -117,7 +117,9 @@
                         }
                     }
                 } catch (e) {
-                    console.warn('[Ziper] 内存初始化失败:', e);
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.warn('Ziper', '内存初始化失败', e);
+                    }
                 }
             }
         },
@@ -790,7 +792,9 @@
                     }
                 });
             } catch (error) {
-                console.error('[Ziper] 选择源文件失败:', error);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('Ziper', '选择源文件失败', error);
+                }
                 this._showMessage(`选择源文件失败: ${error.message}`, 'error');
             }
         },
@@ -898,7 +902,9 @@
                     }
                 });
             } catch (error) {
-                console.error('[Ziper] 选择目标位置失败:', error);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('Ziper', '选择目标位置失败', error);
+                }
                 this._showMessage(`选择目标位置失败: ${error.message}`, 'error');
             }
         },
@@ -937,7 +943,9 @@
                     }
                 });
             } catch (error) {
-                console.error('[Ziper] 选择 ZIP 文件失败:', error);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('Ziper', '选择 ZIP 文件失败', error);
+                }
                 this._showMessage(`选择 ZIP 文件失败: ${error.message}`, 'error');
             }
         },
@@ -1048,7 +1056,9 @@
                     }
                 });
             } catch (error) {
-                console.error('[Ziper] 选择 ZIP 文件失败:', error);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('Ziper', '选择 ZIP 文件失败', error);
+                }
                 this._showMessage(`选择 ZIP 文件失败: ${error.message}`, 'error');
             }
         },
@@ -1074,7 +1084,9 @@
                     }
                 });
             } catch (error) {
-                console.error('[Ziper] 选择解压目标目录失败:', error);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('Ziper', '选择解压目标目录失败', error);
+                }
                 this._showMessage(`选择解压目标目录失败: ${error.message}`, 'error');
             }
         },
@@ -1142,7 +1154,9 @@
                     throw new Error(result.message || '压缩失败');
                 }
             } catch (error) {
-                console.error('[Ziper] 压缩失败:', error);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('Ziper', '压缩失败', error);
+                }
                 this._showMessage(`压缩失败: ${error.message}`, 'error');
             } finally {
                 this._isProcessing = false;
@@ -1218,7 +1232,9 @@
                     throw new Error(`所有 ZIP 文件解压失败：\n${errors.join('\n')}`);
                 }
             } catch (error) {
-                console.error('[Ziper] 解压失败:', error);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('Ziper', '解压失败', error);
+                }
                 this._showMessage(`解压失败: ${error.message}`, 'error');
             } finally {
                 this._isProcessing = false;
@@ -1265,7 +1281,9 @@
                 } else {
                     // 可能是错误页面（HTML）
                     const text = await response.text();
-                    console.error('[Ziper] 服务端返回非 JSON 响应:', text.substring(0, 200));
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.error('Ziper', '服务端返回非 JSON 响应', { text: text.substring(0, 200) });
+                    }
                     
                     // 尝试解析为 JSON（可能错误信息是 JSON 格式）
                     try {
@@ -1287,7 +1305,9 @@
                     throw new Error(result.message || '查看 ZIP 内容失败');
                 }
             } catch (error) {
-                console.error('[Ziper] 查看 ZIP 内容失败:', error);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('Ziper', '查看 ZIP 内容失败', error);
+                }
                 // 如果是 JSON 解析错误，提供更友好的提示
                 if (error.message && error.message.includes('JSON')) {
                     this._showMessage('查看 ZIP 内容失败: 服务端返回了无效的响应，请检查文件路径是否正确', 'error');
@@ -1515,7 +1535,9 @@
             }
             POOL.__ADD__("APPLICATION_SOP", "ZIPER", ZIPER);
         } catch (e) {
-            console.warn('[Ziper] 注册到 POOL 失败:', e);
+            if (typeof KernelLogger !== 'undefined') {
+                KernelLogger.warn('Ziper', '注册到 POOL 失败', e);
+            }
         }
     }
     

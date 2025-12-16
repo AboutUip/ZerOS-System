@@ -821,7 +821,9 @@
                         }
                     }
                 } catch (e) {
-                    console.warn('获取磁盘分区失败:', e);
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.warn('FileManager', '获取磁盘分区失败', e);
+                    }
                 }
             }
             
@@ -1642,7 +1644,9 @@
          */
         _showProperties: async function(item) {
             if (!this.propertiesPanel || !this.propertiesContent) {
-                console.warn('[FileManager] 属性面板未初始化');
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.warn('FileManager', '属性面板未初始化');
+                }
                 return;
             }
             
@@ -1755,7 +1759,9 @@
                 this.propertiesContent.innerHTML = html;
                 
             } catch (error) {
-                console.error('[FileManager] 加载属性失败:', error);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('FileManager', '加载属性失败', error);
+                }
                 this.propertiesContent.innerHTML = `<div style="color: #ff4444;">加载属性失败: ${error.message}</div>`;
             }
         },
@@ -1802,7 +1808,9 @@
                 
                 const response = await fetch(url.toString());
                 if (!response.ok) {
-                    console.warn('[FileManager] 获取文件信息失败:', response.status, response.statusText, `(path: ${dirPath}, name: ${fileName})`);
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.warn('FileManager', `获取文件信息失败: ${response.status} ${response.statusText} (path: ${dirPath}, name: ${fileName})`);
+                    }
                     return null;
                 }
                 
@@ -1813,7 +1821,9 @@
                 
                 return null;
             } catch (error) {
-                console.error('[FileManager] 获取文件信息失败:', error);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('FileManager', '获取文件信息失败', error);
+                }
                 return null;
             }
         },
@@ -1857,7 +1867,9 @@
         _loadRootDirectory: async function() {
             // 确保窗口和文件列表容器已创建
             if (!this.window) {
-                console.warn('[FileManager] 窗口未初始化，无法加载根目录');
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.warn('FileManager', '窗口未初始化，无法加载根目录');
+                }
                 return;
             }
             
@@ -1873,7 +1885,9 @@
                         const fileList = this._createFileList();
                         mainContent.appendChild(fileList);
                     } else {
-                        console.warn('[FileManager] 无法创建文件列表容器，跳过加载根目录');
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('FileManager', '无法创建文件列表容器，跳过加载根目录');
+                        }
                         return;
                     }
                 }
@@ -1913,7 +1927,9 @@
                             }
                         }
                     } catch (e) {
-                        console.warn('从 Disk._getDiskSeparateMap 获取分区失败:', e);
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('FileManager', '从 Disk._getDiskSeparateMap 获取分区失败', e);
+                        }
                     }
                 }
                 
@@ -1940,21 +1956,29 @@
                                         path: diskName,
                                         isRoot: true
                                     });
-                                    console.log(`[FileManager] 成功添加磁盘分区: ${diskName}`);
+                                    if (typeof KernelLogger !== 'undefined') {
+                                        KernelLogger.debug('FileManager', `成功添加磁盘分区: ${diskName}`);
+                                    }
                                 } else {
-                                    console.warn(`[FileManager] 磁盘分区 ${diskName} 未初始化`);
+                                    if (typeof KernelLogger !== 'undefined') {
+                                        KernelLogger.warn('FileManager', `磁盘分区 ${diskName} 未初始化`);
+                                    }
                                 }
                             }
                         } catch (e) {
                             // 记录错误但不阻止其他磁盘的加载
-                            console.warn(`[FileManager] 无法获取分区 ${diskName}:`, e);
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.warn('FileManager', `无法获取分区 ${diskName}`, e);
+                            }
                         }
                     }
                 }
                 
                 // 如果仍然没有结果，至少显示一个提示
                 if (fileList.length === 0) {
-                    console.warn('未找到任何磁盘分区');
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.warn('FileManager', '未找到任何磁盘分区');
+                    }
                 }
                 
                 // 按名称排序（确保 name 是字符串）
@@ -1977,7 +2001,9 @@
                 this._updateStatusBar();
                 
             } catch (error) {
-                console.error('加载根目录失败:', error);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('FileManager', '加载根目录失败', error);
+                }
                 if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
                     await GUIManager.showAlert(`加载根目录失败: ${error.message}`, '错误', 'error');
                 } else {
@@ -1992,7 +2018,9 @@
         _loadDirectory: async function(path) {
             // 确保窗口和文件列表容器已创建
             if (!this.window) {
-                console.warn('[FileManager] 窗口未初始化，无法加载目录');
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.warn('FileManager', '窗口未初始化，无法加载目录');
+                }
                 return;
             }
             
@@ -2008,7 +2036,9 @@
                         const fileList = this._createFileList();
                         mainContent.appendChild(fileList);
                     } else {
-                        console.warn('[FileManager] 无法创建文件列表容器，跳过加载目录');
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('FileManager', '无法创建文件列表容器，跳过加载目录');
+                        }
                         return;
                     }
                 }
@@ -2050,7 +2080,9 @@
                 if (!response.ok) {
                     const errorResult = await response.json().catch(() => ({ message: response.statusText }));
                     const errorMessage = errorResult.message || `HTTP ${response.status}`;
-                    console.error(`[FileManager] 加载目录失败: ${errorMessage}`);
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.error('FileManager', `加载目录失败: ${errorMessage}`);
+                    }
                     if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
                         await GUIManager.showAlert(`无法访问路径: ${path}\n${errorMessage}`, '错误', 'error');
                     } else {
@@ -2063,7 +2095,9 @@
                 
                 if (result.status !== 'success' || !result.data || !result.data.items) {
                     const errorMessage = result.message || '未知错误';
-                    console.error(`[FileManager] 加载目录失败: ${errorMessage}`);
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.error('FileManager', `加载目录失败: ${errorMessage}`);
+                    }
                     if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
                         await GUIManager.showAlert(`无法访问路径: ${path}\n${errorMessage}`, '错误', 'error');
                     } else {
@@ -2078,7 +2112,7 @@
                 if (typeof KernelLogger !== 'undefined') {
                     KernelLogger.debug("FileManager", `加载目录: path=${path}, phpPath=${phpPath}, items=${items.length}`);
                 } else {
-                    console.log(`[FileManager] 加载目录: path=${path}, phpPath=${phpPath}, items=${items.length}`);
+                    // 日志已在下方使用 KernelLogger.debug 输出
                 }
                 
                 // 构建文件列表
@@ -2146,7 +2180,9 @@
                 this._updateSidebarSelection();
                 
             } catch (error) {
-                console.error('[FileManager] 加载目录异常:', error);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('FileManager', '加载目录异常', error);
+                }
                 if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
                     await GUIManager.showAlert(`加载目录失败: ${error.message}`, '错误', 'error');
                 } else {
@@ -2294,7 +2330,9 @@
                                     ProcessManager.killProgram(this.pid);
                                 }
                             }).catch(err => {
-                                console.error('[FileManager] 文件选择回调执行失败:', err);
+                                if (typeof KernelLogger !== 'undefined') {
+                                    KernelLogger.error('FileManager', '文件选择回调执行失败', err);
+                                }
                             });
                         }
                     } else {
@@ -2400,13 +2438,17 @@
          */
         _enableItemDrag: function(itemElement, item) {
             if (typeof DragDrive === 'undefined') {
-                console.warn('[FileManager] DragDrive 不可用，无法启用拖拽');
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.warn('FileManager', 'DragDrive 不可用，无法启用拖拽');
+                }
                 return;
             }
             
             // 检查元素是否在 DOM 中
             if (!itemElement.parentElement) {
-                console.warn('[FileManager] 元素尚未添加到 DOM，无法启用拖拽');
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.warn('FileManager', '元素尚未添加到 DOM，无法启用拖拽');
+                }
                 return;
             }
             
@@ -2478,9 +2520,13 @@
                 // 保存 dragId 到元素上，以便后续清理
                 itemElement._fileManagerDragId = dragId;
                 
-                console.log('[FileManager] 拖拽已启用:', dragId, item.name);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.debug('FileManager', `拖拽已启用: ${dragId}, ${item.name}`);
+                }
             } catch (error) {
-                console.error('[FileManager] 启用拖拽失败:', error);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('FileManager', '启用拖拽失败', error);
+                }
             }
         },
         
@@ -2503,7 +2549,9 @@
             if (!this.fileListElement) {
                 // 首先检查窗口是否存在
                 if (!this.window) {
-                    console.warn('[FileManager] 窗口不存在，跳过渲染文件列表');
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.warn('FileManager', '窗口不存在，跳过渲染文件列表');
+                    }
                     return;
                 }
                 
@@ -2519,7 +2567,9 @@
                         mainContent.appendChild(newFileList);
                         // _createFileList 已经设置了 this.fileListElement，所以这里不需要再设置
                     } else {
-                        console.warn('[FileManager] 主内容容器不存在，无法创建文件列表');
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('FileManager', '主内容容器不存在，无法创建文件列表');
+                        }
                         return;
                     }
                 }
@@ -2527,7 +2577,9 @@
             
             // 再次检查，确保 fileListElement 已设置
             if (!this.fileListElement) {
-                console.warn('[FileManager] 文件列表容器仍未创建，跳过渲染');
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.warn('FileManager', '文件列表容器仍未创建，跳过渲染');
+                }
                 return;
             }
             
@@ -2546,7 +2598,9 @@
             
             // 确保 fileList 是数组
             if (!Array.isArray(fileList)) {
-                console.warn('fileList 不是数组:', fileList);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.warn('FileManager', 'fileList 不是数组', fileList);
+                }
                 this._setFileList([]);
                 return;
             }
@@ -2581,7 +2635,9 @@
             for (const item of fileList) {
                 // 验证 item 对象
                 if (!item || typeof item !== 'object' || !item.name) {
-                    console.warn('无效的 item:', item);
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.warn('FileManager', '无效的 item', item);
+                    }
                     continue;
                 }
                 
@@ -2881,7 +2937,9 @@
                 });
                 
             } catch (error) {
-                console.error('启动视频播放器失败:', error);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('FileManager', '启动视频播放器失败', error);
+                }
                 if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
                     await GUIManager.showAlert(`启动视频播放器失败: ${error.message}`, '错误', 'error');
                 } else {
@@ -2925,7 +2983,9 @@
                 });
                 
             } catch (error) {
-                console.error('启动音频播放器失败:', error);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('FileManager', '启动音频播放器失败', error);
+                }
                 if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
                     await GUIManager.showAlert(`启动音频播放器失败: ${error.message}`, '错误', 'error');
                 } else {
@@ -2969,7 +3029,9 @@
                 });
                 
             } catch (error) {
-                console.error('启动图片查看器失败:', error);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('FileManager', '启动图片查看器失败', error);
+                }
                 if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
                     await GUIManager.showAlert(`启动图片查看器失败: ${error.message}`, '错误', 'error');
                 } else {
@@ -3013,7 +3075,9 @@
                 });
                 
             } catch (error) {
-                console.error('启动 ziper 失败:', error);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('FileManager', '启动 ziper 失败', error);
+                }
                 if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
                     await GUIManager.showAlert(`启动 ziper 失败: ${error.message}`, '错误', 'error');
                 } else {
@@ -3081,7 +3145,9 @@
                 }
                 
             } catch (error) {
-                console.error('打开文件失败:', error);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('FileManager', '打开文件失败', error);
+                }
                 if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
                     await GUIManager.showAlert(`打开文件失败: ${error.message}`, '错误', 'error');
                 } else {
@@ -3156,7 +3222,9 @@
                 }
                 
             } catch (error) {
-                console.error('保存文件失败:', error);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('FileManager', '保存文件失败', error);
+                }
                 if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
                     await GUIManager.showAlert(`保存文件失败: ${error.message}`, '错误', 'error');
                 } else {
@@ -3259,7 +3327,9 @@
                 });
                 
             } catch (error) {
-                console.error('启动 Vim 失败:', error);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('FileManager', '启动 Vim 失败', error);
+                }
                 if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
                     await GUIManager.showAlert(`启动 Vim 失败: ${error.message}`, '错误', 'error');
                 } else {
@@ -3382,7 +3452,9 @@
                 await this._loadDirectory(currentPath);
                 
             } catch (error) {
-                console.error('创建文件失败:', error);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('FileManager', '创建文件失败', error);
+                }
                 if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
                     await GUIManager.showAlert(`创建文件失败: ${error.message}`, '错误', 'error');
                 } else {
@@ -3474,7 +3546,9 @@
                 await this._loadDirectory(currentPath);
                 
             } catch (error) {
-                console.error('创建目录失败:', error);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('FileManager', '创建目录失败', error);
+                }
                 if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
                     await GUIManager.showAlert(`创建目录失败: ${error.message}`, '错误', 'error');
                 } else {
@@ -3488,7 +3562,9 @@
          */
         _initDragAndDrop: function() {
             if (typeof DragDrive === 'undefined') {
-                console.warn('[FileManager] DragDrive 不可用，无法初始化拖拽功能');
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.warn('FileManager', 'DragDrive 不可用，无法初始化拖拽功能');
+                }
                 return;
             }
             
@@ -3507,7 +3583,9 @@
                     // 监听桌面放置事件
                     const self = this;
                     const dropHandler = (e) => {
-                        console.log('[FileManager] 收到桌面放置事件:', e.detail);
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.debug('FileManager', '收到桌面放置事件', e.detail);
+                        }
                         const { dragData, session } = e.detail;
                         
                         // 检查拖拽数据
@@ -3520,10 +3598,14 @@
                         
                         // 检查是否是文件管理器项目
                         if (itemData && itemData.type === 'filemanager-item') {
-                            console.log('[FileManager] 检测到文件管理器项目拖拽:', itemData);
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.debug('FileManager', '检测到文件管理器项目拖拽', itemData);
+                            }
                             self._handleDropToDesktop(itemData);
                         } else {
-                            console.log('[FileManager] 不是文件管理器项目拖拽，忽略');
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.debug('FileManager', '不是文件管理器项目拖拽，忽略');
+                            }
                         }
                     };
                     
@@ -3531,9 +3613,13 @@
                     desktopContainer._fileManagerDropHandler = dropHandler;
                     desktopContainer.addEventListener('zeros-drop', dropHandler);
                     
-                    console.log('[FileManager] 桌面放置区域注册成功');
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.debug('FileManager', '桌面放置区域注册成功');
+                    }
                 } catch (error) {
-                    console.error('[FileManager] 注册桌面放置区域失败:', error);
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.error('FileManager', '注册桌面放置区域失败', error);
+                    }
                     // 如果直接使用 DragDrive 失败，尝试通过 ProcessManager（如果进程已运行）
                     if (typeof ProcessManager !== 'undefined') {
                         const processInfo = ProcessManager.getProcessInfo(this.pid);
@@ -3543,13 +3629,17 @@
                                 'Drag.registerDropZone',
                                 ['#gui-container']
                             ).catch(err => {
-                                console.error('[FileManager] 通过 ProcessManager 注册失败:', err);
+                                if (typeof KernelLogger !== 'undefined') {
+                                    KernelLogger.error('FileManager', '通过 ProcessManager 注册失败', err);
+                                }
                             });
                         }
                     }
                 }
             } else {
-                console.warn('[FileManager] 桌面容器不存在，无法注册放置区域');
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.warn('FileManager', '桌面容器不存在，无法注册放置区域');
+                }
             }
         },
         
@@ -3559,7 +3649,9 @@
         _handleDropToDesktop: async function(itemData) {
             // 防抖：如果正在处理，忽略新的请求
             if (this._isHandlingDrop) {
-                console.log('[FileManager] 正在处理拖拽，忽略重复请求');
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.debug('FileManager', '正在处理拖拽，忽略重复请求');
+                }
                 return;
             }
             
@@ -3567,7 +3659,9 @@
             this._isHandlingDrop = true;
             
             try {
-                console.log('[FileManager] 处理拖拽到桌面:', itemData);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.debug('FileManager', '处理拖拽到桌面', itemData);
+                }
                 
                 if (typeof DesktopManager === 'undefined') {
                     if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
@@ -3583,7 +3677,9 @@
                 const itemName = itemData.name;
                 
                 if (!itemType || !itemPath || !itemName) {
-                    console.error('[FileManager] 拖拽数据不完整:', itemData);
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.error('FileManager', '拖拽数据不完整', itemData);
+                    }
                     if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
                         await GUIManager.showAlert('拖拽数据不完整，无法添加到桌面', '错误', 'error');
                     }
@@ -3629,7 +3725,9 @@
                 
                 if (alreadyExists) {
                     // 静默处理，不显示弹窗（避免干扰用户）
-                    console.log('[FileManager] 文件/文件夹已在桌面存在，跳过添加');
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.debug('FileManager', '文件/文件夹已在桌面存在，跳过添加');
+                    }
                     return;
                 }
                 
@@ -3647,7 +3745,9 @@
                 
                 // 移除成功提示弹窗，静默完成操作
             } catch (error) {
-                console.error('拖拽到桌面失败:', error);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('FileManager', '拖拽到桌面失败', error);
+                }
                 // 错误时也不显示弹窗，避免干扰用户
             } finally {
                 // 清除处理标志（延迟清除，确保操作完成）
@@ -3879,7 +3979,9 @@
                                             ProcessManager.killProgram(self.pid);
                                         }
                                     }).catch(err => {
-                                        console.error('[FileManager] 文件选择回调执行失败:', err);
+                                        if (typeof KernelLogger !== 'undefined') {
+                                            KernelLogger.error('FileManager', '文件选择回调执行失败', err);
+                                        }
                                     });
                                 }
                             }
@@ -4233,7 +4335,9 @@
                             
                             // 移除成功提示弹窗，静默完成操作
                         } catch (error) {
-                            console.error('发送到桌面失败:', error);
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.error('FileManager', '发送到桌面失败', error);
+                            }
                             // 错误时也不显示弹窗，避免干扰用户
                         }
                     }
@@ -4305,7 +4409,9 @@
                                             }
                                         }
                                     } catch (error) {
-                                        console.error('复制路径失败:', error);
+                                        if (typeof KernelLogger !== 'undefined') {
+                                            KernelLogger.error('FileManager', '复制路径失败', error);
+                                        }
                                         if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
                                             await GUIManager.showAlert('复制路径失败', '错误', 'error');
                                         }
@@ -4471,7 +4577,9 @@
                 }
                 
             } catch (error) {
-                console.error('重命名失败:', error);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('FileManager', '重命名失败', error);
+                }
                 if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
                     await GUIManager.showAlert(`重命名失败: ${error.message}`, '错误', 'error');
                 } else {
@@ -4532,7 +4640,9 @@
                 }
                 
             } catch (error) {
-                console.error('删除失败:', error);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('FileManager', '删除失败', error);
+                }
                 // 移除删除失败的错误弹窗，只记录日志
             }
         },
@@ -4738,7 +4848,9 @@
                 this._updateToolbarButtons();
                 
             } catch (error) {
-                console.error('粘贴失败:', error);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('FileManager', '粘贴失败', error);
+                }
                 if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
                     await GUIManager.showAlert(`粘贴失败: ${error.message}`, '错误', 'error');
                 } else {
@@ -4879,7 +4991,9 @@
                     try {
                         ContextMenuManager.unregisterMenu('filemanager-item');
                     } catch (e) {
-                        console.warn('注销右键菜单失败:', e);
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('FileManager', '注销右键菜单失败', e);
+                        }
                     }
                 }
                 
@@ -4893,7 +5007,9 @@
                             this.window.parentNode.removeChild(this.window);
                         }
                     } catch (e) {
-                        console.warn('移除窗口 DOM 失败:', e);
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('FileManager', '移除窗口 DOM 失败', e);
+                        }
                     }
                 }
                 
@@ -4903,7 +5019,9 @@
                     try {
                         GUIManager.unregisterWindow(this.pid);
                     } catch (e) {
-                        console.warn('注销 GUIManager 窗口失败:', e);
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('FileManager', '注销 GUIManager 窗口失败', e);
+                        }
                     }
                 }
                 
@@ -4936,13 +5054,17 @@
                 }
                 
             } catch (error) {
-                console.error('文件管理器退出时发生错误:', error);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('FileManager', '文件管理器退出时发生错误', error);
+                }
                 // 即使出错，也尝试强制移除窗口
                 if (this.window && this.window.parentElement) {
                     try {
                         this.window.parentElement.removeChild(this.window);
                     } catch (e) {
-                        console.error('强制移除窗口失败:', e);
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.error('FileManager', '强制移除窗口失败', e);
+                        }
                     }
                 }
             }
@@ -4953,7 +5075,9 @@
          */
         _initMemory: function(pid) {
             if (!pid) {
-                console.warn('FileManager: PID not available');
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.warn('FileManager', 'PID not available');
+                }
                 return;
             }
             
@@ -4971,7 +5095,9 @@
                     this._heap = result.heap;
                     this._shed = result.shed;
                 } catch (e) {
-                    console.error('FileManager: Error allocating memory', e);
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.error('FileManager', 'Error allocating memory', e);
+                    }
                 }
             }
         },
