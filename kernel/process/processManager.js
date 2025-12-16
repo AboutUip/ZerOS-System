@@ -1064,6 +1064,7 @@ class ProcessManager {
             ProcessManager._saveProcessTable(ProcessManager.PROCESS_TABLE);
             
             // 注册程序权限（从 __info__ 中读取）
+            // 必须在 __init__ 之前完成权限注册，确保程序初始化时已拥有所需权限
             if (typeof PermissionManager !== 'undefined') {
                 try {
                     let programInfo = null;
@@ -1071,19 +1072,14 @@ class ProcessManager {
                         programInfo = programClass.__info__();
                     }
                     if (programInfo) {
-                        // 异步注册权限，不阻塞程序启动
-                        PermissionManager.registerProgramPermissions(pid, programInfo)
-                            .then(() => {
-                                ProcessManager._log(2, `程序 ${programName} (PID: ${pid}) 权限注册完成`);
-                            })
-                            .catch(e => {
-                                ProcessManager._log(1, `注册程序权限失败: ${e.message}`);
-                                KernelLogger.error("ProcessManager", `注册程序 ${pid} 权限失败`, e);
-                            });
+                        // 等待权限注册完成，确保程序初始化时已拥有所需权限
+                        await PermissionManager.registerProgramPermissions(pid, programInfo);
+                        ProcessManager._log(2, `程序 ${programName} (PID: ${pid}) 权限注册完成`);
                     }
                 } catch (e) {
-                    ProcessManager._log(1, `获取程序信息失败: ${e.message}`);
-                    KernelLogger.error("ProcessManager", `获取程序 ${pid} 信息失败`, e);
+                    ProcessManager._log(1, `注册程序权限失败: ${e.message}`);
+                    KernelLogger.error("ProcessManager", `注册程序 ${pid} 权限失败`, e);
+                    // 权限注册失败不应该阻止程序启动，但会记录错误
                 }
             }
             
@@ -1239,7 +1235,23 @@ class ProcessManager {
                 }
             }
             
-            // 清理 GUI 元素
+            // 清理 GUI 元素（包括 GUIManager 中的窗口注册）
+            // 先关闭所有窗口，确保窗口的 onClose 回调被调用
+            if (typeof GUIManager !== 'undefined' && typeof GUIManager.getWindowsByPid === 'function') {
+                const windows = GUIManager.getWindowsByPid(pid);
+                for (const window of windows) {
+                    try {
+                        // 使用 forceClose = true，因为进程已经被 kill，不需要再调用 onClose 回调
+                        // 但为了确保窗口被正确清理，我们仍然调用 unregisterWindow
+                        if (window.windowId && typeof GUIManager.unregisterWindow === 'function') {
+                            GUIManager.unregisterWindow(window.windowId);
+                        }
+                    } catch (e) {
+                        ProcessManager._log(1, `清理窗口 ${window.windowId} 失败: ${e.message}`);
+                    }
+                }
+            }
+            // 然后清理其他 GUI 元素
             ProcessManager._cleanupGUI(pid);
             
             // 清理程序注册的上下文菜单
@@ -1280,6 +1292,16 @@ class ProcessManager {
                     ProcessManager._log(2, `已清理程序 PID ${pid} 的依赖类型通知`);
                 } catch (e) {
                     ProcessManager._log(1, `清理程序 PID ${pid} 的通知失败: ${e.message}`);
+                }
+            }
+            
+            // 清理程序注册的事件处理器
+            if (typeof EventManager !== 'undefined' && typeof EventManager.unregisterAllHandlersForPid === 'function') {
+                try {
+                    EventManager.unregisterAllHandlersForPid(pid);
+                    ProcessManager._log(2, `已清理程序 PID ${pid} 的事件处理器`);
+                } catch (e) {
+                    ProcessManager._log(1, `清理程序 PID ${pid} 的事件处理器失败: ${e.message}`);
                 }
             }
             
@@ -1660,7 +1682,7 @@ class ProcessManager {
         ProcessManager._log(2, `进程 ${pid} 调用内核API: ${apiName}`);
         
         // 执行API调用
-        return await ProcessManager._executeKernelAPI(apiName, args);
+        return await ProcessManager._executeKernelAPI(apiName, args, pid);
     }
     
     /**
@@ -1706,7 +1728,11 @@ class ProcessManager {
             'Desktop.manage': PermissionManager.PERMISSION.DESKTOP_MANAGE,
             
             // 任务栏API
-            'Taskbar.pinProgram': PermissionManager.PERMISSION.DESKTOP_MANAGE, // 使用桌面管理权限
+            'Taskbar.pinProgram': PermissionManager.PERMISSION.DESKTOP_MANAGE,
+            
+            // 事件API
+            'Event.register': PermissionManager.PERMISSION.EVENT_LISTENER,
+            'Event.unregister': PermissionManager.PERMISSION.EVENT_LISTENER, // 使用桌面管理权限
             'Taskbar.unpinProgram': PermissionManager.PERMISSION.DESKTOP_MANAGE,
             'Taskbar.getPinnedPrograms': null, // 读取操作不需要权限
             'Taskbar.isPinned': null, // 读取操作不需要权限
@@ -1719,6 +1745,23 @@ class ProcessManager {
             'Multithreading.createThread': PermissionManager.PERMISSION.MULTITHREADING_CREATE,
             'Multithreading.executeTask': PermissionManager.PERMISSION.MULTITHREADING_EXECUTE,
             'Multithreading.getPoolStatus': PermissionManager.PERMISSION.MULTITHREADING_EXECUTE,
+            
+            // 加密API
+            'Crypt.generateKeyPair': PermissionManager.PERMISSION.CRYPT_GENERATE_KEY,
+            'Crypt.importKeyPair': PermissionManager.PERMISSION.CRYPT_IMPORT_KEY,
+            'Crypt.getKeyInfo': null,  // 读取操作不需要权限
+            'Crypt.listKeys': null,  // 读取操作不需要权限
+            'Crypt.deleteKey': PermissionManager.PERMISSION.CRYPT_DELETE_KEY,
+            'Crypt.setDefaultKey': PermissionManager.PERMISSION.CRYPT_DELETE_KEY,  // 使用删除权限（管理密钥）
+            'Crypt.encrypt': PermissionManager.PERMISSION.CRYPT_ENCRYPT,
+            'Crypt.decrypt': PermissionManager.PERMISSION.CRYPT_DECRYPT,
+            'Crypt.md5': PermissionManager.PERMISSION.CRYPT_MD5,
+            'Crypt.randomInt': PermissionManager.PERMISSION.CRYPT_RANDOM,
+            'Crypt.randomFloat': PermissionManager.PERMISSION.CRYPT_RANDOM,
+            'Crypt.randomBoolean': PermissionManager.PERMISSION.CRYPT_RANDOM,
+            'Crypt.randomString': PermissionManager.PERMISSION.CRYPT_RANDOM,
+            'Crypt.randomChoice': PermissionManager.PERMISSION.CRYPT_RANDOM,
+            'Crypt.shuffle': PermissionManager.PERMISSION.CRYPT_RANDOM,
             
             // 拖拽API
             'Drag.createSession': PermissionManager.PERMISSION.DRAG_ELEMENT,
@@ -1749,7 +1792,7 @@ class ProcessManager {
      * @returns {Promise<any>} API调用结果
      * @throws {Error} 如果API名称无效或调用失败
      */
-    static async _executeKernelAPI(apiName, args) {
+    static async _executeKernelAPI(apiName, args, pid = null) {
         // 参数验证
         if (!apiName || typeof apiName !== 'string') {
             throw new Error('_executeKernelAPI: apiName 必须是字符串');
@@ -1782,19 +1825,94 @@ class ProcessManager {
                         throw new Error('FileSystem.read: Disk 模块未加载');
                     }
                     
+                    // 检查分区是否存在（同时检查 diskSeparateMap 和 diskSeparateSize）
                     const diskMap = Disk.diskSeparateMap;
-                    if (!diskMap.has(diskName)) {
+                    const diskSize = Disk.diskSeparateSize;
+                    const hasPartition = (diskMap && diskMap.has(diskName)) || 
+                                       (diskSize && diskSize.has(diskName));
+                    if (!hasPartition) {
                         throw new Error(`FileSystem.read: 磁盘分区不存在: ${diskName}`);
                     }
                     
-                    const nodeTree = diskMap.get(diskName);
+                    // 尝试获取 nodeTree（可能不存在或未初始化）
+                    let nodeTree = diskMap && diskMap.has(diskName) ? diskMap.get(diskName) : null;
+                    
+                    // 如果 nodeTree 不存在或未初始化，尝试从 PHP 服务重建
                     if (!nodeTree || !nodeTree.initialized) {
-                        throw new Error(`FileSystem.read: 磁盘分区未初始化: ${diskName}`);
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('ProcessManager', `FileSystem.read: 磁盘分区 ${diskName} 的 nodeTree 不可靠，尝试从 PHP 服务重建`);
+                        }
+                        
+                        // 如果 nodeTree 不存在，尝试创建它
+                        if (!nodeTree && typeof NodeTreeCollection !== 'undefined') {
+                            try {
+                                nodeTree = new NodeTreeCollection(diskName);
+                                // 将新的 nodeTree 添加到 diskMap
+                                if (diskMap) {
+                                    diskMap.set(diskName, nodeTree);
+                                }
+                                // 注册到 POOL
+                                if (typeof POOL !== 'undefined' && typeof POOL.__ADD__ === 'function') {
+                                    try {
+                                        if (!POOL.__HAS__("KERNEL_GLOBAL_POOL")) {
+                                            POOL.__INIT__("KERNEL_GLOBAL_POOL");
+                                        }
+                                        POOL.__ADD__("KERNEL_GLOBAL_POOL", diskName, nodeTree);
+                                    } catch (e) {
+                                        KernelLogger.warn('ProcessManager', `注册 nodeTree 到 POOL 失败: ${diskName}`);
+                                    }
+                                }
+                            } catch (e) {
+                                KernelLogger.error('ProcessManager', `创建 nodeTree 失败: ${diskName}`, e);
+                            }
+                        }
+                        
+                        // 如果 nodeTree 存在但未初始化，尝试从 PHP 服务重建
+                        if (nodeTree && typeof nodeTree._rebuildFromPHP === 'function') {
+                            try {
+                                await nodeTree._rebuildFromPHP();
+                                if (typeof KernelLogger !== 'undefined') {
+                                    KernelLogger.info('ProcessManager', `FileSystem.read: 从 PHP 服务重建 nodeTree 成功: ${diskName}`);
+                                }
+                            } catch (e) {
+                                if (typeof KernelLogger !== 'undefined') {
+                                    KernelLogger.warn('ProcessManager', `FileSystem.read: 从 PHP 服务重建 nodeTree 失败: ${diskName}，将从 PHP 服务直接读取`, e);
+                                }
+                            }
+                        }
                     }
                     
                     // 读取文件
-                    const content = nodeTree.read_file(dirPath, fileName);
+                    // 如果 nodeTree 仍然不存在或未初始化，直接从 PHP 服务读取
+                    if (!nodeTree || !nodeTree.initialized) {
+                        // 从 PHP 服务直接读取文件
+                        const url = new URL('/service/FSDirve.php', window.location.origin);
+                        url.searchParams.set('action', 'read_file');
+                        url.searchParams.set('path', path);
+                        
+                        const response = await fetch(url.toString());
+                        if (!response.ok) {
+                            throw new Error(`FileSystem.read: 从 PHP 服务读取文件失败: ${path}`);
+                        }
+                        const result = await response.json();
+                        if (result.status === 'success' && result.data) {
+                            return result.data.content || '';
+                        }
+                        throw new Error(`FileSystem.read: PHP 服务返回错误: ${result.message || '未知错误'}`);
+                    }
+                    
+                    // 如果 dirPath 是根目录（如 "D:"），使用 separateName 作为路径
+                    let actualDirPath = dirPath;
+                    if (dirPath === diskName) {
+                        actualDirPath = nodeTree.separateName || diskName;
+                    }
+                    
+                    const content = nodeTree.read_file(actualDirPath, fileName);
                     if (content === null || content === undefined) {
+                        // 记录详细的错误信息
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.error('ProcessManager', `FileSystem.read: 文件不存在或读取失败: ${path}，dirPath=${dirPath}，actualDirPath=${actualDirPath}，diskName=${diskName}，separateName=${nodeTree.separateName}`);
+                        }
                         throw new Error(`FileSystem.read: 文件不存在: ${path}`);
                     }
                     
@@ -1831,14 +1949,196 @@ class ProcessManager {
                         throw new Error('FileSystem.write: Disk 模块未加载');
                     }
                     
+                    // 检查分区是否存在（同时检查 diskSeparateMap 和 diskSeparateSize）
                     const diskMap = Disk.diskSeparateMap;
-                    if (!diskMap.has(diskName)) {
+                    const diskSize = Disk.diskSeparateSize;
+                    const hasPartition = (diskMap && diskMap.has(diskName)) || 
+                                       (diskSize && diskSize.has(diskName));
+                    if (!hasPartition) {
                         throw new Error(`FileSystem.write: 磁盘分区不存在: ${diskName}`);
                     }
                     
-                    const nodeTree = diskMap.get(diskName);
+                    // 尝试获取 nodeTree（可能不存在或未初始化）
+                    let nodeTree = diskMap && diskMap.has(diskName) ? diskMap.get(diskName) : null;
+                    
+                    // 如果 nodeTree 不存在或未初始化，尝试从 PHP 服务重建
                     if (!nodeTree || !nodeTree.initialized) {
-                        throw new Error(`FileSystem.write: 磁盘分区未初始化: ${diskName}`);
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('ProcessManager', `FileSystem.write: 磁盘分区 ${diskName} 的 nodeTree 不可靠，尝试从 PHP 服务重建`);
+                        }
+                        
+                        // 如果 nodeTree 不存在，尝试创建它
+                        if (!nodeTree && typeof NodeTreeCollection !== 'undefined') {
+                            try {
+                                nodeTree = new NodeTreeCollection(diskName);
+                                // 将新的 nodeTree 添加到 diskMap
+                                if (diskMap) {
+                                    diskMap.set(diskName, nodeTree);
+                                }
+                                // 注册到 POOL
+                                if (typeof POOL !== 'undefined' && typeof POOL.__ADD__ === 'function') {
+                                    try {
+                                        if (!POOL.__HAS__("KERNEL_GLOBAL_POOL")) {
+                                            POOL.__INIT__("KERNEL_GLOBAL_POOL");
+                                        }
+                                        POOL.__ADD__("KERNEL_GLOBAL_POOL", diskName, nodeTree);
+                                    } catch (e) {
+                                        KernelLogger.warn('ProcessManager', `注册 nodeTree 到 POOL 失败: ${diskName}`);
+                                    }
+                                }
+                            } catch (e) {
+                                KernelLogger.error('ProcessManager', `创建 nodeTree 失败: ${diskName}`, e);
+                            }
+                        }
+                        
+                        // 如果 nodeTree 存在但未初始化，尝试从 PHP 服务重建
+                        if (nodeTree && typeof nodeTree._rebuildFromPHP === 'function') {
+                            try {
+                                await nodeTree._rebuildFromPHP();
+                                if (typeof KernelLogger !== 'undefined') {
+                                    KernelLogger.info('ProcessManager', `FileSystem.write: 从 PHP 服务重建 nodeTree 成功: ${diskName}`);
+                                }
+                            } catch (e) {
+                                if (typeof KernelLogger !== 'undefined') {
+                                    KernelLogger.warn('ProcessManager', `FileSystem.write: 从 PHP 服务重建 nodeTree 失败: ${diskName}，将通过 PHP 服务直接写入`, e);
+                                }
+                            }
+                        }
+                    }
+                    
+                    // 如果 nodeTree 仍然不存在或未初始化，直接通过 PHP 服务写入
+                    if (!nodeTree || !nodeTree.initialized) {
+                        // 通过 PHP 服务直接写入文件
+                        const url = new URL('/service/FSDirve.php', window.location.origin);
+                        url.searchParams.set('action', 'write_file');
+                        url.searchParams.set('path', path);
+                        url.searchParams.set('content', content);
+                        url.searchParams.set('writeMod', writeMode);
+                        
+                        const response = await fetch(url.toString(), {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                            body: new URLSearchParams({
+                                action: 'write_file',
+                                path: path,
+                                content: content,
+                                writeMod: writeMode
+                            })
+                        });
+                        
+                        if (!response.ok) {
+                            throw new Error(`FileSystem.write: 从 PHP 服务写入文件失败: ${path}`);
+                        }
+                        const result = await response.json();
+                        if (result.status === 'success') {
+                            return true;
+                        }
+                        throw new Error(`FileSystem.write: PHP 服务返回错误: ${result.message || '未知错误'}`);
+                    }
+                    
+                    // 检查目录节点是否存在
+                    // 如果 dirPath 是根目录（如 "D:"），使用 separateName 作为路径
+                    let actualDirPath = dirPath;
+                    if (dirPath === diskName) {
+                        actualDirPath = nodeTree.separateName || diskName;
+                    }
+                    
+                    const dirNode = nodeTree.getNode(actualDirPath);
+                    if (!dirNode) {
+                        // 如果目录节点不存在，且是根目录，尝试确保根节点存在
+                        if (actualDirPath === nodeTree.separateName && !nodeTree.initialized) {
+                            throw new Error(`FileSystem.write: 磁盘分区未初始化: ${diskName}`);
+                        }
+                        // 记录详细的错误信息
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.error('ProcessManager', `FileSystem.write: 目录节点不存在: ${actualDirPath}，dirPath=${dirPath}，diskName=${diskName}，separateName=${nodeTree.separateName}，initialized=${nodeTree.initialized}`);
+                        }
+                        throw new Error(`FileSystem.write: 目录不存在: ${actualDirPath}`);
+                    }
+                    
+                    // 检查文件是否存在，如果不存在则先创建
+                    if (!dirNode.attributes[fileName]) {
+                        // 文件不存在，先创建文件
+                        const FileTypeRef = typeof FileType !== 'undefined' ? FileType : null;
+                        let fileObj = null;
+                        
+                        if (FileTypeRef && typeof FileFormwork !== 'undefined') {
+                            try {
+                                const fileType = FileTypeRef.GENRE ? FileTypeRef.GENRE.TEXT : 0;
+                                const fileAttributes = FileTypeRef.FILE_ATTRIBUTES ? FileTypeRef.FILE_ATTRIBUTES.NORMAL : null;
+                                fileObj = new FileFormwork(
+                                    fileType,
+                                    fileName,
+                                    '',
+                                    `${actualDirPath}/${fileName}`,
+                                    fileAttributes
+                                );
+                            } catch (e) {
+                                // 如果 FileFormwork 创建失败，使用降级方案
+                                fileObj = {
+                                    fileName: fileName,
+                                    fileSize: 0,
+                                    fileContent: [],
+                                    filePath: `${actualDirPath}/${fileName}`,
+                                    fileBelongDisk: diskName,
+                                    inited: true,
+                                    fileCreatTime: new Date().getTime(),
+                                    fileModifyTime: new Date().getTime(),
+                                    readFile() { 
+                                        return this.fileContent.join('\n') + (this.fileContent.length ? '\n' : ''); 
+                                    },
+                                    writeFile(newContent, writeMod) {
+                                        const appendMode = FileTypeRef && FileTypeRef.WRITE_MODES ? FileTypeRef.WRITE_MODES.APPEND : 1;
+                                        if (writeMod === appendMode) {
+                                            for (const line of newContent.split(/\n/)) {
+                                                this.fileContent.push(line);
+                                            }
+                                            this.fileSize += newContent.length;
+                                        } else {
+                                            this.fileContent = [];
+                                            for (const line of newContent.split(/\n/)) {
+                                                this.fileContent.push(line);
+                                            }
+                                            this.fileSize = newContent.length;
+                                        }
+                                        this.fileModifyTime = new Date().getTime();
+                                    }
+                                };
+                            }
+                        } else {
+                            // 降级方案：创建简单的文件对象
+                            fileObj = {
+                                fileName: fileName,
+                                fileSize: 0,
+                                fileContent: [],
+                                filePath: `${actualDirPath}/${fileName}`,
+                                fileBelongDisk: diskName,
+                                inited: true,
+                                fileCreatTime: new Date().getTime(),
+                                fileModifyTime: new Date().getTime(),
+                                readFile() { 
+                                    return this.fileContent.join('\n') + (this.fileContent.length ? '\n' : ''); 
+                                },
+                                writeFile(newContent, writeMod) {
+                                    if (writeMod === 1) { // APPEND
+                                        for (const line of newContent.split(/\n/)) {
+                                            this.fileContent.push(line);
+                                        }
+                                        this.fileSize += newContent.length;
+                                    } else {
+                                        this.fileContent = [];
+                                        for (const line of newContent.split(/\n/)) {
+                                            this.fileContent.push(line);
+                                        }
+                                        this.fileSize = newContent.length;
+                                    }
+                                    this.fileModifyTime = new Date().getTime();
+                                }
+                            };
+                        }
+                        
+                        // 创建文件（使用实际目录路径）
+                        await nodeTree.create_file(actualDirPath, fileObj);
                     }
                     
                     // 将内容转换为字符串
@@ -1850,13 +2150,400 @@ class ProcessManager {
                         writeMod = FileType.WRITE_MODES[writeMode] || FileType.WRITE_MODES.OVERWRITE;
                     }
                     
-                    // 写入文件
-                    nodeTree.write_file(dirPath, fileName, contentStr, writeMod);
+                    // 写入文件（使用实际目录路径）
+                    await nodeTree.write_file(actualDirPath, fileName, contentStr, writeMod);
                     
                     return true;
                 } catch (error) {
                     if (typeof KernelLogger !== 'undefined') {
                         KernelLogger.error('ProcessManager', `FileSystem.write 失败: ${error.message}`, { path });
+                    }
+                    throw error;
+                }
+            },
+            'FileSystem.create': async (type, path) => {
+                if (!type || typeof type !== 'string') {
+                    throw new Error('FileSystem.create: type 必须是字符串 (directory 或 file)');
+                }
+                if (!path || typeof path !== 'string') {
+                    throw new Error('FileSystem.create: path 必须是字符串');
+                }
+                
+                try {
+                    // 解析路径
+                    const parts = path.split('/');
+                    const diskName = parts[0];
+                    const itemName = parts[parts.length - 1];
+                    const parentPath = parts.slice(0, -1).join('/') || diskName;
+                    
+                    // 获取磁盘分区
+                    if (typeof Disk === 'undefined') {
+                        throw new Error('FileSystem.create: Disk 模块未加载');
+                    }
+                    
+                    // 检查分区是否存在（同时检查 diskSeparateMap 和 diskSeparateSize）
+                    const diskMap = Disk.diskSeparateMap;
+                    const diskSize = Disk.diskSeparateSize;
+                    const hasPartition = (diskMap && diskMap.has(diskName)) || 
+                                       (diskSize && diskSize.has(diskName));
+                    if (!hasPartition) {
+                        throw new Error(`FileSystem.create: 磁盘分区不存在: ${diskName}`);
+                    }
+                    
+                    // 尝试获取 nodeTree（可能不存在或未初始化）
+                    let nodeTree = diskMap && diskMap.has(diskName) ? diskMap.get(diskName) : null;
+                    
+                    // 如果 nodeTree 不存在或未初始化，尝试从 PHP 服务重建
+                    if (!nodeTree || !nodeTree.initialized) {
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('ProcessManager', `FileSystem.create: 磁盘分区 ${diskName} 的 nodeTree 不可靠，尝试从 PHP 服务重建`);
+                        }
+                        
+                        // 如果 nodeTree 不存在，尝试创建它
+                        if (!nodeTree && typeof NodeTreeCollection !== 'undefined') {
+                            try {
+                                nodeTree = new NodeTreeCollection(diskName);
+                                // 将新的 nodeTree 添加到 diskMap
+                                if (diskMap) {
+                                    diskMap.set(diskName, nodeTree);
+                                }
+                                // 注册到 POOL
+                                if (typeof POOL !== 'undefined' && typeof POOL.__ADD__ === 'function') {
+                                    try {
+                                        if (!POOL.__HAS__("KERNEL_GLOBAL_POOL")) {
+                                            POOL.__INIT__("KERNEL_GLOBAL_POOL");
+                                        }
+                                        POOL.__ADD__("KERNEL_GLOBAL_POOL", diskName, nodeTree);
+                                    } catch (e) {
+                                        KernelLogger.warn('ProcessManager', `注册 nodeTree 到 POOL 失败: ${diskName}`);
+                                    }
+                                }
+                            } catch (e) {
+                                KernelLogger.error('ProcessManager', `创建 nodeTree 失败: ${diskName}`, e);
+                            }
+                        }
+                        
+                        // 如果 nodeTree 存在但未初始化，尝试从 PHP 服务重建
+                        if (nodeTree && typeof nodeTree._rebuildFromPHP === 'function') {
+                            try {
+                                await nodeTree._rebuildFromPHP();
+                                if (typeof KernelLogger !== 'undefined') {
+                                    KernelLogger.info('ProcessManager', `FileSystem.create: 从 PHP 服务重建 nodeTree 成功: ${diskName}`);
+                                }
+                            } catch (e) {
+                                if (typeof KernelLogger !== 'undefined') {
+                                    KernelLogger.warn('ProcessManager', `FileSystem.create: 从 PHP 服务重建 nodeTree 失败: ${diskName}，将通过 PHP 服务直接创建`, e);
+                                }
+                            }
+                        }
+                    }
+                    
+                    // 规范化路径
+                    let phpPath = parentPath;
+                    if (/^[CD]:$/.test(phpPath)) {
+                        phpPath = phpPath + '/';
+                    }
+                    
+                    // 使用 PHP 服务创建
+                    const url = new URL('/service/FSDirve.php', window.location.origin);
+                    if (type === 'directory') {
+                        url.searchParams.set('action', 'create_dir');
+                        url.searchParams.set('path', phpPath);
+                        url.searchParams.set('name', itemName);
+                    } else if (type === 'file') {
+                        url.searchParams.set('action', 'create_file');
+                        url.searchParams.set('path', phpPath);
+                        url.searchParams.set('fileName', itemName);
+                        url.searchParams.set('content', '');
+                    } else {
+                        throw new Error(`FileSystem.create: 无效的类型: ${type} (必须是 directory 或 file)`);
+                    }
+                    
+                    const response = await fetch(url.toString());
+                    
+                    if (!response.ok) {
+                        const errorResult = await response.json().catch(() => ({ message: response.statusText }));
+                        throw new Error(errorResult.message || `HTTP ${response.status}`);
+                    }
+                    
+                    const result = await response.json();
+                    
+                    if (result.status !== 'success') {
+                        throw new Error(result.message || '创建失败');
+                    }
+                    
+                    // 如果创建成功，还需要在 nodeTree 中创建对应的节点（如果 nodeTree 存在）
+                    if (type === 'directory' && nodeTree) {
+                        try {
+                            // 检查目录是否已经在 nodeTree 中存在
+                            const fullPath = path;
+                            if (!nodeTree.hasNode(fullPath)) {
+                                // 目录不存在，手动在 nodeTree 中添加节点（不调用 create_dir，因为 PHP 已经创建了）
+                                const FileTypeRef = typeof FileType !== 'undefined' ? FileType : null;
+                                if (FileTypeRef && typeof Node !== 'undefined' && nodeTree.optNode) {
+                                    // 检查父目录节点是否存在
+                                    // 如果 parentPath 是根目录（如 "D:"），使用 separateName 作为父路径
+                                    let actualParentPath = parentPath;
+                                    if (parentPath === diskName) {
+                                        // 父路径是根目录，使用 nodeTree 的 separateName
+                                        actualParentPath = nodeTree.separateName || diskName;
+                                    }
+                                    
+                                    // 如果 actualParentPath 是根目录，确保使用正确的根节点路径
+                                    if (actualParentPath === nodeTree.separateName) {
+                                        // 根节点应该总是存在，直接使用 separateName
+                                        const rootNode = nodeTree.getNode(nodeTree.separateName);
+                                        if (rootNode) {
+                                            const newNode = new Node(itemName, {
+                                                parent: nodeTree.separateName,
+                                                name: itemName
+                                            });
+                                            nodeTree.optNode(FileTypeRef.DIR_OPS.CREATE, nodeTree.separateName, newNode);
+                                            if (typeof KernelLogger !== 'undefined') {
+                                                KernelLogger.debug('ProcessManager', `FileSystem.create: 在 nodeTree 中添加目录节点: ${fullPath}`);
+                                            }
+                                        } else {
+                                            // 根节点不存在，记录警告但不抛出错误（因为 PHP 已经创建成功）
+                                            if (typeof KernelLogger !== 'undefined') {
+                                                KernelLogger.warn('ProcessManager', `FileSystem.create: 根节点不存在: ${nodeTree.separateName}，nodeTree.initialized=${nodeTree.initialized}，跳过 nodeTree 节点创建`);
+                                            }
+                                        }
+                                    } else {
+                                        const parentNode = nodeTree.getNode(actualParentPath);
+                                        if (parentNode) {
+                                            const newNode = new Node(itemName, {
+                                                parent: actualParentPath,
+                                                name: itemName
+                                            });
+                                            nodeTree.optNode(FileTypeRef.DIR_OPS.CREATE, actualParentPath, newNode);
+                                            if (typeof KernelLogger !== 'undefined') {
+                                                KernelLogger.debug('ProcessManager', `FileSystem.create: 在 nodeTree 中添加目录节点: ${fullPath}`);
+                                            }
+                                        } else {
+                                            // 父目录节点不存在，记录警告但不抛出错误（因为 PHP 已经创建成功）
+                                            if (typeof KernelLogger !== 'undefined') {
+                                                KernelLogger.warn('ProcessManager', `FileSystem.create: 父目录节点不存在: ${actualParentPath}，跳过 nodeTree 节点创建`);
+                                            }
+                                        }
+                                    }
+                                } else {
+                                    // 如果 Node 类不可用，尝试使用 create_dir（它会处理已存在的目录）
+                                    // 但 create_dir 会再次尝试通过 PHP 创建，所以我们需要确保它不会失败
+                                    try {
+                                        // 如果 parentPath 是根目录，使用 nodeTree 的 separateName
+                                        let actualParentPath = parentPath;
+                                        if (parentPath === diskName) {
+                                            actualParentPath = nodeTree.separateName || diskName;
+                                        }
+                                        await nodeTree.create_dir(actualParentPath, itemName);
+                                    } catch (createDirError) {
+                                        // create_dir 可能会因为目录已存在而失败，这是正常的
+                                        if (typeof KernelLogger !== 'undefined') {
+                                            KernelLogger.debug('ProcessManager', `FileSystem.create: nodeTree.create_dir 失败（可能因为目录已存在）: ${createDirError.message}`);
+                                        }
+                                    }
+                                }
+                            } else {
+                                // 目录已存在，记录调试信息
+                                if (typeof KernelLogger !== 'undefined') {
+                                    KernelLogger.debug('ProcessManager', `FileSystem.create: 目录已在 nodeTree 中存在: ${fullPath}`);
+                                }
+                            }
+                        } catch (e) {
+                            // 如果 nodeTree 创建失败，记录警告但不抛出错误（因为 PHP 已经创建成功）
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.warn('ProcessManager', `FileSystem.create: nodeTree 创建目录节点失败: ${e.message}`, { path });
+                            }
+                        }
+                    } else if (type === 'file' && nodeTree) {
+                        try {
+                            // 如果 parentPath 是根目录（如 "D:"），使用 separateName 作为路径
+                            let actualParentPath = parentPath;
+                            if (parentPath === diskName) {
+                                actualParentPath = nodeTree.separateName || diskName;
+                            }
+                            
+                            // 检查父目录节点是否存在
+                            const parentNode = nodeTree.getNode(actualParentPath);
+                            if (!parentNode) {
+                                // 父目录节点不存在，记录警告但不抛出错误（因为 PHP 已经创建成功）
+                                if (typeof KernelLogger !== 'undefined') {
+                                    KernelLogger.warn('ProcessManager', `FileSystem.create: 父目录节点不存在: ${actualParentPath}，跳过 nodeTree 文件创建`);
+                                }
+                            } else {
+                                // 创建文件对象
+                                const FileTypeRef = typeof FileType !== 'undefined' ? FileType : null;
+                                let fileObj = null;
+                                
+                                if (FileTypeRef && typeof FileFormwork !== 'undefined') {
+                                    try {
+                                        const fileType = FileTypeRef.GENRE ? FileTypeRef.GENRE.TEXT : 0;
+                                        const fileAttributes = FileTypeRef.FILE_ATTRIBUTES ? FileTypeRef.FILE_ATTRIBUTES.NORMAL : null;
+                                        fileObj = new FileFormwork(
+                                            fileType,
+                                            itemName,
+                                            '',
+                                            `${actualParentPath}/${itemName}`,
+                                            fileAttributes
+                                        );
+                                    } catch (e) {
+                                        // 降级方案
+                                        fileObj = {
+                                            fileName: itemName,
+                                            fileSize: 0,
+                                            fileContent: [],
+                                            filePath: `${actualParentPath}/${itemName}`,
+                                            fileBelongDisk: diskName,
+                                            inited: true,
+                                            fileCreatTime: new Date().getTime(),
+                                            fileModifyTime: new Date().getTime(),
+                                            readFile() { 
+                                                return this.fileContent.join('\n') + (this.fileContent.length ? '\n' : ''); 
+                                            },
+                                            writeFile(newContent, writeMod) {
+                                                if (writeMod === 1) { // APPEND
+                                                    for (const line of newContent.split(/\n/)) {
+                                                        this.fileContent.push(line);
+                                                    }
+                                                    this.fileSize += newContent.length;
+                                                } else {
+                                                    this.fileContent = [];
+                                                    for (const line of newContent.split(/\n/)) {
+                                                        this.fileContent.push(line);
+                                                    }
+                                                    this.fileSize = newContent.length;
+                                                }
+                                                this.fileModifyTime = new Date().getTime();
+                                            }
+                                        };
+                                    }
+                                } else {
+                                    // 降级方案
+                                    fileObj = {
+                                        fileName: itemName,
+                                        fileSize: 0,
+                                        fileContent: [],
+                                        filePath: `${actualParentPath}/${itemName}`,
+                                        fileBelongDisk: diskName,
+                                        inited: true,
+                                        fileCreatTime: new Date().getTime(),
+                                        fileModifyTime: new Date().getTime(),
+                                        readFile() { 
+                                            return this.fileContent.join('\n') + (this.fileContent.length ? '\n' : ''); 
+                                        },
+                                        writeFile(newContent, writeMod) {
+                                            if (writeMod === 1) { // APPEND
+                                                for (const line of newContent.split(/\n/)) {
+                                                    this.fileContent.push(line);
+                                                }
+                                                this.fileSize += newContent.length;
+                                            } else {
+                                                this.fileContent = [];
+                                                for (const line of newContent.split(/\n/)) {
+                                                    this.fileContent.push(line);
+                                                }
+                                                this.fileSize = newContent.length;
+                                            }
+                                            this.fileModifyTime = new Date().getTime();
+                                        }
+                                    };
+                                }
+                                
+                                await nodeTree.create_file(actualParentPath, fileObj);
+                            }
+                        } catch (e) {
+                            // 如果 nodeTree 创建失败，记录警告但不抛出错误（因为 PHP 已经创建成功）
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.warn('ProcessManager', `FileSystem.create: nodeTree 创建文件失败: ${e.message}`, { path });
+                            }
+                        }
+                    }
+                    
+                    return { status: 'success', data: result.data };
+                } catch (error) {
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.error('ProcessManager', `FileSystem.create 失败: ${error.message}`, { type, path });
+                    }
+                    throw error;
+                }
+            },
+            'FileSystem.delete': async (path) => {
+                if (!path || typeof path !== 'string') {
+                    throw new Error('FileSystem.delete: path 必须是字符串');
+                }
+                
+                try {
+                    // 解析路径
+                    const pathParts = path.split('/');
+                    const itemName = pathParts[pathParts.length - 1];
+                    const parentPath = pathParts.slice(0, -1).join('/') || (path.split(':')[0] + ':');
+                    
+                    // 规范化路径
+                    let phpPath = parentPath;
+                    if (/^[CD]:$/.test(phpPath)) {
+                        phpPath = phpPath + '/';
+                    }
+                    
+                    // 使用 PHP 服务删除
+                    const url = new URL('/service/FSDirve.php', window.location.origin);
+                    
+                    // 先检查是文件还是目录（通过尝试列出目录）
+                    try {
+                        const checkUrl = new URL('/service/FSDirve.php', window.location.origin);
+                        checkUrl.searchParams.set('action', 'list_dir');
+                        checkUrl.searchParams.set('path', phpPath);
+                        
+                        const checkResponse = await fetch(checkUrl.toString());
+                        if (checkResponse.ok) {
+                            const checkResult = await checkResponse.json();
+                            if (checkResult.status === 'success' && checkResult.data && checkResult.data.items) {
+                                const item = checkResult.data.items.find(i => i.path === path || i.name === itemName);
+                                if (item && item.type === 'directory') {
+                                    // 是目录，使用递归删除
+                                    url.searchParams.set('action', 'delete_dir_recursive');
+                                    url.searchParams.set('path', path);
+                                } else {
+                                    // 是文件
+                                    url.searchParams.set('action', 'delete_file');
+                                    url.searchParams.set('path', phpPath);
+                                    url.searchParams.set('fileName', itemName);
+                                }
+                            } else {
+                                // 默认尝试删除文件
+                                url.searchParams.set('action', 'delete_file');
+                                url.searchParams.set('path', phpPath);
+                                url.searchParams.set('fileName', itemName);
+                            }
+                        } else {
+                            // 默认尝试删除文件
+                            url.searchParams.set('action', 'delete_file');
+                            url.searchParams.set('path', phpPath);
+                            url.searchParams.set('fileName', itemName);
+                        }
+                    } catch (e) {
+                        // 检查失败，默认尝试删除文件
+                        url.searchParams.set('action', 'delete_file');
+                        url.searchParams.set('path', phpPath);
+                        url.searchParams.set('fileName', itemName);
+                    }
+                    
+                    const response = await fetch(url.toString());
+                    
+                    if (!response.ok) {
+                        const errorResult = await response.json().catch(() => ({ message: response.statusText }));
+                        throw new Error(errorResult.message || `HTTP ${response.status}`);
+                    }
+                    
+                    const result = await response.json();
+                    
+                    if (result.status !== 'success') {
+                        throw new Error(result.message || '删除失败');
+                    }
+                    
+                    return { status: 'success', data: result.data };
+                } catch (error) {
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.error('ProcessManager', `FileSystem.delete 失败: ${error.message}`, { path });
                     }
                     throw error;
                 }
@@ -1960,9 +2647,92 @@ class ProcessManager {
                         throw new Error(`FileSystem.list: 磁盘分区不存在: ${diskName} (可用分区: ${availableDisks})`);
                     }
                     
-                    const nodeTree = diskMap.get(diskName);
+                    let nodeTree = diskMap.get(diskName);
+                    
+                    // 如果 nodeTree 不存在或未初始化，尝试从 PHP 服务重建
                     if (!nodeTree || !nodeTree.initialized) {
-                        throw new Error(`FileSystem.list: 磁盘分区未初始化: ${diskName}`);
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('ProcessManager', `FileSystem.list: 磁盘分区 ${diskName} 的 nodeTree 不可靠，尝试从 PHP 服务重建`);
+                        }
+                        
+                        // 如果 nodeTree 不存在，尝试创建它
+                        if (!nodeTree && typeof NodeTreeCollection !== 'undefined') {
+                            try {
+                                nodeTree = new NodeTreeCollection(diskName);
+                                // 将新的 nodeTree 添加到 diskMap
+                                diskMap.set(diskName, nodeTree);
+                                // 注册到 POOL
+                                if (typeof POOL !== 'undefined' && typeof POOL.__ADD__ === 'function') {
+                                    try {
+                                        if (!POOL.__HAS__("KERNEL_GLOBAL_POOL")) {
+                                            POOL.__INIT__("KERNEL_GLOBAL_POOL");
+                                        }
+                                        POOL.__ADD__("KERNEL_GLOBAL_POOL", diskName, nodeTree);
+                                    } catch (e) {
+                                        KernelLogger.warn('ProcessManager', `注册 nodeTree 到 POOL 失败: ${diskName}`);
+                                    }
+                                }
+                            } catch (e) {
+                                KernelLogger.error('ProcessManager', `创建 nodeTree 失败: ${diskName}`, e);
+                            }
+                        }
+                        
+                        // 如果 nodeTree 存在但未初始化，尝试从 PHP 服务重建
+                        if (nodeTree && typeof nodeTree._rebuildFromPHP === 'function') {
+                            try {
+                                await nodeTree._rebuildFromPHP();
+                                if (typeof KernelLogger !== 'undefined') {
+                                    KernelLogger.info('ProcessManager', `FileSystem.list: 从 PHP 服务重建 nodeTree 成功: ${diskName}`);
+                                }
+                            } catch (e) {
+                                if (typeof KernelLogger !== 'undefined') {
+                                    KernelLogger.warn('ProcessManager', `FileSystem.list: 从 PHP 服务重建 nodeTree 失败: ${diskName}，将从 PHP 服务直接获取列表`, e);
+                                }
+                            }
+                        }
+                    }
+                    
+                    // 如果 nodeTree 仍然不存在或未初始化，直接从 PHP 服务获取列表
+                    if (!nodeTree || !nodeTree.initialized) {
+                        // 从 PHP 服务直接获取目录列表
+                        const phpServiceUrl = "/service/FSDirve.php";
+                        const listUrl = new URL(phpServiceUrl, window.location.origin);
+                        listUrl.searchParams.set('action', 'list_dir');
+                        listUrl.searchParams.set('path', dirPath);
+                        
+                        const response = await fetch(listUrl.toString(), {
+                            method: 'GET',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            }
+                        });
+                        
+                        if (response.ok) {
+                            const phpResult = await response.json();
+                            if (phpResult.status === 'success' && phpResult.data && phpResult.data.items) {
+                                // 从 PHP 服务获取到的数据
+                                const phpItems = phpResult.data.items || [];
+                                
+                                // 从 PHP 服务数据构建结果
+                                const files = phpItems.filter(item => item.type === 'file').map(item => ({
+                                    name: item.name,
+                                    size: item.size || 0,
+                                    type: 'file'
+                                }));
+                                
+                                const directories = phpItems.filter(item => item.type === 'directory').map(item => ({
+                                    name: item.name,
+                                    type: 'directory'
+                                }));
+                                
+                                return {
+                                    files: files,
+                                    directories: directories
+                                };
+                            }
+                        }
+                        
+                        throw new Error(`FileSystem.list: 无法从 PHP 服务获取目录列表: ${dirPath}`);
                     }
                     
                     // 检查节点是否存在
@@ -2150,6 +2920,75 @@ class ProcessManager {
                     }
                     throw error;
                 }
+            },
+            
+            // 通知API
+            'Notification.create': async (pid, options) => {
+                if (typeof NotificationManager === 'undefined') {
+                    throw new Error('NotificationManager 模块未加载');
+                }
+                if (!options || typeof options !== 'object') {
+                    throw new Error('Notification.create: options 必须是对象');
+                }
+                
+                // 转换参数格式（从 ProcessManager API 格式转换为 NotificationManager 格式）
+                const notificationOptions = {
+                    type: options.type || 'snapshot',
+                    title: options.title,
+                    content: options.message || options.content || '',
+                    duration: options.duration || 0,
+                    onClose: options.onClose
+                };
+                
+                // 调用 NotificationManager.createNotification
+                const notificationId = await NotificationManager.createNotification(pid, notificationOptions);
+                return { status: 'success', data: { id: notificationId } };
+            },
+            'Notification.remove': async (pid, notificationId) => {
+                if (typeof NotificationManager === 'undefined') {
+                    throw new Error('NotificationManager 模块未加载');
+                }
+                if (!notificationId || typeof notificationId !== 'string') {
+                    throw new Error('Notification.remove: notificationId 必须是字符串');
+                }
+                
+                NotificationManager.removeNotification(notificationId);
+                return { status: 'success' };
+            },
+            
+            // 事件API
+            'Event.register': async (pid, eventType, handler, options) => {
+                if (typeof EventManager === 'undefined') {
+                    throw new Error('EventManager 模块未加载');
+                }
+                if (!eventType || typeof eventType !== 'string') {
+                    throw new Error('Event.register: eventType 必须是字符串');
+                }
+                if (!handler || typeof handler !== 'function') {
+                    throw new Error('Event.register: handler 必须是函数');
+                }
+                
+                const handlerId = EventManager.registerEventHandler(pid, eventType, handler, options || {});
+                return { status: 'success', data: { handlerId } };
+            },
+            'Event.unregister': async (pid, handlerId) => {
+                if (typeof EventManager === 'undefined') {
+                    throw new Error('EventManager 模块未加载');
+                }
+                if (!handlerId || typeof handlerId !== 'number') {
+                    throw new Error('Event.unregister: handlerId 必须是数字');
+                }
+                
+                EventManager.unregisterEventHandler(handlerId);
+                return { status: 'success' };
+            },
+            'Event.unregisterAll': async (pid) => {
+                if (typeof EventManager === 'undefined') {
+                    throw new Error('EventManager 模块未加载');
+                }
+                
+                EventManager.unregisterAllHandlersForPid(pid);
+                return { status: 'success' };
             },
             
             // 内存管理API
@@ -2571,6 +3410,98 @@ class ProcessManager {
                 return GeographyDrive.getCachedLocation();
             },
             
+            // 加密API
+            'Crypt.generateKeyPair': async (options) => {
+                if (typeof CryptDrive === 'undefined') {
+                    throw new Error('CryptDrive 模块未加载');
+                }
+                return await CryptDrive.generateKeyPair(options || {});
+            },
+            'Crypt.importKeyPair': async (publicKey, privateKey, options) => {
+                if (typeof CryptDrive === 'undefined') {
+                    throw new Error('CryptDrive 模块未加载');
+                }
+                return await CryptDrive.importKeyPair(publicKey, privateKey, options || {});
+            },
+            'Crypt.getKeyInfo': async (keyId) => {
+                if (typeof CryptDrive === 'undefined') {
+                    throw new Error('CryptDrive 模块未加载');
+                }
+                return CryptDrive.getKeyInfo(keyId);
+            },
+            'Crypt.listKeys': async () => {
+                if (typeof CryptDrive === 'undefined') {
+                    throw new Error('CryptDrive 模块未加载');
+                }
+                return CryptDrive.listKeys();
+            },
+            'Crypt.deleteKey': async (keyId) => {
+                if (typeof CryptDrive === 'undefined') {
+                    throw new Error('CryptDrive 模块未加载');
+                }
+                return await CryptDrive.deleteKey(keyId);
+            },
+            'Crypt.setDefaultKey': async (keyId) => {
+                if (typeof CryptDrive === 'undefined') {
+                    throw new Error('CryptDrive 模块未加载');
+                }
+                return await CryptDrive.setDefaultKey(keyId);
+            },
+            'Crypt.encrypt': async (data, keyId, publicKey) => {
+                if (typeof CryptDrive === 'undefined') {
+                    throw new Error('CryptDrive 模块未加载');
+                }
+                return CryptDrive.encrypt(data, keyId, publicKey);
+            },
+            'Crypt.decrypt': async (encryptedData, keyId, privateKey) => {
+                if (typeof CryptDrive === 'undefined') {
+                    throw new Error('CryptDrive 模块未加载');
+                }
+                return CryptDrive.decrypt(encryptedData, keyId, privateKey);
+            },
+            'Crypt.md5': async (data) => {
+                if (typeof CryptDrive === 'undefined') {
+                    throw new Error('CryptDrive 模块未加载');
+                }
+                return await CryptDrive.md5(data);
+            },
+            'Crypt.randomInt': async (min, max) => {
+                if (typeof CryptDrive === 'undefined') {
+                    throw new Error('CryptDrive 模块未加载');
+                }
+                return CryptDrive.randomInt(min, max);
+            },
+            'Crypt.randomFloat': async (min, max) => {
+                if (typeof CryptDrive === 'undefined') {
+                    throw new Error('CryptDrive 模块未加载');
+                }
+                return CryptDrive.randomFloat(min, max);
+            },
+            'Crypt.randomBoolean': async () => {
+                if (typeof CryptDrive === 'undefined') {
+                    throw new Error('CryptDrive 模块未加载');
+                }
+                return CryptDrive.randomBoolean();
+            },
+            'Crypt.randomString': async (length, charset) => {
+                if (typeof CryptDrive === 'undefined') {
+                    throw new Error('CryptDrive 模块未加载');
+                }
+                return CryptDrive.randomString(length, charset);
+            },
+            'Crypt.randomChoice': async (array) => {
+                if (typeof CryptDrive === 'undefined') {
+                    throw new Error('CryptDrive 模块未加载');
+                }
+                return CryptDrive.randomChoice(array);
+            },
+            'Crypt.shuffle': async (array) => {
+                if (typeof CryptDrive === 'undefined') {
+                    throw new Error('CryptDrive 模块未加载');
+                }
+                return CryptDrive.shuffle(array);
+            },
+            
             // 其他API可以在这里添加
         };
         
@@ -2585,6 +3516,17 @@ class ProcessManager {
         }
         
         try {
+            // 某些 API 需要 pid 作为第一个参数
+            if (pid !== null && (
+                apiName === 'Notification.create' || 
+                apiName === 'Notification.remove' ||
+                apiName === 'Event.register' ||
+                apiName === 'Event.unregister' ||
+                apiName === 'Event.unregisterAll'
+            )) {
+                // 这些 API 需要 pid 作为第一个参数
+                return await apiHandler(pid, ...args);
+            }
             return await apiHandler(...args);
         } catch (error) {
             // 增强错误信息

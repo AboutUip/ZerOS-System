@@ -1,137 +1,487 @@
-# ZerOS Kernel - 虚拟内核操作系统
+# ZerOS - 浏览器虚拟操作系统
 
-## 声明
+<div align="center">
 
-1. 本系统内所有的音乐API均由笒鬼鬼提供,由此涉及的所有问题,与ZerOS开发组和笒鬼鬼无关,如有侵权,请联系删除 
-2. 本系统的开发由Gemini 3 Pro提供支持,仅供学习参考 
-3. 本系统不与其他项目进行对标,请勿恶意评价 
-4. 本系统涉及的SVG矢量图均由Gemini 3 Pro生成,非互联网采集而来 
+**一个基于浏览器实现的完整虚拟操作系统内核**
 
-## 项目用途
+[![License](https://img.shields.io/badge/license-GPL--2.0-blue.svg)](LICENSE)
+[![Platform](https://img.shields.io/badge/platform-Browser-lightgrey.svg)](https://developer.mozilla.org/zh-CN/docs/Web/API)
+[![Language](https://img.shields.io/badge/language-JavaScript-yellow.svg)](https://developer.mozilla.org/zh-CN/docs/Web/JavaScript)
 
-ZerOS系统用于教学目的的浏览器虚拟内核开发项目,仅供学习娱乐交流
+</div>
 
-## 简介
+---
 
-**ZerOS Kernel** 是一个基于浏览器实现的虚拟操作系统内核，提供完整的文件系统、内存管理、进程管理和终端界面。它模拟了真实操作系统的核心功能，包括多进程内存管理、虚拟磁盘分区、文件系统树结构、进程生命周期管理，以及功能丰富的命令行终端。
+## 📋 目录
 
-### 核心特性
+- [项目简介](#项目简介)
+- [核心特性](#核心特性)
+- [快速开始](#快速开始)
+- [系统架构](#系统架构)
+- [文档导航](#文档导航)
+- [项目结构](#项目结构)
+- [系统要求](#系统要求)
+- [开发指南](#开发指南)
+- [重要注意事项](#重要注意事项)
+- [许可证](#许可证)
+- [联系我们](#联系我们)
 
-- **虚拟文件系统**：支持多磁盘分区（C:、D: 等），完整的目录树结构，PHP 后端文件存储
-- **内存管理**：堆内存（Heap）和栈内存（Shed）管理，支持多进程隔离，NaN 值安全检查
-- **进程管理**：完整的进程生命周期管理（启动、运行、终止），PID分配，程序资源管理
-- **统一数据存储**：Exploit 程序（PID 10000）作为统一的数据存储中心，管理所有内核动态数据
-- **终端界面**：Bash 风格的命令行终端，支持多标签页、命令历史、自动补全、窗口管理
-- **持久化存储**：使用 localStorage API 实现数据和目录的永久保存，PHP 服务端文件存储
-- **丰富的命令集**：文件操作、目录管理、进程监控、文本编辑器、内核自检等
-- **模块化架构**：基于依赖注入的模块系统，支持异步加载
-- **程序管理**：应用程序资源管理，自动启动程序，CLI程序自动启动终端环境
-- **主题系统**：支持主题（颜色）和风格（GUI样式）的独立管理，支持 GIF 动图、本地图片作为桌面背景
-- **GUI 管理**：完整的窗口管理、任务栏、通知系统、上下文菜单、事件管理、窗口拉伸优化
-- **任务栏功能**：程序固定/取消固定、天气组件（支持缓存）、系统图标、通知徽章
-- **内核自检**：全面的系统健康检查功能，支持通过 `check` 命令进行内核自检
+---
 
-## 快速开始
+## 🎯 项目简介
 
-### 运行系统
+**ZerOS** 是一个基于浏览器实现的虚拟操作系统内核，提供完整的文件系统、内存管理、进程管理、GUI 界面和丰富的应用程序生态。它模拟了真实操作系统的核心功能，为开发者提供了一个完整的虚拟操作系统开发平台。
 
-1. **克隆本项目**（不建议使用打包好的 Releases 包，因为它们会过时）
-2. **部署 PHP 服务**：
+### 项目用途
+
+ZerOS 系统用于教学目的的浏览器虚拟内核开发项目，仅供学习、娱乐和交流使用。
+
+### 设计理念
+
+- **模块化架构**：内核采用模块化设计，各模块职责清晰，易于扩展和维护
+- **统一管理**：所有系统资源（事件、日志、窗口、权限等）由内核统一管理
+- **安全隔离**：进程间资源隔离，权限系统确保系统安全
+- **开发者友好**：提供完整的 API 文档和开发指南，降低开发门槛
+
+---
+
+## ✨ 核心特性
+
+### 🗂️ 文件系统
+- **虚拟磁盘分区**：支持多磁盘分区（C:、D: 等），完整的目录树结构
+- **PHP 后端存储**：使用 PHP 服务端实现文件持久化存储
+- **文件操作 API**：完整的文件读写、目录管理、路径操作 API
+- **ZIP 文件支持**：自动识别 ZIP 文件，支持压缩/解压缩操作
+
+### 💾 内存管理
+- **堆栈分离**：堆内存（Heap）和栈内存（Shed）独立管理
+- **多进程隔离**：每个进程拥有独立的内存空间
+- **NaN 值安全检查**：防止内存污染和安全漏洞
+- **内存引用管理**：自动跟踪和清理内存引用
+
+### 🔄 进程管理
+- **完整生命周期**：进程启动、运行、终止的完整管理
+- **PID 分配**：自动分配和管理进程 ID
+- **资源清理**：进程退出时自动清理所有资源
+- **多实例支持**：支持程序多实例运行
+
+### 🎨 GUI 系统
+- **窗口管理**：完整的窗口创建、拖动、拉伸、最小化、最大化功能
+- **任务栏**：程序固定、多任务切换、通知徽章
+- **通知系统**：系统级通知管理，支持多种通知类型
+- **主题系统**：主题（颜色）和风格（GUI样式）独立管理
+- **桌面管理**：桌面图标、组件拖拽、背景管理
+
+### 🔐 安全系统
+- **权限管理**：完整的内核操作权限控制
+- **进程隔离**：进程间资源隔离，防止相互干扰
+- **加密驱动**：RSA 加密/解密、MD5 哈希、随机数生成
+- **密钥管理**：密钥生命周期管理和有效期跟踪
+
+### 🛠️ 开发工具
+- **终端界面**：Bash 风格的命令行终端，支持多标签页
+- **内核自检**：全面的系统健康检查功能
+- **日志系统**：统一的日志管理，支持多级别日志
+- **事件管理**：统一的事件处理系统，支持优先级和传播控制
+
+---
+
+## 🚀 快速开始
+
+### 环境要求
+
+- **浏览器**：Chrome（推荐）、Edge、Firefox 等现代浏览器
+- **PHP 服务**：PHP 7.0+（用于文件系统持久化）
+- **Web 服务器**：Apache2（推荐）或 Nginx
+- **分辨率**：推荐最小 800x600，最佳 1920x1080
+
+### 部署步骤
+
+1. **克隆项目**
+   ```bash
+   git clone <repository-url>
+   cd ZerOS
+   ```
+
+2. **配置服务器**
    - 将 `ZerOS/` 整个文件夹设置为网站根目录
    - 确保 PHP 服务正常运行（PHP 7.0+）
-   - 服务器(php服务,推荐使用Apache2)端口必须使用 8898
-   - 网站(web服务)开放端口应该为 8089
-3. **访问系统**：
-   - 使用现代浏览器（Chrome 最佳）访问 `http://localhost:8089/test/index.html`
-   - 首次加载可能需要几秒钟来初始化内核
-4. **注意事项**：
-   - 浏览器应该支持 localStorage API(非必须)
-   - 建议使用 Chrome 浏览器以获得最佳体验
-   - 如果遇到问题，请检查浏览器控制台的错误信息
+   - **重要**：PHP 服务端口必须使用 **8898**
+   - **重要**：Web 服务端口应该为 **8089**
 
-## 系统架构概览
+3. **访问系统**
+   - 使用浏览器访问：`http://localhost:8089/test/index.html`
+   - 首次加载可能需要几秒钟来初始化内核
+
+4. **验证安装**
+   - 打开浏览器控制台（F12），检查是否有错误
+   - 系统启动后，应该能看到桌面和任务栏
+
+### 注意事项
+
+- 浏览器应该支持 localStorage API（非必须，但推荐）
+- 建议使用 Chrome 浏览器以获得最佳体验
+- 如果遇到问题，请检查浏览器控制台的错误信息
+- 确保 PHP 服务正常运行，文件系统功能依赖 PHP 后端
+
+---
+
+## 🏗️ 系统架构
 
 ZerOS Kernel 采用模块化架构，主要包含以下核心模块：
 
-- **日志系统**：KernelLogger - 统一的日志管理
-- **启动引导**：Starter - 内核启动器，Pool - 全局对象池
-- **信号系统**：DependencyConfig - 依赖管理和模块加载
-- **内存管理**：Heap、Shed、MemoryManager、KernelMemory
-- **进程管理**：ProcessManager、PermissionManager、ApplicationAssetManager
-- **GUI 管理**：GUIManager、NotificationManager、TaskbarManager、ThemeManager、EventManager、ContextMenuManager、DesktopManager
-- **任务栏功能**：程序固定管理、天气组件、系统图标、通知徽章、多任务切换器
-- **驱动层**：AnimateManager、NetworkManager、LStorage
-- **文件系统**：Disk、NodeTree、FileFormwork、Type
+### 核心层
+- **日志系统**：`KernelLogger` - 统一的日志管理
+- **启动引导**：`Starter` - 内核启动器，`Pool` - 全局对象池
+- **信号系统**：`DependencyConfig` - 依赖管理和模块加载
+
+### 资源管理层
+- **内存管理**：`Heap`、`Shed`、`MemoryManager`、`KernelMemory`
+- **进程管理**：`ProcessManager`、`PermissionManager`、`ApplicationAssetManager`
+- **文件系统**：`Disk`、`NodeTree`、`FileFormwork`
+
+### GUI 层
+- **窗口管理**：`GUIManager` - 窗口创建、拖动、拉伸、焦点管理
+- **任务栏**：`TaskbarManager` - 程序固定、多任务切换、通知徽章
+- **通知系统**：`NotificationManager` - 系统级通知管理
+- **主题系统**：`ThemeManager` - 主题和风格管理
+- **事件管理**：`EventManager` - 统一的事件处理系统
+- **上下文菜单**：`ContextMenuManager` - 右键菜单管理
+- **桌面管理**：`DesktopManager` - 桌面图标和组件管理
+
+### 驱动层
+- **动画管理**：`AnimateManager` - 动画效果管理
+- **网络管理**：`NetworkManager` - 网络请求管理
+- **本地存储**：`LStorage` - 本地数据持久化
+- **拖拽驱动**：`DragDrive` - 拖拽功能支持
+- **地理位置**：`GeographyDrive` - 地理位置服务
+- **加密驱动**：`CryptDrive` - 加密功能支持
+- **多线程驱动**：`MultithreadingDrive` - 多线程支持
+
+### 服务层
+- **PHP 服务**：`FSDirve.php`（文件系统驱动）、`CompressionDirve.php`（压缩驱动）
 
 详细架构说明请参考 [内核架构文档](docs/ZEROS_KERNEL.md)
 
-## 文档导航
+---
 
-- **[开发者指南](docs/DEVELOPER_GUIDE.md)** - 如何在 ZerOS 上开发程序
+## 📚 文档导航
+
+### 开发者文档
+- **[开发者指南](docs/DEVELOPER_GUIDE.md)** - 完整的开发指南，包括：
+  - 开发思维和核心概念
+  - 快速开始教程
+  - 程序结构说明
+  - GUI/CLI 程序开发
+  - 最佳实践和常见问题
+
+### 架构文档
 - **[内核架构](docs/ZEROS_KERNEL.md)** - 系统架构和模块设计详解
-- **[API 文档](docs/API/README.md)** - 完整的 API 参考文档
 
-## 项目结构
+### API 文档
+- **[API 文档索引](docs/API/README.md)** - 完整的 API 参考文档
+  - 核心模块 API
+  - GUI 管理 API
+  - 文件系统 API
+  - 驱动层 API
+
+---
+
+## 📁 项目结构
 
 ```
 ZerOS/
 ├── kernel/                 # 内核模块
 │   ├── bootloader/        # 启动引导
+│   │   └── starter.js    # 内核启动器
 │   ├── fileSystem/        # 文件系统
+│   │   ├── disk.js       # 虚拟磁盘管理
+│   │   ├── nodeTree.js   # 文件树结构
+│   │   ├── fileFramework.js # 文件对象模板
+│   │   └── init.js       # 文件系统初始化
 │   ├── logger/            # 日志系统
+│   │   └── kernelLogger.js # 统一日志管理
 │   ├── memory/            # 内存管理
+│   │   ├── memoryManager.js # 统一内存管理器
+│   │   ├── heap.js       # 堆内存管理
+│   │   ├── shed.js       # 栈内存管理
+│   │   ├── kernelMemory.js # 内核动态数据存储
+│   │   └── memoryUtils.js # 内存工具函数
 │   ├── process/           # 进程管理
+│   │   ├── processManager.js # 进程生命周期管理
+│   │   ├── permissionManager.js # 权限管理
+│   │   ├── applicationAssetManager.js # 应用程序资源管理
+│   │   ├── guiManager.js # GUI窗口管理
+│   │   ├── notificationManager.js # 通知管理
+│   │   ├── taskbarManager.js # 任务栏管理
+│   │   ├── themeManager.js # 主题管理
+│   │   ├── eventManager.js # 事件管理
+│   │   ├── contextMenuManager.js # 上下文菜单管理
+│   │   ├── desktop.js    # 桌面管理
+│   │   └── programCategories.js # 程序分类
 │   ├── drive/             # 驱动层
+│   │   ├── animateManager.js # 动画管理
+│   │   ├── networkManager.js # 网络管理
+│   │   ├── LStorage.js    # 本地存储驱动
+│   │   ├── cryptDrive.js  # 加密驱动
+│   │   ├── dragDrive.js   # 拖拽驱动
+│   │   ├── geographyDrive.js # 地理位置驱动
+│   │   └── multithreadingDrive.js # 多线程驱动
+│   ├── dynamicModule/     # 动态模块管理
+│   │   └── libs/          # 第三方库
 │   ├── signal/            # 信号系统
+│   │   ├── dependencyConfig.js # 依赖管理和模块加载
+│   │   └── pool.js        # 全局对象池
 │   └── typePool/          # 类型池
+│       ├── fileType.js    # 文件类型枚举
+│       ├── logLevel.js    # 日志级别枚举
+│       └── enumManager.js # 枚举管理器
 ├── service/               # 服务端（PHP 文件系统驱动）
-│   └── DISK/              # 虚拟磁盘存储
+│   ├── DISK/              # 虚拟磁盘存储
+│   │   ├── C/             # C: 盘
+│   │   └── D/             # D: 盘
+│   │       └── application/ # 应用程序目录
+│   ├── FSDirve.php        # 文件系统驱动服务
+│   ├── CompressionDirve.php # 压缩驱动服务
+│   └── ImageProxy.php     # 图片代理服务
 ├── test/                  # 测试和界面
-│   ├── application/       # 应用程序
 │   ├── index.html         # 入口页面
-│   └── core.css           # 样式文件
+│   ├── core.css           # 样式文件
+│   └── assets/            # 资源文件
 └── docs/                  # 文档
     ├── API/               # API 文档
     ├── DEVELOPER_GUIDE.md # 开发者指南
     └── ZEROS_KERNEL.md    # 内核架构文档
 ```
 
-## 系统要求
+---
 
-- **浏览器**：支持现代 JavaScript 和 localStorage 的浏览器
+## ⚙️ 系统要求
+
+### 浏览器要求
+- **推荐**：Chrome 90+、Edge 90+、Firefox 88+
+- **最低**：支持 ES6+、localStorage、Fetch API 的现代浏览器
 - **分辨率**：推荐最小 800x600，最佳 1920x1080
-- **存储**：浏览器 localStorage 空间(暂缓区)
-- **服务端**（必须）：PHP 服务用于文件系统持久化
 
-## 许可证
+### 服务端要求
+- **PHP**：PHP 7.0+（必须，用于文件系统持久化）
+- **Web 服务器**：Apache2（推荐）或 Nginx
+- **端口配置**：
+  - PHP 服务端口：**8898**（必须）
+  - Web 服务端口：**8089**（推荐）
 
-GNU GENERAL PUBLIC LICENSE VERSION 2.0 (参见 LICENSE)
+### 存储要求
+- **浏览器 localStorage**：用于系统配置和缓存（非必须，但推荐）
+- **服务端存储**：PHP 文件系统用于文件持久化（必须）
 
-## 贡献
+---
 
-欢迎提交邮件给我们以获取相关信息。
+## 👨‍💻 开发指南
 
-## 联系我们
+### 快速开始开发
 
-Email hacker200714@outlook.com
+1. **阅读开发者指南**：查看 [开发者指南](docs/DEVELOPER_GUIDE.md) 了解开发流程
+2. **查看示例程序**：参考 `service/DISK/D/application/` 目录下的示例程序
+3. **查阅 API 文档**：查看 [API 文档索引](docs/API/README.md) 了解可用 API
 
-## 更新日志
+### 开发工具
+
+- **终端**：使用系统内置终端进行命令行操作
+- **内核自检**：使用 `check` 命令进行系统健康检查
+- **日志查看**：使用浏览器控制台查看系统日志
+
+---
+
+## ⚠️ 重要注意事项
+
+### 必须遵守的开发规范
+
+#### 1. 事件管理
+**所有事件处理必须通过内核的 `EventManager` 进行统一管理**
+
+```javascript
+// ✅ 正确：使用 EventManager
+EventManager.registerEventHandler(this.pid, 'click', handler, {
+    priority: 100,
+    selector: '.my-button'
+});
+
+// ❌ 错误：直接使用 addEventListener（会被警告）
+element.addEventListener('click', handler);
+```
+
+**原因**：
+- 统一管理所有事件，支持事件优先级和传播控制
+- 进程退出时自动清理事件监听器，防止内存泄漏
+- 提供统一的事件传播控制 API
+
+**详细说明**：请参考 [EventManager API 文档](docs/API/EventManager.md)
+
+#### 2. 日志记录
+**所有日志输出必须通过内核的 `KernelLogger` 进行统一管理**
+
+```javascript
+// ✅ 正确：使用 KernelLogger
+KernelLogger.info('MYAPP', '程序启动');
+KernelLogger.warn('MYAPP', '警告信息');
+KernelLogger.error('MYAPP', '错误信息', error);
+
+// ❌ 错误：直接使用 console.log（不推荐）
+console.log('程序启动');
+```
+
+**原因**：
+- 统一的日志格式，便于调试和问题排查
+- 支持日志级别过滤，控制日志输出
+- 结构化日志，包含模块名、时间戳等信息
+
+**详细说明**：请参考 [KernelLogger API 文档](docs/API/KernelLogger.md)
+
+#### 3. 窗口管理
+**GUI 程序必须使用 `GUIManager` 进行窗口管理**
+
+```javascript
+// ✅ 正确：使用 GUIManager
+GUIManager.registerWindow(this.pid, this.window, {
+    title: '我的应用',
+    icon: 'application/myapp/myapp.svg',
+    onClose: () => {
+        ProcessManager.killProgram(this.pid);
+    }
+});
+
+// ❌ 错误：手动管理窗口（不推荐）
+this.window.style.position = 'fixed';
+this.window.style.left = '100px';
+this.window.style.top = '100px';
+```
+
+**原因**：
+- 自动处理窗口拖动、拉伸、最小化、最大化
+- 统一的窗口样式和主题支持
+- 自动管理窗口焦点和 z-index
+
+**详细说明**：请参考 [GUIManager API 文档](docs/API/GUIManager.md)
+
+#### 4. 权限管理
+**所有内核 API 调用都需要相应权限，程序必须在 `__info__` 中声明所需权限**
+
+```javascript
+// ✅ 正确：在 __info__ 中声明权限
+__info__: function() {
+    return {
+        // ...
+        permissions: [
+            PermissionManager.PERMISSION.GUI_WINDOW_CREATE,
+            PermissionManager.PERMISSION.EVENT_LISTENER,
+            PermissionManager.PERMISSION.KERNEL_DISK_READ
+        ]
+    };
+}
+```
+
+**原因**：
+- 确保系统安全，防止恶意程序滥用系统资源
+- 用户可以在首次使用时授权或拒绝权限
+- 权限系统会记录所有权限使用情况
+
+**详细说明**：请参考 [PermissionManager API 文档](docs/API/PermissionManager.md)
+
+#### 5. 资源清理
+**程序必须在 `__exit__` 中清理所有资源**
+
+```javascript
+// ✅ 正确：完整清理所有资源
+__exit__: async function() {
+    // 1. 取消注册 GUI 窗口
+    if (typeof GUIManager !== 'undefined') {
+        GUIManager.unregisterWindow(this.pid);
+    }
+    
+    // 2. 取消注册事件监听器（EventManager 会自动清理）
+    // 但如果有直接使用 addEventListener 的，需要手动清理
+    
+    // 3. 清理 DOM 元素
+    if (this.window && this.window.parentElement) {
+        this.window.parentElement.removeChild(this.window);
+    }
+    
+    // 4. 释放内存引用
+    this.window = null;
+}
+```
+
+**原因**：
+- 防止内存泄漏
+- 确保进程退出时所有资源都被正确释放
+- 保持系统稳定运行
+
+**详细说明**：请参考 [开发者指南 - 资源清理](docs/DEVELOPER_GUIDE.md#资源清理)
+
+### 其他重要规范
+
+- **禁止自动初始化**：程序必须禁止自动初始化，等待 `ProcessManager` 调用
+- **DOM 元素标记**：所有程序创建的 DOM 元素必须标记 `data-pid` 属性
+- **错误处理**：始终使用 try-catch 处理异步操作
+- **异步方法**：`__init__` 和 `__exit__` 必须是异步函数
+
+**详细说明**：请参考 [开发者指南](docs/DEVELOPER_GUIDE.md)
+
+---
+
+## 📝 更新日志
 
 ### 最新版本特性
 
-- ✅ **天气组件**：任务栏右侧显示实时天气信息，支持多主题适配，智能缓存机制（30分钟缓存，刷新时使用缓存）
-- ✅ **任务栏程序固定**：支持将程序固定到任务栏，右键菜单快速固定/取消固定，持久化存储
-- ✅ **窗口拉伸优化**：修复右上角拉伸窗口时的位置计算问题，支持精确的窗口大小调整
-- ✅ **GIF 动图背景支持**：支持使用 GIF 动图作为桌面背景，自动循环播放
-- ✅ **主题系统增强**：支持本地图片（JPG、PNG、GIF、WebP 等）作为桌面背景，自动持久化保存
-- ✅ **check 命令**：全面的内核自检功能，检查核心模块、文件系统、内存管理、进程管理、GUI 管理、主题系统等
-- ✅ **通知管理系统**：完整的通知创建、显示、管理功能，支持快照和依赖类型通知
-- ✅ **多任务切换器**：Ctrl + 鼠标左键打开全屏多任务选择器，支持鼠标滚轮选择
-- ✅ **上下文菜单系统**：完整的右键菜单管理，支持程序注册自定义菜单，动态菜单项生成
-- ✅ **事件管理系统**：统一的窗口拖动、拉伸事件管理，支持多实例程序正确处理
+- ✅ **事件管理系统**：统一的事件处理系统，支持事件优先级、传播控制和自动清理
+- ✅ **日志管理系统**：统一的日志管理，支持多级别日志和结构化输出
+- ✅ **窗口标题栏保护**：自动保护窗口标题栏，防止被意外删除
+- ✅ **权限管理系统**：完整的内核操作权限控制，确保系统安全
+- ✅ **加密驱动系统**：完整的加密功能支持，包括 RSA 加密/解密、MD5 哈希、随机数生成
+- ✅ **窗口四角拉伸**：窗口支持从四个角进行拉伸，提供更灵活的窗口大小调整
+- ✅ **ZIP 文件支持**：文件管理器自动识别 ZIP 文件，支持 ZIP 内容查看和导航
+- ✅ **Ziper 压缩工具**：完整的 ZIP 压缩/解压缩工具，支持多文件/多目录处理
+- ✅ **文件管理器多选**：支持多文件和多目录同时选择
+- ✅ **天气组件**：任务栏右侧显示实时天气信息，支持智能缓存
+- ✅ **任务栏程序固定**：支持将程序固定到任务栏，持久化存储
+- ✅ **GIF 动图背景支持**：支持使用 GIF 动图作为桌面背景
+- ✅ **主题系统增强**：支持本地图片作为桌面背景，随机二次元背景功能
+- ✅ **内核自检功能**：全面的系统健康检查功能
+- ✅ **通知管理系统**：完整的通知创建、显示、管理功能
+- ✅ **多任务切换器**：Ctrl + 鼠标左键打开全屏多任务选择器
+- ✅ **上下文菜单系统**：完整的右键菜单管理
 
 更多特性请查看 [更新日志](docs/ZEROS_KERNEL.md#更新日志)
 
 ---
 
-**ZerOS Kernel** - 一个强大的虚拟操作系统内核，在浏览器中体验完整的系统操作。
+## 📄 许可证
+
+GNU GENERAL PUBLIC LICENSE VERSION 2.0
+
+详见 [LICENSE](LICENSE) 文件
+
+---
+
+## 📧 联系我们
+
+- **Email**: hacker200714@outlook.com
+
+---
+
+## 📢 声明
+
+1. 本系统内所有的音乐 API 均由笒鬼鬼提供，由此涉及的所有问题，与 ZerOS 开发组和笒鬼鬼无关，如有侵权，请联系删除
+2. 本系统的开发由 Gemini 3 Pro 提供支持，仅供学习参考
+3. 本系统不与其他项目进行对标，请勿恶意评价
+4. 本系统涉及的 SVG 矢量图均由 Gemini 3 Pro 生成，非互联网采集而来
+
+---
+
+<div align="center">
+
+**ZerOS** - 一个强大的虚拟操作系统内核，在浏览器中体验完整的系统操作。
+
+Made with ❤️ by ZerOS Team
+
+</div>

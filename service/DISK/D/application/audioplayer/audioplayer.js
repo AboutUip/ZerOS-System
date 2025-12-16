@@ -86,15 +86,30 @@
                         throw new Error('Howler 库加载失败：无法找到 Howl 类');
                     }
                     
-                } catch (error) {
+            } catch (error) {
+                // 记录错误日志
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('AudioPlayer', `加载 Howler 库失败: ${error.message}`, error);
+                } else {
                     console.error('[AudioPlayer] 加载 Howler 库失败:', error);
-                    if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                        await GUIManager.showAlert(`加载音频库失败: ${error.message}`, '错误', 'error');
-                    } else {
-                        alert(`加载音频库失败: ${error.message}`);
-                    }
-                    throw error;
                 }
+                // 加载音频库失败，使用通知提示（不打断用户）
+                if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                    try {
+                        await NotificationManager.createNotification(this.pid, {
+                            type: 'snapshot',
+                            title: '音频播放器',
+                            content: `加载音频库失败: ${error.message}`,
+                            duration: 4000
+                        });
+                    } catch (e) {
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('AudioPlayer', `创建通知失败: ${e.message}`);
+                        }
+                    }
+                }
+                throw error;
+            }
                 
                 // 获取 GUI 容器
                 const guiContainer = initArgs.guiContainer || document.getElementById('gui-container');
@@ -138,9 +153,10 @@
                         title: '音频播放器',
                         icon: icon,
                         onClose: () => {
-                            if (typeof ProcessManager !== 'undefined') {
-                                ProcessManager.killProgram(this.pid);
-                            }
+                            // onClose 回调只做清理工作，不调用 _closeWindow 或 unregisterWindow
+                            // 窗口关闭由 GUIManager._closeWindow 统一处理
+                            // _closeWindow 会在窗口关闭后检查该 PID 是否还有其他窗口，如果没有，会 kill 进程
+                            // 这样可以确保程序多实例（不同 PID）互不影响
                         }
                     });
                     
@@ -306,20 +322,67 @@
                 const percentage = Math.max(0, Math.min(1, clickX / rect.width));
                 const seekTime = this.duration * percentage;
                 this._seek(seekTime);
-            });
-            
-            document.addEventListener('mousemove', (e) => {
-                if (isDragging && this.currentSound && this.duration > 0) {
-                    const rect = this.progressBar.getBoundingClientRect();
-                    const mouseX = e.clientX - rect.left;
-                    const percentage = Math.max(0, Math.min(1, mouseX / rect.width));
-                    const seekTime = this.duration * percentage;
-                    this._seek(seekTime);
+                
+                // 使用 EventManager 注册临时拖动事件
+                if (typeof EventManager !== 'undefined' && this.pid) {
+                    const onMouseMove = (moveEvent) => {
+                        if (isDragging && this.currentSound && this.duration > 0) {
+                            const rect = this.progressBar.getBoundingClientRect();
+                            const mouseX = moveEvent.clientX - rect.left;
+                            const percentage = Math.max(0, Math.min(1, mouseX / rect.width));
+                            const seekTime = this.duration * percentage;
+                            this._seek(seekTime);
+                        }
+                    };
+                    
+                    const onMouseUp = () => {
+                        isDragging = false;
+                        // 注销临时事件
+                        if (this._progressDragHandlers) {
+                            if (this._progressDragHandlers.mousemoveHandlerId) {
+                                EventManager.unregisterEventHandler(this._progressDragHandlers.mousemoveHandlerId);
+                            }
+                            if (this._progressDragHandlers.mouseupHandlerId) {
+                                EventManager.unregisterEventHandler(this._progressDragHandlers.mouseupHandlerId);
+                            }
+                            this._progressDragHandlers = null;
+                        }
+                    };
+                    
+                    // 注册临时事件（拖动时）
+                    const mousemoveHandlerId = EventManager.registerEventHandler(this.pid, 'mousemove', onMouseMove, {
+                        priority: 50,
+                        once: false
+                    });
+                    
+                    const mouseupHandlerId = EventManager.registerEventHandler(this.pid, 'mouseup', onMouseUp, {
+                        priority: 50,
+                        once: true
+                    });
+                    
+                    // 保存 handlerId 以便在 mouseup 时注销
+                    this._progressDragHandlers = { mousemoveHandlerId, mouseupHandlerId };
+                } else {
+                    // 降级：直接使用 addEventListener（不推荐）
+                    const onMouseMove = (e) => {
+                        if (isDragging && this.currentSound && this.duration > 0) {
+                            const rect = this.progressBar.getBoundingClientRect();
+                            const mouseX = e.clientX - rect.left;
+                            const percentage = Math.max(0, Math.min(1, mouseX / rect.width));
+                            const seekTime = this.duration * percentage;
+                            this._seek(seekTime);
+                        }
+                    };
+                    
+                    const onMouseUp = () => {
+                        isDragging = false;
+                        document.removeEventListener('mousemove', onMouseMove);
+                        document.removeEventListener('mouseup', onMouseUp);
+                    };
+                    
+                    document.addEventListener('mousemove', onMouseMove);
+                    document.addEventListener('mouseup', onMouseUp);
                 }
-            });
-            
-            document.addEventListener('mouseup', () => {
-                isDragging = false;
             });
             
             // 进度条点击事件（兼容性）
@@ -710,13 +773,8 @@
                 this.currentSound.load();
                 
             } catch (error) {
-                console.error('加载音频失败:', error);
+                // _onAudioLoadError 已经记录了日志并显示通知，这里不需要重复
                 this._onAudioLoadError(error);
-                if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                    await GUIManager.showAlert(`加载音频失败: ${error.message}`, '错误', 'error');
-                } else {
-                    alert(`加载音频失败: ${error.message}`);
-                }
             }
         },
         
@@ -759,11 +817,18 @@
         _onAudioLoadError: function(error) {
             this.isLoading = false;
             const errorMsg = error || '未知错误';
-            console.error('[AudioPlayer] 音频加载失败:', {
+            const errorInfo = {
                 error: errorMsg,
                 path: this.currentAudioPath,
                 url: this.currentAudioUrl
-            });
+            };
+            
+            // 记录错误日志
+            if (typeof KernelLogger !== 'undefined') {
+                KernelLogger.error('AudioPlayer', `音频加载失败: ${errorMsg}`, errorInfo);
+            } else {
+                console.error('[AudioPlayer] 音频加载失败:', errorInfo);
+            }
             
             if (this.fileInfo) {
                 this.fileInfo.textContent = `加载失败: ${errorMsg}`;
@@ -774,7 +839,11 @@
                 try {
                     this.currentSound.unload();
                 } catch (e) {
-                    console.warn('[AudioPlayer] 清理音频实例失败:', e);
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.warn('AudioPlayer', `清理音频实例失败: ${e.message}`, e);
+                    } else {
+                        console.warn('[AudioPlayer] 清理音频实例失败:', e);
+                    }
                 }
                 this.currentSound = null;
             }
@@ -783,13 +852,24 @@
             this.currentTime = 0;
             this._updateTimeDisplay();
             
-            // 显示详细错误信息
-            if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                GUIManager.showAlert(
-                    `音频加载失败: ${errorMsg}\n\n路径: ${this.currentAudioPath}\nURL: ${this.currentAudioUrl}`,
-                    '加载失败',
-                    'error'
-                );
+            // 显示详细错误信息，使用通知提示（不打断用户）
+            if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                try {
+                    NotificationManager.createNotification(this.pid, {
+                        type: 'snapshot',
+                        title: '加载失败',
+                        content: `音频加载失败: ${errorMsg}\n\n路径: ${this.currentAudioPath}\nURL: ${this.currentAudioUrl}`,
+                        duration: 5000
+                    }).catch(e => {
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('AudioPlayer', `创建通知失败: ${e.message}`);
+                        }
+                    });
+                } catch (e) {
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.warn('AudioPlayer', `创建通知失败: ${e.message}`);
+                    }
+                }
             }
         },
         
@@ -1057,7 +1137,16 @@
                 }
             };
             
-            document.addEventListener('keydown', this.keyboardHandler, { passive: false });
+            // 使用 EventManager 注册键盘事件
+            if (typeof EventManager !== 'undefined' && this.pid) {
+                this._keyboardHandlerId = EventManager.registerEventHandler(this.pid, 'keydown', this.keyboardHandler, {
+                    priority: 100,
+                    useCapture: false
+                });
+            } else {
+                // 降级：直接使用 addEventListener（不推荐）
+                document.addEventListener('keydown', this.keyboardHandler, { passive: false });
+            }
         },
         
         /**
@@ -1069,19 +1158,22 @@
             this.window.addEventListener('dragover', (e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                this.window.style.opacity = '0.8';
+                // 不再修改窗口透明度，防止虚化
+                // this.window.style.opacity = '0.8';
             });
             
             this.window.addEventListener('dragleave', (e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                this.window.style.opacity = '1';
+                // 不再修改窗口透明度，防止虚化
+                // this.window.style.opacity = '1';
             });
             
             this.window.addEventListener('drop', async (e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                this.window.style.opacity = '1';
+                // 不再修改窗口透明度，防止虚化
+                // this.window.style.opacity = '1';
                 
                 const files = e.dataTransfer.files;
                 if (files && files.length > 0) {
@@ -1095,9 +1187,7 @@
                         const fileUrl = URL.createObjectURL(file);
                         await this._loadAudio(fileUrl);
                     } else {
-                        if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                            await GUIManager.showAlert('请拖拽音频文件（mp3, wav, flac等）', '提示', 'info');
-                        }
+                        // 请拖拽音频文件，静默处理（不打断用户）
                     }
                 }
             });
@@ -1109,10 +1199,24 @@
         _openFileDialog: async function() {
             try {
                 if (typeof ProcessManager === 'undefined' || typeof ProcessManager.startProgram !== 'function') {
-                    if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                        await GUIManager.showAlert('ProcessManager 不可用', '错误', 'error');
+                    // ProcessManager 不可用，使用通知提示（不打断用户）
+                    if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                        try {
+                            await NotificationManager.createNotification(this.pid, {
+                                type: 'snapshot',
+                                title: '音频播放器',
+                                content: 'ProcessManager 不可用',
+                                duration: 3000
+                            });
+                        } catch (e) {
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.error('AudioPlayer', `ProcessManager 不可用，且创建通知失败: ${e.message}`);
+                            }
+                        }
                     } else {
-                        alert('ProcessManager 不可用');
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.error('AudioPlayer', 'ProcessManager 不可用');
+                        }
                     }
                     return;
                 }
@@ -1127,20 +1231,39 @@
                             try {
                                 await this._loadAudio(fileItem.path);
                             } catch (error) {
-                                console.error('[AudioPlayer] 加载音频文件失败:', error);
-                                if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                                    await GUIManager.showAlert(`加载音频文件失败: ${error.message}`, '错误', 'error');
+                                // 记录错误日志
+                                if (typeof KernelLogger !== 'undefined') {
+                                    KernelLogger.error('AudioPlayer', `加载音频文件失败: ${error.message}`, error);
+                                } else {
+                                    console.error('[AudioPlayer] 加载音频文件失败:', error);
                                 }
+                                // 调用 _onAudioLoadError 显示通知
+                                this._onAudioLoadError(error);
                             }
                         }
                     }
                 });
             } catch (error) {
-                console.error('[AudioPlayer] 打开文件对话框失败:', error);
-                if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                    await GUIManager.showAlert(`打开文件对话框失败: ${error.message}`, '错误', 'error');
+                // 记录错误日志
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('AudioPlayer', `打开文件对话框失败: ${error.message}`, error);
                 } else {
-                    alert(`打开文件对话框失败: ${error.message}`);
+                    console.error('[AudioPlayer] 打开文件对话框失败:', error);
+                }
+                // 打开文件对话框失败，使用通知提示（不打断用户）
+                if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                    try {
+                        await NotificationManager.createNotification(this.pid, {
+                            type: 'snapshot',
+                            title: '音频播放器',
+                            content: `打开文件对话框失败: ${error.message}`,
+                            duration: 4000
+                        });
+                    } catch (e) {
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('AudioPlayer', `创建通知失败: ${e.message}`);
+                        }
+                    }
                 }
             }
         },
@@ -1150,6 +1273,28 @@
          */
         __exit__: async function() {
             try {
+                // 清理临时拖动事件处理器
+                if (this._progressDragHandlers) {
+                    if (this._progressDragHandlers.mousemoveHandlerId && typeof EventManager !== 'undefined') {
+                        EventManager.unregisterEventHandler(this._progressDragHandlers.mousemoveHandlerId);
+                    }
+                    if (this._progressDragHandlers.mouseupHandlerId && typeof EventManager !== 'undefined') {
+                        EventManager.unregisterEventHandler(this._progressDragHandlers.mouseupHandlerId);
+                    }
+                    this._progressDragHandlers = null;
+                }
+                
+                // 清理键盘事件处理器
+                if (this._keyboardHandlerId && typeof EventManager !== 'undefined') {
+                    EventManager.unregisterEventHandler(this._keyboardHandlerId);
+                    this._keyboardHandlerId = null;
+                }
+                
+                // 清理所有事件处理器（通过 EventManager）
+                if (typeof EventManager !== 'undefined' && this.pid) {
+                    EventManager.unregisterAllHandlersForPid(this.pid);
+                }
+                
                 // 停止播放
                 if (this.currentSound) {
                     try {
@@ -1261,10 +1406,12 @@
                 version: '1.0.0',
                 description: 'ZerOS 音频播放器 - 支持播放 mp3, wav, flac 等音频格式',
                 author: 'ZerOS Team',
-                copyright: '© 2024',
+                copyright: '© 2025 ZerOS',
                 permissions: typeof PermissionManager !== 'undefined' ? [
                     PermissionManager.PERMISSION.GUI_WINDOW_CREATE,
-                    PermissionManager.PERMISSION.KERNEL_DISK_READ
+                    PermissionManager.PERMISSION.KERNEL_DISK_READ,
+                    PermissionManager.PERMISSION.SYSTEM_NOTIFICATION,
+                    PermissionManager.PERMISSION.EVENT_LISTENER
                 ] : [],
                 metadata: {
                     category: 'system',  // 系统应用

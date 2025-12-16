@@ -148,11 +148,19 @@ class TaskbarManager {
             return;
         }
         
+        if (typeof EventManager === 'undefined') {
+            KernelLogger.warn("TaskbarManager", "EventManager 不可用，无法注册 Ctrl 键监听");
+            return;
+        }
+        
+        const exploitPid = typeof ProcessManager !== 'undefined' ? ProcessManager.EXPLOIT_PID : 10000;
+        
         // 用于跟踪Ctrl键是否被单独按下（不与其他键组合）
         let ctrlKeyDownTime = 0;
         let otherKeyPressed = false;
         
-        document.addEventListener('keydown', (e) => {
+        // 注册 keydown 事件处理程序
+        EventManager.registerEventHandler(exploitPid, 'keydown', (e) => {
             // 检查是否按下了Ctrl键
             if (e.key === 'Control' || e.key === 'Ctrl') {
                 // 确保没有同时按下其他修饰键（Alt、Shift、Meta）
@@ -183,9 +191,13 @@ class TaskbarManager {
                 otherKeyPressed = true;
                 ctrlKeyDownTime = 0;
             }
-        }, { passive: false, capture: true });
+        }, {
+            priority: 5,  // 高优先级
+            useCapture: true
+        });
         
-        document.addEventListener('keyup', (e) => {
+        // 注册 keyup 事件处理程序
+        EventManager.registerEventHandler(exploitPid, 'keyup', (e) => {
             if (e.key === 'Control' || e.key === 'Ctrl') {
                 // 检查是否只按下了Ctrl键（没有其他键被按下）
                 if (ctrlKeyDownTime > 0 && !otherKeyPressed) {
@@ -204,7 +216,11 @@ class TaskbarManager {
                 ctrlKeyDownTime = 0;
                 otherKeyPressed = false;
             }
-        }, { passive: true, capture: true });
+        }, {
+            priority: 5,  // 高优先级
+            useCapture: true,
+            passive: true
+        });
         
         TaskbarManager._winKeyListenerRegistered = true;
         KernelLogger.info("TaskbarManager", "Ctrl键监听已注册（用于切换开始菜单）");
@@ -220,7 +236,14 @@ class TaskbarManager {
             return;
         }
         
-        document.addEventListener('keydown', (e) => {
+        if (typeof EventManager === 'undefined') {
+            KernelLogger.warn("TaskbarManager", "EventManager 不可用，无法注册全局快捷键");
+            return;
+        }
+        
+        const exploitPid = typeof ProcessManager !== 'undefined' ? ProcessManager.EXPLOIT_PID : 10000;
+        
+        EventManager.registerEventHandler(exploitPid, 'keydown', (e) => {
             // Ctrl+R: 启动运行程序（完全禁用刷新页面）
             if (e.ctrlKey && (e.key === 'r' || e.key === 'R') && !e.shiftKey && !e.altKey && !e.metaKey) {
                 // 始终阻止默认行为（防止浏览器刷新页面）
@@ -352,9 +375,10 @@ class TaskbarManager {
                             const windowsByPid = GUIManager.getWindowsByPid(focusedPid);
                             if (windowsByPid.length > 1) {
                                 // 如果该 PID 有多个窗口，只关闭当前焦点窗口，而不是整个进程
+                                // 使用 _closeWindow 确保正确关闭窗口，它会自动检查是否需要 kill 进程
                                 KernelLogger.info("TaskbarManager", `程序 PID ${focusedPid} 有 ${windowsByPid.length} 个窗口，只关闭焦点窗口 ${focusedWindow.windowId}`);
                                 try {
-                                    GUIManager.unregisterWindow(focusedWindow.windowId);
+                                    GUIManager._closeWindow(focusedWindow.windowId, false);
                                     KernelLogger.info("TaskbarManager", `已关闭焦点窗口 (WindowID: ${focusedWindow.windowId}, PID: ${focusedPid})`);
                                 } catch (error) {
                                     KernelLogger.error("TaskbarManager", `关闭窗口失败: ${error.message}`, error);
@@ -473,7 +497,10 @@ class TaskbarManager {
                     KernelLogger.warn("TaskbarManager", "ProcessManager 不可用，无法启动文件管理器");
                 }
             }
-        }, { passive: false, capture: true });
+        }, {
+            priority: 5,  // 高优先级
+            useCapture: true
+        });
         
         TaskbarManager._globalShortcutsRegistered = true;
         KernelLogger.info("TaskbarManager", "全局快捷键监听已注册（Ctrl+R 启动运行程序，Ctrl+E 关闭窗口，Ctrl+Q 切换最大化/最小化，Shift+E 启动文件管理器）");
@@ -2597,17 +2624,23 @@ class TaskbarManager {
             
             // 特殊处理：Exploit程序只关闭窗口，不kill进程
             if (processInfo.isExploit) {
-                // 关闭所有Exploit程序的GUI窗口
+                // 关闭所有Exploit程序的GUI窗口（包括所有程序详情窗口）
                 // 使用 GUIManager._closeWindow 确保正确调用 onClose 回调
                 if (typeof GUIManager !== 'undefined') {
                     const windows = GUIManager.getWindowsByPid(pid);
                     // 复制数组，避免迭代时修改
                     const windowsToClose = Array.from(windows);
+                    let closedCount = 0;
                     for (const windowInfo of windowsToClose) {
-                        // 使用 _closeWindow 方法（不强制关闭），它会正确调用 onClose 回调
-                        // onClose 回调会处理窗口清理和任务栏更新
-                        if (windowInfo.windowId) {
-                            GUIManager._closeWindow(windowInfo.windowId, false);
+                        // 检查窗口是否有效（在DOM中）
+                        if (windowInfo.window && windowInfo.window.parentElement && 
+                            document.body.contains(windowInfo.window)) {
+                            // 使用 _closeWindow 方法（不强制关闭），它会正确调用 onClose 回调
+                            // onClose 回调会处理窗口清理和任务栏更新
+                            if (windowInfo.windowId) {
+                                GUIManager._closeWindow(windowInfo.windowId, false);
+                                closedCount++;
+                            }
                         }
                     }
                     // 确保任务栏更新（关闭所有窗口后）
@@ -2616,6 +2649,10 @@ class TaskbarManager {
                             TaskbarManager.update();
                         }
                     }, 300);
+                    
+                    if (typeof KernelLogger !== 'undefined' && closedCount > 0) {
+                        KernelLogger.debug("TaskbarManager", `已关闭 ${closedCount} 个 Exploit 程序窗口`);
+                    }
                 }
             } else {
                 // 其他程序：正常kill进程
@@ -2952,6 +2989,47 @@ class TaskbarManager {
             
             // 单实例或非多实例程序，使用原有逻辑
             TaskbarManager._handleIconClick(programName, programData);
+        });
+        
+        // 中键点击事件：关闭所有窗口（包括程序详情窗口）
+        iconContainer.addEventListener('auxclick', (e) => {
+            // 中键是 button === 1
+            if (e.button === 1) {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                if (!programData.isRunning || !programData.pid) {
+                    return;
+                }
+                
+                // 检查是否是 Exploit 程序（程序详情窗口）
+                const processInfo = ProcessManager.PROCESS_TABLE.get(programData.pid);
+                if (processInfo && processInfo.isExploit) {
+                    // 关闭所有 Exploit 程序的窗口（包括所有程序详情窗口）
+                    if (typeof GUIManager !== 'undefined') {
+                        const windows = GUIManager.getWindowsByPid(programData.pid);
+                        // 复制数组，避免迭代时修改
+                        const windowsToClose = Array.from(windows);
+                        for (const windowInfo of windowsToClose) {
+                            // 使用 _closeWindow 方法（不强制关闭），它会正确调用 onClose 回调
+                            if (windowInfo.windowId) {
+                                GUIManager._closeWindow(windowInfo.windowId, false);
+                            }
+                        }
+                        // 确保任务栏更新（关闭所有窗口后）
+                        setTimeout(() => {
+                            if (typeof TaskbarManager !== 'undefined') {
+                                TaskbarManager.update();
+                            }
+                        }, 300);
+                    }
+                } else {
+                    // 其他程序：正常关闭（kill进程）
+                    if (typeof ProcessManager !== 'undefined' && typeof ProcessManager.killProgram === 'function') {
+                        ProcessManager.killProgram(programData.pid);
+                    }
+                }
+            }
         });
         
         // 添加窗口预览功能（悬停时显示窗口预览）
@@ -3744,12 +3822,37 @@ class TaskbarManager {
             closeBtn.innerHTML = '×';
             closeBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
-                // 如果是子窗口（有windowId），关闭窗口；否则终止进程
-                if (instance.windowId && typeof GUIManager !== 'undefined') {
-                    GUIManager.unregisterWindow(instance.windowId);
-                } else if (typeof ProcessManager !== 'undefined' && typeof ProcessManager.killProgram === 'function') {
-                    ProcessManager.killProgram(instance.pid);
+                
+                // 检查是否是 Exploit 程序（程序详情窗口）
+                const processInfo = instance.pid ? ProcessManager.PROCESS_TABLE.get(instance.pid) : null;
+                if (processInfo && processInfo.isExploit) {
+                    // Exploit 程序：关闭所有窗口（包括所有程序详情窗口）
+                    if (typeof GUIManager !== 'undefined') {
+                        const windows = GUIManager.getWindowsByPid(instance.pid);
+                        // 复制数组，避免迭代时修改
+                        const windowsToClose = Array.from(windows);
+                        for (const windowInfo of windowsToClose) {
+                            // 检查窗口是否有效（在DOM中）
+                            if (windowInfo.window && windowInfo.window.parentElement && 
+                                document.body.contains(windowInfo.window)) {
+                                // 使用 _closeWindow 方法（不强制关闭），它会正确调用 onClose 回调
+                                if (windowInfo.windowId) {
+                                    GUIManager._closeWindow(windowInfo.windowId, false);
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    // 其他程序：使用 _closeWindow 关闭窗口，它会自动检查是否需要 kill 进程
+                    // 这样可以确保窗口正确关闭，并且如果这是最后一个窗口，会自动 kill 进程
+                    if (instance.windowId && typeof GUIManager !== 'undefined' && typeof GUIManager._closeWindow === 'function') {
+                        GUIManager._closeWindow(instance.windowId, false);
+                    } else if (typeof ProcessManager !== 'undefined' && typeof ProcessManager.killProgram === 'function') {
+                        // 如果没有 windowId，直接 kill 进程
+                        ProcessManager.killProgram(instance.pid);
+                    }
                 }
+                
                 TaskbarManager._hideInstanceSelector();
                 setTimeout(() => {
                     TaskbarManager.update();
@@ -3758,8 +3861,16 @@ class TaskbarManager {
             item.appendChild(closeBtn);
             
             // 点击实例项：激活或切换最小化状态
+            // 点击实例项：激活或切换最小化状态
+            // 使用捕获阶段，确保在其他处理程序之前执行
             item.addEventListener('click', (e) => {
+                // 阻止事件传播，避免被 onClickOutside 关闭
                 e.stopPropagation();
+                e.stopImmediatePropagation();
+                
+                // 阻止默认行为
+                e.preventDefault();
+                
                 if (e.target === closeBtn || closeBtn.contains(e.target)) {
                     return; // 如果点击的是关闭按钮，不处理
                 }
@@ -3803,7 +3914,7 @@ class TaskbarManager {
                         }
                     }, 450);  // 延迟更长时间，确保最小化/恢复动画和状态更新完成
                 }, 100);
-            });
+            }, true); // 使用捕获阶段，确保在其他处理程序之前执行
             
             list.appendChild(item);
         }
@@ -8022,12 +8133,24 @@ class TaskbarManager {
             if (window.opener) {
                 window.close();
             } else {
-                // 如果无法关闭窗口，显示提示
-                // 使用GUIManager的提示框
-                if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                    await GUIManager.showAlert('系统已关闭。请手动关闭浏览器标签页。', '系统关闭', 'info');
-                } else {
-                    alert('系统已关闭。请手动关闭浏览器标签页。');
+                // 如果无法关闭窗口，使用通知提示（不打断用户）
+                // 注意：系统关闭后，通知可能无法显示，但这是最后的提示
+                if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                    try {
+                        // 使用 Exploit PID (10000) 创建通知
+                        const exploitPid = typeof ProcessManager !== 'undefined' ? ProcessManager.EXPLOIT_PID : 10000;
+                        await NotificationManager.createNotification(exploitPid, {
+                            type: 'snapshot',
+                            title: '系统关闭',
+                            content: '系统已关闭。请手动关闭浏览器标签页。',
+                            duration: 0  // 不自动关闭
+                        });
+                    } catch (e) {
+                        // 通知创建失败，静默处理（系统已关闭）
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn("TaskbarManager", `创建通知失败: ${e.message}`);
+                        }
+                    }
                 }
             }
         }, 500);
@@ -9799,10 +9922,15 @@ class TaskbarManager {
     static _registerCtrlMouseListener() {
         KernelLogger.info("TaskbarManager", "注册Ctrl+鼠标左键监听器（全屏多任务选择器）");
         
-        // 监听鼠标左键点击（当Ctrl键按下时）
-        // 直接使用事件对象的 ctrlKey 属性，更可靠
-        // 使用捕获阶段并设置更高的优先级（在EventManager之前处理）
-        const mouseHandler = (e) => {
+        if (typeof EventManager === 'undefined') {
+            KernelLogger.warn("TaskbarManager", "EventManager 不可用，无法注册 Ctrl+鼠标左键监听");
+            return;
+        }
+        
+        const exploitPid = typeof ProcessManager !== 'undefined' ? ProcessManager.EXPLOIT_PID : 10000;
+        
+        // 定义鼠标事件处理程序
+        const mouseHandler = (e, eventContext) => {
             // 检查是否是 Ctrl + 鼠标左键
             if (e.ctrlKey && e.button === 0 && !TaskbarManager._taskSwitcherActive) {
                 KernelLogger.debug("TaskbarManager", `检测到Ctrl+鼠标左键，目标: ${e.target?.tagName || 'unknown'}`);
@@ -9823,6 +9951,9 @@ class TaskbarManager {
                 if (target && (
                     target.closest('.zos-window-title-bar') ||
                     target.closest('.zos-window-controls') ||
+                    target.closest('.zos-window-titlebar') ||
+                    target.closest('.window-resizer') ||
+                    target.closest('.zos-window-resizer') ||
                     target.closest('.taskbar') ||
                     target.closest('#task-switcher-container')
                 )) {
@@ -9830,20 +9961,30 @@ class TaskbarManager {
                     return;
                 }
                 
-                e.preventDefault();
-                e.stopPropagation();
-                e.stopImmediatePropagation(); // 阻止其他监听器处理
+                // 使用 eventContext 阻止事件传播（如果可用）
+                if (eventContext) {
+                    eventContext.preventDefault();
+                    eventContext.stopImmediatePropagation();
+                } else {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    e.stopImmediatePropagation();
+                }
                 
                 KernelLogger.info("TaskbarManager", "触发全屏多任务选择器");
                 TaskbarManager._showTaskSwitcher();
+                
+                return 'stopImmediate'; // 立即停止事件传播
             }
+            // 如果不是 Ctrl+鼠标左键，不阻止事件传播，让其他处理程序继续处理
         };
         
-        // 使用捕获阶段，确保在其他监听器之前处理
-        // 使用 addEventListener 的第三个参数 { capture: true } 确保在捕获阶段处理
-        document.addEventListener('mousedown', mouseHandler, { 
-            passive: false, 
-            capture: true 
+        // 监听鼠标左键点击（当Ctrl键按下时）
+        // 直接使用事件对象的 ctrlKey 属性，更可靠
+        // 使用捕获阶段并设置更高的优先级（在EventManager之前处理）
+        EventManager.registerEventHandler(exploitPid, 'mousedown', mouseHandler, {
+            priority: 5,  // 高优先级，在窗口拖动之前处理
+            useCapture: true
         });
         
         // 保存处理器引用以便调试

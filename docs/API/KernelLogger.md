@@ -1,5 +1,18 @@
 # KernelLogger API 文档
 
+## ⚠️ 重要提示
+
+**所有日志输出必须通过 `KernelLogger` 进行统一管理**。这是 ZerOS 系统的强制要求。
+
+- ✅ **必须使用**：`KernelLogger.info()`, `KernelLogger.warn()`, `KernelLogger.error()`, `KernelLogger.debug()`
+- ❌ **禁止直接使用**：`console.log()`, `console.warn()`, `console.error()`（不推荐）
+
+**原因**：
+- 统一的日志格式，包含模块名、时间戳、级别等信息
+- 支持日志级别过滤，控制日志输出
+- 结构化日志，便于调试和问题排查
+- 可以统一控制日志输出，避免性能问题
+
 ## 概述
 
 `KernelLogger` 是 ZerOS 内核的统一日志系统，提供结构化的日志输出。完全独立，不依赖任何外部模块，确保日志系统稳定运行。

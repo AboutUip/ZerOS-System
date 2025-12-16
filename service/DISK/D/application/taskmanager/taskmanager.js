@@ -7,6 +7,10 @@
     
     const TASKMANAGER = {
         pid: null,
+        
+        // 磁盘信息缓存
+        _diskInfoCache: new Map(), // Map<diskName, { data, timestamp }>
+        _diskInfoCacheTimeout: 30000, // 缓存30秒,
         window: null,
         windowState: null,
         updateInterval: null,
@@ -57,13 +61,14 @@
                     icon = ApplicationAssetManager.getIcon('taskmanager');
                 }
                 
-                GUIManager.registerWindow(pid, this.window, {
+                const windowInfo = GUIManager.registerWindow(pid, this.window, {
                     title: '任务管理器',
                     icon: icon,
                     onClose: () => {
-                        if (typeof ProcessManager !== 'undefined') {
-                            ProcessManager.killProgram(this.pid);
-                        }
+                        // onClose 回调只做清理工作，不调用 _closeWindow 或 unregisterWindow
+                        // 窗口关闭由 GUIManager._closeWindow 统一处理
+                        // _closeWindow 会在窗口关闭后检查该 PID 是否还有其他窗口，如果没有，会 kill 进程
+                        // 这样可以确保程序多实例（不同 PID）互不影响
                     },
                     onMinimize: () => {
                         // 最小化回调
@@ -72,6 +77,10 @@
                         // 最大化回调
                     }
                 });
+                // 保存窗口ID，用于精确清理
+                if (windowInfo && windowInfo.windowId) {
+                    this.windowId = windowInfo.windowId;
+                }
             } else {
                 // 降级方案：手动创建标题栏
                 const titleBar = this._createTitleBar();
@@ -602,6 +611,7 @@
             panel.className = 'taskmanager-resource-monitor';
             panel.style.cssText = `
                 display: none;
+                overflow-y: auto;
             `;
             
             // 内存使用图表
@@ -626,15 +636,44 @@
                 border: 1px solid rgba(108, 142, 255, 0.2);
                 border-radius: 8px;
                 padding: 16px;
-                height: 200px;
+                min-height: 200px;
             `;
             memorySection.appendChild(memoryChart);
             
             panel.appendChild(memorySection);
             
+            // 磁盘分区使用情况
+            const diskSection = document.createElement('div');
+            diskSection.style.cssText = `
+                margin-bottom: 24px;
+            `;
+            
+            const diskTitle = document.createElement('h3');
+            diskTitle.textContent = '磁盘分区';
+            diskTitle.style.cssText = `
+                color: #e8ecf0;
+                font-size: 16px;
+                margin-bottom: 12px;
+            `;
+            diskSection.appendChild(diskTitle);
+            
+            const diskChart = document.createElement('div');
+            diskChart.className = 'taskmanager-disk-chart';
+            diskChart.style.cssText = `
+                background: rgba(108, 142, 255, 0.05);
+                border: 1px solid rgba(108, 142, 255, 0.2);
+                border-radius: 8px;
+                padding: 16px;
+                min-height: 150px;
+            `;
+            diskSection.appendChild(diskChart);
+            
+            panel.appendChild(diskSection);
+            
             // 存储引用
             this.resourceMonitorPanel = panel;
             this.memoryChart = memoryChart;
+            this.diskChart = diskChart;
             
             return panel;
         },
@@ -919,20 +958,40 @@
         _killProcess: async function(pid, programName) {
             const process = ProcessManager.getProcessInfo(pid);
             if (!process) {
-                if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                    await GUIManager.showAlert('进程不存在', '错误', 'error');
-                } else {
-                    alert('进程不存在');
+                // 进程不存在，使用通知提示（不打断用户）
+                if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                    try {
+                        await NotificationManager.createNotification(this.pid, {
+                            type: 'snapshot',
+                            title: '任务管理器',
+                            content: '进程不存在',
+                            duration: 3000
+                        });
+                    } catch (e) {
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('TaskManager', `创建通知失败: ${e.message}`);
+                        }
+                    }
                 }
                 return;
             }
             
             // 如果是Exploit程序，不允许终止
             if (process.isExploit) {
-                if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                    await GUIManager.showAlert('无法终止Exploit程序', '错误', 'error');
-                } else {
-                    alert('无法终止Exploit程序');
+                // 无法终止Exploit程序，使用通知提示（不打断用户）
+                if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                    try {
+                        await NotificationManager.createNotification(this.pid, {
+                            type: 'snapshot',
+                            title: '任务管理器',
+                            content: '无法终止Exploit程序',
+                            duration: 3000
+                        });
+                    } catch (e) {
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('TaskManager', `创建通知失败: ${e.message}`);
+                        }
+                    }
                 }
                 return;
             }
@@ -973,17 +1032,37 @@
                         this._updateProcessList();
                     }, 200);
                 } else {
-                    if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                        await GUIManager.showAlert('ProcessManager 不可用，无法终止进程', '错误', 'error');
-                    } else {
-                        alert('ProcessManager 不可用，无法终止进程');
+                    // ProcessManager 不可用，使用通知提示（不打断用户）
+                    if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                        try {
+                            await NotificationManager.createNotification(this.pid, {
+                                type: 'snapshot',
+                                title: '任务管理器',
+                                content: 'ProcessManager 不可用，无法终止进程',
+                                duration: 3000
+                            });
+                        } catch (e) {
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.warn('TaskManager', `创建通知失败: ${e.message}`);
+                            }
+                        }
                     }
                 }
             } catch (e) {
-                if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                    await GUIManager.showAlert(`终止进程失败: ${e.message}`, '错误', 'error');
-                } else {
-                    alert(`终止进程失败: ${e.message}`);
+                // 终止进程失败，使用通知提示（不打断用户）
+                if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                    try {
+                        await NotificationManager.createNotification(this.pid, {
+                            type: 'snapshot',
+                            title: '任务管理器',
+                            content: `终止进程失败: ${e.message}`,
+                            duration: 4000
+                        });
+                    } catch (notifError) {
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('TaskManager', `创建通知失败: ${notifError.message}`);
+                        }
+                    }
                 }
                 console.error('终止进程失败:', e);
             }
@@ -1341,6 +1420,11 @@
                     font-size: 13px;
                     font-weight: 500;
                 `;
+                
+                // 如果指定了 dataAttribute，添加到值元素
+                if (item.dataAttribute) {
+                    value.setAttribute(item.dataAttribute, '');
+                }
                 
                 row.appendChild(label);
                 row.appendChild(value);
@@ -1792,7 +1876,7 @@
             
             // 移除调试输出，避免日志过多
             
-            // 更新图表
+            // 更新内存图表
             this.memoryChart.innerHTML = `
                 <div style="display: flex; flex-direction: column; gap: 12px;">
                     <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -1840,6 +1924,11 @@
                     </div>
                 </div>
             `;
+            
+            // 更新磁盘分区图表（从 PHP 服务实时获取）
+            if (this.diskChart) {
+                this._updateDiskChart();
+            }
         },
         
         _updateSystemInfo: function() {
@@ -1952,15 +2041,231 @@
                 info.push({ label: '磁盘状态', value: Disk.canUsed ? '✓ 可用' : '✗ 不可用' });
                 
                 if (Disk.canUsed && Disk.diskSeparateMap) {
-                    const separates = Array.from(Disk.diskSeparateMap.keys());
-                    info.push({ label: '分区数量', value: separates.length.toString() });
-                    info.push({ label: '分区列表', value: separates.join(', ') || '无' });
+                    // 获取所有分区（不依赖 initialized 属性，因为分区可能已经存在但还未完全初始化）
+                    const allPartitions = [];
+                    Disk.diskSeparateMap.forEach((nodeTree, partitionName) => {
+                        if (nodeTree) {
+                            allPartitions.push(partitionName);
+                        }
+                    });
+                    
+                    // 如果 diskSeparateMap 为空，尝试从 diskSeparateSize 获取分区列表
+                    if (allPartitions.length === 0 && Disk.diskSeparateSize) {
+                        Disk.diskSeparateSize.forEach((size, partitionName) => {
+                            allPartitions.push(partitionName);
+                        });
+                    }
+                    
+                    info.push({ label: '分区数量', value: allPartitions.length.toString() });
+                    info.push({ label: '分区列表', value: allPartitions.length > 0 ? allPartitions.join(', ') : '无' });
+                    
+                    // 显示每个分区的详细信息（从 PHP 服务实时获取）
+                    if (allPartitions.length > 0) {
+                        // 先显示"加载中..."，然后异步更新
+                        allPartitions.forEach(partitionName => {
+                            const partitionLabel = partitionName === 'D:' ? `${partitionName} (系统盘)` : partitionName;
+                            info.push({ 
+                                label: partitionLabel, 
+                                value: '加载中...',
+                                dataAttribute: 'data-disk-info' // 标记为磁盘信息，用于后续更新
+                            });
+                        });
+                        
+                        // 异步更新磁盘信息（使用缓存）
+                        (async () => {
+                            try {
+                                const diskInfos = await Promise.all(
+                                    allPartitions.map(partitionName => this._getRealDiskInfo(partitionName, false))
+                                );
+                                
+                                // 更新系统信息面板中的磁盘信息
+                                if (this.systemInfoContent) {
+                                    const diskInfoElements = this.systemInfoContent.querySelectorAll('[data-disk-info]');
+                                    diskInfos.forEach((diskInfo, index) => {
+                                        if (diskInfoElements[index]) {
+                                            const usedPercent = diskInfo.total > 0 ? ((diskInfo.used / diskInfo.total) * 100).toFixed(1) : '0.0';
+                                            diskInfoElements[index].textContent = `${this._formatBytes(diskInfo.used)} / ${this._formatBytes(diskInfo.total)} (${usedPercent}%)`;
+                                        }
+                                    });
+                                }
+                            } catch (e) {
+                                // 如果获取失败，更新为错误信息
+                                if (this.systemInfoContent) {
+                                    const diskInfoElements = this.systemInfoContent.querySelectorAll('[data-disk-info]');
+                                    diskInfoElements.forEach(el => {
+                                        if (el.textContent === '加载中...') {
+                                            el.textContent = '获取失败';
+                                            el.style.color = '#ff4444';
+                                        }
+                                    });
+                                }
+                            }
+                        })();
+                    }
                 }
             } else {
                 info.push({ label: '磁盘状态', value: '✗ Disk模块未加载' });
             }
             
             return info;
+        },
+        
+        /**
+         * 从 PHP 服务获取真实的磁盘信息（带缓存）
+         * @param {string} diskName 磁盘名称（如 'C:' 或 'D:'）
+         * @param {boolean} forceRefresh 是否强制刷新缓存（默认false）
+         * @returns {Promise<Object>} 磁盘信息对象 { name, total, used, free }
+         */
+        _getRealDiskInfo: async function(diskName, forceRefresh = false) {
+            // 检查缓存
+            if (!forceRefresh && this._diskInfoCache.has(diskName)) {
+                const cached = this._diskInfoCache.get(diskName);
+                const now = Date.now();
+                // 如果缓存未过期，直接返回缓存数据
+                if (now - cached.timestamp < this._diskInfoCacheTimeout) {
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.debug('TASKMANAGER', `使用缓存的磁盘信息: ${diskName}`);
+                    }
+                    return cached.data;
+                }
+            }
+            
+            const disk = diskName.replace(':', ''); // 移除冒号，得到 C 或 D
+            try {
+                const url = new URL('/service/FSDirve.php', window.location.origin);
+                url.searchParams.set('action', 'get_disk_info');
+                url.searchParams.set('disk', disk);
+                
+                const response = await fetch(url);
+                const result = await response.json();
+                
+                if (result.status === 'success' && result.data) {
+                    const data = result.data;
+                    // 使用 dirSize 作为已用空间（这是真实的目录大小）
+                    // 如果 dirSize 为 0 或不存在，使用 usedSpace 作为备用
+                    const used = data.dirSize && data.dirSize > 0 ? data.dirSize : (data.usedSpace || 0);
+                    // 使用配置的分区大小作为总大小，如果没有配置则使用 PHP 返回的 totalSize
+                    const total = (typeof Disk !== 'undefined' && Disk.diskSeparateSize) 
+                        ? (Disk.diskSeparateSize.get(diskName) || data.totalSize || 0)
+                        : (data.totalSize || 0);
+                    const free = total - used;
+                    
+                    const diskInfo = {
+                        name: diskName,
+                        total: total,
+                        used: used,
+                        free: free
+                    };
+                    
+                    // 更新缓存
+                    this._diskInfoCache.set(diskName, {
+                        data: diskInfo,
+                        timestamp: Date.now()
+                    });
+                    
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.debug('TASKMANAGER', `从 PHP 服务获取磁盘 ${diskName} 信息成功: ${this._formatBytes(used)} / ${this._formatBytes(total)}`);
+                    }
+                    
+                    return diskInfo;
+                }
+            } catch (e) {
+                // 如果 PHP 服务不可用，回退到使用内存中的数据
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.debug('TASKMANAGER', `从 PHP 服务获取磁盘 ${diskName} 信息失败，使用内存数据: ${e.message}`);
+                }
+            }
+            
+            // 回退方案：使用内存中的数据
+            if (typeof Disk !== 'undefined' && Disk.diskSeparateSize) {
+                const total = Disk.diskSeparateSize.get(diskName) || 0;
+                const used = (Disk.diskUsedMap && Disk.diskUsedMap.get(diskName)) || 0;
+                const free = (Disk.diskFreeMap && Disk.diskFreeMap.get(diskName)) || (total - used);
+                
+                return {
+                    name: diskName,
+                    total: total,
+                    used: used,
+                    free: free
+                };
+            }
+            
+            // 如果 Disk 模块也不可用，使用默认值
+            const defaultTotal = diskName === 'C:' ? 1024 * 1024 * 1024 * 1 : 
+                                 (diskName === 'D:' ? 1024 * 1024 * 1024 * 2 : 0);
+            return {
+                name: diskName,
+                total: defaultTotal,
+                used: 0,
+                free: defaultTotal
+            };
+        },
+        
+        /**
+         * 更新磁盘分区图表（从 PHP 服务实时获取）
+         */
+        _updateDiskChart: async function() {
+            if (!this.diskChart) return;
+            
+            let diskHtml = '<div style="display: flex; flex-direction: column; gap: 12px;">';
+            
+            if (typeof Disk !== 'undefined' && Disk.canUsed && Disk.diskSeparateMap) {
+                // 获取所有分区（不依赖 initialized 属性）
+                const allPartitions = [];
+                Disk.diskSeparateMap.forEach((nodeTree, partitionName) => {
+                    if (nodeTree) {
+                        allPartitions.push(partitionName);
+                    }
+                });
+                
+                // 如果 diskSeparateMap 为空，尝试从 diskSeparateSize 获取分区列表
+                if (allPartitions.length === 0 && Disk.diskSeparateSize) {
+                    Disk.diskSeparateSize.forEach((size, partitionName) => {
+                        allPartitions.push(partitionName);
+                    });
+                }
+                
+                if (allPartitions.length > 0) {
+                    // 从 PHP 服务获取所有分区的磁盘信息（使用缓存）
+                    try {
+                        const diskInfos = await Promise.all(
+                            allPartitions.map(partitionName => this._getRealDiskInfo(partitionName, false))
+                        );
+                        
+                        diskInfos.forEach(info => {
+                            const usedPercent = info.total > 0 ? ((info.used / info.total) * 100) : 0;
+                            const partitionLabel = info.name === 'D:' ? `${info.name} (系统盘)` : info.name;
+                            
+                            diskHtml += `
+                                <div>
+                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                                        <span style="color: #aab2c0; font-size: 13px;">${partitionLabel}</span>
+                                        <span style="color: #6c8eff; font-size: 14px; font-weight: 600;">${this._formatBytes(info.used)} / ${this._formatBytes(info.total)}</span>
+                                    </div>
+                                    <div style="height: 8px; background: rgba(108, 142, 255, 0.1); border-radius: 4px; overflow: hidden;">
+                                        <div style="height: 100%; width: ${Math.min(100, usedPercent)}%; background: linear-gradient(90deg, #6c8eff, #8da6ff); transition: width 0.3s;"></div>
+                                    </div>
+                                    <div style="display: flex; justify-content: space-between; margin-top: 4px;">
+                                        <span style="color: #8da6ff; font-size: 11px;">已用: ${this._formatBytes(info.used)}</span>
+                                        <span style="color: #aab2c0; font-size: 11px;">空闲: ${this._formatBytes(info.free)}</span>
+                                        <span style="color: #6c8eff; font-size: 11px;">${usedPercent.toFixed(1)}%</span>
+                                    </div>
+                                </div>
+                            `;
+                        });
+                    } catch (e) {
+                        // 如果获取失败，显示错误信息
+                        diskHtml += `<div style="color: #ff4444; font-size: 13px; text-align: center; padding: 20px;">获取磁盘信息失败: ${e.message}</div>`;
+                    }
+                } else {
+                    diskHtml += '<div style="color: #aab2c0; font-size: 13px; text-align: center; padding: 20px;">暂无已初始化的分区</div>';
+                }
+            } else {
+                diskHtml += '<div style="color: #aab2c0; font-size: 13px; text-align: center; padding: 20px;">磁盘未初始化或不可用</div>';
+            }
+            
+            diskHtml += '</div>';
+            this.diskChart.innerHTML = diskHtml;
         },
         
         _showProcessContextMenu: function(e, process) {
@@ -3224,14 +3529,18 @@
             
             // 清理引用（先清理，避免重复调用）
             const window = this._poolViewWindow;
+            const windowId = window.dataset.windowId;
             this._poolViewWindow = null;
             this._childWindows.delete('pool');
             
-            // 通过GUIManager注销窗口（这会自动移除DOM）
-            if (typeof GUIManager !== 'undefined' && window.dataset.windowId) {
-                GUIManager.unregisterWindow(window.dataset.windowId);
+            // 通过GUIManager关闭窗口（使用 _closeWindow 确保正确关闭）
+            if (typeof GUIManager !== 'undefined' && windowId && typeof GUIManager._closeWindow === 'function') {
+                GUIManager._closeWindow(windowId, false);
+            } else if (typeof GUIManager !== 'undefined' && windowId && typeof GUIManager.unregisterWindow === 'function') {
+                // 降级方案：直接注销窗口
+                GUIManager.unregisterWindow(windowId);
             } else {
-                // 降级方案：直接移除DOM
+                // 最后降级方案：直接移除DOM
                 if (window.parentElement) {
                     window.parentElement.removeChild(window);
                 }
@@ -3511,12 +3820,51 @@
          * 获取进程的内存大小（用于排序）
          */
         _getProcessMemorySize: function(process) {
-            if (!process.memoryInfo) return 0;
-            let memInfo = process.memoryInfo;
-            if (memInfo.programs && memInfo.programs.length > 0) {
-                memInfo = memInfo.programs[0];
+            // 首先尝试从 process.memoryInfo 获取
+            let memInfo = null;
+            if (process.memoryInfo) {
+                memInfo = process.memoryInfo;
+                if (memInfo.programs && memInfo.programs.length > 0) {
+                    memInfo = memInfo.programs[0];
+                } else if (memInfo.pid === process.pid) {
+                    // 如果直接是程序信息对象
+                    memInfo = memInfo;
+                }
             }
-            return memInfo.totalHeapSize || 0;
+            
+            // 如果从 process.memoryInfo 获取失败，尝试直接调用 MemoryManager
+            if (!memInfo || !memInfo.totalHeapSize) {
+                if (typeof MemoryManager !== 'undefined') {
+                    try {
+                        // 对于Exploit程序，确保内存已分配
+                        if (process.pid === 10000 && typeof KernelMemory !== 'undefined') {
+                            try {
+                                KernelMemory._ensureMemory();
+                            } catch (e) {
+                                // 忽略错误
+                            }
+                        }
+                        const memoryResult = MemoryManager.checkMemory(process.pid);
+                        if (memoryResult) {
+                            if (memoryResult.programs && memoryResult.programs.length > 0) {
+                                memInfo = memoryResult.programs[0];
+                            } else if (memoryResult.pid === process.pid) {
+                                memInfo = memoryResult;
+                            }
+                        }
+                    } catch (e) {
+                        // 忽略错误，返回 0
+                        return 0;
+                    }
+                }
+            }
+            
+            // 返回内存大小（优先使用 totalHeapSize，如果没有则使用 heapSize）
+            if (memInfo) {
+                return memInfo.totalHeapSize || memInfo.heapSize || 0;
+            }
+            
+            return 0;
         },
         
         __exit__: async function() {
@@ -3635,9 +3983,9 @@
         _getFilterExited: function() {
             if (typeof MemoryUtils !== 'undefined' && this.pid) {
                 const value = MemoryUtils.loadData(this.pid, this._filterExitedKey);
-                return value !== null ? value : false;
+                return value !== null ? value : true;
             }
-            return false;
+            return true;
         },
         
         _setFilterExited: function(value) {
@@ -3666,11 +4014,13 @@
                 version: '1.0.0',
                 description: 'ZerOS 任务管理器 - 进程管理、资源监控和系统检测',
                 author: 'ZerOS Team',
-                copyright: '© 2024',
+                copyright: '© 2025 ZerOS',
                 permissions: typeof PermissionManager !== 'undefined' ? [
                     PermissionManager.PERMISSION.GUI_WINDOW_CREATE,
                     PermissionManager.PERMISSION.PROCESS_MANAGE,
-                    PermissionManager.PERMISSION.KERNEL_MEMORY_READ
+                    PermissionManager.PERMISSION.KERNEL_MEMORY_READ,
+                    PermissionManager.PERMISSION.SYSTEM_NOTIFICATION,
+                    PermissionManager.PERMISSION.EVENT_LISTENER
                 ] : [],
                 metadata: {
                     allowMultipleInstances: false

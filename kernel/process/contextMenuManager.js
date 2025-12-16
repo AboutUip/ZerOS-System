@@ -22,33 +22,66 @@ class ContextMenuManager {
             return;
         }
         
-        // 监听全局右键事件
-        document.addEventListener('contextmenu', (e) => {
-            ContextMenuManager._handleContextMenu(e);
-        }, true); // 使用捕获阶段，确保优先处理
-        
-        // 监听点击事件，关闭菜单
-        document.addEventListener('click', (e) => {
-            ContextMenuManager._handleClick(e);
-        }, true);
-        
-        // 监听鼠标按下事件，确保菜单能及时关闭
-        document.addEventListener('mousedown', (e) => {
-            // 如果点击不在菜单内，立即关闭菜单
-            const clickedInMenu = ContextMenuManager._currentMenu && ContextMenuManager._currentMenu.contains(e.target);
-            const clickedInSubmenu = e.target.closest('.context-menu-submenu');
+        // 使用 EventManager 注册事件处理程序
+        if (typeof EventManager !== 'undefined') {
+            const exploitPid = typeof ProcessManager !== 'undefined' ? ProcessManager.EXPLOIT_PID : 10000;
             
-            if (!clickedInMenu && !clickedInSubmenu) {
-                ContextMenuManager._hideMenu(true); // 立即关闭
-            }
-        }, true);
-        
-        // 监听 ESC 键，关闭菜单
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && ContextMenuManager._currentMenu) {
-                ContextMenuManager._hideMenu(true); // 立即关闭
-            }
-        }, true);
+            // 注册右键菜单事件处理程序（最高优先级）
+            EventManager.registerEventHandler(exploitPid, 'contextmenu', (e, eventContext) => {
+                // 立即阻止默认行为（阻止浏览器默认右键菜单）
+                if (eventContext) {
+                    eventContext.preventDefault();
+                } else {
+                    e.preventDefault();
+                }
+                
+                // 处理右键菜单（异步）
+                ContextMenuManager._handleContextMenu(e, eventContext);
+                
+                // 返回 false 确保阻止默认行为
+                return false;
+            }, {
+                priority: 10, // 最高优先级
+                useCapture: true,
+                stopPropagation: false // 允许其他程序处理
+            });
+            
+            // 注册点击事件处理程序
+            EventManager.registerEventHandler(exploitPid, 'click', (e) => {
+                ContextMenuManager._handleClick(e);
+            }, {
+                priority: 10,
+                useCapture: true
+            });
+            
+            // 注册鼠标按下事件处理程序
+            EventManager.registerEventHandler(exploitPid, 'mousedown', (e) => {
+                // 如果点击不在菜单内，立即关闭菜单
+                const clickedInMenu = ContextMenuManager._currentMenu && ContextMenuManager._currentMenu.contains(e.target);
+                const clickedInSubmenu = e.target.closest('.context-menu-submenu');
+                
+                if (!clickedInMenu && !clickedInSubmenu) {
+                    ContextMenuManager._hideMenu(true); // 立即关闭
+                }
+            }, {
+                priority: 10,
+                useCapture: true
+            });
+            
+            // 注册 ESC 键事件处理程序
+            EventManager.registerEventHandler(exploitPid, 'keydown', (e) => {
+                if (e.key === 'Escape' && ContextMenuManager._currentMenu) {
+                    ContextMenuManager._hideMenu(true); // 立即关闭
+                }
+            }, {
+                priority: 10,
+                useCapture: true
+            });
+        } else {
+            // 降级：如果 EventManager 不可用，记录警告但不注册事件
+            // 这会导致右键菜单功能不可用，但不会导致系统崩溃
+            KernelLogger.warn("ContextMenuManager", "EventManager 不可用，右键菜单功能将不可用");
+        }
         
         KernelLogger.info("ContextMenuManager", "全局右键菜单系统初始化完成");
     }
@@ -56,8 +89,9 @@ class ContextMenuManager {
     /**
      * 处理右键菜单事件
      * @param {Event} e 事件对象
+     * @param {Object} eventContext 事件上下文对象（可选）
      */
-    static async _handleContextMenu(e) {
+    static async _handleContextMenu(e, eventContext = null) {
         // 检查是否点击在扫雷窗口中（扫雷游戏需要拦截右键菜单）
         const minesweeperWindow = e.target.closest && e.target.closest('.minesweeper-window');
         if (minesweeperWindow) {
@@ -66,12 +100,65 @@ class ContextMenuManager {
             return;
         }
         
-        // 阻止默认右键菜单
-        e.preventDefault();
-        e.stopPropagation();
+        // 阻止默认右键菜单（如果还没有被阻止）
+        if (eventContext) {
+            if (!eventContext.prevented) {
+                eventContext.preventDefault();
+            }
+            if (!eventContext.stopped) {
+                eventContext.stopPropagation();
+            }
+        } else {
+            e.preventDefault();
+            e.stopPropagation();
+        }
         
         // 确定上下文
         const context = ContextMenuManager._determineContext(e.target);
+        
+        // 检查是否在程序窗口内，且该程序未注册自定义右键菜单
+        // 如果是，则阻止桌面右键菜单弹出
+        // 注意：不仅检查 window-content，还要检查是否在任何程序窗口内（因为可能被识别为 desktop）
+        const windowElement = e.target.closest && e.target.closest('.bash-window, .zos-gui-window');
+        if (windowElement) {
+            // 获取窗口的PID
+            let targetPid = null;
+            if (windowElement.dataset && windowElement.dataset.pid) {
+                targetPid = parseInt(windowElement.dataset.pid, 10);
+            } else if (typeof GUIManager !== 'undefined' && GUIManager._windows) {
+                // 通过GUIManager查找窗口信息
+                for (const [windowId, windowInfo] of GUIManager._windows) {
+                    if (windowInfo.window === windowElement || 
+                        windowElement.contains(windowInfo.window) || 
+                        windowInfo.window.contains(windowElement)) {
+                        targetPid = windowInfo.pid;
+                        break;
+                    }
+                }
+            }
+            
+            // 如果找到了PID，检查该程序是否注册了自定义右键菜单
+            if (targetPid && typeof targetPid === 'number') {
+                const programMenus = ContextMenuManager._programMenus.get(targetPid);
+                // 如果程序没有注册任何右键菜单，阻止桌面右键菜单弹出
+                if (!programMenus || programMenus.size === 0) {
+                    KernelLogger.debug("ContextMenuManager", 
+                        `程序 PID ${targetPid} 未注册自定义右键菜单，阻止桌面右键菜单弹出`
+                    );
+                    return; // 直接返回，不显示任何菜单
+                }
+            } else if (windowElement) {
+                // 如果找不到PID，但确实在程序窗口内，也阻止菜单（可能是窗口但无法获取PID）
+                // 但排除标题栏，因为标题栏可能有系统菜单
+                const titleBar = e.target.closest('.zos-window-titlebar, .zos-window-title-bar, .bar');
+                if (!titleBar && context !== 'window-titlebar') {
+                    KernelLogger.debug("ContextMenuManager", 
+                        `在程序窗口内但无法获取PID，阻止桌面右键菜单弹出`
+                    );
+                    return; // 直接返回，不显示任何菜单
+                }
+            }
+        }
         
         // 获取对应的菜单配置（可能是 Promise）
         const menuConfigResult = ContextMenuManager._getMenuConfig(context, e.target);
@@ -121,11 +208,12 @@ class ContextMenuManager {
             return 'filemanager-item';
         }
         
-        // 检查是否在程序窗口中
-        const bashWindow = target.closest('.bash-window');
-        if (bashWindow) {
-            const bar = target.closest('.bar');
-            if (bar) {
+        // 检查是否在程序窗口中（包括 .bash-window 和 .zos-gui-window）
+        const programWindow = target.closest('.bash-window, .zos-gui-window');
+        if (programWindow) {
+            // 检查是否在标题栏上
+            const titleBar = target.closest('.zos-window-titlebar, .zos-window-title-bar, .bar');
+            if (titleBar) {
                 return 'window-titlebar';
             }
             return 'window-content';
@@ -386,23 +474,11 @@ class ContextMenuManager {
                         icon: '🗑️',
                         danger: true,
                         action: async () => {
-                            let confirmed = false;
-                            if (typeof GUIManager !== 'undefined' && typeof GUIManager.showConfirm === 'function') {
-                                confirmed = await GUIManager.showConfirm(
-                                    `确定要从桌面删除 "${iconData.name}" 吗？`,
-                                    '确认删除',
-                                    'danger'
-                                );
-                            } else {
-                                confirmed = confirm(`确定要从桌面删除 "${iconData.name}" 吗？`);
+                            // 直接执行删除，不显示确认弹窗
+                            if (typeof DesktopManager !== 'undefined' && typeof DesktopManager.removeShortcut === 'function') {
+                                DesktopManager.removeShortcut(iconData.id);
                             }
-                            
-                            if (confirmed) {
-                                if (typeof DesktopManager !== 'undefined' && typeof DesktopManager.removeShortcut === 'function') {
-                                    DesktopManager.removeShortcut(iconData.id);
-                                }
-                                ContextMenuManager._hideMenu();
-                            }
+                            ContextMenuManager._hideMenu();
                         }
                     });
                     
@@ -462,10 +538,9 @@ class ContextMenuManager {
                                 }
                                 
                                 if (!scriptPath) {
-                                    if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                                        await GUIManager.showAlert(`无法获取程序 ${programName} 的源文件路径`, '错误', 'error');
-                                    } else {
-                                        alert(`无法获取程序 ${programName} 的源文件路径`);
+                                    // 无法获取源文件路径，静默处理（记录日志）
+                                    if (typeof KernelLogger !== 'undefined') {
+                                        KernelLogger.warn("ContextMenuManager", `无法获取程序 ${programName} 的源文件路径`);
                                     }
                                     ContextMenuManager._hideMenu();
                                     return;
@@ -478,10 +553,9 @@ class ContextMenuManager {
                                 const scriptDir = scriptPath.substring(0, scriptPath.lastIndexOf('/'));
                                 
                                 if (!scriptDir) {
-                                    if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                                        await GUIManager.showAlert(`无法提取程序 ${programName} 的源目录路径`, '错误', 'error');
-                                    } else {
-                                        alert(`无法提取程序 ${programName} 的源目录路径`);
+                                    // 无法提取源目录路径，静默处理（记录日志）
+                                    if (typeof KernelLogger !== 'undefined') {
+                                        KernelLogger.warn("ContextMenuManager", `无法提取程序 ${programName} 的源目录路径`);
                                     }
                                     ContextMenuManager._hideMenu();
                                     return;
@@ -531,13 +605,9 @@ class ContextMenuManager {
                                 
                                 ContextMenuManager._hideMenu();
                             } catch (error) {
+                                // 打开程序源地址失败，静默处理（记录日志）
                                 if (typeof KernelLogger !== 'undefined') {
                                     KernelLogger.error("ContextMenuManager", `打开程序源地址失败: ${error.message}`, error);
-                                }
-                                if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                                    await GUIManager.showAlert(`打开程序源地址失败: ${error.message}`, '错误', 'error');
-                                } else {
-                                    alert(`打开程序源地址失败: ${error.message}`);
                                 }
                                 ContextMenuManager._hideMenu();
                             }
@@ -557,10 +627,9 @@ class ContextMenuManager {
                                 }
                                 
                                 if (!scriptPath) {
-                                    if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                                        await GUIManager.showAlert(`无法获取程序 ${programName} 的源文件路径`, '错误', 'error');
-                                    } else {
-                                        alert(`无法获取程序 ${programName} 的源文件路径`);
+                                    // 无法获取源文件路径，静默处理（记录日志）
+                                    if (typeof KernelLogger !== 'undefined') {
+                                        KernelLogger.warn("ContextMenuManager", `无法获取程序 ${programName} 的源文件路径`);
                                     }
                                     ContextMenuManager._hideMenu();
                                     return;
@@ -625,21 +694,15 @@ class ContextMenuManager {
                                         if (typeof GUIManager !== 'undefined') {
                                             GUIManager.focusWindow(zeroidePid);
                                         }
-                                        if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                                            await GUIManager.showAlert('ZeroIDE 已启动，请在 ZeroIDE 中手动打开文件', '提示', 'info');
-                                        }
+                                        // ZeroIDE 已启动，静默处理（用户可以看到 ZeroIDE 窗口已打开）
                                     }
                                 }
                                 
                                 ContextMenuManager._hideMenu();
                             } catch (error) {
+                                // 打开程序源文件失败，静默处理（记录日志）
                                 if (typeof KernelLogger !== 'undefined') {
                                     KernelLogger.error("ContextMenuManager", `打开程序源文件失败: ${error.message}`, error);
-                                }
-                                if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                                    await GUIManager.showAlert(`打开程序源文件失败: ${error.message}`, '错误', 'error');
-                                } else {
-                                    alert(`打开程序源文件失败: ${error.message}`);
                                 }
                                 ContextMenuManager._hideMenu();
                             }
@@ -872,8 +935,9 @@ class ContextMenuManager {
                         try {
                             await TaskbarManager.unpinProgram(programName);
                         } catch (error) {
-                            if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                                await GUIManager.showAlert(`取消固定失败: ${error.message}`, '错误', 'error');
+                            // 取消固定失败，静默处理（记录日志）
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.warn("ContextMenuManager", `取消固定失败: ${error.message}`, error);
                             }
                         }
                     }
@@ -890,8 +954,9 @@ class ContextMenuManager {
                         try {
                             await TaskbarManager.pinProgram(programName);
                         } catch (error) {
-                            if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                                await GUIManager.showAlert(`固定程序失败: ${error.message}`, '错误', 'error');
+                            // 固定程序失败，静默处理（记录日志）
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.warn("ContextMenuManager", `固定程序失败: ${error.message}`, error);
                             }
                         }
                     }
@@ -1018,11 +1083,9 @@ class ContextMenuManager {
                             await ProcessManager.startProgram('taskmanager');
                         }
                     } catch (error) {
+                        // 打开任务管理器失败，静默处理（记录日志）
                         if (typeof KernelLogger !== 'undefined') {
                             KernelLogger.error("ContextMenuManager", `打开任务管理器失败: ${error.message}`, error);
-                        }
-                        if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                            await GUIManager.showAlert(`打开任务管理器失败: ${error.message}`, '错误', 'error');
                         }
                     }
                 }
@@ -1117,8 +1180,9 @@ class ContextMenuManager {
                             try {
                                 await TaskbarManager.unpinProgram(programName);
                             } catch (error) {
-                                if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                                    await GUIManager.showAlert(`取消固定失败: ${error.message}`, '错误', 'error');
+                                // 取消固定失败，静默处理（记录日志）
+                                if (typeof KernelLogger !== 'undefined') {
+                                    KernelLogger.warn("ContextMenuManager", `取消固定失败: ${error.message}`, error);
                                 }
                             }
                         }
@@ -1138,8 +1202,9 @@ class ContextMenuManager {
                             try {
                                 await TaskbarManager.pinProgram(programName);
                             } catch (error) {
-                                if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                                    await GUIManager.showAlert(`固定程序失败: ${error.message}`, '错误', 'error');
+                                // 固定程序失败，静默处理（记录日志）
+                                if (typeof KernelLogger !== 'undefined') {
+                                    KernelLogger.warn("ContextMenuManager", `固定程序失败: ${error.message}`, error);
                                 }
                             }
                         }
@@ -1218,8 +1283,9 @@ class ContextMenuManager {
                         try {
                             await TaskbarManager.unpinProgram(programName);
                         } catch (error) {
-                            if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                                await GUIManager.showAlert(`取消固定失败: ${error.message}`, '错误', 'error');
+                            // 取消固定失败，静默处理（记录日志）
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.warn("ContextMenuManager", `取消固定失败: ${error.message}`, error);
                             }
                         }
                     }
@@ -1239,8 +1305,9 @@ class ContextMenuManager {
                         try {
                             await TaskbarManager.pinProgram(programName);
                         } catch (error) {
-                            if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                                await GUIManager.showAlert(`固定程序失败: ${error.message}`, '错误', 'error');
+                            // 固定程序失败，静默处理（记录日志）
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.warn("ContextMenuManager", `固定程序失败: ${error.message}`, error);
                             }
                         }
                     }
@@ -2030,23 +2097,9 @@ class ContextMenuManager {
      * @param {number|null} pid 进程ID（可选）
      */
     static async _showProgramDetails(programName, pid = null) {
-        // 检查是否已有程序详情窗口（使用Exploit PID）
+        // 支持程序详情窗口多开，不再关闭已存在的窗口
+        // 每个程序详情窗口使用唯一的标识符
         const exploitPid = typeof ProcessManager !== 'undefined' ? ProcessManager.EXPLOIT_PID : 10000;
-        
-        // 如果已有程序详情窗口，先关闭它
-        if (typeof GUIManager !== 'undefined') {
-            const existingWindows = GUIManager.getWindowsByPid(exploitPid);
-            for (const existingWindowInfo of existingWindows) {
-                const existingWindow = existingWindowInfo.window;
-                if (existingWindow && existingWindow.dataset.programDetailsWindow === 'true') {
-                    // 只关闭程序详情窗口，不kill Exploit进程
-                    GUIManager.unregisterWindow(existingWindowInfo.windowId);
-                    if (existingWindow.parentElement) {
-                        existingWindow.remove();
-                    }
-                }
-            }
-        }
         
         // 获取程序信息
         let programInfo = null;
@@ -2133,19 +2186,19 @@ class ContextMenuManager {
         basicInfoSection.appendChild(basicInfoList);
         content.appendChild(basicInfoSection);
         
-        // 程序摘要部分
+        // 程序摘要部分（始终显示，即使没有摘要信息也显示基本信息）
+        const summarySection = document.createElement('div');
+        summarySection.className = 'program-details-section';
+        
+        const summaryTitle = document.createElement('div');
+        summaryTitle.className = 'program-details-section-title';
+        summaryTitle.textContent = '程序摘要';
+        summarySection.appendChild(summaryTitle);
+        
+        const summaryContent = document.createElement('div');
+        summaryContent.className = 'program-details-summary';
+        
         if (programSummary) {
-            const summarySection = document.createElement('div');
-            summarySection.className = 'program-details-section';
-            
-            const summaryTitle = document.createElement('div');
-            summaryTitle.className = 'program-details-section-title';
-            summaryTitle.textContent = '程序摘要';
-            summarySection.appendChild(summaryTitle);
-            
-            const summaryContent = document.createElement('div');
-            summaryContent.className = 'program-details-summary';
-            
             if (typeof programSummary === 'string') {
                 summaryContent.textContent = programSummary;
             } else if (typeof programSummary === 'object' && programSummary !== null) {
@@ -2165,14 +2218,51 @@ class ContextMenuManager {
                     summaryContent.appendChild(ContextMenuManager._createInfoItem('作者', programSummary.author));
                 }
                 
-                if (programSummary.license) {
-                    summaryContent.appendChild(ContextMenuManager._createInfoItem('许可证', programSummary.license));
+                if (programSummary.copyright) {
+                    summaryContent.appendChild(ContextMenuManager._createInfoItem('版权', programSummary.copyright));
+                }
+                
+                if (programSummary.type) {
+                    summaryContent.appendChild(ContextMenuManager._createInfoItem('类型', programSummary.type));
+                }
+            }
+        } else {
+            // 如果没有摘要信息，尝试从程序信息中获取
+            if (programInfo?.metadata) {
+                if (programInfo.metadata.description) {
+                    const desc = document.createElement('div');
+                    desc.className = 'program-summary-description';
+                    desc.textContent = programInfo.metadata.description;
+                    summaryContent.appendChild(desc);
+                }
+                
+                if (programInfo.metadata.version) {
+                    summaryContent.appendChild(ContextMenuManager._createInfoItem('版本', programInfo.metadata.version));
+                }
+                
+                if (programInfo.metadata.author) {
+                    summaryContent.appendChild(ContextMenuManager._createInfoItem('作者', programInfo.metadata.author));
+                }
+                
+                if (programInfo.metadata.type) {
+                    summaryContent.appendChild(ContextMenuManager._createInfoItem('类型', programInfo.metadata.type));
                 }
             }
             
-            summarySection.appendChild(summaryContent);
-            content.appendChild(summarySection);
+            // 如果仍然没有信息，显示提示
+            if (summaryContent.children.length === 0) {
+                summaryContent.textContent = '暂无程序摘要信息';
+                summaryContent.style.color = 'var(--theme-text-muted, rgba(215, 224, 221, 0.5))';
+                summaryContent.style.fontStyle = 'italic';
+            }
         }
+        
+        // 添加多实例支持信息
+        const allowMultipleInstances = programInfo?.metadata?.allowMultipleInstances ?? programSummary?.metadata?.allowMultipleInstances ?? false;
+        summaryContent.appendChild(ContextMenuManager._createInfoItem('支持多实例', allowMultipleInstances ? '是' : '否'));
+        
+        summarySection.appendChild(summaryContent);
+        content.appendChild(summarySection);
         
         // 进程信息部分
         if (processInfo && pid) {
@@ -2256,34 +2346,54 @@ class ContextMenuManager {
             const permissionList = document.createElement('div');
             permissionList.className = 'program-details-info-list';
             
-            // 获取程序声明的权限（从 __info__ 中）
+            // 获取程序声明的权限（优先从程序的 __info__ 方法获取）
             let declaredPermissions = [];
-            if (programInfo?.metadata?.permissions) {
-                declaredPermissions = Array.isArray(programInfo.metadata.permissions) 
-                    ? programInfo.metadata.permissions 
-                    : [programInfo.metadata.permissions];
-            } else {
-                // 尝试从程序对象获取
-                const programNameUpper = programName.toUpperCase();
-                let programClass = null;
-                if (typeof window !== 'undefined' && window[programNameUpper]) {
-                    programClass = window[programNameUpper];
-                } else if (typeof globalThis !== 'undefined' && globalThis[programNameUpper]) {
-                    programClass = globalThis[programNameUpper];
-                }
-                
-                if (programClass && typeof programClass.__info__ === 'function') {
-                    try {
-                        const info = programClass.__info__();
-                        if (info && info.permissions) {
-                            declaredPermissions = Array.isArray(info.permissions) 
-                                ? info.permissions 
-                                : [info.permissions];
-                        }
-                    } catch (e) {
-                        // 静默处理
+            
+            // 首先尝试从程序对象获取（最可靠的方法）
+            const programNameUpper = programName.toUpperCase();
+            let programClass = null;
+            if (typeof window !== 'undefined' && window[programNameUpper]) {
+                programClass = window[programNameUpper];
+            } else if (typeof globalThis !== 'undefined' && globalThis[programNameUpper]) {
+                programClass = globalThis[programNameUpper];
+            }
+            
+            if (programClass && typeof programClass.__info__ === 'function') {
+                try {
+                    const info = programClass.__info__();
+                    if (info && info.permissions) {
+                        declaredPermissions = Array.isArray(info.permissions) 
+                            ? info.permissions 
+                            : [info.permissions];
+                    }
+                } catch (e) {
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.warn('ContextMenuManager', `获取程序 ${programName} 的权限信息失败: ${e.message}`, e);
                     }
                 }
+            }
+            
+            // 如果从程序对象获取失败，尝试从 ProcessManager.getProgramInfo 获取
+            if (declaredPermissions.length === 0 && typeof ProcessManager !== 'undefined' && typeof ProcessManager.getProgramInfo === 'function') {
+                try {
+                    const processProgramInfo = ProcessManager.getProgramInfo(programName);
+                    if (processProgramInfo && processProgramInfo.permissions) {
+                        declaredPermissions = Array.isArray(processProgramInfo.permissions) 
+                            ? processProgramInfo.permissions 
+                            : [processProgramInfo.permissions];
+                    }
+                } catch (e) {
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.warn('ContextMenuManager', `从 ProcessManager 获取程序 ${programName} 的权限信息失败: ${e.message}`, e);
+                    }
+                }
+            }
+            
+            // 最后尝试从 programInfo.metadata.permissions 获取（降级方案）
+            if (declaredPermissions.length === 0 && programInfo?.metadata?.permissions) {
+                declaredPermissions = Array.isArray(programInfo.metadata.permissions) 
+                    ? programInfo.metadata.permissions
+                    : [programInfo.metadata.permissions];
             }
             
             // 获取已授予的权限（如果有运行中的进程）
@@ -2302,7 +2412,7 @@ class ContextMenuManager {
                 'KERNEL_DISK_READ': '读取文件',
                 'KERNEL_DISK_WRITE': '写入文件',
                 'KERNEL_DISK_DELETE': '删除文件',
-                'KERNEL_DISK_CREATE': '创建文件',
+                'KERNEL_DISK_CREATE': '创建文件/目录',
                 'KERNEL_DISK_LIST': '列出目录',
                 'KERNEL_MEMORY_READ': '读取内存',
                 'KERNEL_MEMORY_WRITE': '写入内存',
@@ -2316,7 +2426,14 @@ class ContextMenuManager {
                 'THEME_WRITE': '修改主题',
                 'DESKTOP_MANAGE': '管理桌面',
                 'MULTITHREADING_CREATE': '创建线程',
-                'MULTITHREADING_EXECUTE': '执行多线程任务'
+                'MULTITHREADING_EXECUTE': '执行多线程任务',
+                'EVENT_LISTENER': '事件监听',
+                'CRYPT_GENERATE_KEY': '生成密钥',
+                'CRYPT_ENCRYPT': '加密数据',
+                'CRYPT_DECRYPT': '解密数据',
+                'CRYPT_DELETE_KEY': '删除密钥',
+                'CRYPT_MD5': 'MD5 哈希',
+                'CRYPT_RANDOM': '生成随机数'
             };
             
             if (declaredPermissions.length > 0 || grantedPermissions.length > 0) {

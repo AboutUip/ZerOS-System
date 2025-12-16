@@ -274,7 +274,17 @@ class DesktopManager {
             }, 100);
         };
         
-        window.addEventListener('resize', handleResize);
+        // 使用 EventManager 注册窗口 resize 事件
+        if (typeof EventManager !== 'undefined') {
+            const exploitPid = typeof ProcessManager !== 'undefined' ? ProcessManager.EXPLOIT_PID : 10000;
+            EventManager.registerEventHandler(exploitPid, 'resize', handleResize, {
+                priority: 100,
+                selector: null  // 监听 window 的 resize 事件
+            });
+        } else {
+            // 降级：直接使用 addEventListener
+            window.addEventListener('resize', handleResize);
+        }
         
         // 监听任务栏位置变化（通过观察 DOM 变化）
         if (typeof MutationObserver !== 'undefined') {
@@ -1518,8 +1528,22 @@ class DesktopManager {
             }
         } catch (error) {
             KernelLogger.error("DesktopManager", `打开文件/文件夹失败: ${error.message}`, error);
-            if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                await GUIManager.showAlert(`打开失败: ${error.message}`, '错误', 'error');
+            // 打开失败，使用通知提示（不打断用户）
+            // DesktopManager 没有 PID，使用 exploit PID（系统/内核相关）
+            if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                try {
+                    const exploitPid = typeof ProcessManager !== 'undefined' ? ProcessManager.EXPLOIT_PID : 10000;
+                    await NotificationManager.createNotification(exploitPid, {
+                        type: 'snapshot',
+                        title: '桌面管理器',
+                        content: `打开文件/文件夹失败: ${error.message}`,
+                        duration: 4000
+                    });
+                } catch (e) {
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.warn("DesktopManager", `创建通知失败: ${e.message}`);
+                    }
+                }
             }
         }
     }
@@ -1726,21 +1750,9 @@ class DesktopManager {
             icon: '🗑️',
             danger: true,
             action: async () => {
-                let confirmed = false;
-                if (typeof GUIManager !== 'undefined' && typeof GUIManager.showConfirm === 'function') {
-                    confirmed = await GUIManager.showConfirm(
-                        `确定要从桌面删除 "${iconData.name}" 吗？`,
-                        '确认删除',
-                        'danger'
-                    );
-                } else {
-                    confirmed = confirm(`确定要从桌面删除 "${iconData.name}" 吗？`);
-                }
-                
-                if (confirmed) {
-                    DesktopManager.removeShortcut(iconData.id);
-                    ContextMenuManager._hideMenu();
-                }
+                // 直接执行删除，不显示确认弹窗
+                DesktopManager.removeShortcut(iconData.id);
+                ContextMenuManager._hideMenu();
             }
         });
         
@@ -2010,8 +2022,15 @@ class DesktopManager {
      * 设置键盘监听（Tab 键切换通知栏）
      */
     static _setupKeyboardListeners() {
+        if (typeof EventManager === 'undefined') {
+            KernelLogger.warn("DesktopManager", "EventManager 不可用，无法注册 Tab 键监听");
+            return;
+        }
+        
+        const exploitPid = typeof ProcessManager !== 'undefined' ? ProcessManager.EXPLOIT_PID : 10000;
+        
         // 监听 Tab 键事件
-        document.addEventListener('keydown', (e) => {
+        EventManager.registerEventHandler(exploitPid, 'keydown', (e) => {
             // 检查是否按下了 Tab 键（不包含其他修饰键）
             if (e.key === 'Tab' && !e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey) {
                 // 检查是否在输入框中（如果是，则不处理）
@@ -2032,7 +2051,10 @@ class DesktopManager {
                     NotificationManager.toggleNotificationContainer();
                 }
             }
-        }, { passive: false });
+        }, {
+            priority: 50,  // 中等优先级
+            useCapture: false
+        });
         
         KernelLogger.debug("DesktopManager", "键盘监听已设置（Tab 键切换通知栏）");
     }
@@ -2786,94 +2808,221 @@ class DesktopManager {
      * @param {Object} componentData - 组件数据
      */
     static _setupComponentDrag(componentElement, componentData) {
-        let isDragging = false;
-        let startX = 0;
-        let startY = 0;
-        let initialX = 0;
-        let initialY = 0;
+        // 如果已经设置了拖拽，先移除旧的事件监听器
+        if (componentElement._dragHandlers) {
+            DesktopManager._removeComponentDrag(componentElement);
+        }
         
-        const handleMouseDown = (e) => {
-            // 如果点击的是按钮或其他交互元素，不启动拖动
-            if (e.target.tagName === 'BUTTON' || e.target.closest('button')) {
-                return;
-            }
-            
-            isDragging = true;
-            const rect = componentElement.getBoundingClientRect();
-            const containerRect = DesktopManager._componentsContainer.getBoundingClientRect();
-            
-            startX = e.clientX;
-            startY = e.clientY;
-            initialX = rect.left - containerRect.left;
-            initialY = rect.top - containerRect.top;
-            
-            componentElement.style.zIndex = '1000';
-            componentElement.style.cursor = 'grabbing';
-            componentElement.style.transition = 'none';
-            
-            e.preventDefault();
-        };
-        
-        const handleMouseMove = (e) => {
-            if (!isDragging) return;
-            
-            const moveDeltaX = e.clientX - startX;
-            const moveDeltaY = e.clientY - startY;
-            
-            let newX = initialX + moveDeltaX;
-            let newY = initialY + moveDeltaY;
-            
-            // 限制在桌面容器内
-            const containerRect = DesktopManager._componentsContainer.getBoundingClientRect();
-            const maxX = containerRect.width - componentData.size.width;
-            const maxY = containerRect.height - componentData.size.height;
-            
-            newX = Math.max(0, Math.min(newX, maxX));
-            newY = Math.max(0, Math.min(newY, maxY));
-            
-            // 在非自由排列模式下，检查是否与图标重叠
-            if (DesktopManager._arrangementMode !== 'auto') {
-                const adjustedPosition = DesktopManager._adjustComponentPositionToAvoidIcons(
-                    { x: newX, y: newY },
-                    componentData.size
-                );
-                newX = adjustedPosition.x;
-                newY = adjustedPosition.y;
-            }
-            
-            componentElement.style.left = `${newX}px`;
-            componentElement.style.top = `${newY}px`;
-        };
-        
-        const handleMouseUp = () => {
-            if (!isDragging) return;
-            
-            isDragging = false;
-            componentElement.style.zIndex = '';
-            componentElement.style.cursor = 'move';
-            componentElement.style.transition = '';
-            
-            // 更新组件数据
-            const rect = componentElement.getBoundingClientRect();
-            const containerRect = DesktopManager._componentsContainer.getBoundingClientRect();
-            componentData.position = {
-                x: rect.left - containerRect.left,
-                y: rect.top - containerRect.top
+        // 使用 EventManager 注册拖动事件（如果可用）
+        if (typeof EventManager !== 'undefined' && typeof EventManager.registerDrag === 'function') {
+            const exploitPid = typeof ProcessManager !== 'undefined' ? ProcessManager.EXPLOIT_PID : 10000;
+            const componentId = componentData.id;
+            const dragState = {
+                isDragging: false,
+                startX: 0,
+                startY: 0,
+                initialX: 0,
+                initialY: 0
             };
             
-            KernelLogger.debug("DesktopManager", `组件 ${componentData.id} 拖动完成，新位置: (${componentData.position.x}, ${componentData.position.y})`);
-        };
+            EventManager.registerDrag(
+                `desktop-component-${componentId}`,
+                componentElement,
+                componentElement,
+                dragState,
+                // onDragStart
+                (e) => {
+                    // 只处理鼠标左键
+                    if (e.button !== 0) {
+                        return;
+                    }
+                    
+                    // 如果点击的是按钮或其他交互元素，不启动拖动
+                    if (e.target.tagName === 'BUTTON' || e.target.closest('button')) {
+                        return;
+                    }
+                    
+                    dragState.isDragging = true;
+                    const rect = componentElement.getBoundingClientRect();
+                    const containerRect = DesktopManager._componentsContainer.getBoundingClientRect();
+                    
+                    dragState.startX = e.clientX;
+                    dragState.startY = e.clientY;
+                    dragState.initialX = rect.left - containerRect.left;
+                    dragState.initialY = rect.top - containerRect.top;
+                    
+                    componentElement.style.zIndex = '1000';
+                    componentElement.style.cursor = 'grabbing';
+                    componentElement.style.transition = 'none';
+                    
+                    // 阻止默认行为，避免文本选择等
+                    e.preventDefault();
+                },
+                // onDrag
+                (e) => {
+                    const moveDeltaX = e.clientX - dragState.startX;
+                    const moveDeltaY = e.clientY - dragState.startY;
+                    
+                    let newX = dragState.initialX + moveDeltaX;
+                    let newY = dragState.initialY + moveDeltaY;
+                    
+                    // 限制在桌面容器内
+                    const containerRect = DesktopManager._componentsContainer.getBoundingClientRect();
+                    const maxX = containerRect.width - componentData.size.width;
+                    const maxY = containerRect.height - componentData.size.height;
+                    
+                    newX = Math.max(0, Math.min(newX, maxX));
+                    newY = Math.max(0, Math.min(newY, maxY));
+                    
+                    // 在非自由排列模式下，检查是否与图标重叠
+                    if (DesktopManager._arrangementMode !== 'auto') {
+                        const adjustedPosition = DesktopManager._adjustComponentPositionToAvoidIcons(
+                            { x: newX, y: newY },
+                            componentData.size
+                        );
+                        newX = adjustedPosition.x;
+                        newY = adjustedPosition.y;
+                    }
+                    
+                    componentElement.style.left = `${newX}px`;
+                    componentElement.style.top = `${newY}px`;
+                },
+                // onDragEnd
+                (e) => {
+                    dragState.isDragging = false;
+                    componentElement.style.zIndex = '';
+                    componentElement.style.cursor = 'move';
+                    componentElement.style.transition = '';
+                    
+                    // 更新组件数据
+                    const rect = componentElement.getBoundingClientRect();
+                    const containerRect = DesktopManager._componentsContainer.getBoundingClientRect();
+                    componentData.position = {
+                        x: rect.left - containerRect.left,
+                        y: rect.top - containerRect.top
+                    };
+                    
+                    KernelLogger.debug("DesktopManager", `组件 ${componentData.id} 拖动完成，新位置: (${componentData.position.x}, ${componentData.position.y})`);
+                },
+                ['button'] // 排除按钮元素
+            );
+            
+            // 保存拖动状态引用以便清理
+            componentElement._dragState = dragState;
+            componentElement._dragId = `desktop-component-${componentId}`;
+        } else {
+            // 降级方案：使用 addEventListener
+            let isDragging = false;
+            let startX = 0;
+            let startY = 0;
+            let initialX = 0;
+            let initialY = 0;
+            
+            const handleMouseDown = (e) => {
+                // 如果点击的是按钮或其他交互元素，不启动拖动
+                if (e.target.tagName === 'BUTTON' || e.target.closest('button')) {
+                    return;
+                }
+                
+                isDragging = true;
+                const rect = componentElement.getBoundingClientRect();
+                const containerRect = DesktopManager._componentsContainer.getBoundingClientRect();
+                
+                startX = e.clientX;
+                startY = e.clientY;
+                initialX = rect.left - containerRect.left;
+                initialY = rect.top - containerRect.top;
+                
+                componentElement.style.zIndex = '1000';
+                componentElement.style.cursor = 'grabbing';
+                componentElement.style.transition = 'none';
+                
+                e.preventDefault();
+            };
+            
+            const handleMouseMove = (e) => {
+                if (!isDragging) return;
+                
+                const moveDeltaX = e.clientX - startX;
+                const moveDeltaY = e.clientY - startY;
+                
+                let newX = initialX + moveDeltaX;
+                let newY = initialY + moveDeltaY;
+                
+                // 限制在桌面容器内
+                const containerRect = DesktopManager._componentsContainer.getBoundingClientRect();
+                const maxX = containerRect.width - componentData.size.width;
+                const maxY = containerRect.height - componentData.size.height;
+                
+                newX = Math.max(0, Math.min(newX, maxX));
+                newY = Math.max(0, Math.min(newY, maxY));
+                
+                // 在非自由排列模式下，检查是否与图标重叠
+                if (DesktopManager._arrangementMode !== 'auto') {
+                    const adjustedPosition = DesktopManager._adjustComponentPositionToAvoidIcons(
+                        { x: newX, y: newY },
+                        componentData.size
+                    );
+                    newX = adjustedPosition.x;
+                    newY = adjustedPosition.y;
+                }
+                
+                componentElement.style.left = `${newX}px`;
+                componentElement.style.top = `${newY}px`;
+            };
+            
+            const handleMouseUp = () => {
+                if (!isDragging) return;
+                
+                isDragging = false;
+                componentElement.style.zIndex = '';
+                componentElement.style.cursor = 'move';
+                componentElement.style.transition = '';
+                
+                // 更新组件数据
+                const rect = componentElement.getBoundingClientRect();
+                const containerRect = DesktopManager._componentsContainer.getBoundingClientRect();
+                componentData.position = {
+                    x: rect.left - containerRect.left,
+                    y: rect.top - containerRect.top
+                };
+                
+                KernelLogger.debug("DesktopManager", `组件 ${componentData.id} 拖动完成，新位置: (${componentData.position.x}, ${componentData.position.y})`);
+            };
+            
+            componentElement.addEventListener('mousedown', handleMouseDown);
+            document.addEventListener('mousemove', handleMouseMove);
+            document.addEventListener('mouseup', handleMouseUp);
+            
+            // 保存事件处理器以便清理
+            componentElement._dragHandlers = {
+                mousedown: handleMouseDown,
+                mousemove: handleMouseMove,
+                mouseup: handleMouseUp
+            };
+        }
+    }
+    
+    /**
+     * 移除组件拖动功能
+     * @param {HTMLElement} componentElement - 组件元素
+     */
+    static _removeComponentDrag(componentElement) {
+        // 如果使用 EventManager，注销拖动
+        if (componentElement._dragId && typeof EventManager !== 'undefined' && typeof EventManager.unregisterDrag === 'function') {
+            EventManager.unregisterDrag(componentElement._dragId);
+            delete componentElement._dragId;
+            delete componentElement._dragState;
+        }
         
-        componentElement.addEventListener('mousedown', handleMouseDown);
-        document.addEventListener('mousemove', handleMouseMove);
-        document.addEventListener('mouseup', handleMouseUp);
-        
-        // 保存事件处理器以便清理
-        componentElement._dragHandlers = {
-            mousedown: handleMouseDown,
-            mousemove: handleMouseMove,
-            mouseup: handleMouseUp
-        };
+        // 如果使用降级方案，移除事件监听器
+        if (componentElement._dragHandlers) {
+            const handlers = componentElement._dragHandlers;
+            componentElement.removeEventListener('mousedown', handlers.mousedown);
+            document.removeEventListener('mousemove', handlers.mousemove);
+            document.removeEventListener('mouseup', handlers.mouseup);
+            delete componentElement._dragHandlers;
+        }
     }
     
     /**
@@ -3074,12 +3223,8 @@ class DesktopManager {
         }
         
         // 清理拖动事件监听器
-        if (componentData.element && componentData.element._dragHandlers) {
-            const handlers = componentData.element._dragHandlers;
-            componentData.element.removeEventListener('mousedown', handlers.mousedown);
-            document.removeEventListener('mousemove', handlers.mousemove);
-            document.removeEventListener('mouseup', handlers.mouseup);
-            delete componentData.element._dragHandlers;
+        if (componentData.element) {
+            DesktopManager._removeComponentDrag(componentData.element);
         }
         
         // 从DOM移除

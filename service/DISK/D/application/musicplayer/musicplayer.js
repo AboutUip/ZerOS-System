@@ -90,14 +90,16 @@
                     icon = ApplicationAssetManager.getIcon('musicplayer');
                 }
                 
-                GUIManager.registerWindow(pid, this.window, {
+                const windowInfo = GUIManager.registerWindow(pid, this.window, {
                     title: '音乐播放器',
                     icon: icon,
                     onClose: () => {
+                        // 先执行清理
                         this._cleanup();
-                        if (typeof ProcessManager !== 'undefined') {
-                            ProcessManager.killProgram(this.pid);
-                        }
+                        // onClose 回调只做清理工作，不调用 _closeWindow 或 unregisterWindow
+                        // 窗口关闭由 GUIManager._closeWindow 统一处理
+                        // _closeWindow 会在窗口关闭后检查该 PID 是否还有其他窗口，如果没有，会 kill 进程
+                        // 这样可以确保程序多实例（不同 PID）互不影响
                     },
                     onMinimize: () => {
                         // 最小化回调
@@ -115,6 +117,10 @@
                         }
                     }
                 });
+                // 保存窗口ID，用于精确清理
+                if (windowInfo && windowInfo.windowId) {
+                    this.windowId = windowInfo.windowId;
+                }
             }
             
             // 创建主内容
@@ -2683,9 +2689,18 @@
             }
             
             try {
-                // 尝试使用 GUIManager 显示消息
-                if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                    GUIManager.showAlert(message, '提示', 'info');
+                // 使用通知提示（不打断用户）
+                if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                    NotificationManager.createNotification(this.pid, {
+                        type: 'snapshot',
+                        title: '音乐播放器',
+                        content: message,
+                        duration: 3000
+                    }).catch(e => {
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('MusicPlayer', `创建通知失败: ${e.message}`);
+                        }
+                    });
                 } else {
                     // 降级方案：使用 console
                     console.log('[MusicPlayer]', message);
@@ -3801,9 +3816,20 @@
             resizeObserver.observe(this.window);
             
             // 也监听窗口的 resize 事件（作为备用）
-            window.addEventListener('resize', () => {
-                this._updateWindowSize();
-            });
+            // 使用 EventManager 注册窗口 resize 事件
+            if (typeof EventManager !== 'undefined' && this.pid) {
+                this._resizeHandlerId = EventManager.registerEventHandler(this.pid, 'resize', () => {
+                    this._updateWindowSize();
+                }, {
+                    priority: 100,
+                    selector: null  // 监听 window 的 resize 事件
+                });
+            } else {
+                // 降级：直接使用 addEventListener（不推荐）
+                window.addEventListener('resize', () => {
+                    this._updateWindowSize();
+                });
+            }
         },
         
         _updateWindowSize: function() {
@@ -4884,12 +4910,14 @@
                 type: 'GUI',
                 version: '1.0.0',
                 description: '高仿网易云音乐风格的在线音乐播放器',
-                author: 'ZerOS',
+                author: 'ZerOS Team',
+                copyright: '© 2025 ZerOS',
                 category: 'other',
                 permissions: typeof PermissionManager !== 'undefined' ? [
                     PermissionManager.PERMISSION.GUI_WINDOW_CREATE,
                     PermissionManager.PERMISSION.SYSTEM_NOTIFICATION,
-                    PermissionManager.PERMISSION.NETWORK_ACCESS
+                    PermissionManager.PERMISSION.NETWORK_ACCESS,
+                    PermissionManager.PERMISSION.EVENT_LISTENER
                 ] : []
             };
         },
@@ -4901,6 +4929,17 @@
         // 清理资源
         _cleanup: function() {
             try {
+                // 清理事件处理器
+                if (this._resizeHandlerId && typeof EventManager !== 'undefined') {
+                    EventManager.unregisterEventHandler(this._resizeHandlerId);
+                    this._resizeHandlerId = null;
+                }
+                
+                // 清理所有事件处理器（通过 EventManager）
+                if (typeof EventManager !== 'undefined' && this.pid) {
+                    EventManager.unregisterAllHandlersForPid(this.pid);
+                }
+                
                 // 设置退出标志，防止后续操作
                 this._isExiting = true;
                 

@@ -21,6 +21,7 @@ class GUIManager {
     
     // 模态对话框管理
     static _modalDialogs = new Set(); // 存储所有活动的模态对话框
+    static _windowOpacityBackup = new Map(); // 存储窗口透明度备份 Map<windowId, originalOpacity>
     
     // 窗口日志记录
     static _windowLogs = new Map(); // Map<windowId, Array<LogEntry>>
@@ -219,7 +220,12 @@ class GUIManager {
                 savedTop: null,
                 savedWidth: null,
                 savedHeight: null,
-                savedTransform: null
+                savedTransform: null,
+                isDragging: false,
+                isResizing: false,
+                isMaximized: false,
+                isMinimized: false,
+                isFullscreen: false
             }
         };
         
@@ -323,6 +329,10 @@ class GUIManager {
         if (!windowElement.querySelector('.zos-window-titlebar')) {
             GUIManager._createTitleBar(windowElement, windowInfo, options);
         }
+        
+        // 保护标题栏：使用 MutationObserver 监听窗口内容变化
+        // 如果标题栏被意外删除，自动重新创建
+        GUIManager._protectTitleBar(windowElement, windowInfo, options);
         
         // 注册窗口（使用windowId作为key）
         GUIManager._windows.set(windowId, windowInfo);
@@ -641,15 +651,16 @@ class GUIManager {
         const allWindows = GUIManager.getWindowsByPid(pid);
         
         // 先关闭所有子窗口
+        // 注意：使用 forceClose = false，让 _closeWindow 调用 onClose 回调并自动处理 kill 进程
+        // 最后一个窗口关闭后，_closeWindow 会自动检查并 kill 进程（如果不是 Exploit 程序）
         const childWindows = GUIManager.getChildWindows(pid);
         for (const childWindow of childWindows) {
-            // Exploit程序的窗口使用非强制关闭，以触发onClose回调
-            GUIManager._closeWindow(childWindow.windowId, !isExploit);
+            GUIManager._closeWindow(childWindow.windowId, false);
         }
         
         // 最后关闭主窗口
-        // Exploit程序的窗口使用非强制关闭，以触发onClose回调
-        GUIManager._closeWindow(mainWindow.windowId, !isExploit);
+        // 主窗口关闭后，如果该 PID 没有其他窗口了，_closeWindow 会自动 kill 进程（如果不是 Exploit 程序）
+        GUIManager._closeWindow(mainWindow.windowId, false);
         
         // 点击关闭按钮时，必须强制显示任务栏（无论窗口状态如何）
         GUIManager._showTaskbar();
@@ -687,6 +698,11 @@ class GUIManager {
         const wasMaximized = windowInfo.isMaximized;
         windowInfo.isMaximized = false;
         windowInfo.isMinimized = false; // 也清除最小化状态
+        // 同步到 windowState（供 EventManager 使用）
+        if (windowInfo.windowState) {
+            windowInfo.windowState.isMaximized = false;
+            windowInfo.windowState.isMinimized = false;
+        }
         
         // 点击关闭按钮时，必须强制显示任务栏（无论窗口状态如何）
         GUIManager._showTaskbar();
@@ -700,12 +716,25 @@ class GUIManager {
         const isExploit = windowInfo.pid === (typeof ProcessManager !== 'undefined' ? ProcessManager.EXPLOIT_PID : 10000);
         
         // 如果不是强制关闭，调用onClose回调
-        if (!forceClose && windowInfo.onClose) {
+        // 重要：先保存并清除onClose回调，避免递归调用（onClose回调可能调用_closeWindow）
+        const onCloseCallback = !forceClose ? windowInfo.onClose : null;
+        let windowClosedByCallback = false; // 标记窗口是否已被 onClose 回调关闭
+        if (onCloseCallback) {
+            windowInfo.onClose = null; // 清除回调，避免递归
             try {
-                windowInfo.onClose();
+                onCloseCallback();
+                // 检查窗口是否已被 onClose 回调关闭（通过检查窗口是否还在 _windows 中）
+                if (!GUIManager._windows.has(windowId)) {
+                    windowClosedByCallback = true;
+                }
             } catch (e) {
                 KernelLogger.warn("GUIManager", `窗口onClose回调执行失败: ${e.message}`, e);
             }
+        }
+        
+        // 如果窗口已被 onClose 回调关闭，直接返回
+        if (windowClosedByCallback) {
+            return;
         }
         
         // 检查窗口是否还在DOM中（onClose回调可能已经移除了窗口）
@@ -723,16 +752,63 @@ class GUIManager {
             }
             
             // 等待动画完成后再移除窗口
+            // 注意：保存 pid 和 isExploit，因为 windowInfo 可能在 onClose 回调中被删除
+            const savedPid = windowInfo.pid;
+            const savedIsExploit = isExploit;
             setTimeout(() => {
-                if (windowInfo.window && windowInfo.window.parentElement) {
-                    windowInfo.window.remove();
+                // 再次检查窗口是否还存在（可能在动画期间被 onClose 回调关闭）
+                if (!GUIManager._windows.has(windowId)) {
+                    return;
+                }
+                
+                // 在注销窗口之前，先检查该 PID 是否还有其他窗口
+                // 这是为了确保只检查当前 PID 的窗口，不会影响其他程序实例（不同 PID）
+                const remainingWindowsBeforeUnregister = GUIManager.getWindowsByPid(savedPid);
+                const willBeLastWindow = remainingWindowsBeforeUnregister.length === 1 && 
+                                         remainingWindowsBeforeUnregister[0].windowId === windowId;
+                
+                const currentWindowInfo = GUIManager._windows.get(windowId);
+                if (currentWindowInfo && currentWindowInfo.window && currentWindowInfo.window.parentElement) {
+                    currentWindowInfo.window.remove();
                 }
                 // 注销窗口（此时会再次调用 _updateTaskbarVisibility，但状态已经更新，不会有问题）
                 GUIManager.unregisterWindow(windowId);
+                
+                // 检查是否需要 kill 进程
+                // 如果不是 Exploit 程序，且这是该 PID 的最后一个窗口，kill 进程
+                // 注意：我们使用 willBeLastWindow 而不是再次检查 remainingWindows，因为窗口已经被注销了
+                if (!savedIsExploit && typeof ProcessManager !== 'undefined' && willBeLastWindow) {
+                    // 该 PID 没有其他窗口了，kill 进程
+                    KernelLogger.debug("GUIManager", `窗口 ${windowId} 关闭后，PID ${savedPid} 没有其他窗口，kill 进程`);
+                    ProcessManager.killProgram(savedPid).catch(e => {
+                        KernelLogger.warn("GUIManager", `kill 进程 ${savedPid} 失败: ${e.message}`, e);
+                    });
+                }
             }, closeDuration);
         } else {
             // 如果窗口已经不在DOM中，直接注销
+            // 注意：保存 pid 和 isExploit，因为 windowInfo 可能在 onClose 回调中被删除
+            const savedPid = windowInfo.pid;
+            const savedIsExploit = isExploit;
+            
+            // 在注销窗口之前，先检查该 PID 是否还有其他窗口
+            // 这是为了确保只检查当前 PID 的窗口，不会影响其他程序实例（不同 PID）
+            const remainingWindowsBeforeUnregister = GUIManager.getWindowsByPid(savedPid);
+            const willBeLastWindow = remainingWindowsBeforeUnregister.length === 1 && 
+                                     remainingWindowsBeforeUnregister[0].windowId === windowId;
+            
             GUIManager.unregisterWindow(windowId);
+            
+            // 检查是否需要 kill 进程
+            // 如果不是 Exploit 程序，且这是该 PID 的最后一个窗口，kill 进程
+            // 注意：我们使用 willBeLastWindow 而不是再次检查 remainingWindows，因为窗口已经被注销了
+            if (!savedIsExploit && typeof ProcessManager !== 'undefined' && willBeLastWindow) {
+                // 该 PID 没有其他窗口了，kill 进程
+                KernelLogger.debug("GUIManager", `窗口 ${windowId} 关闭后，PID ${savedPid} 没有其他窗口，kill 进程`);
+                ProcessManager.killProgram(savedPid).catch(e => {
+                    KernelLogger.warn("GUIManager", `kill 进程 ${savedPid} 失败: ${e.message}`, e);
+                });
+            }
         }
     }
     
@@ -802,6 +878,16 @@ class GUIManager {
             EventManager.unregisterResizer(`zos-window-resize-top-right-${windowId}`);
             EventManager.unregisterResizer(`zos-window-resize-top-left-${windowId}`);
             EventManager.unregisterResizer(`zos-window-resize-bottom-left-${windowId}`);
+        }
+        
+        // 清理标题栏保护观察器
+        if (windowInfo._titleBarObserver) {
+            windowInfo._titleBarObserver.disconnect();
+            windowInfo._titleBarObserver = null;
+        }
+        if (windowInfo._titleBarRecreateTimer) {
+            clearTimeout(windowInfo._titleBarRecreateTimer);
+            windowInfo._titleBarRecreateTimer = null;
         }
         
         // 移除窗口类
@@ -1076,52 +1162,17 @@ class GUIManager {
             GUIManager._showTaskbar();
             KernelLogger.debug("GUIManager", "点击关闭按钮，强制显示任务栏");
             
-            // 检查是否是Exploit程序（PID 10000），如果是，只关闭窗口，不kill进程
-            const isExploit = windowInfo.pid === (typeof ProcessManager !== 'undefined' ? ProcessManager.EXPLOIT_PID : 10000);
-            
-            // 获取该PID的所有窗口
-            const allWindows = GUIManager.getWindowsByPid(windowInfo.pid);
-            
-            // 如果是主窗口，检查是否有子窗口
-            if (windowInfo.isMainWindow) {
-                // 检查是否有子窗口
-                const childWindows = GUIManager.getChildWindows(windowInfo.pid);
-                if (childWindows.length > 0) {
-                    // 有子窗口，关闭主窗口和所有子窗口
-                    GUIManager.closeMainWindowAndChildren(windowInfo.pid);
-                } else {
-                    // 没有子窗口，检查该PID是否只有一个窗口
-                    if (allWindows.length === 1) {
-                        // 只有一个窗口，关闭窗口并kill进程（如果适用）
-                        if (windowInfo.onClose) {
-                            // 如果有onClose回调，调用它
-                            windowInfo.onClose();
-                        } else if (isExploit) {
-                            // Exploit程序没有onClose回调时，只关闭窗口，不kill进程
-                            GUIManager._closeWindow(windowInfo.windowId, false);
-                        } else if (typeof ProcessManager !== 'undefined') {
-                            // 其他程序：正常kill进程
-                            ProcessManager.killProgram(windowInfo.pid);
-                        }
-                    } else {
-                        // 该PID有多个窗口（虽然不应该发生，因为只有主窗口没有子窗口），只关闭当前窗口
-                        KernelLogger.warn("GUIManager", `PID ${windowInfo.pid} 有多个窗口但主窗口没有子窗口，只关闭当前窗口 ${windowInfo.windowId}`);
-                        if (windowInfo.onClose) {
-                            windowInfo.onClose();
-                        } else {
-                            GUIManager._closeWindow(windowInfo.windowId, false);
-                        }
-                    }
-                }
-            } else {
-                // 子窗口关闭，只关闭自己，不影响程序运行
-                if (windowInfo.onClose) {
-                    windowInfo.onClose();
-                } else {
-                    // 如果没有onClose回调，直接移除窗口
-                    GUIManager._closeWindow(windowInfo.windowId, false);
-                }
-            }
+            // 直接调用 _closeWindow 处理窗口关闭
+            // _closeWindow 会：
+            // 1. 调用 onClose 回调（如果存在），让程序有机会做清理工作
+            // 2. 执行关闭动画
+            // 3. 注销窗口
+            // 4. 检查该 PID 是否还有其他窗口，如果没有，会 kill 进程
+            // 注意：这里不检查是否有子窗口，因为：
+            // 1. 程序多窗口（同一PID的多个窗口）应该由程序自己管理
+            // 2. 程序多实例（不同PID）应该独立管理，互不影响
+            // 3. 关闭按钮应该只关闭当前窗口，由 _closeWindow 检查是否需要 kill 进程
+            GUIManager._closeWindow(windowInfo.windowId, false);
         });
         controls.appendChild(closeBtn);
         
@@ -1144,6 +1195,90 @@ class GUIManager {
         GUIManager._setupWindowDragAndResize(windowInfo.windowId, windowElement, titleBar, windowInfo);
         
         return titleBar;
+    }
+    
+    /**
+     * 保护标题栏，防止被意外删除
+     * 使用 MutationObserver 监听窗口内容变化，如果标题栏被删除，自动重新创建
+     * @param {HTMLElement} windowElement 窗口元素
+     * @param {Object} windowInfo 窗口信息
+     * @param {Object} options 窗口选项
+     */
+    static _protectTitleBar(windowElement, windowInfo, options) {
+        // 如果已经有观察器，先断开
+        if (windowInfo._titleBarObserver) {
+            windowInfo._titleBarObserver.disconnect();
+            windowInfo._titleBarObserver = null;
+        }
+        
+        // 创建 MutationObserver 监听窗口子元素的变化
+        const observer = new MutationObserver((mutations) => {
+            // 检查窗口是否正在被注销或删除
+            // 如果窗口不在 _windows Map 中，或者窗口元素不在 DOM 中，说明窗口正在被删除，不应该重新创建标题栏
+            if (!GUIManager._windows.has(windowInfo.windowId)) {
+                // 窗口已被注销，断开观察器
+                observer.disconnect();
+                return;
+            }
+            
+            // 检查窗口元素是否还在 DOM 中
+            if (!windowElement.parentElement || !document.body.contains(windowElement)) {
+                // 窗口元素已被移除，断开观察器
+                observer.disconnect();
+                return;
+            }
+            
+            // 检查标题栏是否还存在
+            const titleBar = windowElement.querySelector('.zos-window-titlebar');
+            if (!titleBar) {
+                // 标题栏被删除了，重新创建
+                KernelLogger.warn("GUIManager", `窗口 ${windowInfo.windowId} 的标题栏被删除，正在重新创建`);
+                
+                // 延迟重新创建，避免在批量操作时频繁创建
+                if (windowInfo._titleBarRecreateTimer) {
+                    clearTimeout(windowInfo._titleBarRecreateTimer);
+                }
+                
+                windowInfo._titleBarRecreateTimer = setTimeout(() => {
+                    // 再次检查窗口是否还在（可能在延迟期间窗口已被删除）
+                    if (!GUIManager._windows.has(windowInfo.windowId)) {
+                        // 窗口已被注销，取消重新创建
+                        windowInfo._titleBarRecreateTimer = null;
+                        return;
+                    }
+                    
+                    // 再次检查窗口元素是否还在 DOM 中
+                    if (!windowElement.parentElement || !document.body.contains(windowElement)) {
+                        // 窗口元素已被移除，取消重新创建
+                        windowInfo._titleBarRecreateTimer = null;
+                        return;
+                    }
+                    
+                    // 再次检查标题栏是否已恢复（可能其他代码已经恢复了）
+                    const currentTitleBar = windowElement.querySelector('.zos-window-titlebar');
+                    if (!currentTitleBar) {
+                        // 重新创建标题栏
+                        GUIManager._createTitleBar(windowElement, windowInfo, options);
+                        // 重新设置拖动和拉伸功能
+                        const newTitleBar = windowElement.querySelector('.zos-window-titlebar');
+                        if (newTitleBar) {
+                            GUIManager._setupWindowDragAndResize(windowInfo.windowId, windowElement, newTitleBar, windowInfo);
+                        }
+                        KernelLogger.debug("GUIManager", `窗口 ${windowInfo.windowId} 的标题栏已重新创建`);
+                    }
+                    windowInfo._titleBarRecreateTimer = null;
+                }, 100);
+            }
+        });
+        
+        // 开始观察窗口的子元素变化
+        observer.observe(windowElement, {
+            childList: true,  // 监听子元素的添加和删除
+            subtree: false    // 只监听直接子元素，不监听深层嵌套
+        });
+        
+        // 保存观察器引用，以便后续清理
+        windowInfo._titleBarObserver = observer;
     }
     
     /**
@@ -1520,8 +1655,8 @@ class GUIManager {
             ? POOL.__GET__("KERNEL_GLOBAL_POOL", "ThemeManager")
             : (typeof ThemeManager !== 'undefined' ? ThemeManager : null);
         
-        let overlayBg = 'rgba(0, 0, 0, 0.35)'; // 更透明的默认背景（35% 透明度）
-        let overlayBlur = 'blur(12px) saturate(150%)'; // 更强的模糊效果
+        let overlayBg = 'rgba(0, 0, 0, 0.5)'; // 半透明背景（50% 透明度，不使用模糊）
+        let overlayBlur = 'none'; // 移除模糊效果，防止窗口虚化
         
         if (overlayThemeManager) {
             try {
@@ -1559,6 +1694,8 @@ class GUIManager {
             transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1),
                         backdrop-filter 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         `;
+        
+        // 不再需要修改窗口透明度，因为我们已经移除了遮罩层的模糊效果
         
         // 创建对话框
         const dialog = document.createElement('div');
@@ -2037,6 +2174,10 @@ class GUIManager {
         
         // 立即更新状态（在动画之前），确保任务栏可见性判断准确
         windowInfo.isMinimized = true;
+        // 同步到 windowState（供 EventManager 使用）
+        if (windowInfo.windowState) {
+            windowInfo.windowState.isMinimized = true;
+        }
         
         // 更新任务栏可见性（在状态更新后立即调用，确保判断准确）
         // 注意：必须在 isMinimized 设置为 true 之后调用
@@ -2115,6 +2256,10 @@ class GUIManager {
         
         // 立即更新状态（在动画之前），避免状态不一致导致需要点击两次
         windowInfo.isMinimized = false;
+        // 同步到 windowState（供 EventManager 使用）
+        if (windowInfo.windowState) {
+            windowInfo.windowState.isMinimized = false;
+        }
         
         // 移除最小化类
         windowInfo.window.classList.remove('zos-window-minimized');
@@ -2377,6 +2522,10 @@ class GUIManager {
         
         // 立即更新状态（在动画之前），确保任务栏可见性判断准确
         windowInfo.isMaximized = true;
+        // 同步到 windowState（供 EventManager 使用）
+        if (windowInfo.windowState) {
+            windowInfo.windowState.isMaximized = true;
+        }
         windowInfo.window.classList.add('zos-window-maximized');
         
         // 更新任务栏可见性（在状态更新后立即调用，确保判断准确）
@@ -2469,6 +2618,10 @@ class GUIManager {
         
         // 立即更新状态（在动画之前），确保任务栏可见性判断准确
         windowInfo.isMaximized = false;
+        // 同步到 windowState（供 EventManager 使用）
+        if (windowInfo.windowState) {
+            windowInfo.windowState.isMaximized = false;
+        }
         windowInfo.window.classList.remove('zos-window-maximized');
         
         // 更新任务栏可见性（在状态更新后立即调用，确保判断准确）
@@ -2681,6 +2834,10 @@ class GUIManager {
             windowInfo.windowState.resizeAnchor = null;
         }
         
+        // 同步 isMaximized 和 isMinimized 到 windowState（供 EventManager 使用）
+        windowInfo.windowState.isMaximized = windowInfo.isMaximized;
+        windowInfo.windowState.isMinimized = windowInfo.isMinimized;
+        
         // 注册拖动事件（通过标题栏拖动）
         if (typeof EventManager !== 'undefined') {
             EventManager.registerDrag(
@@ -2690,6 +2847,11 @@ class GUIManager {
                 windowInfo.windowState,
                 (e) => {
                     // 拖动开始
+                    // 只处理鼠标左键
+                    if (e.button !== 0) {
+                        return;
+                    }
+                    
                     if (windowInfo.isMaximized || windowInfo.isMinimized) {
                         e.preventDefault();
                         e.stopPropagation();
@@ -2817,7 +2979,7 @@ class GUIManager {
             }
         }
         
-        // 右下角拉伸器
+        // 右下角拉伸器（提高 z-index 确保不被其他元素遮挡）
         const resizerBottomRight = document.createElement('div');
         resizerBottomRight.className = 'zos-window-resizer zos-window-resizer-bottom-right';
         resizerBottomRight.style.cssText = `
@@ -2827,7 +2989,7 @@ class GUIManager {
             width: 20px;
             height: 20px;
             cursor: se-resize;
-            z-index: 1000;
+            z-index: 10001;
             background: transparent;
             pointer-events: auto;
             user-select: none;
@@ -2839,7 +3001,7 @@ class GUIManager {
         resizerBottomRight.setAttribute('data-resizer', 'bottom-right');
         windowElement.appendChild(resizerBottomRight);
         
-        // 右上角拉伸器
+        // 右上角拉伸器（提高 z-index 确保在标题栏之上）
         const resizerTopRight = document.createElement('div');
         resizerTopRight.className = 'zos-window-resizer zos-window-resizer-top-right';
         resizerTopRight.style.cssText = `
@@ -2849,7 +3011,7 @@ class GUIManager {
             width: 20px;
             height: 20px;
             cursor: ne-resize;
-            z-index: 1000;
+            z-index: 10001;
             background: transparent;
             pointer-events: auto;
             user-select: none;
@@ -2861,7 +3023,7 @@ class GUIManager {
         resizerTopRight.setAttribute('data-resizer', 'top-right');
         windowElement.appendChild(resizerTopRight);
         
-        // 左上角拉伸器
+        // 左上角拉伸器（提高 z-index 确保在标题栏之上）
         const resizerTopLeft = document.createElement('div');
         resizerTopLeft.className = 'zos-window-resizer zos-window-resizer-top-left';
         resizerTopLeft.style.cssText = `
@@ -2871,7 +3033,7 @@ class GUIManager {
             width: 20px;
             height: 20px;
             cursor: nw-resize;
-            z-index: 1000;
+            z-index: 10001;
             background: transparent;
             pointer-events: auto;
             user-select: none;
@@ -2881,9 +3043,10 @@ class GUIManager {
         `;
         // 确保拉伸器可以接收鼠标事件
         resizerTopLeft.setAttribute('data-resizer', 'top-left');
+        // 将左上角拉伸器添加到窗口末尾，确保它在 DOM 中最后渲染（z-index 更高）
         windowElement.appendChild(resizerTopLeft);
         
-        // 左下角拉伸器
+        // 左下角拉伸器（提高 z-index 确保不被其他元素遮挡）
         const resizerBottomLeft = document.createElement('div');
         resizerBottomLeft.className = 'zos-window-resizer zos-window-resizer-bottom-left';
         resizerBottomLeft.style.cssText = `
@@ -2893,7 +3056,7 @@ class GUIManager {
             width: 20px;
             height: 20px;
             cursor: sw-resize;
-            z-index: 1000;
+            z-index: 10001;
             background: transparent;
             pointer-events: auto;
             user-select: none;
@@ -2903,6 +3066,7 @@ class GUIManager {
         `;
         // 确保拉伸器可以接收鼠标事件
         resizerBottomLeft.setAttribute('data-resizer', 'bottom-left');
+        // 将左下角拉伸器添加到窗口末尾，确保它在 DOM 中最后渲染（z-index 更高）
         windowElement.appendChild(resizerBottomLeft);
         
         // 注册拉伸事件

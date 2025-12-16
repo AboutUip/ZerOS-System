@@ -55,15 +55,20 @@
                     icon = ApplicationAssetManager.getIcon('regedit');
                 }
                 
-                GUIManager.registerWindow(pid, this.window, {
+                const windowInfo = GUIManager.registerWindow(pid, this.window, {
                     title: '注册表编辑器',
                     icon: icon,
                     onClose: () => {
-                        if (typeof ProcessManager !== 'undefined') {
-                            ProcessManager.killProgram(this.pid);
-                        }
+                        // onClose 回调只做清理工作，不调用 _closeWindow 或 unregisterWindow
+                        // 窗口关闭由 GUIManager._closeWindow 统一处理
+                        // _closeWindow 会在窗口关闭后检查该 PID 是否还有其他窗口，如果没有，会 kill 进程
+                        // 这样可以确保程序多实例（不同 PID）互不影响
                     }
                 });
+                // 保存窗口ID，用于精确清理
+                if (windowInfo && windowInfo.windowId) {
+                    this.windowId = windowInfo.windowId;
+                }
             }
             
             // 创建菜单栏
@@ -146,7 +151,9 @@
             
             // 验证数据加载
             if (!this.storageData || !this.storageData.system) {
-                console.warn('[RegEdit] 数据加载异常，storageData:', this.storageData);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.warn('RegEdit', '数据加载异常', { storageData: this.storageData });
+                }
             }
             
             // 渲染树形结构
@@ -185,7 +192,9 @@
                 this.storageData = LStorage._storageData;
                 
                 if (!this.storageData) {
-                    console.warn('[RegEdit] storageData 为 null，使用默认值');
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.warn('RegEdit', 'storageData 为 null，使用默认值');
+                    }
                     this.storageData = {
                         system: {},
                         programs: {}
@@ -198,10 +207,14 @@
                     if (!this.storageData.programs) {
                         this.storageData.programs = {};
                     }
-                    console.log('[RegEdit] 数据加载成功，system键数:', Object.keys(this.storageData.system).length, 'programs键数:', Object.keys(this.storageData.programs).length);
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.debug('RegEdit', `数据加载成功，system键数: ${Object.keys(this.storageData.system).length}, programs键数: ${Object.keys(this.storageData.programs).length}`);
+                    }
                 }
             } catch (error) {
-                console.error('[RegEdit] 加载注册表数据失败:', error);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('RegEdit', '加载注册表数据失败', error);
+                }
                 this.storageData = {
                     system: {},
                     programs: {}
@@ -219,7 +232,9 @@
                     this._renderValues(this.selectedPath);
                 }
             } catch (error) {
-                console.error('[RegEdit] 刷新数据失败:', error);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('RegEdit', '刷新数据失败', error);
+                }
             }
         },
         
@@ -252,9 +267,16 @@
                 font-size: 13px;
             `;
             root.innerHTML = '<span style="margin-right: 5px;">📁</span>LocalSData';
-            root.addEventListener('click', () => {
-                this._selectPath('');
-            });
+            // 使用 EventManager 注册点击事件
+            if (typeof EventManager !== 'undefined' && this.pid) {
+                EventManager.registerElementEvent(this.pid, root, 'click', () => {
+                    this._selectPath('');
+                });
+            } else {
+                root.addEventListener('click', () => {
+                    this._selectPath('');
+                });
+            }
             this.treeContainer.appendChild(root);
             
             // System节点
@@ -340,38 +362,75 @@
                 node.style.background = 'rgba(108, 142, 255, 0.2)';
             }
             
-            node.addEventListener('mouseenter', () => {
-                if (this.selectedPath !== key) {
-                    node.style.background = 'rgba(108, 142, 255, 0.1)';
-                }
-            });
-            
-            node.addEventListener('mouseleave', () => {
-                if (this.selectedPath !== key) {
-                    node.style.background = 'transparent';
-                }
-            });
-            
-            node.addEventListener('click', (e) => {
-                e.stopPropagation();
-                this._selectPath(key);
-                
-                // 如果是对象且有子节点，展开/折叠
-                if (hasChildren) {
-                    const wasExpanded = node.dataset.expanded === 'true';
-                    if (wasExpanded) {
-                        expandedPaths.delete(key);
-                        node.dataset.expanded = 'false';
-                    } else {
-                        expandedPaths.add(key);
-                        node.dataset.expanded = 'true';
+            // 使用 EventManager 注册鼠标事件
+            if (typeof EventManager !== 'undefined' && this.pid) {
+                EventManager.registerElementEvent(this.pid, node, 'mouseenter', () => {
+                    if (this.selectedPath !== key) {
+                        node.style.background = 'rgba(108, 142, 255, 0.1)';
                     }
-                    this._renderTree(); // 重新渲染以更新展开状态
-                } else {
-                    // 没有子节点，只选择路径
+                });
+                
+                EventManager.registerElementEvent(this.pid, node, 'mouseleave', () => {
+                    if (this.selectedPath !== key) {
+                        node.style.background = 'transparent';
+                    }
+                });
+                
+                EventManager.registerElementEvent(this.pid, node, 'click', (e) => {
+                    e.stopPropagation();
                     this._selectPath(key);
-                }
-            });
+                    
+                    // 如果是对象且有子节点，展开/折叠
+                    if (hasChildren) {
+                        const wasExpanded = node.dataset.expanded === 'true';
+                        if (wasExpanded) {
+                            expandedPaths.delete(key);
+                            node.dataset.expanded = 'false';
+                        } else {
+                            expandedPaths.add(key);
+                            node.dataset.expanded = 'true';
+                        }
+                        this._renderTree(); // 重新渲染以更新展开状态
+                    } else {
+                        // 没有子节点，只选择路径
+                        this._selectPath(key);
+                    }
+                });
+            } else {
+                // 降级方案：使用原生 addEventListener
+                node.addEventListener('mouseenter', () => {
+                    if (this.selectedPath !== key) {
+                        node.style.background = 'rgba(108, 142, 255, 0.1)';
+                    }
+                });
+                
+                node.addEventListener('mouseleave', () => {
+                    if (this.selectedPath !== key) {
+                        node.style.background = 'transparent';
+                    }
+                });
+                
+                node.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    this._selectPath(key);
+                    
+                    // 如果是对象且有子节点，展开/折叠
+                    if (hasChildren) {
+                        const wasExpanded = node.dataset.expanded === 'true';
+                        if (wasExpanded) {
+                            expandedPaths.delete(key);
+                            node.dataset.expanded = 'false';
+                        } else {
+                            expandedPaths.add(key);
+                            node.dataset.expanded = 'true';
+                        }
+                        this._renderTree(); // 重新渲染以更新展开状态
+                    } else {
+                        // 没有子节点，只选择路径
+                        this._selectPath(key);
+                    }
+                });
+            }
             
             // 注意：子节点的创建在_renderTree中处理，这里只返回当前节点
             
@@ -408,7 +467,9 @@
             
             // 确保数据已加载
             if (!this.storageData) {
-                console.warn('[RegEdit] storageData 未加载');
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.warn('RegEdit', 'storageData 未加载');
+                }
                 this.valueContainer.innerHTML = '<div style="padding: 20px; color: rgba(255, 100, 100, 0.7);">数据未加载，请刷新</div>';
                 return;
             }
@@ -485,9 +546,42 @@
                 return;
             }
             
-            // 如果数据不是对象也不是数组，显示为单个值
+            // 如果数据不是对象也不是数组，显示为单个值（基本类型：string, number, boolean等）
             if (typeof data !== 'object' || data === null) {
-                this.valueContainer.innerHTML = '<div style="padding: 20px; color: rgba(215, 224, 221, 0.5);">当前项不是对象或数组，无法显示子项</div>';
+                // 获取当前路径的键名（用于显示）
+                // 对于路径如 'system.randomAnimeBgStatus'，键名应该是 'randomAnimeBgStatus'
+                // 对于路径如 'system.musicplayer.settings'，键名应该是 'settings'
+                let currentKey = '';
+                if (path) {
+                    const pathParts = path.split('.');
+                    if (pathParts.length > 0) {
+                        // 获取路径的最后一部分作为键名
+                        currentKey = pathParts[pathParts.length - 1];
+                    }
+                }
+                
+                // 如果路径为空，使用"（默认）"作为键名
+                if (!currentKey) {
+                    currentKey = '（默认）';
+                }
+                
+                // 创建一个特殊的值行，显示基本类型的值
+                // 注意：parentPath 应该是当前路径的父路径，用于编辑和删除操作
+                // 例如：如果 path 是 'system.randomAnimeBgStatus'，parentPath 应该是 'system'
+                let parentPath = '';
+                if (path) {
+                    const pathParts = path.split('.');
+                    if (pathParts.length > 1) {
+                        // 移除最后一部分，得到父路径
+                        parentPath = pathParts.slice(0, -1).join('.');
+                    } else if (pathParts.length === 1) {
+                        // 如果只有一部分（如 'system'），父路径为空
+                        parentPath = '';
+                    }
+                }
+                
+                const row = this._createValueRow(currentKey, data, parentPath);
+                this.valueContainer.appendChild(row);
                 return;
             }
             
@@ -525,13 +619,45 @@
                 transition: background 0.2s;
             `;
             
-            row.addEventListener('mouseenter', () => {
-                row.style.background = 'rgba(108, 142, 255, 0.1)';
-            });
-            
-            row.addEventListener('mouseleave', () => {
-                row.style.background = 'transparent';
-            });
+            // 使用 EventManager 注册鼠标事件
+            if (typeof EventManager !== 'undefined' && this.pid) {
+                EventManager.registerElementEvent(this.pid, row, 'mouseenter', () => {
+                    row.style.background = 'rgba(108, 142, 255, 0.1)';
+                });
+                
+                EventManager.registerElementEvent(this.pid, row, 'mouseleave', () => {
+                    row.style.background = 'transparent';
+                });
+                
+                EventManager.registerElementEvent(this.pid, row, 'dblclick', () => {
+                    if (typeof value === 'object' && value !== null) {
+                        // 对象或数组，打开新窗口
+                        this._openChildWindow(key, value, parentPath);
+                    } else {
+                        // 其他类型，编辑
+                        this._editValue(parentPath, key, value);
+                    }
+                });
+            } else {
+                // 降级方案
+                row.addEventListener('mouseenter', () => {
+                    row.style.background = 'rgba(108, 142, 255, 0.1)';
+                });
+                
+                row.addEventListener('mouseleave', () => {
+                    row.style.background = 'transparent';
+                });
+                
+                row.addEventListener('dblclick', () => {
+                    if (typeof value === 'object' && value !== null) {
+                        // 对象或数组，打开新窗口
+                        this._openChildWindow(key, value, parentPath);
+                    } else {
+                        // 其他类型，编辑
+                        this._editValue(parentPath, key, value);
+                    }
+                });
+            }
             
             const nameCell = document.createElement('div');
             nameCell.style.cssText = `
@@ -581,17 +707,6 @@
                 valueCell.textContent = String(value);
             }
             
-            // 双击：如果是对象或数组，打开新窗口；否则编辑
-            row.addEventListener('dblclick', () => {
-                if (typeof value === 'object' && value !== null) {
-                    // 对象或数组，打开新窗口
-                    this._openChildWindow(key, value, parentPath);
-                } else {
-                    // 其他类型，编辑
-                    this._editValue(parentPath, key, value);
-                }
-            });
-            
             // 右键菜单由ContextMenuManager处理，不需要在这里添加事件监听
             
             row.appendChild(nameCell);
@@ -604,112 +719,325 @@
          * 编辑值
          */
         _editValue: function(parentPath, key, currentValue) {
-            // 创建编辑对话框
-            const dialog = document.createElement('div');
-            dialog.style.cssText = `
-                position: fixed;
-                top: 50%;
-                left: 50%;
-                transform: translate(-50%, -50%);
-                width: 500px;
-                background: rgba(30, 30, 46, 0.98);
-                border: 1px solid rgba(108, 142, 255, 0.3);
-                border-radius: 8px;
-                padding: 20px;
-                z-index: 100000;
-                box-shadow: 0 12px 40px rgba(0, 0, 0, 0.8);
-            `;
+            if (typeof GUIManager === 'undefined') {
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.warn('RegEdit', 'GUIManager 不可用，无法创建编辑窗口');
+                }
+                return;
+            }
             
+            const self = this;
             const valueType = typeof currentValue;
             const isObject = typeof currentValue === 'object' && currentValue !== null;
             
-            dialog.innerHTML = `
-                <div style="margin-bottom: 15px; font-size: 14px; color: rgba(215, 224, 221, 0.9); font-weight: bold;">
-                    编辑值: ${key}
-                </div>
-                <div style="margin-bottom: 10px; font-size: 12px; color: rgba(215, 224, 221, 0.6);">
-                    类型: ${valueType}${isObject ? (Array.isArray(currentValue) ? ' (Array)' : ' (Object)') : ''}
-                </div>
-                <textarea id="regedit-edit-value" style="
-                    width: 100%;
-                    height: 200px;
-                    background: rgba(20, 20, 30, 0.8);
-                    border: 1px solid rgba(108, 142, 255, 0.3);
-                    border-radius: 4px;
-                    padding: 10px;
-                    color: rgba(215, 224, 221, 0.9);
-                    font-family: monospace;
-                    font-size: 12px;
-                    resize: vertical;
-                    box-sizing: border-box;
-                ">${isObject ? JSON.stringify(currentValue, null, 2) : String(currentValue)}</textarea>
-                <div style="margin-top: 15px; display: flex; justify-content: flex-end; gap: 10px;">
-                    <button id="regedit-edit-cancel" style="
-                        padding: 8px 20px;
-                        background: rgba(100, 100, 100, 0.3);
-                        border: 1px solid rgba(108, 142, 255, 0.3);
-                        border-radius: 4px;
-                        color: rgba(215, 224, 221, 0.9);
-                        cursor: pointer;
-                    ">取消</button>
-                    <button id="regedit-edit-save" style="
-                        padding: 8px 20px;
-                        background: rgba(108, 142, 255, 0.3);
-                        border: 1px solid rgba(108, 142, 255, 0.5);
-                        border-radius: 4px;
-                        color: rgba(215, 224, 221, 0.9);
-                        cursor: pointer;
-                    ">保存</button>
-                </div>
+            // 生成窗口ID（必须符合GUIManager规范：以window_开头）
+            const windowId = `window_${this.pid}_regedit_edit_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+            
+            // 获取 GUI 容器
+            const guiContainer = document.getElementById('gui-container');
+            if (!guiContainer) {
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.warn('RegEdit', 'GUI 容器不存在，无法创建编辑窗口');
+                }
+                return;
+            }
+            
+            // 创建窗口元素
+            const editWindow = document.createElement('div');
+            editWindow.className = 'regedit-edit-window zos-gui-window';
+            editWindow.dataset.pid = this.pid.toString();
+            editWindow.style.cssText = `
+                width: 600px;
+                height: 500px;
+                display: flex;
+                flex-direction: column;
+                overflow: hidden;
             `;
             
-            document.body.appendChild(dialog);
+            // 获取图标
+            let icon = null;
+            if (typeof ApplicationAssetManager !== 'undefined') {
+                icon = ApplicationAssetManager.getIcon('regedit');
+            }
             
-            const textarea = dialog.querySelector('#regedit-edit-value');
-            const cancelBtn = dialog.querySelector('#regedit-edit-cancel');
-            const saveBtn = dialog.querySelector('#regedit-edit-save');
-            
-            cancelBtn.addEventListener('click', () => {
-                document.body.removeChild(dialog);
+            // 使用GUIManager注册窗口
+            const windowInfo = GUIManager.registerWindow(this.pid, editWindow, {
+                title: `编辑值: ${key}`,
+                icon: icon,
+                windowId: windowId,
+                onClose: () => {
+                    // onClose 回调只做清理工作，不调用 _closeWindow 或 unregisterWindow
+                    // 窗口关闭由 GUIManager._closeWindow 统一处理
+                    // _closeWindow 会在窗口关闭后自动调用 unregisterWindow
+                    // 这样可以确保程序多实例（不同 PID）互不影响
+                    
+                    // 从子窗口列表中移除
+                    const actualWindowId = windowInfo ? windowInfo.windowId : windowId;
+                    const index = self.childWindows.findIndex(w => w.windowId === actualWindowId);
+                    if (index !== -1) {
+                        self.childWindows.splice(index, 1);
+                    }
+                }
             });
             
-            saveBtn.addEventListener('click', async () => {
-                try {
-                    const newValueText = textarea.value.trim();
-                    let newValue;
-                    
-                    // 尝试解析JSON
+            // 保存实际的windowId
+            const actualWindowId = windowInfo ? windowInfo.windowId : windowId;
+            
+            // 创建内容区域
+            const content = document.createElement('div');
+            content.style.cssText = `
+                flex: 1;
+                display: flex;
+                flex-direction: column;
+                overflow: hidden;
+                padding: 20px;
+                background: rgba(20, 20, 30, 0.3);
+            `;
+            
+            // 创建信息显示区域
+            const infoSection = document.createElement('div');
+            infoSection.style.cssText = `
+                margin-bottom: 15px;
+                padding: 12px;
+                background: rgba(30, 30, 46, 0.5);
+                border: 1px solid rgba(108, 142, 255, 0.2);
+                border-radius: 4px;
+            `;
+            
+            const keyLabel = document.createElement('div');
+            keyLabel.style.cssText = `
+                font-size: 14px;
+                font-weight: bold;
+                color: rgba(215, 224, 221, 0.9);
+                margin-bottom: 8px;
+            `;
+            keyLabel.textContent = `键名: ${key}`;
+            infoSection.appendChild(keyLabel);
+            
+            const typeLabel = document.createElement('div');
+            typeLabel.style.cssText = `
+                font-size: 12px;
+                color: rgba(215, 224, 221, 0.6);
+            `;
+            typeLabel.textContent = `类型: ${valueType}${isObject ? (Array.isArray(currentValue) ? ' (Array)' : ' (Object)') : ''}`;
+            infoSection.appendChild(typeLabel);
+            
+            if (parentPath) {
+                const pathLabel = document.createElement('div');
+                pathLabel.style.cssText = `
+                    font-size: 12px;
+                    color: rgba(215, 224, 221, 0.6);
+                    margin-top: 4px;
+                    font-family: monospace;
+                `;
+                pathLabel.textContent = `路径: ${parentPath}`;
+                infoSection.appendChild(pathLabel);
+            }
+            
+            content.appendChild(infoSection);
+            
+            // 创建文本编辑区域
+            const textarea = document.createElement('textarea');
+            textarea.id = 'regedit-edit-value';
+            textarea.value = isObject ? JSON.stringify(currentValue, null, 2) : String(currentValue);
+            textarea.style.cssText = `
+                flex: 1;
+                width: 100%;
+                min-height: 200px;
+                background: rgba(20, 20, 30, 0.8);
+                border: 1px solid rgba(108, 142, 255, 0.3);
+                border-radius: 4px;
+                padding: 10px;
+                color: rgba(215, 224, 221, 0.9);
+                font-family: monospace;
+                font-size: 12px;
+                resize: vertical;
+                box-sizing: border-box;
+                outline: none;
+            `;
+            content.appendChild(textarea);
+            
+            // 创建按钮区域
+            const buttonBar = document.createElement('div');
+            buttonBar.style.cssText = `
+                margin-top: 15px;
+                display: flex;
+                justify-content: flex-end;
+                gap: 10px;
+            `;
+            
+            const cancelBtn = document.createElement('button');
+            cancelBtn.textContent = '取消';
+            cancelBtn.style.cssText = `
+                padding: 8px 20px;
+                background: rgba(100, 100, 100, 0.3);
+                border: 1px solid rgba(108, 142, 255, 0.3);
+                border-radius: 4px;
+                color: rgba(215, 224, 221, 0.9);
+                cursor: pointer;
+                transition: all 0.2s;
+            `;
+            
+            const saveBtn = document.createElement('button');
+            saveBtn.textContent = '保存';
+            saveBtn.style.cssText = `
+                padding: 8px 20px;
+                background: rgba(108, 142, 255, 0.3);
+                border: 1px solid rgba(108, 142, 255, 0.5);
+                border-radius: 4px;
+                color: rgba(215, 224, 221, 0.9);
+                cursor: pointer;
+                transition: all 0.2s;
+            `;
+            
+            // 按钮悬停效果
+            cancelBtn.addEventListener('mouseenter', () => {
+                cancelBtn.style.background = 'rgba(100, 100, 100, 0.5)';
+            });
+            cancelBtn.addEventListener('mouseleave', () => {
+                cancelBtn.style.background = 'rgba(100, 100, 100, 0.3)';
+            });
+            
+            saveBtn.addEventListener('mouseenter', () => {
+                saveBtn.style.background = 'rgba(108, 142, 255, 0.5)';
+            });
+            saveBtn.addEventListener('mouseleave', () => {
+                saveBtn.style.background = 'rgba(108, 142, 255, 0.3)';
+            });
+            
+            buttonBar.appendChild(cancelBtn);
+            buttonBar.appendChild(saveBtn);
+            content.appendChild(buttonBar);
+            
+            editWindow.appendChild(content);
+            
+            // 添加到容器
+            guiContainer.appendChild(editWindow);
+            
+            // 保存子窗口引用
+            this.childWindows.push({
+                windowId: actualWindowId,
+                window: editWindow,
+                path: parentPath,
+                key: key,
+                windowInfo: windowInfo
+            });
+            
+            // 使用 EventManager 注册按钮点击事件
+            if (typeof EventManager !== 'undefined' && this.pid) {
+                EventManager.registerElementEvent(this.pid, cancelBtn, 'click', () => {
+                    // 关闭窗口
+                    if (windowInfo && windowInfo.windowId) {
+                        GUIManager._closeWindow(windowInfo.windowId, false);
+                    } else {
+                        GUIManager._closeWindow(windowId, false);
+                    }
+                });
+                
+                EventManager.registerElementEvent(this.pid, saveBtn, 'click', async () => {
                     try {
-                        newValue = JSON.parse(newValueText);
-                    } catch (e) {
-                        // 如果不是JSON，尝试按原类型转换
-                        if (valueType === 'number') {
-                            newValue = parseFloat(newValueText);
-                            if (isNaN(newValue)) {
-                                throw new Error('无效的数字');
+                        const newValueText = textarea.value.trim();
+                        let newValue;
+                        
+                        // 尝试解析JSON
+                        try {
+                            newValue = JSON.parse(newValueText);
+                        } catch (e) {
+                            // 如果不是JSON，尝试按原类型转换
+                            if (valueType === 'number') {
+                                newValue = parseFloat(newValueText);
+                                if (isNaN(newValue)) {
+                                    throw new Error('无效的数字');
+                                }
+                            } else if (valueType === 'boolean') {
+                                newValue = newValueText === 'true';
+                            } else {
+                                newValue = newValueText;
                             }
-                        } else if (valueType === 'boolean') {
-                            newValue = newValueText === 'true';
+                        }
+                        
+                        await this._setValue(parentPath, key, newValue);
+                        
+                        // 关闭窗口
+                        if (windowInfo && windowInfo.windowId) {
+                            GUIManager._closeWindow(windowInfo.windowId, false);
                         } else {
-                            newValue = newValueText;
+                            GUIManager._closeWindow(windowId, false);
+                        }
+                        
+                        // 刷新数据
+                        this._refreshData();
+                        this._renderValues(this.selectedPath);
+                    } catch (error) {
+                        if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
+                            GUIManager.showAlert('保存失败: ' + error.message);
+                        } else {
+                            alert('保存失败: ' + error.message);
                         }
                     }
-                    
-                    await this._setValue(parentPath, key, newValue);
-                    document.body.removeChild(dialog);
-                    this._refreshData();
-                    this._renderValues(this.selectedPath);
-                } catch (error) {
-                    alert('保存失败: ' + error.message);
-                }
-            });
+                });
+            } else {
+                // 降级方案
+                cancelBtn.addEventListener('click', () => {
+                    if (windowInfo && windowInfo.windowId) {
+                        GUIManager._closeWindow(windowInfo.windowId, false);
+                    } else {
+                        GUIManager._closeWindow(windowId, false);
+                    }
+                });
+                
+                saveBtn.addEventListener('click', async () => {
+                    try {
+                        const newValueText = textarea.value.trim();
+                        let newValue;
+                        
+                        // 尝试解析JSON
+                        try {
+                            newValue = JSON.parse(newValueText);
+                        } catch (e) {
+                            // 如果不是JSON，尝试按原类型转换
+                            if (valueType === 'number') {
+                                newValue = parseFloat(newValueText);
+                                if (isNaN(newValue)) {
+                                    throw new Error('无效的数字');
+                                }
+                            } else if (valueType === 'boolean') {
+                                newValue = newValueText === 'true';
+                            } else {
+                                newValue = newValueText;
+                            }
+                        }
+                        
+                        await this._setValue(parentPath, key, newValue);
+                        
+                        // 关闭窗口
+                        if (windowInfo && windowInfo.windowId) {
+                            GUIManager._closeWindow(windowInfo.windowId, false);
+                        } else {
+                            GUIManager._closeWindow(windowId, false);
+                        }
+                        
+                        // 刷新数据
+                        this._refreshData();
+                        this._renderValues(this.selectedPath);
+                    } catch (error) {
+                        if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
+                            GUIManager.showAlert('保存失败: ' + error.message);
+                        } else {
+                            alert('保存失败: ' + error.message);
+                        }
+                    }
+                });
+            }
             
-            // 点击外部关闭
-            dialog.addEventListener('click', (e) => {
-                if (e.target === dialog) {
-                    document.body.removeChild(dialog);
-                }
-            });
+            // 聚焦新窗口
+            GUIManager.focusWindow(actualWindowId);
+            
+            // 自动聚焦文本区域
+            setTimeout(() => {
+                textarea.focus();
+                textarea.select();
+            }, 100);
         },
         
         /**
@@ -756,7 +1084,9 @@
                 // 重新加载数据
                 await this._loadRegistryData();
             } catch (error) {
-                console.error('[RegEdit] 设置值失败:', error);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('RegEdit', '设置值失败', error);
+                }
                 throw error;
             }
         },
@@ -766,7 +1096,9 @@
          */
         _registerContextMenu: function() {
             if (typeof ContextMenuManager === 'undefined' || !this.pid) {
-                console.warn('[RegEdit] ContextMenuManager 不可用，无法注册右键菜单');
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.warn('RegEdit', 'ContextMenuManager 不可用，无法注册右键菜单');
+                }
                 return;
             }
             
@@ -810,7 +1142,9 @@
                             value = data[key];
                         }
                     } catch (e) {
-                        console.error('[RegEdit] 获取值失败:', e);
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.error('RegEdit', '获取值失败', e);
+                        }
                     }
                     
                     return [
@@ -1205,13 +1539,25 @@
                 transition: background 0.2s;
             `;
             
-            row.addEventListener('mouseenter', () => {
-                row.style.background = 'rgba(108, 142, 255, 0.1)';
-            });
-            
-            row.addEventListener('mouseleave', () => {
-                row.style.background = 'transparent';
-            });
+            // 使用 EventManager 注册鼠标事件
+            if (typeof EventManager !== 'undefined' && this.pid) {
+                EventManager.registerElementEvent(this.pid, row, 'mouseenter', () => {
+                    row.style.background = 'rgba(108, 142, 255, 0.1)';
+                });
+                
+                EventManager.registerElementEvent(this.pid, row, 'mouseleave', () => {
+                    row.style.background = 'transparent';
+                });
+            } else {
+                // 降级方案
+                row.addEventListener('mouseenter', () => {
+                    row.style.background = 'rgba(108, 142, 255, 0.1)';
+                });
+                
+                row.addEventListener('mouseleave', () => {
+                    row.style.background = 'transparent';
+                });
+            }
             
             const nameCell = document.createElement('div');
             nameCell.style.cssText = `
@@ -1262,15 +1608,28 @@
             }
             
             // 双击：如果是对象或数组，打开新窗口；否则编辑
-            row.addEventListener('dblclick', () => {
-                if (typeof value === 'object' && value !== null) {
-                    // 对象或数组，打开新窗口
-                    this._openChildWindow(key, value, parentPath);
-                } else {
-                    // 其他类型，编辑
-                    this._editValue(parentPath, key, value);
-                }
-            });
+            if (typeof EventManager !== 'undefined' && this.pid) {
+                EventManager.registerElementEvent(this.pid, row, 'dblclick', () => {
+                    if (typeof value === 'object' && value !== null) {
+                        // 对象或数组，打开新窗口
+                        this._openChildWindow(key, value, parentPath);
+                    } else {
+                        // 其他类型，编辑
+                        this._editValue(parentPath, key, value);
+                    }
+                });
+            } else {
+                // 降级方案
+                row.addEventListener('dblclick', () => {
+                    if (typeof value === 'object' && value !== null) {
+                        // 对象或数组，打开新窗口
+                        this._openChildWindow(key, value, parentPath);
+                    } else {
+                        // 其他类型，编辑
+                        this._editValue(parentPath, key, value);
+                    }
+                });
+            }
             
             row.appendChild(nameCell);
             row.appendChild(valueCell);
@@ -1292,13 +1651,29 @@
                 border-radius: 3px;
             `;
             btn.textContent = label;
-            btn.addEventListener('mouseenter', () => {
-                btn.style.background = 'rgba(108, 142, 255, 0.2)';
-            });
-            btn.addEventListener('mouseleave', () => {
-                btn.style.background = 'transparent';
-            });
-            btn.addEventListener('click', onClick);
+            
+            // 使用 EventManager 注册事件
+            if (typeof EventManager !== 'undefined' && this.pid) {
+                EventManager.registerElementEvent(this.pid, btn, 'mouseenter', () => {
+                    btn.style.background = 'rgba(108, 142, 255, 0.2)';
+                });
+                
+                EventManager.registerElementEvent(this.pid, btn, 'mouseleave', () => {
+                    btn.style.background = 'transparent';
+                });
+                
+                EventManager.registerElementEvent(this.pid, btn, 'click', onClick);
+            } else {
+                // 降级方案
+                btn.addEventListener('mouseenter', () => {
+                    btn.style.background = 'rgba(108, 142, 255, 0.2)';
+                });
+                btn.addEventListener('mouseleave', () => {
+                    btn.style.background = 'transparent';
+                });
+                btn.addEventListener('click', onClick);
+            }
+            
             return btn;
         },
         
@@ -1348,8 +1723,14 @@
                 this._renderTree();
                 this._renderValues(this.selectedPath);
             } catch (error) {
-                console.error('[RegEdit] 删除值失败:', error);
-                alert('删除失败: ' + error.message);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('RegEdit', '删除值失败', error);
+                }
+                if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
+                    GUIManager.showAlert('删除失败: ' + error.message);
+                } else {
+                    alert('删除失败: ' + error.message);
+                }
             }
         },
         
@@ -1385,8 +1766,14 @@
                 this._renderTree();
                 this._renderValues(this.selectedPath);
             } catch (error) {
-                console.error('[RegEdit] 新建值失败:', error);
-                alert('新建失败: ' + error.message);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('RegEdit', '新建值失败', error);
+                }
+                if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
+                    GUIManager.showAlert('新建失败: ' + error.message);
+                } else {
+                    alert('新建失败: ' + error.message);
+                }
             }
         },
         
@@ -1441,9 +1828,12 @@
                 type: 'GUI',
                 version: '1.0.0',
                 description: '注册表编辑器',
-                author: 'ZerOS',
-                copyright: '© 2024 ZerOS',
-                permissions: [],
+                author: 'ZerOS Team',
+                copyright: '© 2025 ZerOS',
+                permissions: typeof PermissionManager !== 'undefined' ? [
+                    PermissionManager.PERMISSION.EVENT_LISTENER,
+                    PermissionManager.PERMISSION.GUI_WINDOW_CREATE
+                ] : [],
                 metadata: {
                     autoStart: false,
                     priority: 5,

@@ -57,9 +57,10 @@
                     title: 'WebViewer',
                     icon: icon,
                     onClose: () => {
-                        if (typeof ProcessManager !== 'undefined') {
-                            ProcessManager.killProgram(this.pid);
-                        }
+                        // onClose 回调只做清理工作，不调用 _closeWindow 或 unregisterWindow
+                        // 窗口关闭由 GUIManager._closeWindow 统一处理
+                        // _closeWindow 会在窗口关闭后检查该 PID 是否还有其他窗口，如果没有，会 kill 进程
+                        // 这样可以确保程序多实例（不同 PID）互不影响
                     }
                 });
             }
@@ -158,13 +159,34 @@
                 user-select: none;
                 margin-left: 8px;
             `;
-            btn.addEventListener('click', onClick);
-            btn.addEventListener('mouseenter', () => {
-                btn.style.background = 'rgba(139, 92, 246, 0.2)';
-            });
-            btn.addEventListener('mouseleave', () => {
-                btn.style.background = 'rgba(139, 92, 246, 0.1)';
-            });
+            // 使用 EventManager 注册事件
+            if (typeof EventManager !== 'undefined' && this.pid) {
+                EventManager.registerElementEvent(this.pid, btn, 'mouseenter', () => {
+                    btn.style.background = 'rgba(139, 92, 246, 0.2)';
+                });
+                EventManager.registerElementEvent(this.pid, btn, 'mouseleave', () => {
+                    btn.style.background = 'rgba(139, 92, 246, 0.1)';
+                });
+                const btnId = `webviewer-btn-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                btn.dataset.eventId = btnId;
+                EventManager.registerEventHandler(this.pid, 'click', (e) => {
+                    if (btn === e.target || btn.contains(e.target)) {
+                        onClick(e);
+                    }
+                }, {
+                    priority: 100,
+                    selector: `[data-event-id="${btnId}"]`
+                });
+            } else {
+                // 降级方案
+                btn.addEventListener('click', onClick);
+                btn.addEventListener('mouseenter', () => {
+                    btn.style.background = 'rgba(139, 92, 246, 0.2)';
+                });
+                btn.addEventListener('mouseleave', () => {
+                    btn.style.background = 'rgba(139, 92, 246, 0.1)';
+                });
+            }
             return btn;
         },
         
@@ -275,17 +297,29 @@
             this.emptyState = emptyState;
             content.appendChild(emptyState);
             
-            // 监听iframe加载状态
-            iframe.addEventListener('load', () => {
-                this.loadingIndicator.style.display = 'none';
-                if (this.currentIndexHtml) {
-                    this.emptyState.style.display = 'none';
-                }
-            });
-            
-            iframe.addEventListener('loadstart', () => {
-                this.loadingIndicator.style.display = 'flex';
-            });
+            // 监听iframe加载状态（使用 EventManager）
+            if (typeof EventManager !== 'undefined' && this.pid) {
+                EventManager.registerElementEvent(this.pid, iframe, 'load', () => {
+                    this.loadingIndicator.style.display = 'none';
+                    if (this.currentIndexHtml) {
+                        this.emptyState.style.display = 'none';
+                    }
+                });
+                EventManager.registerElementEvent(this.pid, iframe, 'loadstart', () => {
+                    this.loadingIndicator.style.display = 'flex';
+                });
+            } else {
+                // 降级方案
+                iframe.addEventListener('load', () => {
+                    this.loadingIndicator.style.display = 'none';
+                    if (this.currentIndexHtml) {
+                        this.emptyState.style.display = 'none';
+                    }
+                });
+                iframe.addEventListener('loadstart', () => {
+                    this.loadingIndicator.style.display = 'flex';
+                });
+            }
             
             return content;
         },
@@ -295,10 +329,24 @@
          */
         _openFolderSelector: async function() {
             if (typeof ProcessManager === 'undefined') {
-                if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                    await GUIManager.showAlert('ProcessManager 不可用', '错误', 'error');
+                // ProcessManager 不可用，使用通知提示（不打断用户）
+                if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                    try {
+                        await NotificationManager.createNotification(this.pid, {
+                            type: 'snapshot',
+                            title: 'WebViewer',
+                            content: 'ProcessManager 不可用',
+                            duration: 3000
+                        });
+                    } catch (e) {
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.error('WebViewer', `ProcessManager 不可用，且创建通知失败: ${e.message}`);
+                        }
+                    }
                 } else {
-                    alert('ProcessManager 不可用');
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.error('WebViewer', 'ProcessManager 不可用');
+                    }
                 }
                 return;
             }
@@ -320,10 +368,20 @@
                 if (typeof KernelLogger !== 'undefined') {
                     KernelLogger.error('WebViewer', `打开文件夹选择器失败: ${error.message}`);
                 }
-                if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                    await GUIManager.showAlert(`打开文件夹选择器失败: ${error.message}`, '错误', 'error');
-                } else {
-                    alert(`打开文件夹选择器失败: ${error.message}`);
+                // 打开文件夹选择器失败，使用通知提示（不打断用户）
+                if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                    try {
+                        await NotificationManager.createNotification(this.pid, {
+                            type: 'snapshot',
+                            title: 'WebViewer',
+                            content: `打开文件夹选择器失败: ${error.message}`,
+                            duration: 4000
+                        });
+                    } catch (e) {
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('WebViewer', `创建通知失败: ${e.message}`);
+                        }
+                    }
                 }
             }
         },
@@ -373,10 +431,20 @@
                 if (typeof KernelLogger !== 'undefined') {
                     KernelLogger.error('WebViewer', `加载文件夹失败: ${error.message}`);
                 }
-                if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                    await GUIManager.showAlert(`加载文件夹失败: ${error.message}`, '错误', 'error');
-                } else {
-                    alert(`加载文件夹失败: ${error.message}`);
+                // 加载文件夹失败，使用通知提示（不打断用户）
+                if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                    try {
+                        await NotificationManager.createNotification(this.pid, {
+                            type: 'snapshot',
+                            title: 'WebViewer',
+                            content: `加载文件夹失败: ${error.message}`,
+                            duration: 4000
+                        });
+                    } catch (e) {
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('WebViewer', `创建通知失败: ${e.message}`);
+                        }
+                    }
                 }
             }
         },
@@ -585,9 +653,18 @@
          * 程序退出
          */
         __exit__: function() {
-            // 注销窗口
-            if (typeof GUIManager !== 'undefined') {
-                GUIManager.unregisterWindow(this.pid);
+            // 注销窗口（使用 windowId 精确注销当前窗口）
+            if (typeof GUIManager !== 'undefined' && GUIManager.unregisterWindow) {
+                try {
+                    if (this.windowId) {
+                        GUIManager.unregisterWindow(this.windowId);
+                    } else if (this.pid) {
+                        // 降级方案：如果没有 windowId，使用 pid（会注销该 PID 的所有窗口）
+                        GUIManager.unregisterWindow(this.pid);
+                    }
+                } catch (e) {
+                    // 静默处理错误
+                }
             }
             
             // 清理 DOM
@@ -597,6 +674,7 @@
             
             // 清理引用
             this.window = null;
+            this.windowId = null;
             this.iframe = null;
             this.pathDisplay = null;
             this.loadingIndicator = null;
@@ -614,6 +692,8 @@
                 type: 'GUI',
                 version: '1.0.0',
                 description: 'ZerOS WebViewer - 静态网页容器，用于运行用户编写的静态网页',
+                author: 'ZerOS Team',
+                copyright: '© 2025 ZerOS',
                 pid: this.pid,
                 status: this.window ? 'running' : 'exited',
                 currentFolder: this.currentFolder,
@@ -622,7 +702,9 @@
                     PermissionManager.PERMISSION.GUI_WINDOW_CREATE,
                     PermissionManager.PERMISSION.KERNEL_DISK_READ,
                     PermissionManager.PERMISSION.KERNEL_DISK_LIST,
-                    PermissionManager.PERMISSION.PROCESS_MANAGE
+                    PermissionManager.PERMISSION.PROCESS_MANAGE,
+                    PermissionManager.PERMISSION.SYSTEM_NOTIFICATION,
+                    PermissionManager.PERMISSION.EVENT_LISTENER
                 ] : [],
                 metadata: {
                     system: true,  // 系统程序

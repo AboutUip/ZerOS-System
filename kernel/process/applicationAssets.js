@@ -53,6 +53,7 @@ const APPLICATION_ASSETS = {
             description: "Vim文本编辑器",
             version: "1.0.0",
             alwaysShowInTaskbar: false,  // 不常显在任务栏（仅在运行时显示）
+            allowMultipleInstances: true,
             supportsPreview: true,  // 支持窗口预览快照
             category: "utility"  // 轻松使用
         }
@@ -122,7 +123,7 @@ const APPLICATION_ASSETS = {
             version: "1.1.0",
             type: "GUI",
             alwaysShowInTaskbar: false,
-            allowMultipleInstances: true,
+            allowMultipleInstances: false,
             supportsPreview: true,  // 支持窗口预览快照
             category: "other"  // 其他程序
         }
@@ -141,7 +142,7 @@ const APPLICATION_ASSETS = {
             version: "1.0.0",
             type: "GUI",
             alwaysShowInTaskbar: false,
-            allowMultipleInstances: true,
+            allowMultipleInstances: false,
             supportsPreview: true,  // 支持窗口预览快照
             category: "game"  // 游戏
         }
@@ -316,7 +317,7 @@ const APPLICATION_ASSETS = {
             version: "1.0.0",
             type: "GUI",
             alwaysShowInTaskbar: false,
-            allowMultipleInstances: true,
+            allowMultipleInstances: false,
             supportsPreview: true,  // 支持窗口预览快照
             category: "other"  // 其他应用
         }
@@ -335,7 +336,7 @@ const APPLICATION_ASSETS = {
             version: "1.0.0",
             type: "GUI",
             alwaysShowInTaskbar: false,
-            allowMultipleInstances: true,
+            allowMultipleInstances: false,
             supportsPreview: true,  // 支持窗口预览快照
             category: "other"  // 其他应用
         }
@@ -376,6 +377,25 @@ const APPLICATION_ASSETS = {
             allowMultipleInstances: true,
             supportsPreview: true,  // 支持窗口预览快照
             category: "utility"  // 工具类应用
+        }
+    },
+    
+    // 内核检查程序
+    // 注意：路径是 D: 盘下的真实路径
+    "kernelchecker": {
+        script: "D:/application/kernelchecker/kernelchecker.js",
+        styles: ["D:/application/kernelchecker/kernelchecker.css"],
+        icon: "D:/application/kernelchecker/kernelchecker.svg",
+        metadata: {
+            autoStart: false,
+            priority: 2,
+            description: "专业的内核检查程序",
+            version: "1.0.0",
+            type: "GUI",
+            alwaysShowInTaskbar: false,
+            allowMultipleInstances: true,
+            supportsPreview: true,  // 支持窗口预览快照
+            category: "system"  // 系统应用
         }
     },
     

@@ -112,15 +112,20 @@
                         icon = ApplicationAssetManager.getIcon('handtracker');
                     }
                     
-                    GUIManager.registerWindow(pid, this.window, {
+                    const windowInfo = GUIManager.registerWindow(pid, this.window, {
                         title: '手势跟踪器',
                         icon: icon,
                         onClose: () => {
-                            if (typeof ProcessManager !== 'undefined') {
-                                ProcessManager.killProgram(this.pid);
-                            }
+                            // onClose 回调只做清理工作，不调用 _closeWindow 或 unregisterWindow
+                            // 窗口关闭由 GUIManager._closeWindow 统一处理
+                            // _closeWindow 会在窗口关闭后检查该 PID 是否还有其他窗口，如果没有，会 kill 进程
+                            // 这样可以确保程序多实例（不同 PID）互不影响
                         }
                     });
+                    // 保存窗口ID，用于精确清理
+                    if (windowInfo && windowInfo.windowId) {
+                        this.windowId = windowInfo.windowId;
+                    }
                 }
                 
                 // 创建UI
@@ -1187,6 +1192,21 @@
          * 程序退出
          */
         __exit__: async function() {
+            // 清理事件处理器
+            if (this._resizeHandlerId && typeof EventManager !== 'undefined') {
+                EventManager.unregisterEventHandler(this._resizeHandlerId);
+                this._resizeHandlerId = null;
+            }
+            if (this._trackingResizeHandlerId && typeof EventManager !== 'undefined') {
+                EventManager.unregisterEventHandler(this._trackingResizeHandlerId);
+                this._trackingResizeHandlerId = null;
+            }
+            
+            // 清理所有事件处理器（通过 EventManager）
+            if (typeof EventManager !== 'undefined' && this.pid) {
+                EventManager.unregisterAllHandlersForPid(this.pid);
+            }
+            
             // 停止跟踪
             this._stopTracking();
             
@@ -1757,9 +1777,17 @@
                 
                 console.log('[HandTracker] Three.js 初始化完成，粒子组数量:', this._particleGroups.length);
                 
-                // 监听窗口大小变化（保存引用以便后续移除）
+                // 监听窗口大小变化（使用 EventManager）
                 this._resizeHandler = () => this._onThreeJSResize();
-                window.addEventListener('resize', this._resizeHandler);
+                if (typeof EventManager !== 'undefined' && this.pid) {
+                    this._resizeHandlerId = EventManager.registerEventHandler(this.pid, 'resize', this._resizeHandler, {
+                        priority: 100,
+                        selector: null  // 监听 window 的 resize 事件
+                    });
+                } else {
+                    // 降级：直接使用 addEventListener（不推荐）
+                    window.addEventListener('resize', this._resizeHandler);
+                }
                 
             } catch (error) {
                 console.error('[HandTracker] Three.js 初始化失败:', error);
@@ -2799,7 +2827,7 @@
                 // 开始渲染循环
                 this._animateTrackingThreeJS();
                 
-                // 监听窗口大小变化
+                // 监听窗口大小变化（使用 EventManager）
                 const resizeHandler = () => {
                     if (!this._trackingThreeRenderer || !this._trackingThreeCamera) return;
                     const container = document.getElementById('tracking-three-container');
@@ -2810,7 +2838,15 @@
                     this._trackingThreeCamera.aspect = width / height;
                     this._trackingThreeCamera.updateProjectionMatrix();
                 };
-                window.addEventListener('resize', resizeHandler);
+                if (typeof EventManager !== 'undefined' && this.pid) {
+                    this._trackingResizeHandlerId = EventManager.registerEventHandler(this.pid, 'resize', resizeHandler, {
+                        priority: 100,
+                        selector: null  // 监听 window 的 resize 事件
+                    });
+                } else {
+                    // 降级：直接使用 addEventListener（不推荐）
+                    window.addEventListener('resize', resizeHandler);
+                }
                 
                 console.log('[HandTracker] 跟踪页面Three.js初始化完成');
                 
@@ -4041,7 +4077,7 @@
                 type: 'GUI',
                 version: '1.0.0',
                 description: '手势和面部跟踪器 - 使用 MediaPipe 实时跟踪用户手部、手势和面部并绘制骨架',
-                author: 'ZerOS',
+                author: 'ZerOS Team',
                 copyright: '© 2025 ZerOS',
                 permissions: [
                     'MULTITHREADING_CREATE',

@@ -1914,7 +1914,7 @@
                 version: '1.0.0',
                 description: 'Vim文本编辑器 - 类Vim编辑体验',
                 author: 'ZerOS Team',
-                copyright: 'Copyright (c) 2024 ZerOS',
+                copyright: '© 2025 ZerOS',
                 capabilities: [
                     'text_editing',
                     'file_operations',
@@ -1924,7 +1924,8 @@
                 permissions: typeof PermissionManager !== 'undefined' ? [
                     PermissionManager.PERMISSION.KERNEL_DISK_READ,
                     PermissionManager.PERMISSION.KERNEL_DISK_WRITE,
-                    PermissionManager.PERMISSION.KERNEL_DISK_LIST
+                    PermissionManager.PERMISSION.KERNEL_DISK_LIST,
+                    PermissionManager.PERMISSION.EVENT_LISTENER
                 ] : [],
                 metadata: {
                     autoStart: false,

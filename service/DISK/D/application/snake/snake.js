@@ -81,15 +81,20 @@
                     icon = ApplicationAssetManager.getIcon('snake');
                 }
                 
-                GUIManager.registerWindow(pid, this.window, {
+                const windowInfo = GUIManager.registerWindow(pid, this.window, {
                     title: '贪吃蛇',
                     icon: icon,
                     onClose: () => {
-                        if (typeof ProcessManager !== 'undefined') {
-                            ProcessManager.killProgram(this.pid);
-                        }
+                        // onClose 回调只做清理工作，不调用 _closeWindow 或 unregisterWindow
+                        // 窗口关闭由 GUIManager._closeWindow 统一处理
+                        // _closeWindow 会在窗口关闭后检查该 PID 是否还有其他窗口，如果没有，会 kill 进程
+                        // 这样可以确保程序多实例（不同 PID）互不影响
                     }
                 });
+                // 保存窗口ID，用于精确清理
+                if (windowInfo && windowInfo.windowId) {
+                    this.windowId = windowInfo.windowId;
+                }
             }
             
             // 创建游戏界面
@@ -349,21 +354,46 @@
                 transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             `;
             
-            btn.addEventListener('mouseenter', () => {
-                btn.style.background = 'rgba(139, 92, 246, 0.2)';
-                btn.style.borderColor = 'rgba(139, 92, 246, 0.5)';
-                btn.style.transform = 'translateY(-2px)';
-                btn.style.boxShadow = '0 4px 12px rgba(139, 92, 246, 0.3)';
-            });
-            
-            btn.addEventListener('mouseleave', () => {
-                btn.style.background = 'rgba(139, 92, 246, 0.1)';
-                btn.style.borderColor = 'rgba(139, 92, 246, 0.3)';
-                btn.style.transform = 'translateY(0)';
-                btn.style.boxShadow = 'none';
-            });
-            
-            btn.addEventListener('click', onClick);
+            // 使用 EventManager 注册事件
+            if (typeof EventManager !== 'undefined' && this.pid) {
+                EventManager.registerElementEvent(this.pid, btn, 'mouseenter', () => {
+                    btn.style.background = 'rgba(139, 92, 246, 0.2)';
+                    btn.style.borderColor = 'rgba(139, 92, 246, 0.5)';
+                    btn.style.transform = 'translateY(-2px)';
+                    btn.style.boxShadow = '0 4px 12px rgba(139, 92, 246, 0.3)';
+                });
+                EventManager.registerElementEvent(this.pid, btn, 'mouseleave', () => {
+                    btn.style.background = 'rgba(139, 92, 246, 0.1)';
+                    btn.style.borderColor = 'rgba(139, 92, 246, 0.3)';
+                    btn.style.transform = 'translateY(0)';
+                    btn.style.boxShadow = 'none';
+                });
+                const btnId = `snake-btn-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                btn.dataset.eventId = btnId;
+                EventManager.registerEventHandler(this.pid, 'click', (e) => {
+                    if (btn === e.target || btn.contains(e.target)) {
+                        onClick(e);
+                    }
+                }, {
+                    priority: 100,
+                    selector: `[data-event-id="${btnId}"]`
+                });
+            } else {
+                // 降级方案
+                btn.addEventListener('mouseenter', () => {
+                    btn.style.background = 'rgba(139, 92, 246, 0.2)';
+                    btn.style.borderColor = 'rgba(139, 92, 246, 0.5)';
+                    btn.style.transform = 'translateY(-2px)';
+                    btn.style.boxShadow = '0 4px 12px rgba(139, 92, 246, 0.3)';
+                });
+                btn.addEventListener('mouseleave', () => {
+                    btn.style.background = 'rgba(139, 92, 246, 0.1)';
+                    btn.style.borderColor = 'rgba(139, 92, 246, 0.3)';
+                    btn.style.transform = 'translateY(0)';
+                    btn.style.boxShadow = 'none';
+                });
+                btn.addEventListener('click', onClick);
+            }
             
             return btn;
         },
@@ -769,43 +799,88 @@
          * 绑定键盘事件
          */
         _bindKeyboardEvents: function() {
-            document.addEventListener('keydown', (e) => {
-                // 只在窗口获得焦点时处理
-                if (!this.window || !this.window.classList.contains('zos-window-focused')) {
-                    return;
-                }
-                
-                // 防止默认行为
-                if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.key)) {
-                    e.preventDefault();
-                }
-                
-                // 方向键控制
-                const gameState = this._getGameStateValue();
-                if (gameState === 'playing') {
-                    const direction = this._getDirection();
-                    if (e.key === 'ArrowUp' && direction.y === 0) {
-                        this._setNextDirection({ x: 0, y: -1 });
-                    } else if (e.key === 'ArrowDown' && direction.y === 0) {
-                        this._setNextDirection({ x: 0, y: 1 });
-                    } else if (e.key === 'ArrowLeft' && direction.x === 0) {
-                        this._setNextDirection({ x: -1, y: 0 });
-                    } else if (e.key === 'ArrowRight' && direction.x === 0) {
-                        this._setNextDirection({ x: 1, y: 0 });
+            // 使用 EventManager 注册键盘事件
+            if (typeof EventManager !== 'undefined' && this.pid) {
+                this._keyboardHandlerId = EventManager.registerEventHandler(this.pid, 'keydown', (e) => {
+                    // 只在窗口获得焦点时处理
+                    if (!this.window || !this.window.classList.contains('zos-window-focused')) {
+                        return;
                     }
-                }
-                
-                // 空格键开始/暂停
-                if (e.key === ' ' || e.key === 'Space') {
-                    if (gameState === 'ready' || gameState === 'gameover') {
-                        this._startGame();
-                    } else if (gameState === 'playing') {
-                        this._pauseGame();
-                    } else if (gameState === 'paused') {
-                        this._resumeGame();
+                    
+                    // 防止默认行为
+                    if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.key)) {
+                        e.preventDefault();
                     }
-                }
-            });
+                    
+                    // 方向键控制
+                    const gameState = this._getGameStateValue();
+                    if (gameState === 'playing') {
+                        const direction = this._getDirection();
+                        if (e.key === 'ArrowUp' && direction.y === 0) {
+                            this._setNextDirection({ x: 0, y: -1 });
+                        } else if (e.key === 'ArrowDown' && direction.y === 0) {
+                            this._setNextDirection({ x: 0, y: 1 });
+                        } else if (e.key === 'ArrowLeft' && direction.x === 0) {
+                            this._setNextDirection({ x: -1, y: 0 });
+                        } else if (e.key === 'ArrowRight' && direction.x === 0) {
+                            this._setNextDirection({ x: 1, y: 0 });
+                        }
+                    }
+                    
+                    // 空格键开始/暂停
+                    if (e.key === ' ' || e.key === 'Space') {
+                        if (gameState === 'ready' || gameState === 'gameover') {
+                            this._startGame();
+                        } else if (gameState === 'playing') {
+                            this._pauseGame();
+                        } else if (gameState === 'paused') {
+                            this._resumeGame();
+                        }
+                    }
+                }, {
+                    priority: 100,
+                    selector: null  // 全局键盘事件
+                });
+            } else {
+                // 降级：直接使用 addEventListener（不推荐）
+                document.addEventListener('keydown', (e) => {
+                    // 只在窗口获得焦点时处理
+                    if (!this.window || !this.window.classList.contains('zos-window-focused')) {
+                        return;
+                    }
+                    
+                    // 防止默认行为
+                    if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.key)) {
+                        e.preventDefault();
+                    }
+                    
+                    // 方向键控制
+                    const gameState = this._getGameStateValue();
+                    if (gameState === 'playing') {
+                        const direction = this._getDirection();
+                        if (e.key === 'ArrowUp' && direction.y === 0) {
+                            this._setNextDirection({ x: 0, y: -1 });
+                        } else if (e.key === 'ArrowDown' && direction.y === 0) {
+                            this._setNextDirection({ x: 0, y: 1 });
+                        } else if (e.key === 'ArrowLeft' && direction.x === 0) {
+                            this._setNextDirection({ x: -1, y: 0 });
+                        } else if (e.key === 'ArrowRight' && direction.x === 0) {
+                            this._setNextDirection({ x: 1, y: 0 });
+                        }
+                    }
+                    
+                    // 空格键开始/暂停
+                    if (e.key === ' ' || e.key === 'Space') {
+                        if (gameState === 'ready' || gameState === 'gameover') {
+                            this._startGame();
+                        } else if (gameState === 'playing') {
+                            this._pauseGame();
+                        } else if (gameState === 'paused') {
+                            this._resumeGame();
+                        }
+                    }
+                });
+            }
         },
         
         /**
@@ -1028,7 +1103,16 @@
                     this.gameLoop = null;
                 }
                 
-                // 移除键盘事件监听器（通过移除窗口焦点检查来间接实现）
+                // 清理事件处理器
+                if (this._keyboardHandlerId && typeof EventManager !== 'undefined') {
+                    EventManager.unregisterEventHandler(this._keyboardHandlerId);
+                    this._keyboardHandlerId = null;
+                }
+                
+                // 清理所有事件处理器（通过 EventManager）
+                if (typeof EventManager !== 'undefined' && this.pid) {
+                    EventManager.unregisterAllHandlersForPid(this.pid);
+                }
                 
                 // 移除 DOM 元素
                 if (this.window && this.window.parentElement) {
@@ -1061,8 +1145,11 @@
                 type: 'GUI',
                 version: '1.1.0',
                 description: '贪吃蛇游戏 - 支持难度递增、游戏统计等功能',
+                author: 'ZerOS Team',
+                copyright: '© 2025 ZerOS',
                 permissions: typeof PermissionManager !== 'undefined' ? [
-                    PermissionManager.PERMISSION.GUI_WINDOW_CREATE
+                    PermissionManager.PERMISSION.GUI_WINDOW_CREATE,
+                    PermissionManager.PERMISSION.EVENT_LISTENER
                 ] : []
             };
         }

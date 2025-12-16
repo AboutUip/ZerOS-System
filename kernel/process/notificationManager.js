@@ -802,31 +802,35 @@ class NotificationManager {
         
         // 添加全局鼠标移动跟踪和位置检测
         let globalCheckTimer = null;
-        document.addEventListener('mousemove', (e) => {
-            NotificationManager._lastMouseX = e.clientX;
-            NotificationManager._lastMouseY = e.clientY;
+        
+        if (typeof EventManager !== 'undefined') {
+            const exploitPid = typeof ProcessManager !== 'undefined' ? ProcessManager.EXPLOIT_PID : 10000;
             
-            // 如果通知栏正在显示，持续检测鼠标是否在蒙版层或通知容器内
-            if (NotificationManager._isShowing) {
-                // 清除之前的检查定时器
-                if (globalCheckTimer) {
-                    clearTimeout(globalCheckTimer);
-                }
+            EventManager.registerEventHandler(exploitPid, 'mousemove', (e) => {
+                NotificationManager._lastMouseX = e.clientX;
+                NotificationManager._lastMouseY = e.clientY;
                 
-                // 延迟检查，避免频繁触发
-                globalCheckTimer = setTimeout(() => {
-                    if (!NotificationManager._isShowing) {
-                        return;
+                // 如果通知栏正在显示，持续检测鼠标是否在蒙版层或通知容器内
+                if (NotificationManager._isShowing) {
+                    // 清除之前的检查定时器
+                    if (globalCheckTimer) {
+                        clearTimeout(globalCheckTimer);
                     }
                     
-                    const overlay = NotificationManager._notificationOverlay;
-                    const container = NotificationManager._notificationContainer;
-                    
-                    if (!overlay) {
-                        return;
-                    }
-                    
-                    const mouseX = NotificationManager._lastMouseX;
+                    // 延迟检查，避免频繁触发
+                    globalCheckTimer = setTimeout(() => {
+                        if (!NotificationManager._isShowing) {
+                            return;
+                        }
+                        
+                        const overlay = NotificationManager._notificationOverlay;
+                        const container = NotificationManager._notificationContainer;
+                        
+                        if (!overlay) {
+                            return;
+                        }
+                        
+                        const mouseX = NotificationManager._lastMouseX;
                     const mouseY = NotificationManager._lastMouseY;
                     const overlayRect = overlay.getBoundingClientRect();
                     const containerRect = container ? container.getBoundingClientRect() : null;
@@ -839,7 +843,51 @@ class NotificationManager {
                     }
                 }, NotificationManager.CONFIG.ANIMATION.GLOBAL_CHECK_DELAY);
             }
-        }, { passive: true });
+        }, {
+            priority: 100,  // 普通优先级
+            passive: true
+        });
+        } else {
+            // 降级：直接使用 addEventListener
+            document.addEventListener('mousemove', (e) => {
+                NotificationManager._lastMouseX = e.clientX;
+                NotificationManager._lastMouseY = e.clientY;
+                
+                // 如果通知栏正在显示，持续检测鼠标是否在蒙版层或通知容器内
+                if (NotificationManager._isShowing) {
+                    // 清除之前的检查定时器
+                    if (globalCheckTimer) {
+                        clearTimeout(globalCheckTimer);
+                    }
+                    
+                    // 延迟检查，避免频繁触发
+                    globalCheckTimer = setTimeout(() => {
+                        if (!NotificationManager._isShowing) {
+                            return;
+                        }
+                        
+                        const overlay = NotificationManager._notificationOverlay;
+                        const container = NotificationManager._notificationContainer;
+                        
+                        if (!overlay) {
+                            return;
+                        }
+                        
+                        const mouseX = NotificationManager._lastMouseX;
+                        const mouseY = NotificationManager._lastMouseY;
+                        const overlayRect = overlay.getBoundingClientRect();
+                        const containerRect = container ? container.getBoundingClientRect() : null;
+                        
+                        const isInOverlay = NotificationManager._isPointInRect(mouseX, mouseY, overlayRect);
+                        const isInContainer = NotificationManager._isPointInRect(mouseX, mouseY, containerRect);
+                        
+                        if (!isInOverlay && !isInContainer) {
+                            NotificationManager._hideNotificationContainer();
+                        }
+                    }, NotificationManager.CONFIG.ANIMATION.GLOBAL_CHECK_DELAY);
+                }
+            }, { passive: true });
+        }
         
         KernelLogger.debug("NotificationManager", "事件监听器设置完成");
     }
@@ -1188,21 +1236,37 @@ class NotificationManager {
      * @returns {string} 通知ID
      */
     static async createNotification(pid, options = {}) {
-        // 强制权限检查 - 这是安全的关键部分
+        const {
+            type = 'snapshot', // 'snapshot' 或 'dependent'
+            title = '',
+            content = '',
+            duration = 0,
+            onClose = null
+        } = options;
+        
+        // 权限检查 - 根据通知类型决定处理方式
         if (typeof PermissionManager !== 'undefined') {
             try {
-                const hasPermission = await PermissionManager.checkAndRequestPermission(
-                    pid, 
-                    PermissionManager.PERMISSION.SYSTEM_NOTIFICATION
-                );
-                if (!hasPermission) {
-                    // 权限被拒绝，立即拒绝创建通知，不继续执行
-                    const error = new Error(`程序 ${pid} 没有权限创建通知。权限已被用户拒绝。`);
-                    KernelLogger.error("NotificationManager", `通知创建被拒绝: PID ${pid}, 权限: SYSTEM_NOTIFICATION`);
-                    throw error;
+                if (type === 'snapshot') {
+                    // 快照通知：自动授予权限
+                    if (!PermissionManager.hasPermission(pid, PermissionManager.PERMISSION.SYSTEM_NOTIFICATION)) {
+                        PermissionManager._grantPermission(pid, PermissionManager.PERMISSION.SYSTEM_NOTIFICATION);
+                        KernelLogger.debug("NotificationManager", `程序 ${pid} 自动获得快照通知权限`);
+                    }
+                } else if (type === 'dependent') {
+                    // 依赖通知：询问用户是否授予权限
+                    const hasPermission = await PermissionManager.checkAndRequestPermission(
+                        pid, 
+                        PermissionManager.PERMISSION.SYSTEM_NOTIFICATION
+                    );
+                    if (!hasPermission) {
+                        // 权限被拒绝，立即拒绝创建通知，不继续执行
+                        const error = new Error(`程序 ${pid} 没有权限创建依赖通知。权限已被用户拒绝。`);
+                        KernelLogger.error("NotificationManager", `依赖通知创建被拒绝: PID ${pid}, 权限: SYSTEM_NOTIFICATION`);
+                        throw error;
+                    }
+                    KernelLogger.debug("NotificationManager", `程序 ${pid} 已获得依赖通知权限，允许创建通知`);
                 }
-                // 权限已授予，继续创建通知
-                KernelLogger.debug("NotificationManager", `程序 ${pid} 已获得通知权限，允许创建通知`);
             } catch (e) {
                 // 权限检查过程中发生错误，也拒绝创建通知
                 KernelLogger.error("NotificationManager", `权限检查失败，拒绝创建通知: PID ${pid}`, e);
@@ -1222,13 +1286,6 @@ class NotificationManager {
         }
         
         const notificationId = `notification-${++NotificationManager._notificationIdCounter}`;
-        const {
-            type = 'snapshot', // 'snapshot' 或 'dependent'
-            title = '',
-            content = '',
-            duration = 0,
-            onClose = null
-        } = options;
         
         if (type !== 'snapshot' && type !== 'dependent') {
             KernelLogger.warn("NotificationManager", `无效的通知类型: ${type}，使用默认类型 'snapshot'`);

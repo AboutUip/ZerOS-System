@@ -41,13 +41,14 @@
                     icon = ApplicationAssetManager.getIcon('about');
                 }
                 
-                GUIManager.registerWindow(pid, this.window, {
+                const windowInfo = GUIManager.registerWindow(pid, this.window, {
                     title: '关于 ZerOS',
                     icon: icon,
                     onClose: () => {
-                        if (typeof ProcessManager !== 'undefined') {
-                            ProcessManager.killProgram(this.pid);
-                        }
+                        // onClose 回调只做清理工作，不调用 _closeWindow 或 unregisterWindow
+                        // 窗口关闭由 GUIManager._closeWindow 统一处理
+                        // _closeWindow 会在窗口关闭后检查该 PID 是否还有其他窗口，如果没有，会 kill 进程
+                        // 这样可以确保程序多实例（不同 PID）互不影响
                     },
                     onMinimize: () => {
                         // 最小化回调
@@ -56,6 +57,10 @@
                         // 最大化回调
                     }
                 });
+                // 保存窗口ID，用于精确清理
+                if (windowInfo && windowInfo.windowId) {
+                    this.windowId = windowInfo.windowId;
+                }
             }
             
             // 创建主内容区域
@@ -482,8 +487,11 @@
                 type: 'GUI',
                 version: '1.0.0',
                 description: 'ZerOS 系统信息 - 显示系统版本、内核版本、宿主环境信息和开发者信息',
+                author: 'ZerOS Team',
+                copyright: '© 2025 ZerOS',
                 permissions: typeof PermissionManager !== 'undefined' ? [
-                    PermissionManager.PERMISSION.GUI_WINDOW_CREATE
+                    PermissionManager.PERMISSION.GUI_WINDOW_CREATE,
+                    PermissionManager.PERMISSION.EVENT_LISTENER
                 ] : [],
                 metadata: {
                     category: 'system',

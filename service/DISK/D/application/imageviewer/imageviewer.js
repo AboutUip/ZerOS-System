@@ -79,11 +79,10 @@
                         title: '图片查看器',
                         icon: icon,
                         onClose: () => {
-                            // 关闭窗口时，通过 ProcessManager 终止程序
-                            // ProcessManager 会调用 __exit__ 方法进行清理
-                            if (typeof ProcessManager !== 'undefined' && this.pid) {
-                                ProcessManager.killProgram(this.pid);
-                            }
+                            // onClose 回调只做清理工作，不调用 _closeWindow 或 unregisterWindow
+                            // 窗口关闭由 GUIManager._closeWindow 统一处理
+                            // _closeWindow 会在窗口关闭后检查该 PID 是否还有其他窗口，如果没有，会 kill 进程
+                            // 这样可以确保程序多实例（不同 PID）互不影响
                         }
                     });
                     
@@ -152,15 +151,23 @@
             `;
             this.imageElement.dataset.pid = this.pid.toString();
             
-            // 图片加载完成事件
-            this.imageElement.addEventListener('load', () => {
-                this._onImageLoaded();
-            });
-            
-            // 图片加载错误事件
-            this.imageElement.addEventListener('error', () => {
-                this._onImageError();
-            });
+            // 图片加载完成事件（使用 EventManager）
+            if (typeof EventManager !== 'undefined' && this.pid) {
+                EventManager.registerElementEvent(this.pid, this.imageElement, 'load', () => {
+                    this._onImageLoaded();
+                });
+                EventManager.registerElementEvent(this.pid, this.imageElement, 'error', () => {
+                    this._onImageError();
+                });
+            } else {
+                // 降级方案
+                this.imageElement.addEventListener('load', () => {
+                    this._onImageLoaded();
+                });
+                this.imageElement.addEventListener('error', () => {
+                    this._onImageError();
+                });
+            }
             
             this.imageContainer.appendChild(this.imageElement);
             this.window.appendChild(this.imageContainer);
@@ -208,7 +215,16 @@
                 }, 100);
             };
             
-            window.addEventListener('resize', this.windowResizeHandler);
+            // 使用 EventManager 注册窗口 resize 事件
+            if (typeof EventManager !== 'undefined' && this.pid) {
+                this._resizeHandlerId = EventManager.registerEventHandler(this.pid, 'resize', this.windowResizeHandler, {
+                    priority: 100,
+                    selector: null  // 监听 window 的 resize 事件
+                });
+            } else {
+                // 降级：直接使用 addEventListener（不推荐）
+                window.addEventListener('resize', this.windowResizeHandler);
+            }
         },
         
         /**
@@ -286,15 +302,34 @@
                 font-size: 12px;
                 transition: all 0.2s;
             `;
-            resetBtn.addEventListener('mouseenter', () => {
-                resetBtn.style.background = 'var(--theme-primary-hover, rgba(108, 142, 255, 0.2))';
-            });
-            resetBtn.addEventListener('mouseleave', () => {
-                resetBtn.style.background = 'var(--theme-primary, rgba(108, 142, 255, 0.1))';
-            });
-            resetBtn.addEventListener('click', () => {
-                this._resetView();
-            });
+            // 使用 EventManager 注册事件
+            if (typeof EventManager !== 'undefined' && this.pid) {
+                EventManager.registerElementEvent(this.pid, resetBtn, 'mouseenter', () => {
+                    resetBtn.style.background = 'var(--theme-primary-hover, rgba(108, 142, 255, 0.2))';
+                });
+                EventManager.registerElementEvent(this.pid, resetBtn, 'mouseleave', () => {
+                    resetBtn.style.background = 'var(--theme-primary, rgba(108, 142, 255, 0.1))';
+                });
+                const resetBtnId = `imageviewer-reset-btn-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                resetBtn.dataset.eventId = resetBtnId;
+                EventManager.registerEventHandler(this.pid, 'click', () => {
+                    this._resetView();
+                }, {
+                    priority: 100,
+                    selector: `[data-event-id="${resetBtnId}"]`
+                });
+            } else {
+                // 降级方案
+                resetBtn.addEventListener('mouseenter', () => {
+                    resetBtn.style.background = 'var(--theme-primary-hover, rgba(108, 142, 255, 0.2))';
+                });
+                resetBtn.addEventListener('mouseleave', () => {
+                    resetBtn.style.background = 'var(--theme-primary, rgba(108, 142, 255, 0.1))';
+                });
+                resetBtn.addEventListener('click', () => {
+                    this._resetView();
+                });
+            }
             infoRight.appendChild(resetBtn);
             
             this.infoBar.appendChild(infoLeft);
@@ -306,32 +341,71 @@
          * 注册事件监听器
          */
         _registerEvents: function() {
-            // 鼠标滚轮缩放
-            this.imageContainer.addEventListener('wheel', (e) => {
-                e.preventDefault();
-                this._handleWheel(e);
-            });
+            // 使用 EventManager 注册事件
+            if (typeof EventManager !== 'undefined' && this.pid) {
+                // 鼠标滚轮缩放
+                const containerId = `imageviewer-container-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                this.imageContainer.dataset.eventId = containerId;
+                EventManager.registerEventHandler(this.pid, 'wheel', (e) => {
+                    if (this.imageContainer === e.target || this.imageContainer.contains(e.target)) {
+                        e.preventDefault();
+                        this._handleWheel(e);
+                    }
+                }, {
+                    priority: 100,
+                    selector: `[data-event-id="${containerId}"]`
+                });
+                
+                // 鼠标按下（开始拖拽）
+                EventManager.registerEventHandler(this.pid, 'mousedown', (e) => {
+                    if (this.imageContainer === e.target || this.imageContainer.contains(e.target)) {
+                        if (e.button === 0) {  // 左键
+                            this._handleMouseDown(e);
+                        }
+                    }
+                }, {
+                    priority: 100,
+                    selector: `[data-event-id="${containerId}"]`
+                });
+            } else {
+                // 降级方案
+                // 鼠标滚轮缩放
+                this.imageContainer.addEventListener('wheel', (e) => {
+                    e.preventDefault();
+                    this._handleWheel(e);
+                });
+                
+                // 鼠标按下（开始拖拽）
+                this.imageContainer.addEventListener('mousedown', (e) => {
+                    if (e.button === 0) {  // 左键
+                        this._handleMouseDown(e);
+                    }
+                });
+            }
             
-            // 鼠标按下（开始拖拽）
-            this.imageContainer.addEventListener('mousedown', (e) => {
-                if (e.button === 0) {  // 左键
-                    this._handleMouseDown(e);
-                }
-            });
-            
-            // 鼠标移动（拖拽中）
-            document.addEventListener('mousemove', (e) => {
+            // 鼠标移动（拖拽中）- 使用 EventManager 注册临时拖动事件
+            // 注意：这些事件在 mousedown 时注册，在 mouseup 时注销
+            // 这里先定义处理函数，在 mousedown 时注册
+            this._dragMousemoveHandler = (e) => {
                 if (this.isDragging) {
                     this._handleMouseMove(e);
                 }
-            });
+            };
             
-            // 鼠标抬起（结束拖拽）
-            document.addEventListener('mouseup', (e) => {
+            this._dragMouseupHandler = (e) => {
                 if (e.button === 0) {
                     this._handleMouseUp(e);
+                    // 拖拽结束后注销临时事件
+                    if (this._dragMousemoveHandlerId && typeof EventManager !== 'undefined') {
+                        EventManager.unregisterEventHandler(this._dragMousemoveHandlerId);
+                        this._dragMousemoveHandlerId = null;
+                    }
+                    if (this._dragMouseupHandlerId && typeof EventManager !== 'undefined') {
+                        EventManager.unregisterEventHandler(this._dragMouseupHandlerId);
+                        this._dragMouseupHandlerId = null;
+                    }
                 }
-            });
+            };
             
             // 注册右键菜单
             this._registerContextMenu();
@@ -495,6 +569,23 @@
             this.dragStartOffsetY = this.offsetY;
             
             this.imageContainer.style.cursor = 'grabbing';
+            
+            // 注册临时拖动事件（使用 EventManager）
+            if (typeof EventManager !== 'undefined' && this.pid) {
+                this._dragMousemoveHandlerId = EventManager.registerEventHandler(this.pid, 'mousemove', this._dragMousemoveHandler, {
+                    priority: 50,
+                    once: false
+                });
+                
+                this._dragMouseupHandlerId = EventManager.registerEventHandler(this.pid, 'mouseup', this._dragMouseupHandler, {
+                    priority: 50,
+                    once: true
+                });
+            } else {
+                // 降级：直接使用 addEventListener（不推荐）
+                document.addEventListener('mousemove', this._dragMousemoveHandler);
+                document.addEventListener('mouseup', this._dragMouseupHandler);
+            }
         },
         
         /**
@@ -660,10 +751,20 @@
             } catch (error) {
                 console.error('加载图片失败:', error);
                 this._onImageError();
-                if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                    await GUIManager.showAlert(`加载图片失败: ${error.message}`, '错误', 'error');
-                } else {
-                    alert(`加载图片失败: ${error.message}`);
+                // 加载图片失败，使用通知提示（不打断用户）
+                if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                    try {
+                        await NotificationManager.createNotification(this.pid, {
+                            type: 'snapshot',
+                            title: '图片查看器',
+                            content: `加载图片失败: ${error.message}`,
+                            duration: 4000
+                        });
+                    } catch (e) {
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('ImageViewer', `创建通知失败: ${e.message}`);
+                        }
+                    }
                 }
             }
         },
@@ -722,6 +823,25 @@
          */
         __exit__: async function() {
             try {
+                // 清理事件处理器
+                if (this._resizeHandlerId && typeof EventManager !== 'undefined') {
+                    EventManager.unregisterEventHandler(this._resizeHandlerId);
+                    this._resizeHandlerId = null;
+                }
+                if (this._dragMousemoveHandlerId && typeof EventManager !== 'undefined') {
+                    EventManager.unregisterEventHandler(this._dragMousemoveHandlerId);
+                    this._dragMousemoveHandlerId = null;
+                }
+                if (this._dragMouseupHandlerId && typeof EventManager !== 'undefined') {
+                    EventManager.unregisterEventHandler(this._dragMouseupHandlerId);
+                    this._dragMouseupHandlerId = null;
+                }
+                
+                // 清理所有事件处理器（通过 EventManager）
+                if (typeof EventManager !== 'undefined' && this.pid) {
+                    EventManager.unregisterAllHandlersForPid(this.pid);
+                }
+                
                 // 先清理定时器
                 if (this.resizeTimer) {
                     clearTimeout(this.resizeTimer);
@@ -876,10 +996,12 @@
                 version: '1.0.0',
                 description: 'ZerOS 图片查看器 - 支持 jpg, png, svg, webp 等格式，提供缩放和拖拽功能',
                 author: 'ZerOS Team',
-                copyright: '© 2024',
+                copyright: '© 2025 ZerOS',
                 permissions: typeof PermissionManager !== 'undefined' ? [
                     PermissionManager.PERMISSION.GUI_WINDOW_CREATE,
-                    PermissionManager.PERMISSION.KERNEL_DISK_READ
+                    PermissionManager.PERMISSION.KERNEL_DISK_READ,
+                    PermissionManager.PERMISSION.SYSTEM_NOTIFICATION,
+                    PermissionManager.PERMISSION.EVENT_LISTENER
                 ] : [],
                 metadata: {
                     category: 'system',  // 系统应用

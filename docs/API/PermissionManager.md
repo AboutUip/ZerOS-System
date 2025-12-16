@@ -62,6 +62,24 @@ PermissionManager.PERMISSION.GUI_WINDOW_CREATE        // 创建GUI窗口
 PermissionManager.PERMISSION.GUI_WINDOW_MANAGE        // 管理其他程序的GUI窗口（最小化/最大化/关闭）
 ```
 
+### 加密权限
+
+```javascript
+PermissionManager.PERMISSION.CRYPT_GENERATE_KEY       // 生成密钥对
+PermissionManager.PERMISSION.CRYPT_IMPORT_KEY         // 导入密钥对
+PermissionManager.PERMISSION.CRYPT_DELETE_KEY         // 删除密钥
+PermissionManager.PERMISSION.CRYPT_ENCRYPT            // 加密数据
+PermissionManager.PERMISSION.CRYPT_DECRYPT            // 解密数据
+PermissionManager.PERMISSION.CRYPT_MD5                // MD5 哈希
+PermissionManager.PERMISSION.CRYPT_RANDOM             // 随机数生成
+```
+
+### 地理位置权限
+
+```javascript
+PermissionManager.PERMISSION.GEOGRAPHY_LOCATION       // 获取地理位置信息
+```
+
 ## 初始化
 
 权限管理器在系统启动时自动初始化，无需手动调用。

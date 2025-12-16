@@ -1,0 +1,185 @@
+/* KernelChecker 样式文件 */
+
+.kernelchecker-window {
+    background: rgba(20, 25, 35, 0.95);
+    backdrop-filter: blur(60px) saturate(180%);
+    -webkit-backdrop-filter: blur(60px) saturate(180%);
+    border-radius: 12px;
+    border: 1px solid rgba(108, 142, 255, 0.2);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* 确保 KernelChecker 窗口完全不透明，防止虚化 */
+.kernelchecker-window.zos-gui-window.zos-window-focused {
+    opacity: 1 !important;
+}
+
+.kernelchecker-window.zos-gui-window:not(.zos-window-focused) {
+    opacity: 1 !important;
+}
+
+.kernelchecker-content {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    overflow: hidden;
+}
+
+.kernelchecker-toolbar {
+    padding: 15px 20px;
+    border-bottom: 1px solid rgba(108, 142, 255, 0.2);
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    background: rgba(108, 142, 255, 0.05);
+}
+
+.kernelchecker-btn {
+    padding: 8px 16px;
+    border: 1px solid rgba(108, 142, 255, 0.3);
+    background: rgba(108, 142, 255, 0.1);
+    color: #e8ecf0;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    transition: all 0.2s;
+    outline: none;
+}
+
+.kernelchecker-btn:hover:not(:disabled) {
+    background: rgba(108, 142, 255, 0.2);
+    border-color: rgba(108, 142, 255, 0.5);
+    transform: translateY(-1px);
+}
+
+.kernelchecker-btn:active:not(:disabled) {
+    transform: translateY(0);
+}
+
+.kernelchecker-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.kernelchecker-btn-primary {
+    background: rgba(108, 142, 255, 0.3);
+    border-color: rgba(108, 142, 255, 0.5);
+}
+
+.kernelchecker-btn-primary:hover:not(:disabled) {
+    background: rgba(108, 142, 255, 0.4);
+    border-color: rgba(108, 142, 255, 0.7);
+}
+
+.kernelchecker-results {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+    background: rgba(0, 0, 0, 0.2);
+}
+
+.kernelchecker-results-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.kernelchecker-result-item {
+    padding: 12px;
+    border-radius: 6px;
+    border-left: 4px solid;
+    background: rgba(0, 0, 0, 0.3);
+    transition: all 0.3s;
+}
+
+.kernelchecker-result-item:hover {
+    background: rgba(0, 0, 0, 0.4);
+    transform: translateX(4px);
+}
+
+.kernelchecker-result-success {
+    border-left-color: #00ff00;
+}
+
+.kernelchecker-result-failed {
+    border-left-color: #ff4444;
+}
+
+.kernelchecker-result-warning {
+    border-left-color: #ffaa00;
+}
+
+.kernelchecker-result-error {
+    border-left-color: #ff0000;
+}
+
+.kernelchecker-result-pending {
+    border-left-color: #888888;
+}
+
+.kernelchecker-result-category {
+    font-size: 11px;
+    color: rgba(232, 236, 240, 0.6);
+    margin-bottom: 4px;
+}
+
+.kernelchecker-result-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: #e8ecf0;
+    margin-bottom: 4px;
+}
+
+.kernelchecker-result-message {
+    font-size: 12px;
+    color: rgba(232, 236, 240, 0.8);
+}
+
+.kernelchecker-result-details {
+    font-size: 11px;
+    color: rgba(232, 236, 240, 0.6);
+    margin-top: 4px;
+    font-family: monospace;
+    white-space: pre-wrap;
+    word-break: break-all;
+}
+
+.kernelchecker-statusbar {
+    padding: 10px 20px;
+    border-top: 1px solid rgba(108, 142, 255, 0.2);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 12px;
+    color: rgba(232, 236, 240, 0.7);
+    background: rgba(108, 142, 255, 0.05);
+}
+
+.kernelchecker-stats {
+    font-weight: 600;
+    color: rgba(232, 236, 240, 0.9);
+}
+
+/* 滚动条样式 */
+.kernelchecker-results::-webkit-scrollbar {
+    width: 8px;
+}
+
+.kernelchecker-results::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 4px;
+}
+
+.kernelchecker-results::-webkit-scrollbar-thumb {
+    background: rgba(108, 142, 255, 0.3);
+    border-radius: 4px;
+}
+
+.kernelchecker-results::-webkit-scrollbar-thumb:hover {
+    background: rgba(108, 142, 255, 0.5);
+}
+

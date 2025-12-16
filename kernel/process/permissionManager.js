@@ -58,6 +58,18 @@ class PermissionManager {
         
         // 地理位置权限
         GEOGRAPHY_LOCATION: 'GEOGRAPHY_LOCATION',       // 获取地理位置信息
+        
+        // 加密权限
+        CRYPT_GENERATE_KEY: 'CRYPT_GENERATE_KEY',           // 生成密钥对
+        CRYPT_IMPORT_KEY: 'CRYPT_IMPORT_KEY',               // 导入密钥对
+        CRYPT_DELETE_KEY: 'CRYPT_DELETE_KEY',               // 删除密钥
+        CRYPT_ENCRYPT: 'CRYPT_ENCRYPT',                     // 加密数据
+        CRYPT_DECRYPT: 'CRYPT_DECRYPT',                     // 解密数据
+        CRYPT_MD5: 'CRYPT_MD5',                             // MD5 哈希
+        CRYPT_RANDOM: 'CRYPT_RANDOM',                       // 随机数生成
+        
+        // 事件权限
+        EVENT_LISTENER: 'EVENT_LISTENER'                    // 注册事件监听器
     };
     
     /**
@@ -103,6 +115,18 @@ class PermissionManager {
         
         // 地理位置权限（特殊权限，需要用户确认）
         [PermissionManager.PERMISSION.GEOGRAPHY_LOCATION]: PermissionManager.PERMISSION_LEVEL.SPECIAL,
+        
+        // 加密权限（特殊权限，需要用户确认）
+        [PermissionManager.PERMISSION.CRYPT_GENERATE_KEY]: PermissionManager.PERMISSION_LEVEL.SPECIAL,
+        [PermissionManager.PERMISSION.CRYPT_IMPORT_KEY]: PermissionManager.PERMISSION_LEVEL.SPECIAL,
+        [PermissionManager.PERMISSION.CRYPT_DELETE_KEY]: PermissionManager.PERMISSION_LEVEL.SPECIAL,
+        [PermissionManager.PERMISSION.CRYPT_ENCRYPT]: PermissionManager.PERMISSION_LEVEL.SPECIAL,
+        [PermissionManager.PERMISSION.CRYPT_DECRYPT]: PermissionManager.PERMISSION_LEVEL.SPECIAL,
+        [PermissionManager.PERMISSION.CRYPT_MD5]: PermissionManager.PERMISSION_LEVEL.NORMAL,  // MD5 哈希是普通权限
+        [PermissionManager.PERMISSION.CRYPT_RANDOM]: PermissionManager.PERMISSION_LEVEL.NORMAL,  // 随机数生成是普通权限
+        
+        // 事件权限（普通权限，自动授予）
+        [PermissionManager.PERMISSION.EVENT_LISTENER]: PermissionManager.PERMISSION_LEVEL.NORMAL,
         
         // 危险权限（需要明确授权）
         [PermissionManager.PERMISSION.PROCESS_MANAGE]: PermissionManager.PERMISSION_LEVEL.DANGEROUS,
@@ -809,6 +833,10 @@ class PermissionManager {
             [PermissionManager.PERMISSION.MULTITHREADING_EXECUTE]: {
                 name: '执行多线程任务',
                 description: '允许程序在多线程环境中执行任务'
+            },
+            [PermissionManager.PERMISSION.EVENT_LISTENER]: {
+                name: '事件监听',
+                description: '允许程序注册事件监听器，监听用户交互和系统事件'
             }
         };
         

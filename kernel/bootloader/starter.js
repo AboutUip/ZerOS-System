@@ -38,12 +38,16 @@
         "../kernel/process/applicationAssetManager.js": ["../kernel/process/applicationAssets.js"],
         "../kernel/process/programCategories.js": [], // 程序类别配置（独立模块）
         "../kernel/process/processManager.js": ["../kernel/memory/memoryManager.js", "../kernel/memory/kernelMemory.js", "../kernel/process/applicationAssetManager.js"],
-        "../kernel/process/eventManager.js": [],
+        
+        // 第六层：事件管理器（必须在其他使用事件的模块之前加载）
+        "../kernel/process/eventManager.js": ["../kernel/process/processManager.js"],
+        
+        // 第七层：GUI 和菜单管理模块（依赖进程管理器和事件管理器）
         "../kernel/process/guiManager.js": ["../kernel/process/processManager.js", "../kernel/process/eventManager.js"],
-        "../kernel/process/contextMenuManager.js": ["../kernel/process/processManager.js"],
+        "../kernel/process/contextMenuManager.js": ["../kernel/process/processManager.js", "../kernel/process/eventManager.js"],
         "../kernel/process/taskbarManager.js": ["../kernel/process/processManager.js", "../kernel/process/applicationAssetManager.js", "../kernel/process/contextMenuManager.js", "../kernel/process/eventManager.js", "../kernel/process/programCategories.js", "../kernel/process/themeManager.js"],
-        "../kernel/process/notificationManager.js": ["../kernel/process/taskbarManager.js", "../kernel/process/processManager.js"],
-        "../kernel/process/desktop.js": ["../kernel/process/processManager.js", "../kernel/process/applicationAssetManager.js", "../kernel/process/contextMenuManager.js", "../kernel/process/themeManager.js", "../kernel/process/guiManager.js"],
+        "../kernel/process/notificationManager.js": ["../kernel/process/taskbarManager.js", "../kernel/process/processManager.js", "../kernel/process/eventManager.js"],
+        "../kernel/process/desktop.js": ["../kernel/process/processManager.js", "../kernel/process/applicationAssetManager.js", "../kernel/process/contextMenuManager.js", "../kernel/process/themeManager.js", "../kernel/process/guiManager.js", "../kernel/process/eventManager.js"],
         
         // 第七层：文件系统初始化（依赖所有文件系统模块）
         "../kernel/fileSystem/init.js": [
@@ -97,6 +101,12 @@
         // 第十二层：地理位置驱动器（依赖进程管理器，用于权限检查）
         "../kernel/drive/geographyDrive.js": [
             "../kernel/process/processManager.js"
+        ],
+        
+        // 第十二层：加密驱动器（依赖本地存储管理器和动态模块管理器）
+        "../kernel/drive/cryptDrive.js": [
+            "../kernel/drive/LStorage.js",
+            "../kernel/dynamicModule/dynamicManager.js"
         ],
     };
     
@@ -395,12 +405,29 @@
             check('KernelLogger.error', typeof KernelLogger.error === 'function', true);
             check('KernelLogger.warn', typeof KernelLogger.warn === 'function');
             check('KernelLogger.debug', typeof KernelLogger.debug === 'function');
+            // 检查日志级别配置
+            try {
+                if (KernelLogger.getLogLevel) {
+                    const logLevel = KernelLogger.getLogLevel();
+                    info('KernelLogger 日志级别', logLevel || '默认');
+                }
+            } catch (e) {}
         }
         
         check('DependencyConfig', typeof DependencyConfig !== 'undefined', true);
         if (typeof DependencyConfig !== 'undefined') {
             check('DependencyConfig.generate', typeof DependencyConfig.generate === 'function');
             check('DependencyConfig.publishSignal', typeof DependencyConfig.publishSignal === 'function');
+            // 检查依赖配置状态
+            try {
+                if (DependencyConfig.getConfig) {
+                    const config = DependencyConfig.getConfig();
+                    if (config && typeof config === 'object') {
+                        const moduleCount = Object.keys(config).length;
+                        info('依赖配置模块数', `${moduleCount} 个`);
+                    }
+                }
+            } catch (e) {}
         }
         
         check('POOL', typeof POOL !== 'undefined', true);
@@ -424,6 +451,19 @@
                     if (workspace) {
                         info('POOL.WORK_SPACE', workspace);
                     }
+                    
+                    // 检查 POOL 中的其他关键模块
+                    const modules = ['GUIManager', 'ProcessManager', 'ThemeManager', 'MemoryManager', 'NetworkManager', 'CryptDrive'];
+                    let loadedModules = 0;
+                    modules.forEach(moduleName => {
+                        try {
+                            const module = POOL.__GET__("KERNEL_GLOBAL_POOL", moduleName);
+                            if (module !== undefined && module !== null) {
+                                loadedModules++;
+                            }
+                        } catch (e) {}
+                    });
+                    info('POOL 已加载模块', `${loadedModules}/${modules.length} 个核心模块`);
                 } else {
                     warn('POOL.KERNEL_GLOBAL_POOL', '类别未初始化');
                 }
@@ -562,10 +602,41 @@
             check('MemoryManager.freeMemory', typeof MemoryManager.freeMemory === 'function');
             check('MemoryManager.registerProgramName', typeof MemoryManager.registerProgramName === 'function');
             check('MemoryManager.checkMemory', typeof MemoryManager.checkMemory === 'function');
+            // 检查内存使用情况
+            try {
+                if (MemoryManager.checkMemory) {
+                    const memInfo = MemoryManager.checkMemory();
+                    if (memInfo && typeof memInfo === 'object') {
+                        const total = memInfo.total || memInfo.totalMemory || 0;
+                        const used = memInfo.used || memInfo.usedMemory || 0;
+                        const free = memInfo.free || memInfo.freeMemory || 0;
+                        if (total > 0) {
+                            const usedPercent = ((used / total) * 100).toFixed(1);
+                            info('内存使用情况', `已用 ${usedPercent}% (${used}/${total})`);
+                        }
+                    }
+                }
+            } catch (e) {}
         }
         
         check('Heap', typeof Heap !== 'undefined');
+        if (typeof Heap !== 'undefined') {
+            try {
+                if (Heap.getSize) {
+                    const heapSize = Heap.getSize();
+                    info('堆内存大小', `${heapSize} 字节`);
+                }
+            } catch (e) {}
+        }
         check('Shed', typeof Shed !== 'undefined');
+        if (typeof Shed !== 'undefined') {
+            try {
+                if (Shed.getSize) {
+                    const shedSize = Shed.getSize();
+                    info('栈内存大小', `${shedSize} 字节`);
+                }
+            } catch (e) {}
+        }
         
         check('KernelMemory', typeof KernelMemory !== 'undefined', true);
         if (typeof KernelMemory !== 'undefined') {
@@ -611,6 +682,20 @@
         if (typeof GUIManager !== 'undefined') {
             check('GUIManager.registerWindow', typeof GUIManager.registerWindow === 'function');
             check('GUIManager.unregisterWindow', typeof GUIManager.unregisterWindow === 'function');
+            // 检查窗口状态
+            try {
+                if (GUIManager.getWindows) {
+                    const windows = GUIManager.getWindows();
+                    if (windows && windows.length > 0) {
+                        info('已注册窗口', `${windows.length} 个`);
+                    }
+                } else if (GUIManager._windows) {
+                    const windowCount = GUIManager._windows.size || 0;
+                    if (windowCount > 0) {
+                        info('已注册窗口', `${windowCount} 个`);
+                    }
+                }
+            } catch (e) {}
         }
         
         check('ThemeManager', typeof ThemeManager !== 'undefined');
@@ -719,6 +804,21 @@
         if (typeof SystemInformation !== 'undefined') {
             check('SystemInformation.getSystemVersion', typeof SystemInformation.getSystemVersion === 'function');
             check('SystemInformation.getKernelVersion', typeof SystemInformation.getKernelVersion === 'function');
+            // 获取系统版本信息
+            try {
+                if (SystemInformation.getSystemVersion) {
+                    const sysVersion = SystemInformation.getSystemVersion();
+                    if (sysVersion) {
+                        info('系统版本', sysVersion);
+                    }
+                }
+                if (SystemInformation.getKernelVersion) {
+                    const kernelVersion = SystemInformation.getKernelVersion();
+                    if (kernelVersion) {
+                        info('内核版本', kernelVersion);
+                    }
+                }
+            } catch (e) {}
         }
         
         check('DynamicManager', typeof DynamicManager !== 'undefined');
@@ -748,11 +848,64 @@
             check('GeographyDrive.getCachedLocation', typeof GeographyDrive.getCachedLocation === 'function');
         }
         
+        check('CryptDrive', typeof CryptDrive !== 'undefined');
+        if (typeof CryptDrive !== 'undefined') {
+            check('CryptDrive.generateKeyPair', typeof CryptDrive.generateKeyPair === 'function');
+            check('CryptDrive.encrypt', typeof CryptDrive.encrypt === 'function');
+            check('CryptDrive.decrypt', typeof CryptDrive.decrypt === 'function');
+            check('CryptDrive.md5', typeof CryptDrive.md5 === 'function');
+            check('CryptDrive.randomInt', typeof CryptDrive.randomInt === 'function');
+            check('CryptDrive.randomBoolean', typeof CryptDrive.randomBoolean === 'function');
+            // 检查密钥管理状态
+            try {
+                if (CryptDrive.listKeys) {
+                    const keys = await CryptDrive.listKeys();
+                    if (keys && Array.isArray(keys)) {
+                        info('加密密钥数量', `${keys.length} 个`);
+                        if (keys.length > 0) {
+                            const defaultKey = keys.find(k => k.isDefault);
+                            if (defaultKey) {
+                                info('默认密钥', defaultKey.keyId);
+                            }
+                        }
+                    }
+                }
+            } catch (e) {}
+        }
+        
         // ========== 8. 浏览器环境检查 ==========
         updateProgress(8, '检查浏览器环境...', 95);
         check('localStorage', typeof Storage !== 'undefined' && typeof localStorage !== 'undefined');
+        if (typeof localStorage !== 'undefined') {
+            try {
+                const testKey = '__zeros_test__';
+                localStorage.setItem(testKey, 'test');
+                const canWrite = localStorage.getItem(testKey) === 'test';
+                localStorage.removeItem(testKey);
+                if (canWrite) {
+                    info('localStorage', '读写功能正常');
+                } else {
+                    warn('localStorage', '写入测试失败');
+                }
+            } catch (e) {
+                warn('localStorage', `测试失败: ${e.message}`);
+            }
+        }
         check('document.body', typeof document !== 'undefined' && document.body !== null);
+        if (typeof document !== 'undefined' && document.body) {
+            try {
+                const bodyChildren = document.body.children ? document.body.children.length : 0;
+                info('DOM 结构', `body 包含 ${bodyChildren} 个子元素`);
+            } catch (e) {}
+        }
         check('window 对象', typeof window !== 'undefined');
+        if (typeof window !== 'undefined') {
+            try {
+                const userAgent = window.navigator ? window.navigator.userAgent : '未知';
+                const platform = window.navigator ? window.navigator.platform : '未知';
+                info('浏览器信息', `${platform} - ${userAgent.substring(0, 50)}...`);
+            } catch (e) {}
+        }
         
         // 输出自检摘要
         updateProgress(9, '完成自检...', 100);
@@ -916,6 +1069,14 @@
                 } catch (e) {
                     KernelLogger.warn("BootLoader", `注册KernelMemory失败: ${e.message}`);
                 }
+            }
+            
+            // 确保事件管理器已初始化（必须在进程管理器之前）
+            if (typeof EventManager !== 'undefined') {
+                EventManager.init();
+                KernelLogger.info("BootLoader", "事件管理器初始化完成");
+            } else {
+                KernelLogger.warn("BootLoader", "EventManager 未加载，事件管理功能将不可用");
             }
             
             // 初始化进程管理器

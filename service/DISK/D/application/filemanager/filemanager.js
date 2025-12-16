@@ -127,9 +127,10 @@
                     title: windowTitle,
                     icon: icon,
                     onClose: () => {
-                        if (typeof ProcessManager !== 'undefined') {
-                            ProcessManager.killProgram(this.pid);
-                        }
+                        // onClose 回调只做清理工作，不调用 _closeWindow 或 unregisterWindow
+                        // 窗口关闭由 GUIManager._closeWindow 统一处理
+                        // _closeWindow 会在窗口关闭后检查该 PID 是否还有其他窗口，如果没有，会 kill 进程
+                        // 这样可以确保程序多实例（不同 PID）互不影响
                     }
                 });
                 // 保存窗口ID，用于精确清理
@@ -1866,9 +1867,10 @@
          */
         _loadRootDirectory: async function() {
             // 确保窗口和文件列表容器已创建
-            if (!this.window) {
+            // 检查窗口是否还在 DOM 中，如果不在，说明窗口已被关闭
+            if (!this.window || !this.window.parentElement) {
                 if (typeof KernelLogger !== 'undefined') {
-                    KernelLogger.warn('FileManager', '窗口未初始化，无法加载根目录');
+                    KernelLogger.warn('FileManager', '窗口未初始化或已被关闭，无法加载根目录');
                 }
                 return;
             }
@@ -2004,10 +2006,20 @@
                 if (typeof KernelLogger !== 'undefined') {
                     KernelLogger.error('FileManager', '加载根目录失败', error);
                 }
-                if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                    await GUIManager.showAlert(`加载根目录失败: ${error.message}`, '错误', 'error');
-                } else {
-                    alert(`加载根目录失败: ${error.message}`);
+                // 加载根目录失败，使用通知提示（不打断用户）
+                if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                    try {
+                        await NotificationManager.createNotification(this.pid, {
+                            type: 'snapshot',
+                            title: '文件管理器',
+                            content: `加载根目录失败: ${error.message}`,
+                            duration: 4000
+                        });
+                    } catch (e) {
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('FileManager', `创建通知失败: ${e.message}`);
+                        }
+                    }
                 }
             }
         },
@@ -2017,9 +2029,10 @@
          */
         _loadDirectory: async function(path) {
             // 确保窗口和文件列表容器已创建
-            if (!this.window) {
+            // 检查窗口是否还在 DOM 中，如果不在，说明窗口已被关闭
+            if (!this.window || !this.window.parentElement) {
                 if (typeof KernelLogger !== 'undefined') {
-                    KernelLogger.warn('FileManager', '窗口未初始化，无法加载目录');
+                    KernelLogger.warn('FileManager', '窗口未初始化或已被关闭，无法加载目录');
                 }
                 return;
             }
@@ -2083,10 +2096,20 @@
                     if (typeof KernelLogger !== 'undefined') {
                         KernelLogger.error('FileManager', `加载目录失败: ${errorMessage}`);
                     }
-                    if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                        await GUIManager.showAlert(`无法访问路径: ${path}\n${errorMessage}`, '错误', 'error');
-                    } else {
-                        alert(`无法访问路径: ${path}\n${errorMessage}`);
+                    // 无法访问路径，使用通知提示（不打断用户）
+                    if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                        try {
+                            await NotificationManager.createNotification(this.pid, {
+                                type: 'snapshot',
+                                title: '文件管理器',
+                                content: `无法访问路径: ${path}\n${errorMessage}`,
+                                duration: 4000
+                            });
+                        } catch (e) {
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.warn('FileManager', `创建通知失败: ${e.message}`);
+                            }
+                        }
                     }
                     return;
                 }
@@ -2098,10 +2121,20 @@
                     if (typeof KernelLogger !== 'undefined') {
                         KernelLogger.error('FileManager', `加载目录失败: ${errorMessage}`);
                     }
-                    if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                        await GUIManager.showAlert(`无法访问路径: ${path}\n${errorMessage}`, '错误', 'error');
-                    } else {
-                        alert(`无法访问路径: ${path}\n${errorMessage}`);
+                    // 无法访问路径，使用通知提示（不打断用户）
+                    if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                        try {
+                            await NotificationManager.createNotification(this.pid, {
+                                type: 'snapshot',
+                                title: '文件管理器',
+                                content: `无法访问路径: ${path}\n${errorMessage}`,
+                                duration: 4000
+                            });
+                        } catch (e) {
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.warn('FileManager', `创建通知失败: ${e.message}`);
+                            }
+                        }
                     }
                     return;
                 }
@@ -2183,10 +2216,20 @@
                 if (typeof KernelLogger !== 'undefined') {
                     KernelLogger.error('FileManager', '加载目录异常', error);
                 }
-                if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                    await GUIManager.showAlert(`加载目录失败: ${error.message}`, '错误', 'error');
-                } else {
-                    alert(`加载目录失败: ${error.message}`);
+                // 加载目录失败，使用通知提示（不打断用户）
+                if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                    try {
+                        await NotificationManager.createNotification(this.pid, {
+                            type: 'snapshot',
+                            title: '文件管理器',
+                            content: `加载目录失败: ${error.message}`,
+                            duration: 4000
+                        });
+                    } catch (e) {
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('FileManager', `创建通知失败: ${e.message}`);
+                        }
+                    }
                 }
             }
         },
@@ -2761,8 +2804,20 @@
                     if (typeof KernelLogger !== 'undefined') {
                         KernelLogger.error('FileManager', `多选回调失败: ${err.message}`);
                     }
-                    if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                        await GUIManager.showAlert(`选择失败: ${err.message}`, '错误', 'error');
+                    // 选择失败，使用通知提示（不打断用户）
+                    if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                        try {
+                            await NotificationManager.createNotification(this.pid, {
+                                type: 'snapshot',
+                                title: '文件管理器',
+                                content: `选择失败: ${err.message}`,
+                                duration: 4000
+                            });
+                        } catch (e) {
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.warn('FileManager', `创建通知失败: ${e.message}`);
+                            }
+                        }
                     }
                 }
             }
@@ -2787,8 +2842,20 @@
                     if (typeof KernelLogger !== 'undefined') {
                         KernelLogger.error('FileManager', `文件夹选择回调失败: ${err.message}`);
                     }
-                    if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                        await GUIManager.showAlert(`选择失败: ${err.message}`, '错误', 'error');
+                    // 选择失败，使用通知提示（不打断用户）
+                    if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                        try {
+                            await NotificationManager.createNotification(this.pid, {
+                                type: 'snapshot',
+                                title: '文件管理器',
+                                content: `选择失败: ${err.message}`,
+                                duration: 4000
+                            });
+                        } catch (e) {
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.warn('FileManager', `创建通知失败: ${e.message}`);
+                            }
+                        }
                     }
                 }
             }
@@ -2816,10 +2883,7 @@
                     }
                 } else if (item.type === 'file') {
                     // 在文件夹选择器模式下，双击文件不执行任何操作（只选择文件夹）
-                    // 可以显示提示信息
-                    if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                        await GUIManager.showAlert('请选择一个文件夹', '提示', 'info');
-                    }
+                    // 静默处理（用户已经知道需要选择文件夹）
                 }
                 return;
             }
@@ -2908,20 +2972,44 @@
         _openFileWithVideoPlayer: async function(item) {
             try {
                 if (typeof ProcessManager === 'undefined') {
-                    if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                        await GUIManager.showAlert('ProcessManager 不可用', '错误', 'error');
+                    // ProcessManager 不可用，使用通知提示（不打断用户）
+                    if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                        try {
+                            await NotificationManager.createNotification(this.pid, {
+                                type: 'snapshot',
+                                title: '文件管理器',
+                                content: 'ProcessManager 不可用',
+                                duration: 3000
+                            });
+                        } catch (e) {
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.error('FileManager', `ProcessManager 不可用，且创建通知失败: ${e.message}`);
+                            }
+                        }
                     } else {
-                        alert('ProcessManager 不可用');
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.error('FileManager', 'ProcessManager 不可用');
+                        }
                     }
                     return;
                 }
                 
                 // 确保item.path存在且有效
                 if (!item || !item.path) {
-                    if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                        await GUIManager.showAlert('文件路径无效', '错误', 'error');
-                    } else {
-                        alert('文件路径无效');
+                    // 文件路径无效，使用通知提示（不打断用户）
+                    if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                        try {
+                            await NotificationManager.createNotification(this.pid, {
+                                type: 'snapshot',
+                                title: '文件管理器',
+                                content: '文件路径无效',
+                                duration: 3000
+                            });
+                        } catch (e) {
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.warn('FileManager', `创建通知失败: ${e.message}`);
+                            }
+                        }
                     }
                     return;
                 }
@@ -2940,10 +3028,20 @@
                 if (typeof KernelLogger !== 'undefined') {
                     KernelLogger.error('FileManager', '启动视频播放器失败', error);
                 }
-                if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                    await GUIManager.showAlert(`启动视频播放器失败: ${error.message}`, '错误', 'error');
-                } else {
-                    alert(`启动视频播放器失败: ${error.message}`);
+                // 启动视频播放器失败，使用通知提示（不打断用户）
+                if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                    try {
+                        await NotificationManager.createNotification(this.pid, {
+                            type: 'snapshot',
+                            title: '文件管理器',
+                            content: `启动视频播放器失败: ${error.message}`,
+                            duration: 4000
+                        });
+                    } catch (e) {
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('FileManager', `创建通知失败: ${e.message}`);
+                        }
+                    }
                 }
             }
         },
@@ -2954,20 +3052,44 @@
         _openFileWithAudioPlayer: async function(item) {
             try {
                 if (typeof ProcessManager === 'undefined') {
-                    if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                        await GUIManager.showAlert('ProcessManager 不可用', '错误', 'error');
+                    // ProcessManager 不可用，使用通知提示（不打断用户）
+                    if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                        try {
+                            await NotificationManager.createNotification(this.pid, {
+                                type: 'snapshot',
+                                title: '文件管理器',
+                                content: 'ProcessManager 不可用',
+                                duration: 3000
+                            });
+                        } catch (e) {
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.error('FileManager', `ProcessManager 不可用，且创建通知失败: ${e.message}`);
+                            }
+                        }
                     } else {
-                        alert('ProcessManager 不可用');
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.error('FileManager', 'ProcessManager 不可用');
+                        }
                     }
                     return;
                 }
                 
                 // 确保item.path存在且有效
                 if (!item || !item.path) {
-                    if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                        await GUIManager.showAlert('文件路径无效', '错误', 'error');
-                    } else {
-                        alert('文件路径无效');
+                    // 文件路径无效，使用通知提示（不打断用户）
+                    if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                        try {
+                            await NotificationManager.createNotification(this.pid, {
+                                type: 'snapshot',
+                                title: '文件管理器',
+                                content: '文件路径无效',
+                                duration: 3000
+                            });
+                        } catch (e) {
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.warn('FileManager', `创建通知失败: ${e.message}`);
+                            }
+                        }
                     }
                     return;
                 }
@@ -2986,10 +3108,20 @@
                 if (typeof KernelLogger !== 'undefined') {
                     KernelLogger.error('FileManager', '启动音频播放器失败', error);
                 }
-                if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                    await GUIManager.showAlert(`启动音频播放器失败: ${error.message}`, '错误', 'error');
-                } else {
-                    alert(`启动音频播放器失败: ${error.message}`);
+                // 启动音频播放器失败，使用通知提示（不打断用户）
+                if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                    try {
+                        await NotificationManager.createNotification(this.pid, {
+                            type: 'snapshot',
+                            title: '文件管理器',
+                            content: `启动音频播放器失败: ${error.message}`,
+                            duration: 4000
+                        });
+                    } catch (e) {
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('FileManager', `创建通知失败: ${e.message}`);
+                        }
+                    }
                 }
             }
         },
@@ -3000,20 +3132,44 @@
         _openFileWithImageViewer: async function(item) {
             try {
                 if (typeof ProcessManager === 'undefined') {
-                    if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                        await GUIManager.showAlert('ProcessManager 不可用', '错误', 'error');
+                    // ProcessManager 不可用，使用通知提示（不打断用户）
+                    if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                        try {
+                            await NotificationManager.createNotification(this.pid, {
+                                type: 'snapshot',
+                                title: '文件管理器',
+                                content: 'ProcessManager 不可用',
+                                duration: 3000
+                            });
+                        } catch (e) {
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.error('FileManager', `ProcessManager 不可用，且创建通知失败: ${e.message}`);
+                            }
+                        }
                     } else {
-                        alert('ProcessManager 不可用');
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.error('FileManager', 'ProcessManager 不可用');
+                        }
                     }
                     return;
                 }
                 
                 // 确保item.path存在且有效
                 if (!item || !item.path) {
-                    if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                        await GUIManager.showAlert('文件路径无效', '错误', 'error');
-                    } else {
-                        alert('文件路径无效');
+                    // 文件路径无效，使用通知提示（不打断用户）
+                    if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                        try {
+                            await NotificationManager.createNotification(this.pid, {
+                                type: 'snapshot',
+                                title: '文件管理器',
+                                content: '文件路径无效',
+                                duration: 3000
+                            });
+                        } catch (e) {
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.warn('FileManager', `创建通知失败: ${e.message}`);
+                            }
+                        }
                     }
                     return;
                 }
@@ -3032,10 +3188,20 @@
                 if (typeof KernelLogger !== 'undefined') {
                     KernelLogger.error('FileManager', '启动图片查看器失败', error);
                 }
-                if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                    await GUIManager.showAlert(`启动图片查看器失败: ${error.message}`, '错误', 'error');
-                } else {
-                    alert(`启动图片查看器失败: ${error.message}`);
+                // 启动图片查看器失败，使用通知提示（不打断用户）
+                if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                    try {
+                        await NotificationManager.createNotification(this.pid, {
+                            type: 'snapshot',
+                            title: '文件管理器',
+                            content: `启动图片查看器失败: ${error.message}`,
+                            duration: 4000
+                        });
+                    } catch (e) {
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('FileManager', `创建通知失败: ${e.message}`);
+                        }
+                    }
                 }
             }
         },
@@ -3046,20 +3212,44 @@
         _openFileWithZiper: async function(item) {
             try {
                 if (typeof ProcessManager === 'undefined') {
-                    if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                        await GUIManager.showAlert('ProcessManager 不可用', '错误', 'error');
+                    // ProcessManager 不可用，使用通知提示（不打断用户）
+                    if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                        try {
+                            await NotificationManager.createNotification(this.pid, {
+                                type: 'snapshot',
+                                title: '文件管理器',
+                                content: 'ProcessManager 不可用',
+                                duration: 3000
+                            });
+                        } catch (e) {
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.error('FileManager', `ProcessManager 不可用，且创建通知失败: ${e.message}`);
+                            }
+                        }
                     } else {
-                        alert('ProcessManager 不可用');
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.error('FileManager', 'ProcessManager 不可用');
+                        }
                     }
                     return;
                 }
                 
                 // 确保item.path存在且有效
                 if (!item || !item.path) {
-                    if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                        await GUIManager.showAlert('文件路径无效', '错误', 'error');
-                    } else {
-                        alert('文件路径无效');
+                    // 文件路径无效，使用通知提示（不打断用户）
+                    if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                        try {
+                            await NotificationManager.createNotification(this.pid, {
+                                type: 'snapshot',
+                                title: '文件管理器',
+                                content: '文件路径无效',
+                                duration: 3000
+                            });
+                        } catch (e) {
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.warn('FileManager', `创建通知失败: ${e.message}`);
+                            }
+                        }
                     }
                     return;
                 }
@@ -3078,10 +3268,20 @@
                 if (typeof KernelLogger !== 'undefined') {
                     KernelLogger.error('FileManager', '启动 ziper 失败', error);
                 }
-                if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                    await GUIManager.showAlert(`启动 ziper 失败: ${error.message}`, '错误', 'error');
-                } else {
-                    alert(`启动 ziper 失败: ${error.message}`);
+                // 启动 ziper 失败，使用通知提示（不打断用户）
+                if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                    try {
+                        await NotificationManager.createNotification(this.pid, {
+                            type: 'snapshot',
+                            title: '文件管理器',
+                            content: `启动 ziper 失败: ${error.message}`,
+                            duration: 4000
+                        });
+                    } catch (e) {
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('FileManager', `创建通知失败: ${e.message}`);
+                        }
+                    }
                 }
             }
         },
@@ -3148,10 +3348,20 @@
                 if (typeof KernelLogger !== 'undefined') {
                     KernelLogger.error('FileManager', '打开文件失败', error);
                 }
-                if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                    await GUIManager.showAlert(`打开文件失败: ${error.message}`, '错误', 'error');
-                } else {
-                    alert(`打开文件失败: ${error.message}`);
+                // 打开文件失败，使用通知提示（不打断用户）
+                if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                    try {
+                        await NotificationManager.createNotification(this.pid, {
+                            type: 'snapshot',
+                            title: '文件管理器',
+                            content: `打开文件失败: ${error.message}`,
+                            duration: 4000
+                        });
+                    } catch (e) {
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('FileManager', `创建通知失败: ${e.message}`);
+                        }
+                    }
                 }
             }
         },
@@ -3215,20 +3425,40 @@
                     await this._loadDirectory(currentPathForRefresh);
                 }
                 
-                if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                    await GUIManager.showAlert('文件已保存', '成功', 'success');
-                } else {
-                    alert('文件已保存');
+                // 文件已保存，使用通知提示（不打断用户）
+                if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                    try {
+                        await NotificationManager.createNotification(this.pid, {
+                            type: 'snapshot',
+                            title: '保存成功',
+                            content: '文件已保存',
+                            duration: 2000
+                        });
+                    } catch (e) {
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('FileManager', `创建通知失败: ${e.message}`);
+                        }
+                    }
                 }
                 
             } catch (error) {
                 if (typeof KernelLogger !== 'undefined') {
                     KernelLogger.error('FileManager', '保存文件失败', error);
                 }
-                if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                    await GUIManager.showAlert(`保存文件失败: ${error.message}`, '错误', 'error');
-                } else {
-                    alert(`保存文件失败: ${error.message}`);
+                // 保存文件失败，使用通知提示（不打断用户）
+                if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                    try {
+                        await NotificationManager.createNotification(this.pid, {
+                            type: 'snapshot',
+                            title: '保存失败',
+                            content: `保存文件失败: ${error.message}`,
+                            duration: 4000
+                        });
+                    } catch (e) {
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('FileManager', `创建通知失败: ${e.message}`);
+                        }
+                    }
                 }
             }
         },
@@ -3253,20 +3483,44 @@
         _openFileWithVim: async function(item) {
             try {
                 if (typeof ProcessManager === 'undefined') {
-                    if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                        await GUIManager.showAlert('ProcessManager 不可用', '错误', 'error');
+                    // ProcessManager 不可用，使用通知提示（不打断用户）
+                    if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                        try {
+                            await NotificationManager.createNotification(this.pid, {
+                                type: 'snapshot',
+                                title: '文件管理器',
+                                content: 'ProcessManager 不可用',
+                                duration: 3000
+                            });
+                        } catch (e) {
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.error('FileManager', `ProcessManager 不可用，且创建通知失败: ${e.message}`);
+                            }
+                        }
                     } else {
-                        alert('ProcessManager 不可用');
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.error('FileManager', 'ProcessManager 不可用');
+                        }
                     }
                     return;
                 }
                 
                 // 确保item.path存在且有效
                 if (!item || !item.path) {
-                    if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                        await GUIManager.showAlert('文件路径无效', '错误', 'error');
-                    } else {
-                        alert('文件路径无效');
+                    // 文件路径无效，使用通知提示（不打断用户）
+                    if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                        try {
+                            await NotificationManager.createNotification(this.pid, {
+                                type: 'snapshot',
+                                title: '文件管理器',
+                                content: '文件路径无效',
+                                duration: 3000
+                            });
+                        } catch (e) {
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.warn('FileManager', `创建通知失败: ${e.message}`);
+                            }
+                        }
                     }
                     return;
                 }
@@ -3307,10 +3561,20 @@
                 }
                 
                 if (!terminalInstance) {
-                    if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                        await GUIManager.showAlert('无法获取终端实例，Vim 需要终端来运行', '错误', 'error');
-                    } else {
-                        alert('无法获取终端实例，Vim 需要终端来运行');
+                    // 无法获取终端实例，使用通知提示（不打断用户）
+                    if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                        try {
+                            await NotificationManager.createNotification(this.pid, {
+                                type: 'snapshot',
+                                title: '文件管理器',
+                                content: '无法获取终端实例，Vim 需要终端来运行',
+                                duration: 4000
+                            });
+                        } catch (e) {
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.warn('FileManager', `创建通知失败: ${e.message}`);
+                            }
+                        }
                     }
                     return;
                 }
@@ -3330,10 +3594,20 @@
                 if (typeof KernelLogger !== 'undefined') {
                     KernelLogger.error('FileManager', '启动 Vim 失败', error);
                 }
-                if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                    await GUIManager.showAlert(`启动 Vim 失败: ${error.message}`, '错误', 'error');
-                } else {
-                    alert(`启动 Vim 失败: ${error.message}`);
+                // 启动 Vim 失败，使用通知提示（不打断用户）
+                if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                    try {
+                        await NotificationManager.createNotification(this.pid, {
+                            type: 'snapshot',
+                            title: '文件管理器',
+                            content: `启动 Vim 失败: ${error.message}`,
+                            duration: 4000
+                        });
+                    } catch (e) {
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('FileManager', `创建通知失败: ${e.message}`);
+                        }
+                    }
                 }
             }
         },
@@ -3403,20 +3677,40 @@
                 // 如果当前在根目录视图，无法创建文件
                 const currentPath = this._getCurrentPath();
                 if (currentPath === null || currentPath === '') {
-                    if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                        await GUIManager.showAlert('请在磁盘分区内创建文件', '提示', 'info');
-                    } else {
-                        alert('请在磁盘分区内创建文件');
+                    // 请在磁盘分区内创建文件，使用通知提示（不打断用户）
+                    if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                        try {
+                            await NotificationManager.createNotification(this.pid, {
+                                type: 'snapshot',
+                                title: '文件管理器',
+                                content: '请在磁盘分区内创建文件',
+                                duration: 3000
+                            });
+                        } catch (e) {
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.warn('FileManager', `创建通知失败: ${e.message}`);
+                            }
+                        }
                     }
                     return;
                 }
                 
                 // 确保currentPath是字符串
                 if (typeof currentPath !== 'string') {
-                    if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                        await GUIManager.showAlert('当前路径无效', '错误', 'error');
-                    } else {
-                        alert('当前路径无效');
+                    // 当前路径无效，使用通知提示（不打断用户）
+                    if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                        try {
+                            await NotificationManager.createNotification(this.pid, {
+                                type: 'snapshot',
+                                title: '文件管理器',
+                                content: '当前路径无效',
+                                duration: 3000
+                            });
+                        } catch (e) {
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.warn('FileManager', `创建通知失败: ${e.message}`);
+                            }
+                        }
                     }
                     return;
                 }
@@ -3455,10 +3749,20 @@
                 if (typeof KernelLogger !== 'undefined') {
                     KernelLogger.error('FileManager', '创建文件失败', error);
                 }
-                if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                    await GUIManager.showAlert(`创建文件失败: ${error.message}`, '错误', 'error');
-                } else {
-                    alert(`创建文件失败: ${error.message}`);
+                // 创建文件失败，使用通知提示（不打断用户）
+                if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                    try {
+                        await NotificationManager.createNotification(this.pid, {
+                            type: 'snapshot',
+                            title: '创建失败',
+                            content: `创建文件失败: ${error.message}`,
+                            duration: 4000
+                        });
+                    } catch (e) {
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('FileManager', `创建通知失败: ${e.message}`);
+                        }
+                    }
                 }
             }
         },
@@ -3488,20 +3792,40 @@
                 // 如果当前在根目录视图，无法创建目录
                 const currentPath = this._getCurrentPath();
                 if (currentPath === null || currentPath === '') {
-                    if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                        await GUIManager.showAlert('请在磁盘分区内创建目录', '提示', 'info');
-                    } else {
-                        alert('请在磁盘分区内创建目录');
+                    // 请在磁盘分区内创建目录，使用通知提示（不打断用户）
+                    if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                        try {
+                            await NotificationManager.createNotification(this.pid, {
+                                type: 'snapshot',
+                                title: '文件管理器',
+                                content: '请在磁盘分区内创建目录',
+                                duration: 3000
+                            });
+                        } catch (e) {
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.warn('FileManager', `创建通知失败: ${e.message}`);
+                            }
+                        }
                     }
                     return;
                 }
                 
                 // 确保currentPath是字符串
                 if (typeof currentPath !== 'string') {
-                    if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                        await GUIManager.showAlert('当前路径无效', '错误', 'error');
-                    } else {
-                        alert('当前路径无效');
+                    // 当前路径无效，使用通知提示（不打断用户）
+                    if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                        try {
+                            await NotificationManager.createNotification(this.pid, {
+                                type: 'snapshot',
+                                title: '文件管理器',
+                                content: '当前路径无效',
+                                duration: 3000
+                            });
+                        } catch (e) {
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.warn('FileManager', `创建通知失败: ${e.message}`);
+                            }
+                        }
                     }
                     return;
                 }
@@ -3549,10 +3873,20 @@
                 if (typeof KernelLogger !== 'undefined') {
                     KernelLogger.error('FileManager', '创建目录失败', error);
                 }
-                if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                    await GUIManager.showAlert(`创建目录失败: ${error.message}`, '错误', 'error');
-                } else {
-                    alert(`创建目录失败: ${error.message}`);
+                // 创建目录失败，使用通知提示（不打断用户）
+                if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                    try {
+                        await NotificationManager.createNotification(this.pid, {
+                            type: 'snapshot',
+                            title: '创建失败',
+                            content: `创建目录失败: ${error.message}`,
+                            duration: 4000
+                        });
+                    } catch (e) {
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('FileManager', `创建通知失败: ${e.message}`);
+                        }
+                    }
                 }
             }
         },
@@ -3664,8 +3998,20 @@
                 }
                 
                 if (typeof DesktopManager === 'undefined') {
-                    if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                        await GUIManager.showAlert('DesktopManager 不可用', '错误', 'error');
+                    // DesktopManager 不可用，使用通知提示（不打断用户）
+                    if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                        try {
+                            await NotificationManager.createNotification(this.pid, {
+                                type: 'snapshot',
+                                title: '文件管理器',
+                                content: 'DesktopManager 不可用',
+                                duration: 3000
+                            });
+                        } catch (e) {
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.warn('FileManager', `创建通知失败: ${e.message}`);
+                            }
+                        }
                     }
                     return;
                 }
@@ -3680,8 +4026,20 @@
                     if (typeof KernelLogger !== 'undefined') {
                         KernelLogger.error('FileManager', '拖拽数据不完整', itemData);
                     }
-                    if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                        await GUIManager.showAlert('拖拽数据不完整，无法添加到桌面', '错误', 'error');
+                    // 拖拽数据不完整，使用通知提示（不打断用户）
+                    if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                        try {
+                            await NotificationManager.createNotification(this.pid, {
+                                type: 'snapshot',
+                                title: '文件管理器',
+                                content: '拖拽数据不完整，无法添加到桌面',
+                                duration: 3000
+                            });
+                        } catch (e) {
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.warn('FileManager', `创建通知失败: ${e.message}`);
+                            }
+                        }
                     }
                     return;
                 }
@@ -4214,8 +4572,20 @@
                             action: async () => {
                                 try {
                                     if (typeof DesktopManager === 'undefined') {
-                                        if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                                            await GUIManager.showAlert('DesktopManager 不可用', '错误', 'error');
+                                        // DesktopManager 不可用，使用通知提示（不打断用户）
+                                        if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                                            try {
+                                                await NotificationManager.createNotification(this.pid, {
+                                                    type: 'snapshot',
+                                                    title: '文件管理器',
+                                                    content: 'DesktopManager 不可用',
+                                                    duration: 3000
+                                                });
+                                            } catch (e) {
+                                                if (typeof KernelLogger !== 'undefined') {
+                                                    KernelLogger.warn('FileManager', `创建通知失败: ${e.message}`);
+                                                }
+                                            }
                                         }
                                         return;
                                     }
@@ -4258,8 +4628,20 @@
                             });
                             
                             if (alreadyExists) {
-                                if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                                    await GUIManager.showAlert('该文件/文件夹已在桌面存在', '提示', 'info');
+                                // 该文件/文件夹已在桌面存在，使用通知提示（不打断用户）
+                                if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                                    try {
+                                        await NotificationManager.createNotification(this.pid, {
+                                            type: 'snapshot',
+                                            title: '文件管理器',
+                                            content: '该文件/文件夹已在桌面存在',
+                                            duration: 3000
+                                        });
+                                    } catch (e) {
+                                        if (typeof KernelLogger !== 'undefined') {
+                                            KernelLogger.warn('FileManager', `创建通知失败: ${e.message}`);
+                                        }
+                                    }
                                 }
                                 return;
                             }
@@ -4391,8 +4773,20 @@
                                         // 复制路径到剪贴板
                                         if (navigator.clipboard && navigator.clipboard.writeText) {
                                             await navigator.clipboard.writeText(itemPath);
-                                            if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                                                await GUIManager.showAlert('路径已复制到剪贴板', '提示', 'success');
+                                            // 路径已复制到剪贴板，使用通知提示（不打断用户）
+                                            if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                                                try {
+                                                    await NotificationManager.createNotification(this.pid, {
+                                                        type: 'snapshot',
+                                                        title: '复制成功',
+                                                        content: '路径已复制到剪贴板',
+                                                        duration: 2000
+                                                    });
+                                                } catch (e) {
+                                                    if (typeof KernelLogger !== 'undefined') {
+                                                        KernelLogger.warn('FileManager', `创建通知失败: ${e.message}`);
+                                                    }
+                                                }
                                             }
                                         } else {
                                             // 降级方案：使用临时文本区域
@@ -4404,16 +4798,40 @@
                                             textArea.select();
                                             document.execCommand('copy');
                                             document.body.removeChild(textArea);
-                                            if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                                                await GUIManager.showAlert('路径已复制到剪贴板', '提示', 'success');
+                                            // 路径已复制到剪贴板，使用通知提示（不打断用户）
+                                            if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                                                try {
+                                                    await NotificationManager.createNotification(this.pid, {
+                                                        type: 'snapshot',
+                                                        title: '复制成功',
+                                                        content: '路径已复制到剪贴板',
+                                                        duration: 2000
+                                                    });
+                                                } catch (e) {
+                                                    if (typeof KernelLogger !== 'undefined') {
+                                                        KernelLogger.warn('FileManager', `创建通知失败: ${e.message}`);
+                                                    }
+                                                }
                                             }
                                         }
                                     } catch (error) {
                                         if (typeof KernelLogger !== 'undefined') {
                                             KernelLogger.error('FileManager', '复制路径失败', error);
                                         }
-                                        if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                                            await GUIManager.showAlert('复制路径失败', '错误', 'error');
+                                        // 复制路径失败，使用通知提示（不打断用户）
+                                        if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                                            try {
+                                                await NotificationManager.createNotification(this.pid, {
+                                                    type: 'snapshot',
+                                                    title: '复制失败',
+                                                    content: '复制路径失败',
+                                                    duration: 3000
+                                                });
+                                            } catch (e) {
+                                                if (typeof KernelLogger !== 'undefined') {
+                                                    KernelLogger.warn('FileManager', `创建通知失败: ${e.message}`);
+                                                }
+                                            }
                                         }
                                     }
                                 }
@@ -4580,10 +4998,20 @@
                 if (typeof KernelLogger !== 'undefined') {
                     KernelLogger.error('FileManager', '重命名失败', error);
                 }
-                if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                    await GUIManager.showAlert(`重命名失败: ${error.message}`, '错误', 'error');
-                } else {
-                    alert(`重命名失败: ${error.message}`);
+                // 重命名失败，使用通知提示（不打断用户）
+                if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                    try {
+                        await NotificationManager.createNotification(this.pid, {
+                            type: 'snapshot',
+                            title: '重命名失败',
+                            content: `重命名失败: ${error.message}`,
+                            duration: 4000
+                        });
+                    } catch (e) {
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('FileManager', `创建通知失败: ${e.message}`);
+                        }
+                    }
                 }
             }
         },
@@ -4653,10 +5081,24 @@
         _copySelectedItems: function() {
             const selectedItem = this._getSelectedItem();
             if (!selectedItem) {
-                if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                    GUIManager.showAlert('请先选择一个文件或目录', '提示', 'info');
-                } else {
-                    alert('请先选择一个文件或目录');
+                // 请先选择一个文件或目录，使用通知提示（不打断用户）
+                if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                    try {
+                        NotificationManager.createNotification(this.pid, {
+                            type: 'snapshot',
+                            title: '文件管理器',
+                            content: '请先选择一个文件或目录',
+                            duration: 2000
+                        }).catch(e => {
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.warn('FileManager', `创建通知失败: ${e.message}`);
+                            }
+                        });
+                    } catch (e) {
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('FileManager', `创建通知失败: ${e.message}`);
+                        }
+                    }
                 }
                 return;
             }
@@ -4685,10 +5127,24 @@
         _cutSelectedItems: function() {
             const selectedItem = this._getSelectedItem();
             if (!selectedItem) {
-                if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                    GUIManager.showAlert('请先选择一个文件或目录', '提示', 'info');
-                } else {
-                    alert('请先选择一个文件或目录');
+                // 请先选择一个文件或目录，使用通知提示（不打断用户）
+                if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                    try {
+                        NotificationManager.createNotification(this.pid, {
+                            type: 'snapshot',
+                            title: '文件管理器',
+                            content: '请先选择一个文件或目录',
+                            duration: 2000
+                        }).catch(e => {
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.warn('FileManager', `创建通知失败: ${e.message}`);
+                            }
+                        });
+                    } catch (e) {
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('FileManager', `创建通知失败: ${e.message}`);
+                        }
+                    }
                 }
                 return;
             }
@@ -4716,20 +5172,40 @@
          */
         _pasteItems: async function() {
             if (!this._clipboard || !this._clipboard.items || this._clipboard.items.length === 0) {
-                if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                    await GUIManager.showAlert('剪贴板为空', '提示', 'info');
-                } else {
-                    alert('剪贴板为空');
+                // 剪贴板为空，使用通知提示（不打断用户）
+                if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                    try {
+                        await NotificationManager.createNotification(this.pid, {
+                            type: 'snapshot',
+                            title: '文件管理器',
+                            content: '剪贴板为空',
+                            duration: 2000
+                        });
+                    } catch (e) {
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('FileManager', `创建通知失败: ${e.message}`);
+                        }
+                    }
                 }
                 return;
             }
             
             const currentPath = this._getCurrentPath();
             if (currentPath === null || currentPath === '') {
-                if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                    await GUIManager.showAlert('无法在根目录粘贴', '错误', 'error');
-                } else {
-                    alert('无法在根目录粘贴');
+                // 无法在根目录粘贴，使用通知提示（不打断用户）
+                if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                    try {
+                        await NotificationManager.createNotification(this.pid, {
+                            type: 'snapshot',
+                            title: '文件管理器',
+                            content: '无法在根目录粘贴',
+                            duration: 3000
+                        });
+                    } catch (e) {
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('FileManager', `创建通知失败: ${e.message}`);
+                        }
+                    }
                 }
                 return;
             }
@@ -4851,10 +5327,20 @@
                 if (typeof KernelLogger !== 'undefined') {
                     KernelLogger.error('FileManager', '粘贴失败', error);
                 }
-                if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                    await GUIManager.showAlert(`粘贴失败: ${error.message}`, '错误', 'error');
-                } else {
-                    alert(`粘贴失败: ${error.message}`);
+                // 粘贴失败，使用通知提示（不打断用户）
+                if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                    try {
+                        await NotificationManager.createNotification(this.pid, {
+                            type: 'snapshot',
+                            title: '粘贴失败',
+                            content: `粘贴失败: ${error.message}`,
+                            duration: 4000
+                        });
+                    } catch (e) {
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('FileManager', `创建通知失败: ${e.message}`);
+                        }
+                    }
                 }
             }
         },
@@ -4911,8 +5397,13 @@
             
             const self = this;
             
-            // 监听键盘事件
-            this.window.addEventListener('keydown', (e) => {
+            // 监听键盘事件（使用 EventManager）
+            if (typeof EventManager !== 'undefined' && this.pid) {
+                this._keyboardHandlerId = EventManager.registerEventHandler(this.pid, 'keydown', (e) => {
+                    // 检查是否在窗口内
+                    if (!this.window || !this.window.contains(e.target)) {
+                        return;
+                    }
                 // 检查是否在输入框中
                 const activeElement = document.activeElement;
                 if (activeElement && (
@@ -4943,7 +5434,45 @@
                     e.stopPropagation();
                     self._pasteItems();
                 }
-            });
+                }, {
+                    priority: 100,
+                    selector: null  // 全局键盘事件
+                });
+            } else {
+                // 降级：直接使用 addEventListener（不推荐）
+                this.window.addEventListener('keydown', (e) => {
+                    // 检查是否在输入框中
+                    const activeElement = document.activeElement;
+                    if (activeElement && (
+                        activeElement.tagName === 'INPUT' ||
+                        activeElement.tagName === 'TEXTAREA' ||
+                        activeElement.isContentEditable
+                    )) {
+                        return;
+                    }
+                    
+                    // Ctrl+C: 复制
+                    if (e.ctrlKey && e.key === 'c' && !e.shiftKey && !e.altKey && !e.metaKey) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        self._copySelectedItems();
+                    }
+                    
+                    // Ctrl+X: 剪切
+                    if (e.ctrlKey && e.key === 'x' && !e.shiftKey && !e.altKey && !e.metaKey) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        self._cutSelectedItems();
+                    }
+                    
+                    // Ctrl+V: 粘贴
+                    if (e.ctrlKey && e.key === 'v' && !e.shiftKey && !e.altKey && !e.metaKey) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        self._pasteItems();
+                    }
+                });
+            }
         },
         
         /**
@@ -4986,6 +5515,17 @@
          */
         __exit__: async function() {
             try {
+                // 清理事件处理器
+                if (this._keyboardHandlerId && typeof EventManager !== 'undefined') {
+                    EventManager.unregisterEventHandler(this._keyboardHandlerId);
+                    this._keyboardHandlerId = null;
+                }
+                
+                // 清理所有事件处理器（通过 EventManager）
+                if (typeof EventManager !== 'undefined' && this.pid) {
+                    EventManager.unregisterAllHandlersForPid(this.pid);
+                }
+                
                 // 注销右键菜单
                 if (typeof ContextMenuManager !== 'undefined' && ContextMenuManager.unregisterMenu) {
                     try {
@@ -5015,9 +5555,16 @@
                 
                 // 如果使用GUIManager，注销窗口（从 GUIManager 的内部映射中移除）
                 // 注意：这应该在 DOM 移除之后进行，因为 unregisterWindow 不会移除 DOM
+                // 使用 windowId 来精确注销当前窗口，而不是注销整个 PID 的所有窗口
                 if (typeof GUIManager !== 'undefined' && GUIManager.unregisterWindow) {
                     try {
-                        GUIManager.unregisterWindow(this.pid);
+                        if (this.windowId) {
+                            // 使用 windowId 精确注销当前窗口
+                            GUIManager.unregisterWindow(this.windowId);
+                        } else {
+                            // 降级方案：如果没有 windowId，使用 pid（会注销该 PID 的所有窗口）
+                            GUIManager.unregisterWindow(this.pid);
+                        }
                     } catch (e) {
                         if (typeof KernelLogger !== 'undefined') {
                             KernelLogger.warn('FileManager', '注销 GUIManager 窗口失败', e);
@@ -5309,14 +5856,16 @@
                 version: '1.0.0',
                 description: 'ZerOS 文件管理器 - 图形化文件浏览、编辑和管理',
                 author: 'ZerOS Team',
-                copyright: '© 2024',
+                copyright: '© 2025 ZerOS',
                 permissions: typeof PermissionManager !== 'undefined' ? [
                     PermissionManager.PERMISSION.GUI_WINDOW_CREATE,
                     PermissionManager.PERMISSION.KERNEL_DISK_READ,
                     PermissionManager.PERMISSION.KERNEL_DISK_WRITE,
                     PermissionManager.PERMISSION.KERNEL_DISK_DELETE,
                     PermissionManager.PERMISSION.KERNEL_DISK_CREATE,
-                    PermissionManager.PERMISSION.KERNEL_DISK_LIST
+                    PermissionManager.PERMISSION.KERNEL_DISK_LIST,
+                    PermissionManager.PERMISSION.SYSTEM_NOTIFICATION,
+                    PermissionManager.PERMISSION.EVENT_LISTENER
                 ] : [],
                 metadata: {
                     allowMultipleInstances: true

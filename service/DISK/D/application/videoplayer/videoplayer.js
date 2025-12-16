@@ -90,9 +90,10 @@
                         title: '视频播放器',
                         icon: icon,
                         onClose: () => {
-                            if (typeof ProcessManager !== 'undefined') {
-                                ProcessManager.killProgram(this.pid);
-                            }
+                            // onClose 回调只做清理工作，不调用 _closeWindow 或 unregisterWindow
+                            // 窗口关闭由 GUIManager._closeWindow 统一处理
+                            // _closeWindow 会在窗口关闭后检查该 PID 是否还有其他窗口，如果没有，会 kill 进程
+                            // 这样可以确保程序多实例（不同 PID）互不影响
                         }
                     });
                     
@@ -114,7 +115,12 @@
                 }
                 
             } catch (error) {
-                console.error('视频播放器初始化失败:', error);
+                // 记录错误日志
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('VideoPlayer', `视频播放器初始化失败: ${error.message}`, error);
+                } else {
+                    console.error('视频播放器初始化失败:', error);
+                }
                 if (this.window && this.window.parentElement) {
                     this.window.parentElement.removeChild(this.window);
                 }
@@ -287,20 +293,58 @@
                 isDragging = true;
                 handleProgressInteraction(e);
                 
-                const onMouseMove = (moveEvent) => {
-                    if (!isDragging) return;
-                    moveEvent.preventDefault();
-                    handleProgressInteraction(moveEvent);
-                };
-                
-                const onMouseUp = () => {
-                    isDragging = false;
-                    document.removeEventListener('mousemove', onMouseMove);
-                    document.removeEventListener('mouseup', onMouseUp);
-                };
-                
-                document.addEventListener('mousemove', onMouseMove);
-                document.addEventListener('mouseup', onMouseUp);
+                // 使用 EventManager 注册临时拖动事件
+                if (typeof EventManager !== 'undefined' && this.pid) {
+                    const onMouseMove = (moveEvent) => {
+                        if (!isDragging) return;
+                        moveEvent.preventDefault();
+                        handleProgressInteraction(moveEvent);
+                    };
+                    
+                    // 注册临时事件（拖动时）
+                    const mousemoveHandlerId = EventManager.registerEventHandler(this.pid, 'mousemove', onMouseMove, {
+                        priority: 50,
+                        once: false
+                    });
+                    
+                    const onMouseUp = () => {
+                        isDragging = false;
+                        // 注销临时事件
+                        if (this._progressDragHandlers) {
+                            if (this._progressDragHandlers.mousemoveHandlerId) {
+                                EventManager.unregisterEventHandler(this._progressDragHandlers.mousemoveHandlerId);
+                            }
+                            if (this._progressDragHandlers.mouseupHandlerId) {
+                                EventManager.unregisterEventHandler(this._progressDragHandlers.mouseupHandlerId);
+                            }
+                            this._progressDragHandlers = null;
+                        }
+                    };
+                    
+                    const mouseupHandlerId = EventManager.registerEventHandler(this.pid, 'mouseup', onMouseUp, {
+                        priority: 50,
+                        once: true  // mouseup 只触发一次
+                    });
+                    
+                    // 保存 handlerId 以便在 mouseup 时注销
+                    this._progressDragHandlers = { mousemoveHandlerId, mouseupHandlerId };
+                } else {
+                    // 降级：直接使用 addEventListener（不推荐）
+                    const onMouseMove = (moveEvent) => {
+                        if (!isDragging) return;
+                        moveEvent.preventDefault();
+                        handleProgressInteraction(moveEvent);
+                    };
+                    
+                    const onMouseUp = () => {
+                        isDragging = false;
+                        document.removeEventListener('mousemove', onMouseMove);
+                        document.removeEventListener('mouseup', onMouseUp);
+                    };
+                    
+                    document.addEventListener('mousemove', onMouseMove);
+                    document.addEventListener('mouseup', onMouseUp);
+                }
             });
             
             // 防止拖动时触发视频容器的点击事件
@@ -485,20 +529,58 @@
                 isVolumeDragging = true;
                 handleVolumeInteraction(e);
                 
-                const onMouseMove = (moveEvent) => {
-                    if (!isVolumeDragging) return;
-                    moveEvent.preventDefault();
-                    handleVolumeInteraction(moveEvent);
-                };
-                
-                const onMouseUp = () => {
-                    isVolumeDragging = false;
-                    document.removeEventListener('mousemove', onMouseMove);
-                    document.removeEventListener('mouseup', onMouseUp);
-                };
-                
-                document.addEventListener('mousemove', onMouseMove);
-                document.addEventListener('mouseup', onMouseUp);
+                // 使用 EventManager 注册临时拖动事件
+                if (typeof EventManager !== 'undefined' && this.pid) {
+                    const onMouseMove = (moveEvent) => {
+                        if (!isVolumeDragging) return;
+                        moveEvent.preventDefault();
+                        handleVolumeInteraction(moveEvent);
+                    };
+                    
+                    const onMouseUp = () => {
+                        isVolumeDragging = false;
+                        // 注销临时事件
+                        if (this._volumeDragHandlers) {
+                            if (this._volumeDragHandlers.mousemoveHandlerId) {
+                                EventManager.unregisterEventHandler(this._volumeDragHandlers.mousemoveHandlerId);
+                            }
+                            if (this._volumeDragHandlers.mouseupHandlerId) {
+                                EventManager.unregisterEventHandler(this._volumeDragHandlers.mouseupHandlerId);
+                            }
+                            this._volumeDragHandlers = null;
+                        }
+                    };
+                    
+                    // 注册临时事件（拖动时）
+                    const mousemoveHandlerId = EventManager.registerEventHandler(this.pid, 'mousemove', onMouseMove, {
+                        priority: 50,
+                        once: false
+                    });
+                    
+                    const mouseupHandlerId = EventManager.registerEventHandler(this.pid, 'mouseup', onMouseUp, {
+                        priority: 50,
+                        once: true  // mouseup 只触发一次
+                    });
+                    
+                    // 保存 handlerId 以便在 mouseup 时注销
+                    this._volumeDragHandlers = { mousemoveHandlerId, mouseupHandlerId };
+                } else {
+                    // 降级：直接使用 addEventListener（不推荐）
+                    const onMouseMove = (moveEvent) => {
+                        if (!isVolumeDragging) return;
+                        moveEvent.preventDefault();
+                        handleVolumeInteraction(moveEvent);
+                    };
+                    
+                    const onMouseUp = () => {
+                        isVolumeDragging = false;
+                        document.removeEventListener('mousemove', onMouseMove);
+                        document.removeEventListener('mouseup', onMouseUp);
+                    };
+                    
+                    document.addEventListener('mousemove', onMouseMove);
+                    document.addEventListener('mouseup', onMouseUp);
+                }
             });
             
             volumeSliderContainer.appendChild(this.volumeSlider);
@@ -841,13 +923,8 @@
                 this.isLoading = true;
                 
             } catch (error) {
-                console.error('[VideoPlayer] 加载视频失败:', error);
+                // _onVideoLoadError 已经记录了日志并显示通知，这里不需要重复
                 this._onVideoLoadError(error.message);
-                if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                    await GUIManager.showAlert(`加载视频失败: ${error.message}`, '错误', 'error');
-                } else {
-                    alert(`加载视频失败: ${error.message}`);
-                }
             }
         },
         
@@ -876,14 +953,21 @@
         /**
          * 视频加载错误
          */
-        _onVideoLoadError: function(error) {
+        _onVideoLoadError: async function(error) {
             this.isLoading = false;
             const errorMsg = error || '未知错误';
-            console.error('[VideoPlayer] 视频加载失败:', {
+            const errorInfo = {
                 error: errorMsg,
                 path: this.currentVideoPath,
                 url: this.currentVideoUrl
-            });
+            };
+            
+            // 记录错误日志
+            if (typeof KernelLogger !== 'undefined') {
+                KernelLogger.error('VideoPlayer', `视频加载失败: ${errorMsg}`, errorInfo);
+            } else {
+                console.error('[VideoPlayer] 视频加载失败:', errorInfo);
+            }
             
             if (this.fileInfo) {
                 this.fileInfo.textContent = `加载失败: ${errorMsg}`;
@@ -894,13 +978,20 @@
             this._updateTimeDisplay();
             this._updateProgress();
             
-            // 显示详细错误信息
-            if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                GUIManager.showAlert(
-                    `视频加载失败: ${errorMsg}\n\n路径: ${this.currentVideoPath}\nURL: ${this.currentVideoUrl}`,
-                    '加载失败',
-                    'error'
-                );
+            // 显示详细错误信息，使用通知提示（不打断用户）
+            if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                try {
+                    await NotificationManager.createNotification(this.pid, {
+                        type: 'snapshot',
+                        title: '加载失败',
+                        content: `视频加载失败: ${errorMsg}\n\n路径: ${this.currentVideoPath}\nURL: ${this.currentVideoUrl}`,
+                        duration: 5000
+                    });
+                } catch (e) {
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.warn('VideoPlayer', `创建通知失败: ${e.message}`);
+                    }
+                }
             }
         },
         
@@ -945,20 +1036,37 @@
         /**
          * 切换播放/暂停
          */
-        _togglePlayPause: function() {
+        _togglePlayPause: async function() {
             if (!this.videoElement) return;
             
             if (this.isPlaying) {
                 this.videoElement.pause();
             } else {
-                this.videoElement.play().catch(error => {
+                this.videoElement.play().catch(async error => {
                     // 忽略 AbortError（通常是因为快速切换播放/暂停导致的）
                     if (error.name === 'AbortError') {
                         return;
                     }
-                    console.error('[VideoPlayer] 播放失败:', error);
-                    if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                        GUIManager.showAlert(`播放失败: ${error.message}`, '错误', 'error');
+                    // 记录错误日志
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.error('VideoPlayer', `播放失败: ${error.message}`, error);
+                    } else {
+                        console.error('[VideoPlayer] 播放失败:', error);
+                    }
+                    // 播放失败，使用通知提示（不打断用户）
+                    if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                        try {
+                            await NotificationManager.createNotification(this.pid, {
+                                type: 'snapshot',
+                                title: '视频播放器',
+                                content: `播放失败: ${error.message}`,
+                                duration: 4000
+                            });
+                        } catch (e) {
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.warn('VideoPlayer', `创建通知失败: ${e.message}`);
+                            }
+                        }
                     }
                 });
             }
@@ -1155,6 +1263,31 @@
          */
         __exit__: async function() {
             try {
+                // 清理临时拖动事件处理器
+                if (this._progressDragHandlers) {
+                    if (this._progressDragHandlers.mousemoveHandlerId && typeof EventManager !== 'undefined') {
+                        EventManager.unregisterEventHandler(this._progressDragHandlers.mousemoveHandlerId);
+                    }
+                    if (this._progressDragHandlers.mouseupHandlerId && typeof EventManager !== 'undefined') {
+                        EventManager.unregisterEventHandler(this._progressDragHandlers.mouseupHandlerId);
+                    }
+                    this._progressDragHandlers = null;
+                }
+                if (this._volumeDragHandlers) {
+                    if (this._volumeDragHandlers.mousemoveHandlerId && typeof EventManager !== 'undefined') {
+                        EventManager.unregisterEventHandler(this._volumeDragHandlers.mousemoveHandlerId);
+                    }
+                    if (this._volumeDragHandlers.mouseupHandlerId && typeof EventManager !== 'undefined') {
+                        EventManager.unregisterEventHandler(this._volumeDragHandlers.mouseupHandlerId);
+                    }
+                    this._volumeDragHandlers = null;
+                }
+                
+                // 清理所有事件处理器（通过 EventManager）
+                if (typeof EventManager !== 'undefined' && this.pid) {
+                    EventManager.unregisterAllHandlersForPid(this.pid);
+                }
+                
                 // 停止进度更新（先停止，避免在清理过程中触发更新）
                 this._stopProgressUpdate();
                 
@@ -1289,10 +1422,12 @@
                 version: '1.0.0',
                 description: 'ZerOS 视频播放器 - 支持播放 mp4, webm, avi 等视频格式',
                 author: 'ZerOS Team',
-                copyright: '© 2024',
+                copyright: '© 2025 ZerOS',
                 permissions: typeof PermissionManager !== 'undefined' ? [
                     PermissionManager.PERMISSION.GUI_WINDOW_CREATE,
-                    PermissionManager.PERMISSION.KERNEL_DISK_READ
+                    PermissionManager.PERMISSION.KERNEL_DISK_READ,
+                    PermissionManager.PERMISSION.SYSTEM_NOTIFICATION,
+                    PermissionManager.PERMISSION.EVENT_LISTENER
                 ] : [],
                 metadata: {
                     category: 'system',  // 系统应用

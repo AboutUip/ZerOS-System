@@ -6,6 +6,7 @@
 
 - [开发思维](#开发思维)
 - [快速开始](#快速开始)
+- [重要注意事项](#重要注意事项) ⚠️ **必读**
 - [开发约定](#开发约定)
 - [程序结构](#程序结构)
 - [GUI 程序开发](#gui-程序开发)
@@ -174,6 +175,280 @@ const APPLICATION_ASSETS = {
 - 从任务栏的"所有程序"菜单启动
 - 通过 `ProcessManager.startProgram('myapp', {})` 启动
 - 如果设置了 `autoStart: true`，系统启动时自动运行
+
+---
+
+## ⚠️ 重要注意事项
+
+### 必须遵守的开发规范
+
+ZerOS 系统要求所有程序必须遵守以下开发规范，以确保系统稳定运行和资源正确管理。
+
+#### 1. 事件管理 - 必须使用 EventManager
+
+**所有事件处理必须通过内核的 `EventManager` 进行统一管理**
+
+```javascript
+// ✅ 正确：使用 EventManager
+EventManager.registerEventHandler(this.pid, 'click', (e, eventContext) => {
+    // 处理点击事件
+    // 可以使用 eventContext.stopPropagation() 控制事件传播
+}, {
+    priority: 100,
+    selector: '.my-button'
+});
+
+// 对于非冒泡事件（如 mouseenter, mouseleave, load, error）
+EventManager.registerElementEvent(this.pid, element, 'mouseenter', (e) => {
+    // 处理鼠标进入事件
+});
+
+// ❌ 错误：直接使用 addEventListener（会被警告，不推荐）
+element.addEventListener('click', handler);
+```
+
+**为什么必须使用 EventManager**：
+- ✅ **统一管理**：所有事件由内核统一管理，支持事件优先级和传播控制
+- ✅ **自动清理**：进程退出时自动清理所有事件监听器，防止内存泄漏
+- ✅ **权限控制**：事件注册需要相应权限，确保系统安全
+- ✅ **事件传播控制**：提供统一的 `eventContext` API 控制事件传播
+- ✅ **多程序支持**：支持多个程序注册同一事件，按优先级执行
+
+**详细说明**：请参考 [EventManager API 文档](API/EventManager.md)
+
+#### 2. 日志记录 - 必须使用 KernelLogger
+
+**所有日志输出必须通过内核的 `KernelLogger` 进行统一管理**
+
+```javascript
+// ✅ 正确：使用 KernelLogger
+KernelLogger.info('MYAPP', '程序启动');
+KernelLogger.warn('MYAPP', '警告信息');
+KernelLogger.error('MYAPP', '错误信息', error);
+KernelLogger.debug('MYAPP', '调试信息');
+
+// ❌ 错误：直接使用 console.log（不推荐）
+console.log('程序启动');
+console.warn('警告信息');
+console.error('错误信息');
+```
+
+**为什么必须使用 KernelLogger**：
+- ✅ **统一格式**：所有日志使用统一格式，包含模块名、时间戳、级别等信息
+- ✅ **日志过滤**：支持日志级别过滤，控制日志输出
+- ✅ **结构化日志**：便于调试和问题排查
+- ✅ **性能优化**：可以统一控制日志输出，避免性能问题
+
+**详细说明**：请参考 [KernelLogger API 文档](API/KernelLogger.md)
+
+#### 3. 窗口管理 - 必须使用 GUIManager
+
+**GUI 程序必须使用 `GUIManager` 进行窗口管理**
+
+```javascript
+// ✅ 正确：使用 GUIManager
+GUIManager.registerWindow(this.pid, this.window, {
+    title: '我的应用',
+    icon: 'application/myapp/myapp.svg',
+    onClose: () => {
+        ProcessManager.killProgram(this.pid);
+    },
+    onMinimize: () => {
+        // 窗口最小化回调
+    },
+    onMaximize: () => {
+        // 窗口最大化回调
+    }
+});
+
+// ❌ 错误：手动管理窗口（不推荐）
+this.window.style.position = 'fixed';
+this.window.style.left = '100px';
+this.window.style.top = '100px';
+// 手动实现拖动、拉伸等功能
+```
+
+**为什么必须使用 GUIManager**：
+- ✅ **自动功能**：自动处理窗口拖动、拉伸、最小化、最大化、焦点管理
+- ✅ **统一样式**：统一的窗口样式和主题支持
+- ✅ **标题栏保护**：自动保护窗口标题栏，防止被意外删除
+- ✅ **z-index 管理**：自动管理窗口层级，确保正确的显示顺序
+- ✅ **窗口状态同步**：自动同步窗口状态（最大化、最小化等）
+
+**详细说明**：请参考 [GUIManager API 文档](API/GUIManager.md)
+
+#### 4. 权限管理 - 必须声明权限
+
+**所有内核 API 调用都需要相应权限，程序必须在 `__info__` 中声明所需权限**
+
+```javascript
+// ✅ 正确：在 __info__ 中声明权限
+__info__: function() {
+    return {
+        name: 'myapp',
+        type: 'GUI',
+        version: '1.0.0',
+        description: '我的应用程序',
+        author: 'Your Name',
+        copyright: '© 2024',
+        permissions: typeof PermissionManager !== 'undefined' ? [
+            PermissionManager.PERMISSION.GUI_WINDOW_CREATE,  // 创建窗口
+            PermissionManager.PERMISSION.EVENT_LISTENER,     // 注册事件
+            PermissionManager.PERMISSION.KERNEL_DISK_READ,   // 读取文件
+            PermissionManager.PERMISSION.KERNEL_DISK_WRITE,   // 写入文件
+            PermissionManager.PERMISSION.KERNEL_DISK_CREATE,  // 创建文件/目录
+            PermissionManager.PERMISSION.KERNEL_DISK_DELETE,  // 删除文件/目录
+            PermissionManager.PERMISSION.KERNEL_DISK_LIST,    // 列出目录
+            PermissionManager.PERMISSION.SYSTEM_NOTIFICATION, // 显示通知
+            PermissionManager.PERMISSION.SYSTEM_STORAGE_READ, // 读取系统存储
+            PermissionManager.PERMISSION.SYSTEM_STORAGE_WRITE, // 写入系统存储
+            PermissionManager.PERMISSION.CRYPT_GENERATE_KEY,  // 生成密钥
+            PermissionManager.PERMISSION.CRYPT_ENCRYPT,        // 加密
+            PermissionManager.PERMISSION.CRYPT_DECRYPT,        // 解密
+            PermissionManager.PERMISSION.CRYPT_MD5,           // MD5 哈希
+            PermissionManager.PERMISSION.CRYPT_RANDOM          // 随机数生成
+        ] : [],
+        metadata: {
+            allowMultipleInstances: true
+        }
+    };
+}
+```
+
+**为什么必须声明权限**：
+- ✅ **系统安全**：确保系统安全，防止恶意程序滥用系统资源
+- ✅ **用户授权**：用户可以在首次使用时授权或拒绝权限
+- ✅ **权限追踪**：权限系统会记录所有权限使用情况
+- ✅ **自动清理**：进程退出时自动清理所有权限
+
+**详细说明**：请参考 [PermissionManager API 文档](API/PermissionManager.md)
+
+#### 5. 资源清理 - 必须完整清理
+
+**程序必须在 `__exit__` 中清理所有资源**
+
+```javascript
+// ✅ 正确：完整清理所有资源
+__exit__: async function() {
+    try {
+        // 1. 取消注册 GUI 窗口（优先处理，确保窗口正确关闭）
+        if (this.windowId && typeof GUIManager !== 'undefined') {
+            await GUIManager.unregisterWindow(this.windowId);
+        } else if (this.pid && typeof GUIManager !== 'undefined') {
+            await GUIManager.unregisterWindow(this.pid);
+        }
+        
+        // 2. 取消注册上下文菜单（如果注册了自定义菜单）
+        if (this.pid && typeof ContextMenuManager !== 'undefined') {
+            ContextMenuManager.unregisterContextMenu(this.pid);
+        }
+        
+        // 3. EventManager 会自动清理所有事件监听器
+        // 但如果有直接使用 addEventListener 的，需要手动清理
+        if (this._manualEventListeners) {
+            this._manualEventListeners.forEach(({element, event, handler}) => {
+                if (element && typeof element.removeEventListener === 'function') {
+                    element.removeEventListener(event, handler);
+                }
+            });
+            this._manualEventListeners = null;
+        }
+        
+        // 4. 清理 DOM 元素（从 DOM 中移除）
+        if (this.window && this.window.parentElement) {
+            this.window.parentElement.removeChild(this.window);
+        }
+        
+        // 5. 清理定时器和异步操作
+        if (this._timers) {
+            this._timers.forEach(timer => clearTimeout(timer));
+            this._timers = null;
+        }
+        
+        // 6. 释放内存引用
+        if (this.memoryRefs) {
+            for (const [refId, ref] of this.memoryRefs) {
+                if (typeof ProcessManager !== 'undefined') {
+                    await ProcessManager.freeMemoryRef(this.pid, refId);
+                }
+            }
+            this.memoryRefs.clear();
+            this.memoryRefs = null;
+        }
+        
+        // 7. 清理所有对象引用（帮助垃圾回收）
+        this.window = null;
+        this.windowId = null;
+        this._eventHandlers = null;
+        this._timers = null;
+        this.memoryRefs = null;
+        
+    } catch (error) {
+        if (typeof KernelLogger !== 'undefined') {
+            KernelLogger.error("MYAPP", `清理资源失败: ${error.message}`, error);
+        } else {
+            console.error('清理资源失败:', error);
+        }
+    }
+}
+```
+
+**为什么必须清理资源**：
+- ✅ **防止内存泄漏**：确保所有资源都被正确释放
+- ✅ **系统稳定**：保持系统稳定运行，避免资源耗尽
+- ✅ **进程隔离**：确保进程退出时不影响其他进程
+
+**详细说明**：请参考 [最佳实践 - 资源清理](#资源清理)
+
+### 其他重要规范
+
+#### 禁止自动初始化
+
+**程序必须禁止自动初始化，等待 `ProcessManager` 调用**
+
+```javascript
+// ❌ 错误：自动初始化
+(function() {
+    const app = new MyApp();
+    app.init();  // 这会在脚本加载时立即执行
+})();
+
+// ✅ 正确：等待 ProcessManager 调用
+const MYAPP = {
+    __init__: async function(pid, initArgs) {
+        // 初始化代码
+    }
+};
+```
+
+#### DOM 元素标记
+
+**所有程序创建的 DOM 元素必须标记 `data-pid` 属性**
+
+```javascript
+// ✅ 正确：标记 data-pid
+const element = document.createElement('div');
+element.dataset.pid = this.pid.toString();
+```
+
+#### 错误处理
+
+**始终使用 try-catch 处理异步操作**
+
+```javascript
+// ✅ 正确：错误处理
+__init__: async function(pid, initArgs) {
+    try {
+        await this._initialize();
+    } catch (error) {
+        if (typeof KernelLogger !== 'undefined') {
+            KernelLogger.error('MYAPP', `初始化失败: ${error.message}`, error);
+        }
+        // 清理已创建的资源
+        await this.__exit__();
+    }
+}
+```
 
 ---
 
@@ -369,10 +644,17 @@ __init__: async function(pid, initArgs) {
 
 ### 窗口控制
 
-如果使用 GUIManager，窗口的拖动、拉伸、最小化、最大化等功能会自动处理。如果需要自定义，可以使用 EventManager：
+**推荐使用 GUIManager**，窗口的拖动、拉伸、最小化、最大化等功能会自动处理。GUIManager 会自动：
+- 创建统一的标题栏（包含关闭、最小化、最大化按钮）
+- 自动处理窗口拖动（通过标题栏）
+- 自动处理窗口拉伸（四个角和四条边）
+- 自动管理窗口焦点和 z-index
+- 自动保护标题栏，防止被意外删除
+
+如果需要自定义窗口控制，可以使用 EventManager：
 
 ```javascript
-// 注册拖动事件
+// 注册拖动事件（不推荐，GUIManager 已自动处理）
 EventManager.registerDrag(
     `myapp-window-${this.pid}`,
     titleBar,
@@ -384,6 +666,8 @@ EventManager.registerDrag(
     ['.button', '.controls']
 );
 ```
+
+**注意**：如果使用 GUIManager，通常不需要手动注册拖动和拉伸事件，GUIManager 会自动处理。
 
 详细 API 文档请参考 [EventManager API](API/EventManager.md) 和 [GUIManager API](API/GUIManager.md)
 
@@ -736,6 +1020,21 @@ const data = sharedSpace.getData('myKey');
                 content.style.cssText = 'padding: 20px;';
                 this.window.appendChild(content);
                 
+                // 注册事件处理程序（必须使用 EventManager）
+                if (typeof EventManager !== 'undefined') {
+                    EventManager.registerEventHandler(this.pid, 'click', (e, eventContext) => {
+                        if (e.target.classList.contains('my-button')) {
+                            // 处理按钮点击
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.info('MYAPP', '按钮被点击');
+                            }
+                        }
+                    }, {
+                        priority: 100,
+                        selector: '.my-button'
+                    });
+                }
+                
                 // 添加到容器
                 guiContainer.appendChild(this.window);
                 
@@ -747,7 +1046,12 @@ const data = sharedSpace.getData('myKey');
                 };
                 
             } catch (error) {
-                console.error('初始化失败:', error);
+                // 使用 KernelLogger 记录错误（必须使用）
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('MYAPP', `初始化失败: ${error.message}`, error);
+                } else {
+                    console.error('初始化失败:', error);
+                }
                 if (this.window && this.window.parentElement) {
                     this.window.parentElement.removeChild(this.window);
                 }
@@ -756,27 +1060,46 @@ const data = sharedSpace.getData('myKey');
         },
         
         __exit__: async function() {
-            // 清理事件监听器
-            if (this.eventListeners) {
-                this.eventListeners.forEach(({element, event, handler}) => {
-                    element.removeEventListener(event, handler);
-                });
-                this.eventListeners = [];
-            }
-            
-            // 释放内存
-            if (this.memoryRefs) {
-                for (const [refId, ref] of this.memoryRefs) {
-                    await ProcessManager.freeMemoryRef(this.pid, refId);
+            try {
+                // 1. 注销窗口（优先处理，确保窗口正确关闭）
+                if (typeof GUIManager !== 'undefined') {
+                    await GUIManager.unregisterWindow(this.pid);
+                } else if (this.window && this.window.parentElement) {
+                    this.window.parentElement.removeChild(this.window);
                 }
-                this.memoryRefs.clear();
-            }
-            
-            // 注销窗口
-            if (typeof GUIManager !== 'undefined') {
-                GUIManager.unregisterWindow(this.pid);
-            } else if (this.window && this.window.parentElement) {
-                this.window.parentElement.removeChild(this.window);
+                
+                // 2. EventManager 会自动清理所有通过它注册的事件监听器
+                // 但如果有直接使用 addEventListener 的，需要手动清理
+                if (this._manualEventListeners) {
+                    this._manualEventListeners.forEach(({element, event, handler}) => {
+                        if (element && typeof element.removeEventListener === 'function') {
+                            element.removeEventListener(event, handler);
+                        }
+                    });
+                    this._manualEventListeners = null;
+                }
+                
+                // 3. 释放内存
+                if (this.memoryRefs) {
+                    for (const [refId, ref] of this.memoryRefs) {
+                        if (typeof ProcessManager !== 'undefined') {
+                            await ProcessManager.freeMemoryRef(this.pid, refId);
+                        }
+                    }
+                    this.memoryRefs.clear();
+                    this.memoryRefs = null;
+                }
+                
+                // 4. 清理所有对象引用
+                this.window = null;
+                this.windowId = null;
+                
+            } catch (error) {
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('MYAPP', `清理资源失败: ${error.message}`, error);
+                } else {
+                    console.error('清理资源失败:', error);
+                }
             }
         },
         
@@ -905,7 +1228,22 @@ if (otherProgramAPI) {
 
 ### Q: 如何监听系统事件？
 
-A: 通过 EventManager 或直接使用 DOM 事件。对于窗口事件，推荐使用 GUIManager。
+A: **必须使用 EventManager**。所有事件处理都应该通过 EventManager 进行统一管理：
+
+```javascript
+// ✅ 正确：使用 EventManager
+EventManager.registerEventHandler(this.pid, 'click', (e, eventContext) => {
+    // 处理点击事件
+}, {
+    priority: 100,
+    selector: '.my-button'
+});
+
+// ❌ 错误：直接使用 addEventListener（会被警告）
+element.addEventListener('click', handler);
+```
+
+详细说明请参考 [EventManager API 文档](API/EventManager.md)
 
 ### Q: 如何保存用户数据？
 
@@ -1486,6 +1824,69 @@ async function checkUpdate() {
 }
 ```
 
+### Q: 如何使用加密功能？
+
+A: 通过 ProcessManager 调用加密 API，需要相应权限：
+
+```javascript
+// 在 __info__ 中声明权限
+__info__() {
+    return {
+        // ...
+        permissions: [
+            PermissionManager.PERMISSION.CRYPT_GENERATE_KEY,
+            PermissionManager.PERMISSION.CRYPT_ENCRYPT,
+            PermissionManager.PERMISSION.CRYPT_DECRYPT,
+            PermissionManager.PERMISSION.CRYPT_MD5,
+            PermissionManager.PERMISSION.CRYPT_RANDOM
+        ]
+    };
+}
+
+// 生成密钥对
+const keyPair = await ProcessManager.callKernelAPI(
+    this.pid,
+    'Crypt.generateKeyPair',
+    [{ keySize: 2048, setAsDefault: true }]
+);
+
+// 加密数据
+const encrypted = await ProcessManager.callKernelAPI(
+    this.pid,
+    'Crypt.encrypt',
+    ['敏感数据']
+);
+
+// 解密数据
+const decrypted = await ProcessManager.callKernelAPI(
+    this.pid,
+    'Crypt.decrypt',
+    [encrypted]
+);
+
+// MD5 哈希
+const hash = await ProcessManager.callKernelAPI(
+    this.pid,
+    'Crypt.md5',
+    ['数据']
+);
+
+// 生成随机数
+const randomInt = await ProcessManager.callKernelAPI(
+    this.pid,
+    'Crypt.randomInt',
+    [1, 100]
+);
+
+const randomString = await ProcessManager.callKernelAPI(
+    this.pid,
+    'Crypt.randomString',
+    [16]
+);
+```
+
+详细文档请参考 [CryptDrive API](API/CryptDrive.md)。
+
 ### Q: 如何实现程序设置持久化？
 
 A: 使用 LStorage API：
@@ -1525,15 +1926,22 @@ function getFileType(fileName) {
 
 ### Q: 如何实现程序日志记录？
 
-A: 使用 KernelLogger：
+A: **必须使用 KernelLogger**。所有日志输出都应该通过 KernelLogger 进行统一管理：
 
 ```javascript
+// ✅ 正确：使用 KernelLogger
 if (typeof KernelLogger !== 'undefined') {
     KernelLogger.info('MYAPP', '程序启动');
     KernelLogger.warn('MYAPP', '警告信息');
     KernelLogger.error('MYAPP', '错误信息', error);
+    KernelLogger.debug('MYAPP', '调试信息');
 }
+
+// ❌ 错误：直接使用 console.log（不推荐）
+console.log('程序启动');
 ```
+
+详细说明请参考 [KernelLogger API 文档](API/KernelLogger.md)
 
 ### Q: 如何处理程序权限请求？
 
@@ -1548,6 +1956,667 @@ try {
         // 权限被拒绝
         console.log('用户拒绝了权限请求');
     }
+}
+```
+
+### Q: 为什么我的程序无法注册事件处理程序？
+
+A: 检查以下几点：
+
+1. **是否声明了 EVENT_LISTENER 权限**：
+```javascript
+__info__() {
+    return {
+        permissions: [
+            PermissionManager.PERMISSION.EVENT_LISTENER
+        ]
+    };
+}
+```
+
+2. **是否使用了 EventManager**：
+```javascript
+// ✅ 正确
+EventManager.registerEventHandler(this.pid, 'click', handler);
+
+// ❌ 错误（会被警告）
+element.addEventListener('click', handler);
+```
+
+3. **检查控制台日志**：查看是否有权限相关的警告信息
+
+### Q: 如何正确清理事件监听器？
+
+A: 在 `__exit__` 方法中使用 `EventManager.unregisterAllHandlersForPid`：
+
+```javascript
+__exit__: async function() {
+    // 清理所有事件监听器
+    if (typeof EventManager !== 'undefined') {
+        EventManager.unregisterAllHandlersForPid(this.pid);
+    }
+    
+    // 清理窗口
+    if (this.windowId && typeof GUIManager !== 'undefined') {
+        GUIManager.unregisterWindow(this.windowId);
+    }
+}
+```
+
+### Q: 窗口拖动和拉伸功能不工作怎么办？
+
+A: 确保使用 `GUIManager.registerWindow` 注册窗口，窗口会自动获得拖动和拉伸功能：
+
+```javascript
+// GUIManager 会自动处理窗口拖动和拉伸
+const windowInfo = GUIManager.registerWindow(this.pid, this.window, {
+    title: '我的程序',
+    icon: icon
+});
+```
+
+如果窗口已经注册但拖动不工作，检查：
+1. 窗口是否被最大化或最小化（最大化/最小化时无法拖动）
+2. 是否点击在标题栏上（只有标题栏可以拖动）
+3. 是否有其他元素遮挡了标题栏
+
+### Q: 如何实现窗口内的元素拖动（非窗口拖动）？
+
+A: 使用 `EventManager.registerDrag`：
+
+```javascript
+if (typeof EventManager !== 'undefined') {
+    EventManager.registerDrag(
+        `my-drag-${this.pid}`,
+        draggableElement,  // 可拖动的元素
+        containerElement,  // 容器元素
+        { isDragging: false },  // 状态对象
+        (e) => {
+            // 拖动开始
+            state.isDragging = true;
+        },
+        (e) => {
+            // 拖动中
+            if (state.isDragging) {
+                // 更新元素位置
+            }
+        },
+        (e) => {
+            // 拖动结束
+            state.isDragging = false;
+        }
+    );
+}
+```
+
+### Q: 如何实现窗口拉伸功能？
+
+A: 对于窗口，`GUIManager` 会自动创建拉伸器。对于自定义元素，使用 `EventManager.registerResizer`：
+
+```javascript
+if (typeof EventManager !== 'undefined') {
+    EventManager.registerResizer(
+        `my-resizer-${this.pid}`,
+        resizerElement,  // 拉伸器元素
+        targetElement,   // 目标元素
+        { isResizing: false },  // 状态对象
+        (e) => {
+            // 拉伸开始
+            state.isResizing = true;
+        },
+        (e) => {
+            // 拉伸中
+            if (state.isResizing) {
+                // 更新元素大小
+            }
+        },
+        (e) => {
+            // 拉伸结束
+            state.isResizing = false;
+        }
+    );
+}
+```
+
+### Q: 如何获取当前窗口信息？
+
+A: 使用 `GUIManager.getWindowInfo`：
+
+```javascript
+if (typeof GUIManager !== 'undefined' && this.windowId) {
+    const windowInfo = GUIManager.getWindowInfo(this.windowId);
+    if (windowInfo) {
+        console.log('窗口标题:', windowInfo.title);
+        console.log('是否最大化:', windowInfo.isMaximized);
+        console.log('是否最小化:', windowInfo.isMinimized);
+        console.log('z-index:', windowInfo.zIndex);
+    }
+}
+```
+
+### Q: 如何检查窗口是否获得焦点？
+
+A: 使用 `GUIManager.getFocusedWindowId`：
+
+```javascript
+if (typeof GUIManager !== 'undefined') {
+    const focusedWindowId = GUIManager.getFocusedWindowId();
+    if (focusedWindowId === this.windowId) {
+        console.log('当前窗口已获得焦点');
+    }
+}
+```
+
+### Q: 如何监听窗口焦点变化？
+
+A: 使用 `EventManager.registerEventHandler` 监听 `focus` 和 `blur` 事件：
+
+```javascript
+if (typeof EventManager !== 'undefined') {
+    EventManager.registerEventHandler(this.pid, 'focus', (e) => {
+        if (e.target === this.window) {
+            console.log('窗口获得焦点');
+        }
+    });
+    
+    EventManager.registerEventHandler(this.pid, 'blur', (e) => {
+        if (e.target === this.window) {
+            console.log('窗口失去焦点');
+        }
+    });
+}
+```
+
+### Q: 如何实现模态对话框？
+
+A: 使用 `GUIManager.showAlert`、`GUIManager.showConfirm` 或 `GUIManager.showPrompt`：
+
+```javascript
+// 提示框
+await GUIManager.showAlert('操作完成', '提示', 'success');
+
+// 确认框
+const confirmed = await GUIManager.showConfirm(
+    '确定要删除吗？',
+    '确认删除',
+    'warning'
+);
+
+// 输入框
+const input = await GUIManager.showPrompt(
+    '请输入文件名',
+    '输入',
+    'default.txt'
+);
+```
+
+### Q: 如何创建自定义模态窗口？
+
+A: 使用 `GUIManager.registerWindow` 创建窗口，并设置合适的 z-index：
+
+```javascript
+const dialogWindow = document.createElement('div');
+dialogWindow.className = 'my-dialog zos-gui-window';
+dialogWindow.style.cssText = `
+    width: 500px;
+    height: 400px;
+    display: flex;
+    flex-direction: column;
+`;
+
+const windowInfo = GUIManager.registerWindow(this.pid, dialogWindow, {
+    title: '自定义对话框',
+    icon: icon,
+    onClose: () => {
+        GUIManager.unregisterWindow(windowInfo.windowId);
+    }
+});
+
+// 聚焦窗口
+GUIManager.focusWindow(windowInfo.windowId);
+```
+
+### Q: 如何实现多窗口程序？
+
+A: 使用 `childWindows` 数组管理多个窗口：
+
+```javascript
+const MYAPP = {
+    pid: null,
+    window: null,
+    childWindows: [],  // 子窗口列表
+    
+    _openChildWindow: function(data) {
+        const childWindow = document.createElement('div');
+        childWindow.className = 'myapp-child-window zos-gui-window';
+        
+        const windowInfo = GUIManager.registerWindow(this.pid, childWindow, {
+            title: '子窗口',
+            onClose: () => {
+                // 从列表中移除
+                const index = this.childWindows.findIndex(w => w.windowId === windowInfo.windowId);
+                if (index !== -1) {
+                    this.childWindows.splice(index, 1);
+                }
+                GUIManager.unregisterWindow(windowInfo.windowId);
+            }
+        });
+        
+        // 保存到列表
+        this.childWindows.push({
+            windowId: windowInfo.windowId,
+            window: childWindow,
+            windowInfo: windowInfo
+        });
+        
+        GUIManager.focusWindow(windowInfo.windowId);
+    },
+    
+    __exit__: async function() {
+        // 关闭所有子窗口
+        this.childWindows.forEach(child => {
+            if (child.windowId && typeof GUIManager !== 'undefined') {
+                GUIManager.unregisterWindow(child.windowId);
+            }
+        });
+        this.childWindows = [];
+        
+        // 关闭主窗口
+        if (this.windowId && typeof GUIManager !== 'undefined') {
+            GUIManager.unregisterWindow(this.windowId);
+        }
+    }
+};
+```
+
+### Q: 如何实现程序间的通信？
+
+A: 使用 POOL 共享空间：
+
+```javascript
+// 程序 A：发布数据
+if (typeof POOL !== 'undefined') {
+    if (!POOL.__HAS__("APPLICATION_SHARED_POOL")) {
+        POOL.__INIT__("APPLICATION_SHARED_POOL");
+    }
+    POOL.__ADD__("APPLICATION_SHARED_POOL", "MyAppData", {
+        value: 'some data',
+        update: (newValue) => {
+            // 更新数据
+        }
+    });
+}
+
+// 程序 B：获取数据
+if (typeof POOL !== 'undefined') {
+    const myAppData = POOL.__GET__("APPLICATION_SHARED_POOL", "MyAppData");
+    if (myAppData) {
+        console.log(myAppData.value);
+    }
+}
+```
+
+### Q: 如何处理文件路径中的特殊字符？
+
+A: 使用 `ProcessManager.callKernelAPI` 调用 `FileSystem` API，它会自动处理路径规范化：
+
+```javascript
+// ✅ 正确：使用 FileSystem API
+const content = await ProcessManager.callKernelAPI(
+    this.pid,
+    'FileSystem.read',
+    ['D:/path with spaces/file.txt']
+);
+
+// ❌ 错误：直接使用路径可能有问题
+const url = `/service/FSDirve.php?path=D:/path with spaces/file.txt`;
+```
+
+### Q: 如何检查文件或目录是否存在？
+
+A: 使用 `FileSystem.list` 或 `FileSystem.read`：
+
+```javascript
+try {
+    // 尝试读取文件
+    await ProcessManager.callKernelAPI(
+        this.pid,
+        'FileSystem.read',
+        ['D:/file.txt']
+    );
+    console.log('文件存在');
+} catch (error) {
+    if (error.message.includes('不存在') || error.message.includes('not found')) {
+        console.log('文件不存在');
+    }
+}
+
+// 或者列出目录内容
+try {
+    const list = await ProcessManager.callKernelAPI(
+        this.pid,
+        'FileSystem.list',
+        ['D:/directory']
+    );
+    console.log('目录存在，包含', list.length, '个项目');
+} catch (error) {
+    console.log('目录不存在');
+}
+```
+
+### Q: 如何实现文件上传功能？
+
+A: 使用 HTML5 File API 和 FileSystem API：
+
+```javascript
+// 创建文件输入元素
+const input = document.createElement('input');
+input.type = 'file';
+input.multiple = true;  // 支持多选
+
+input.addEventListener('change', async (e) => {
+    const files = e.target.files;
+    for (const file of files) {
+        const reader = new FileReader();
+        reader.onload = async (event) => {
+            const content = event.target.result;
+            // 保存到虚拟文件系统
+            await ProcessManager.callKernelAPI(
+                this.pid,
+                'FileSystem.write',
+                [`D:/uploads/${file.name}`, content]
+            );
+            console.log(`文件 ${file.name} 已上传`);
+        };
+        reader.readAsText(file);  // 或 readAsArrayBuffer 用于二进制文件
+    }
+});
+
+input.click();
+```
+
+### Q: 如何实现文件下载功能？
+
+A: 读取文件内容后创建下载链接：
+
+```javascript
+async function downloadFile(virtualPath, fileName) {
+    try {
+        // 读取文件内容
+        const content = await ProcessManager.callKernelAPI(
+            this.pid,
+            'FileSystem.read',
+            [virtualPath]
+        );
+        
+        // 创建 Blob
+        const blob = new Blob([content], { type: 'application/octet-stream' });
+        const url = URL.createObjectURL(blob);
+        
+        // 创建下载链接
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName || virtualPath.split('/').pop();
+        a.click();
+        
+        // 清理
+        URL.revokeObjectURL(url);
+    } catch (error) {
+        console.error('下载失败:', error);
+        if (typeof GUIManager !== 'undefined') {
+            await GUIManager.showAlert('下载失败: ' + error.message, '错误', 'error');
+        }
+    }
+}
+```
+
+### Q: 如何实现程序自动更新？
+
+A: 检查版本并提示用户：
+
+```javascript
+async function checkForUpdates() {
+    try {
+        // 获取当前版本
+        const currentVersion = this.__info__().version;
+        
+        // 检查最新版本（从服务器或配置文件）
+        const response = await fetch('/service/version.json');
+        const versionInfo = await response.json();
+        
+        if (versionInfo.latestVersion > currentVersion) {
+            const update = await GUIManager.showConfirm(
+                `发现新版本 ${versionInfo.latestVersion}，是否更新？`,
+                '更新提示',
+                'info'
+            );
+            
+            if (update) {
+                // 执行更新逻辑
+                // 例如：重新加载程序文件
+                window.location.reload();
+            }
+        }
+    } catch (error) {
+        KernelLogger.warn('MYAPP', '检查更新失败', error);
+    }
+}
+```
+
+### Q: 如何处理程序崩溃和错误恢复？
+
+A: 使用 try-catch 和错误边界：
+
+```javascript
+__init__: async function(pid, initArgs) {
+    this.pid = pid;
+    
+    try {
+        await this._initialize();
+    } catch (error) {
+        KernelLogger.error('MYAPP', '初始化失败', error);
+        
+        // 显示错误提示
+        if (typeof GUIManager !== 'undefined') {
+            await GUIManager.showAlert(
+                `程序启动失败: ${error.message}`,
+                '错误',
+                'error'
+            );
+        }
+        
+        // 清理资源
+        await this.__exit__();
+        
+        // 退出程序
+        if (typeof ProcessManager !== 'undefined') {
+            ProcessManager.killProgram(this.pid);
+        }
+        return;
+    }
+}
+
+_initialize: async function() {
+    // 初始化代码
+    // 如果出错，会抛出异常
+}
+```
+
+### Q: 如何实现程序设置界面？
+
+A: 创建设置窗口并使用 LStorage 保存：
+
+```javascript
+_openSettings: function() {
+    const settingsWindow = document.createElement('div');
+    settingsWindow.className = 'myapp-settings zos-gui-window';
+    
+    // 加载当前设置
+    LStorage.getProgramStorage(this.pid, 'settings').then(settings => {
+        // 填充设置表单
+        const themeSelect = settingsWindow.querySelector('#theme-select');
+        themeSelect.value = settings?.theme || 'dark';
+    });
+    
+    // 保存按钮
+    const saveBtn = settingsWindow.querySelector('#save-settings');
+    saveBtn.addEventListener('click', async () => {
+        const newSettings = {
+            theme: settingsWindow.querySelector('#theme-select').value,
+            // ... 其他设置
+        };
+        
+        await LStorage.setProgramStorage(this.pid, 'settings', newSettings);
+        
+        // 关闭设置窗口
+        GUIManager.unregisterWindow(settingsWindowInfo.windowId);
+        
+        // 应用新设置
+        this._applySettings(newSettings);
+    });
+    
+    const settingsWindowInfo = GUIManager.registerWindow(this.pid, settingsWindow, {
+        title: '设置',
+        onClose: () => {
+            GUIManager.unregisterWindow(settingsWindowInfo.windowId);
+        }
+    });
+}
+```
+
+### Q: 如何实现程序快捷键？
+
+A: 使用 `EventManager.registerEventHandler` 监听键盘事件：
+
+```javascript
+if (typeof EventManager !== 'undefined') {
+    EventManager.registerEventHandler(this.pid, 'keydown', (e, eventContext) => {
+        // Ctrl+S: 保存
+        if (e.ctrlKey && e.key === 's') {
+            e.preventDefault();
+            eventContext.preventDefault();
+            this._save();
+        }
+        
+        // Ctrl+N: 新建
+        if (e.ctrlKey && e.key === 'n') {
+            e.preventDefault();
+            eventContext.preventDefault();
+            this._new();
+        }
+        
+        // Escape: 关闭
+        if (e.key === 'Escape') {
+            if (this._hasUnsavedChanges()) {
+                // 提示保存
+            } else {
+                this._close();
+            }
+        }
+    }, {
+        priority: 50,  // 较高优先级
+        useCapture: true
+    });
+}
+```
+
+### Q: 如何实现程序状态持久化？
+
+A: 使用 LStorage 或文件系统：
+
+```javascript
+// 保存状态
+async _saveState() {
+    const state = {
+        windowPosition: { x: this.window.style.left, y: this.window.style.top },
+        windowSize: { width: this.window.style.width, height: this.window.style.height },
+        userData: this.userData
+    };
+    
+    await LStorage.setProgramStorage(this.pid, 'state', state);
+}
+
+// 恢复状态
+async _restoreState() {
+    const state = await LStorage.getProgramStorage(this.pid, 'state');
+    if (state) {
+        if (state.windowPosition) {
+            this.window.style.left = state.windowPosition.x;
+            this.window.style.top = state.windowPosition.y;
+        }
+        if (state.windowSize) {
+            this.window.style.width = state.windowSize.width;
+            this.window.style.height = state.windowSize.height;
+        }
+        if (state.userData) {
+            this.userData = state.userData;
+        }
+    }
+}
+```
+
+### Q: 如何实现程序国际化（i18n）？
+
+A: 使用配置文件和多语言支持：
+
+```javascript
+const i18n = {
+    'zh-CN': {
+        'save': '保存',
+        'cancel': '取消',
+        'delete': '删除'
+    },
+    'en-US': {
+        'save': 'Save',
+        'cancel': 'Cancel',
+        'delete': 'Delete'
+    }
+};
+
+// 获取当前语言
+_getLanguage: function() {
+    const settings = await LStorage.getProgramStorage(this.pid, 'settings');
+    return settings?.language || 'zh-CN';
+}
+
+// 翻译文本
+_t: function(key) {
+    const lang = this._getLanguage();
+    return i18n[lang]?.[key] || key;
+}
+
+// 使用
+button.textContent = this._t('save');
+```
+
+### Q: 如何实现程序插件系统？
+
+A: 使用 POOL 共享空间和事件系统：
+
+```javascript
+// 主程序：注册插件接口
+if (typeof POOL !== 'undefined') {
+    POOL.__ADD__("APPLICATION_SHARED_POOL", "MyAppPluginAPI", {
+        registerPlugin: (plugin) => {
+            this.plugins.push(plugin);
+            plugin.init?.(this);
+        },
+        unregisterPlugin: (pluginId) => {
+            this.plugins = this.plugins.filter(p => p.id !== pluginId);
+        }
+    });
+}
+
+// 插件：注册到主程序
+const pluginAPI = POOL.__GET__("APPLICATION_SHARED_POOL", "MyAppPluginAPI");
+if (pluginAPI) {
+    pluginAPI.registerPlugin({
+        id: 'my-plugin',
+        name: '我的插件',
+        init: (app) => {
+            // 插件初始化
+        }
+    });
 }
 ```
 

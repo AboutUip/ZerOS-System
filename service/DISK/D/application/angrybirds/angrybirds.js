@@ -85,15 +85,20 @@
                 this.window.style.width = '900px';
                 this.window.style.height = '600px';
                 
-                GUIManager.registerWindow(pid, this.window, {
+                const windowInfo = GUIManager.registerWindow(pid, this.window, {
                     title: '愤怒的小鸟',
                     icon: icon,
                     onClose: () => {
-                        if (typeof ProcessManager !== 'undefined') {
-                            ProcessManager.killProgram(this.pid);
-                        }
+                        // onClose 回调只做清理工作，不调用 _closeWindow 或 unregisterWindow
+                        // 窗口关闭由 GUIManager._closeWindow 统一处理
+                        // _closeWindow 会在窗口关闭后检查该 PID 是否还有其他窗口，如果没有，会 kill 进程
+                        // 这样可以确保程序多实例（不同 PID）互不影响
                     }
                 });
+                // 保存窗口ID，用于精确清理
+                if (windowInfo && windowInfo.windowId) {
+                    this.windowId = windowInfo.windowId;
+                }
             }
             
             // 创建游戏界面
@@ -217,12 +222,28 @@
                     btn.classList.add('locked');
                 }
                 
-                btn.addEventListener('click', () => {
-                    if (!btn.classList.contains('locked')) {
-                        this.currentLevel = i;
-                        this._startLevel(i);
-                    }
-                });
+                // 使用 EventManager 注册事件
+                if (typeof EventManager !== 'undefined' && this.pid) {
+                    const btnId = `angrybirds-level-btn-${i}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                    btn.dataset.eventId = btnId;
+                    EventManager.registerEventHandler(this.pid, 'click', () => {
+                        if (!btn.classList.contains('locked')) {
+                            this.currentLevel = i;
+                            this._startLevel(i);
+                        }
+                    }, {
+                        priority: 100,
+                        selector: `[data-event-id="${btnId}"]`
+                    });
+                } else {
+                    // 降级方案
+                    btn.addEventListener('click', () => {
+                        if (!btn.classList.contains('locked')) {
+                            this.currentLevel = i;
+                            this._startLevel(i);
+                        }
+                    });
+                }
                 
                 grid.appendChild(btn);
             }
@@ -255,9 +276,22 @@
             const retryBtn = document.createElement('button');
             retryBtn.className = 'angrybirds-btn primary';
             retryBtn.textContent = '重试';
-            retryBtn.addEventListener('click', () => {
-                this._startLevel(this.currentLevel);
-            });
+            // 使用 EventManager 注册事件
+            if (typeof EventManager !== 'undefined' && this.pid) {
+                const retryBtnId = `angrybirds-retry-btn-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                retryBtn.dataset.eventId = retryBtnId;
+                EventManager.registerEventHandler(this.pid, 'click', () => {
+                    this._startLevel(this.currentLevel);
+                }, {
+                    priority: 100,
+                    selector: `[data-event-id="${retryBtnId}"]`
+                });
+            } else {
+                // 降级方案
+                retryBtn.addEventListener('click', () => {
+                    this._startLevel(this.currentLevel);
+                });
+            }
             buttons.appendChild(retryBtn);
             
             const nextBtn = document.createElement('button');
@@ -265,20 +299,47 @@
             nextBtn.textContent = '下一关';
             nextBtn.id = 'next-level-btn';
             nextBtn.style.display = 'none';
-            nextBtn.addEventListener('click', () => {
-                if (this.currentLevel < this.maxLevel) {
-                    this.currentLevel++;
-                    this._startLevel(this.currentLevel);
-                }
-            });
+            if (typeof EventManager !== 'undefined' && this.pid) {
+                const nextBtnId = `angrybirds-next-btn-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                nextBtn.dataset.eventId = nextBtnId;
+                EventManager.registerEventHandler(this.pid, 'click', () => {
+                    if (this.currentLevel < this.maxLevel) {
+                        this.currentLevel++;
+                        this._startLevel(this.currentLevel);
+                    }
+                }, {
+                    priority: 100,
+                    selector: `[data-event-id="${nextBtnId}"]`
+                });
+            } else {
+                // 降级方案
+                nextBtn.addEventListener('click', () => {
+                    if (this.currentLevel < this.maxLevel) {
+                        this.currentLevel++;
+                        this._startLevel(this.currentLevel);
+                    }
+                });
+            }
             buttons.appendChild(nextBtn);
             
             const menuBtn = document.createElement('button');
             menuBtn.className = 'angrybirds-btn';
             menuBtn.textContent = '返回菜单';
-            menuBtn.addEventListener('click', () => {
-                this._showLevelSelector();
-            });
+            if (typeof EventManager !== 'undefined' && this.pid) {
+                const menuBtnId = `angrybirds-menu-btn-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                menuBtn.dataset.eventId = menuBtnId;
+                EventManager.registerEventHandler(this.pid, 'click', () => {
+                    this._showLevelSelector();
+                }, {
+                    priority: 100,
+                    selector: `[data-event-id="${menuBtnId}"]`
+                });
+            } else {
+                // 降级方案
+                menuBtn.addEventListener('click', () => {
+                    this._showLevelSelector();
+                });
+            }
             buttons.appendChild(menuBtn);
             
             gameOver.appendChild(buttons);
@@ -430,19 +491,38 @@
                 return; // 已经加载过
             }
             
+            // 定义纹理路径（使用虚拟路径格式）
             const texturePaths = {
-                'bird-red': 'application/angrybirds/assets/bird-red.svg',
-                'bird-blue': 'application/angrybirds/assets/bird-blue.svg',
-                'bird-yellow': 'application/angrybirds/assets/bird-yellow.svg',
-                'bird-black': 'application/angrybirds/assets/bird-black.svg',
-                'bird-white': 'application/angrybirds/assets/bird-white.svg',
-                'pig': 'application/angrybirds/assets/pig.svg',
-                'block-wood': 'application/angrybirds/assets/block-wood.svg',
-                'block-stone': 'application/angrybirds/assets/block-stone.svg',
-                'slingshot': 'application/angrybirds/assets/slingshot.svg',
-                'ground': 'application/angrybirds/assets/ground.svg',
-                'egg': 'application/angrybirds/assets/egg.svg',
-                'explosion': 'application/angrybirds/assets/explosion.svg'
+                'bird-red': 'D:/application/angrybirds/assets/bird-red.svg',
+                'bird-blue': 'D:/application/angrybirds/assets/bird-blue.svg',
+                'bird-yellow': 'D:/application/angrybirds/assets/bird-yellow.svg',
+                'bird-black': 'D:/application/angrybirds/assets/bird-black.svg',
+                'bird-white': 'D:/application/angrybirds/assets/bird-white.svg',
+                'pig': 'D:/application/angrybirds/assets/pig.svg',
+                'block-wood': 'D:/application/angrybirds/assets/block-wood.svg',
+                'block-stone': 'D:/application/angrybirds/assets/block-stone.svg',
+                'slingshot': 'D:/application/angrybirds/assets/slingshot.svg',
+                'ground': 'D:/application/angrybirds/assets/ground.svg',
+                'egg': 'D:/application/angrybirds/assets/egg.svg',
+                'explosion': 'D:/application/angrybirds/assets/explosion.svg'
+            };
+            
+            // 转换路径为实际URL
+            const convertPathToUrl = (path) => {
+                if (path.startsWith('http://') || path.startsWith('https://') || path.startsWith('data:')) {
+                    return path;
+                } else if (typeof ProcessManager !== 'undefined' && typeof ProcessManager.convertVirtualPathToUrl === 'function') {
+                    return ProcessManager.convertVirtualPathToUrl(path);
+                } else if (path.startsWith('D:/') || path.startsWith('C:/')) {
+                    const relativePath = path.substring(3);
+                    const disk = path.startsWith('D:/') ? 'D' : 'C';
+                    return `/service/DISK/${disk}/${relativePath}`;
+                } else if (path.startsWith('/')) {
+                    return path;
+                } else {
+                    // 相对路径，尝试添加 /service/DISK/D/ 前缀
+                    return `/service/DISK/D/${path}`;
+                }
             };
             
             try {
@@ -450,9 +530,14 @@
                 if (PIXI.Assets && typeof PIXI.Assets.load === 'function') {
                     for (const [key, path] of Object.entries(texturePaths)) {
                         try {
-                            this.textures[key] = await PIXI.Assets.load(path);
+                            const url = convertPathToUrl(path);
+                            this.textures[key] = await PIXI.Assets.load(url);
                         } catch (e) {
-                            console.warn(`加载纹理失败 ${key}: ${path}`, e);
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.warn('ANGRYBIRDS', `加载纹理失败 ${key}: ${path}`, e);
+                            } else {
+                                console.warn(`加载纹理失败 ${key}: ${path}`, e);
+                            }
                             // 如果加载失败，创建一个占位纹理
                             const graphics = new PIXI.Graphics();
                             graphics.beginFill(0xFF0000);
@@ -465,9 +550,14 @@
                     // 降级方案：使用 Texture.from (同步加载)
                     for (const [key, path] of Object.entries(texturePaths)) {
                         try {
-                            this.textures[key] = PIXI.Texture.from(path);
+                            const url = convertPathToUrl(path);
+                            this.textures[key] = PIXI.Texture.from(url);
                         } catch (e) {
-                            console.warn(`加载纹理失败 ${key}: ${path}`, e);
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.warn('ANGRYBIRDS', `加载纹理失败 ${key}: ${path}`, e);
+                            } else {
+                                console.warn(`加载纹理失败 ${key}: ${path}`, e);
+                            }
                             // 如果加载失败，创建一个占位纹理
                             const graphics = new PIXI.Graphics();
                             graphics.beginFill(0xFF0000);
@@ -585,8 +675,16 @@
                 }
             };
             
-            // 监听窗口大小变化
-            window.addEventListener('resize', this._resizeHandler);
+            // 监听窗口大小变化（使用 EventManager）
+            if (typeof EventManager !== 'undefined' && this.pid) {
+                this._resizeHandlerId = EventManager.registerEventHandler(this.pid, 'resize', this._resizeHandler, {
+                    priority: 100,
+                    selector: null  // 监听 window 的 resize 事件
+                });
+            } else {
+                // 降级：直接使用 addEventListener（不推荐）
+                window.addEventListener('resize', this._resizeHandler);
+            }
         },
         
         /**
@@ -1449,9 +1547,11 @@
                         version: '1.0.0',
                         description: '使用PixiJS实现的愤怒的小鸟游戏，1:1还原经典玩法',
                         type: 'GUI',
-                        author: 'ZerOS',
+                        author: 'ZerOS Team',
+                        copyright: '© 2025 ZerOS',
                         permissions: typeof PermissionManager !== 'undefined' ? [
-                            PermissionManager.PERMISSION.GUI_WINDOW_CREATE
+                            PermissionManager.PERMISSION.GUI_WINDOW_CREATE,
+                            PermissionManager.PERMISSION.EVENT_LISTENER
                         ] : []
                     };
                 },
@@ -1461,6 +1561,17 @@
                  */
                 __exit__: function(pid, force) {
                     try {
+                        // 清理事件处理器
+                        if (this._resizeHandlerId && typeof EventManager !== 'undefined') {
+                            EventManager.unregisterEventHandler(this._resizeHandlerId);
+                            this._resizeHandlerId = null;
+                        }
+                        
+                        // 清理所有事件处理器（通过 EventManager）
+                        if (typeof EventManager !== 'undefined' && this.pid) {
+                            EventManager.unregisterAllHandlersForPid(this.pid);
+                        }
+                        
                         // 停止游戏循环
                         if (this.app && this.app.ticker && typeof this._gameLoop === 'function') {
                             try {

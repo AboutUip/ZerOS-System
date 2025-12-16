@@ -141,6 +141,39 @@ class ThemeManager {
             KernelLogger.warn("ThemeManager", "LStorage 不可用，使用默认主题和风格");
         }
         
+        // 从 LStorage 加载保存的动画预设
+        if (typeof LStorage !== 'undefined') {
+            try {
+                const savedAnimationPresetId = await LStorage.getSystemStorage(ThemeManager.STORAGE_KEY_ANIMATION_PRESET);
+                if (savedAnimationPresetId && typeof savedAnimationPresetId === 'string' && savedAnimationPresetId.trim() !== '') {
+                    const trimmedId = savedAnimationPresetId.trim();
+                    if (ThemeManager._animationPresets.has(trimmedId)) {
+                        ThemeManager._currentAnimationPresetId = trimmedId;
+                        ThemeManager._applyAnimationPreset(trimmedId);
+                        KernelLogger.info("ThemeManager", `加载保存的动画预设: ${trimmedId}`);
+                    } else {
+                        KernelLogger.warn("ThemeManager", `保存的动画预设 ${trimmedId} 不存在，使用默认预设`);
+                        ThemeManager._currentAnimationPresetId = 'smooth';
+                        ThemeManager._applyAnimationPreset('smooth');
+                    }
+                } else {
+                    // 如果没有保存的动画预设，使用默认预设
+                    ThemeManager._currentAnimationPresetId = 'smooth';
+                    ThemeManager._applyAnimationPreset('smooth');
+                    KernelLogger.info("ThemeManager", "使用默认动画预设: smooth");
+                }
+            } catch (e) {
+                KernelLogger.warn("ThemeManager", `加载动画预设失败: ${e.message}，使用默认预设`);
+                ThemeManager._currentAnimationPresetId = 'smooth';
+                ThemeManager._applyAnimationPreset('smooth');
+            }
+        } else {
+            // LStorage 不可用，使用默认动画预设
+            ThemeManager._currentAnimationPresetId = 'smooth';
+            ThemeManager._applyAnimationPreset('smooth');
+            KernelLogger.warn("ThemeManager", "LStorage 不可用，使用默认动画预设");
+        }
+        
         // 应用当前主题和风格
         ThemeManager._applyTheme(ThemeManager._currentThemeId);
         ThemeManager._applyStyle(ThemeManager._currentStyleId);

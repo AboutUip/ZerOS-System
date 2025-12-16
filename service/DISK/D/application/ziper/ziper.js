@@ -23,6 +23,44 @@
         // 已选择的 ZIP 文件列表（用于解压）
         _selectedZipFiles: [],
         
+        /**
+         * 辅助函数：为按钮注册事件（使用 EventManager）
+         * @param {HTMLElement} btn 按钮元素
+         * @param {Function} onClick 点击回调
+         * @param {string} hoverColor 悬停背景色
+         * @param {string} normalColor 正常背景色
+         * @param {string} btnIdPrefix 按钮ID前缀
+         */
+        _registerButtonEvents: function(btn, onClick, hoverColor, normalColor, btnIdPrefix) {
+            if (typeof EventManager !== 'undefined' && this.pid) {
+                EventManager.registerElementEvent(this.pid, btn, 'mouseenter', () => {
+                    btn.style.background = hoverColor;
+                });
+                EventManager.registerElementEvent(this.pid, btn, 'mouseleave', () => {
+                    btn.style.background = normalColor;
+                });
+                const btnId = `${btnIdPrefix}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                btn.dataset.eventId = btnId;
+                EventManager.registerEventHandler(this.pid, 'click', (e) => {
+                    if (btn === e.target || btn.contains(e.target)) {
+                        onClick(e);
+                    }
+                }, {
+                    priority: 100,
+                    selector: `[data-event-id="${btnId}"]`
+                });
+            } else {
+                // 降级方案
+                btn.addEventListener('mouseenter', () => {
+                    btn.style.background = hoverColor;
+                });
+                btn.addEventListener('mouseleave', () => {
+                    btn.style.background = normalColor;
+                });
+                btn.addEventListener('click', onClick);
+            }
+        },
+        
         __init__: async function(pid, initArgs) {
             this.pid = pid;
             
@@ -58,9 +96,10 @@
                     title: 'Ziper - Zip压缩工具',
                     icon: icon,
                     onClose: () => {
-                        if (typeof ProcessManager !== 'undefined') {
-                            ProcessManager.killProgram(this.pid);
-                        }
+                        // onClose 回调只做清理工作，不调用 _closeWindow 或 unregisterWindow
+                        // 窗口关闭由 GUIManager._closeWindow 统一处理
+                        // _closeWindow 会在窗口关闭后检查该 PID 是否还有其他窗口，如果没有，会 kill 进程
+                        // 这样可以确保程序多实例（不同 PID）互不影响
                     },
                     onMinimize: () => {
                         // 最小化回调
@@ -266,15 +305,14 @@
                 cursor: pointer;
                 transition: all 0.2s;
             `;
-            sourceBtn.addEventListener('mouseenter', () => {
-                sourceBtn.style.background = 'rgba(108, 142, 255, 0.5)';
-            });
-            sourceBtn.addEventListener('mouseleave', () => {
-                sourceBtn.style.background = 'rgba(108, 142, 255, 0.3)';
-            });
-            sourceBtn.addEventListener('click', () => {
-                this._addSourceForCompress(sourceListContainer, emptyHint);
-            });
+            // 使用辅助函数注册事件
+            this._registerButtonEvents(
+                sourceBtn,
+                () => this._addSourceForCompress(sourceListContainer, emptyHint),
+                'rgba(108, 142, 255, 0.5)',
+                'rgba(108, 142, 255, 0.3)',
+                'ziper-source-btn'
+            );
             sourceInputGroup.appendChild(sourceBtn);
             
             const clearBtn = document.createElement('button');
@@ -290,16 +328,17 @@
                 cursor: pointer;
                 transition: all 0.2s;
             `;
-            clearBtn.addEventListener('mouseenter', () => {
-                clearBtn.style.background = 'rgba(239, 68, 68, 0.5)';
-            });
-            clearBtn.addEventListener('mouseleave', () => {
-                clearBtn.style.background = 'rgba(239, 68, 68, 0.3)';
-            });
-            clearBtn.addEventListener('click', () => {
-                this._selectedSources = [];
-                this._updateSourceList(sourceListContainer, emptyHint);
-            });
+            // 使用辅助函数注册事件
+            this._registerButtonEvents(
+                clearBtn,
+                () => {
+                    this._selectedSources = [];
+                    this._updateSourceList(sourceListContainer, emptyHint);
+                },
+                'rgba(239, 68, 68, 0.5)',
+                'rgba(239, 68, 68, 0.3)',
+                'ziper-clear-btn'
+            );
             sourceInputGroup.appendChild(clearBtn);
             
             sourceGroup.appendChild(sourceListContainer);
@@ -361,15 +400,14 @@
                 cursor: pointer;
                 transition: all 0.2s;
             `;
-            targetBtn.addEventListener('mouseenter', () => {
-                targetBtn.style.background = 'rgba(108, 142, 255, 0.5)';
-            });
-            targetBtn.addEventListener('mouseleave', () => {
-                targetBtn.style.background = 'rgba(108, 142, 255, 0.3)';
-            });
-            targetBtn.addEventListener('click', () => {
-                this._selectTargetForCompress(targetInput);
-            });
+            // 使用辅助函数注册事件
+            this._registerButtonEvents(
+                targetBtn,
+                () => this._selectTargetForCompress(targetInput),
+                'rgba(108, 142, 255, 0.5)',
+                'rgba(108, 142, 255, 0.3)',
+                'ziper-target-btn'
+            );
             targetInputGroup.appendChild(targetBtn);
             
             targetGroup.appendChild(targetInputGroup);
@@ -391,19 +429,42 @@
                 transition: all 0.2s;
                 align-self: flex-start;
             `;
-            compressBtn.addEventListener('mouseenter', () => {
-                if (!this._isProcessing) {
-                    compressBtn.style.background = 'rgba(245, 158, 11, 0.5)';
-                }
-            });
-            compressBtn.addEventListener('mouseleave', () => {
-                if (!this._isProcessing) {
-                    compressBtn.style.background = 'rgba(245, 158, 11, 0.3)';
-                }
-            });
-            compressBtn.addEventListener('click', () => {
-                this._compress(this._selectedSources, targetInput.value, compressBtn);
-            });
+            // 使用 EventManager 注册事件（特殊处理：需要检查处理状态）
+            if (typeof EventManager !== 'undefined' && this.pid) {
+                EventManager.registerElementEvent(this.pid, compressBtn, 'mouseenter', () => {
+                    if (!this._isProcessing) {
+                        compressBtn.style.background = 'rgba(245, 158, 11, 0.5)';
+                    }
+                });
+                EventManager.registerElementEvent(this.pid, compressBtn, 'mouseleave', () => {
+                    if (!this._isProcessing) {
+                        compressBtn.style.background = 'rgba(245, 158, 11, 0.3)';
+                    }
+                });
+                const compressBtnId = `ziper-compress-btn-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                compressBtn.dataset.eventId = compressBtnId;
+                EventManager.registerEventHandler(this.pid, 'click', () => {
+                    this._compress(this._selectedSources, targetInput.value, compressBtn);
+                }, {
+                    priority: 100,
+                    selector: `[data-event-id="${compressBtnId}"]`
+                });
+            } else {
+                // 降级方案
+                compressBtn.addEventListener('mouseenter', () => {
+                    if (!this._isProcessing) {
+                        compressBtn.style.background = 'rgba(245, 158, 11, 0.5)';
+                    }
+                });
+                compressBtn.addEventListener('mouseleave', () => {
+                    if (!this._isProcessing) {
+                        compressBtn.style.background = 'rgba(245, 158, 11, 0.3)';
+                    }
+                });
+                compressBtn.addEventListener('click', () => {
+                    this._compress(this._selectedSources, targetInput.value, compressBtn);
+                });
+            }
             section.appendChild(compressBtn);
             
             // 保存引用
@@ -495,15 +556,14 @@
                 cursor: pointer;
                 transition: all 0.2s;
             `;
-            zipBtn.addEventListener('mouseenter', () => {
-                zipBtn.style.background = 'rgba(108, 142, 255, 0.5)';
-            });
-            zipBtn.addEventListener('mouseleave', () => {
-                zipBtn.style.background = 'rgba(108, 142, 255, 0.3)';
-            });
-            zipBtn.addEventListener('click', () => {
-                this._addZipFileForExtract(zipListContainer, zipEmptyHint);
-            });
+            // 使用辅助函数注册事件
+            this._registerButtonEvents(
+                zipBtn,
+                () => this._addZipFileForExtract(zipListContainer, zipEmptyHint),
+                'rgba(108, 142, 255, 0.5)',
+                'rgba(108, 142, 255, 0.3)',
+                'ziper-zip-btn'
+            );
             zipInputGroup.appendChild(zipBtn);
             
             const clearZipBtn = document.createElement('button');
@@ -519,16 +579,17 @@
                 cursor: pointer;
                 transition: all 0.2s;
             `;
-            clearZipBtn.addEventListener('mouseenter', () => {
-                clearZipBtn.style.background = 'rgba(239, 68, 68, 0.5)';
-            });
-            clearZipBtn.addEventListener('mouseleave', () => {
-                clearZipBtn.style.background = 'rgba(239, 68, 68, 0.3)';
-            });
-            clearZipBtn.addEventListener('click', () => {
-                this._selectedZipFiles = [];
-                this._updateZipFileList(zipListContainer, zipEmptyHint);
-            });
+            // 使用辅助函数注册事件
+            this._registerButtonEvents(
+                clearZipBtn,
+                () => {
+                    this._selectedZipFiles = [];
+                    this._updateZipFileList(zipListContainer, zipEmptyHint);
+                },
+                'rgba(239, 68, 68, 0.5)',
+                'rgba(239, 68, 68, 0.3)',
+                'ziper-clear-zip-btn'
+            );
             zipInputGroup.appendChild(clearZipBtn);
             
             zipGroup.appendChild(zipListContainer);
@@ -590,15 +651,14 @@
                 cursor: pointer;
                 transition: all 0.2s;
             `;
-            targetBtn.addEventListener('mouseenter', () => {
-                targetBtn.style.background = 'rgba(108, 142, 255, 0.5)';
-            });
-            targetBtn.addEventListener('mouseleave', () => {
-                targetBtn.style.background = 'rgba(108, 142, 255, 0.3)';
-            });
-            targetBtn.addEventListener('click', () => {
-                this._selectTargetForExtract(targetInput);
-            });
+            // 使用辅助函数注册事件
+            this._registerButtonEvents(
+                targetBtn,
+                () => this._selectTargetForExtract(targetInput),
+                'rgba(108, 142, 255, 0.5)',
+                'rgba(108, 142, 255, 0.3)',
+                'ziper-extract-target-btn'
+            );
             targetInputGroup.appendChild(targetBtn);
             
             targetGroup.appendChild(targetInputGroup);
@@ -620,19 +680,42 @@
                 transition: all 0.2s;
                 align-self: flex-start;
             `;
-            extractBtn.addEventListener('mouseenter', () => {
-                if (!this._isProcessing) {
-                    extractBtn.style.background = 'rgba(34, 197, 94, 0.5)';
-                }
-            });
-            extractBtn.addEventListener('mouseleave', () => {
-                if (!this._isProcessing) {
-                    extractBtn.style.background = 'rgba(34, 197, 94, 0.3)';
-                }
-            });
-            extractBtn.addEventListener('click', () => {
-                this._extract(this._selectedZipFiles, targetInput.value, extractBtn);
-            });
+            // 使用 EventManager 注册事件（特殊处理：需要检查处理状态）
+            if (typeof EventManager !== 'undefined' && this.pid) {
+                EventManager.registerElementEvent(this.pid, extractBtn, 'mouseenter', () => {
+                    if (!this._isProcessing) {
+                        extractBtn.style.background = 'rgba(34, 197, 94, 0.5)';
+                    }
+                });
+                EventManager.registerElementEvent(this.pid, extractBtn, 'mouseleave', () => {
+                    if (!this._isProcessing) {
+                        extractBtn.style.background = 'rgba(34, 197, 94, 0.3)';
+                    }
+                });
+                const extractBtnId = `ziper-extract-btn-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                extractBtn.dataset.eventId = extractBtnId;
+                EventManager.registerEventHandler(this.pid, 'click', () => {
+                    this._extract(this._selectedZipFiles, targetInput.value, extractBtn);
+                }, {
+                    priority: 100,
+                    selector: `[data-event-id="${extractBtnId}"]`
+                });
+            } else {
+                // 降级方案
+                extractBtn.addEventListener('mouseenter', () => {
+                    if (!this._isProcessing) {
+                        extractBtn.style.background = 'rgba(34, 197, 94, 0.5)';
+                    }
+                });
+                extractBtn.addEventListener('mouseleave', () => {
+                    if (!this._isProcessing) {
+                        extractBtn.style.background = 'rgba(34, 197, 94, 0.3)';
+                    }
+                });
+                extractBtn.addEventListener('click', () => {
+                    this._extract(this._selectedZipFiles, targetInput.value, extractBtn);
+                });
+            }
             section.appendChild(extractBtn);
             
             // 保存引用
@@ -712,15 +795,14 @@
                 cursor: pointer;
                 transition: all 0.2s;
             `;
-            zipBtn.addEventListener('mouseenter', () => {
-                zipBtn.style.background = 'rgba(108, 142, 255, 0.5)';
-            });
-            zipBtn.addEventListener('mouseleave', () => {
-                zipBtn.style.background = 'rgba(108, 142, 255, 0.3)';
-            });
-            zipBtn.addEventListener('click', () => {
-                this._selectZipFile(zipInput);
-            });
+            // 使用辅助函数注册事件
+            this._registerButtonEvents(
+                zipBtn,
+                () => this._selectZipFile(zipInput),
+                'rgba(108, 142, 255, 0.5)',
+                'rgba(108, 142, 255, 0.3)',
+                'ziper-list-zip-btn'
+            );
             zipInputGroup.appendChild(zipBtn);
             
             zipGroup.appendChild(zipInputGroup);
@@ -742,19 +824,42 @@
                 transition: all 0.2s;
                 align-self: flex-start;
             `;
-            listBtn.addEventListener('mouseenter', () => {
-                if (!this._isProcessing) {
-                    listBtn.style.background = 'rgba(139, 92, 246, 0.5)';
-                }
-            });
-            listBtn.addEventListener('mouseleave', () => {
-                if (!this._isProcessing) {
-                    listBtn.style.background = 'rgba(139, 92, 246, 0.3)';
-                }
-            });
-            listBtn.addEventListener('click', () => {
-                this._listZip(zipInput.value, listBtn);
-            });
+            // 使用 EventManager 注册事件（特殊处理：需要检查处理状态）
+            if (typeof EventManager !== 'undefined' && this.pid) {
+                EventManager.registerElementEvent(this.pid, listBtn, 'mouseenter', () => {
+                    if (!this._isProcessing) {
+                        listBtn.style.background = 'rgba(139, 92, 246, 0.5)';
+                    }
+                });
+                EventManager.registerElementEvent(this.pid, listBtn, 'mouseleave', () => {
+                    if (!this._isProcessing) {
+                        listBtn.style.background = 'rgba(139, 92, 246, 0.3)';
+                    }
+                });
+                const listBtnId = `ziper-list-btn-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                listBtn.dataset.eventId = listBtnId;
+                EventManager.registerEventHandler(this.pid, 'click', () => {
+                    this._listZip(zipInput.value, listBtn);
+                }, {
+                    priority: 100,
+                    selector: `[data-event-id="${listBtnId}"]`
+                });
+            } else {
+                // 降级方案
+                listBtn.addEventListener('mouseenter', () => {
+                    if (!this._isProcessing) {
+                        listBtn.style.background = 'rgba(139, 92, 246, 0.5)';
+                    }
+                });
+                listBtn.addEventListener('mouseleave', () => {
+                    if (!this._isProcessing) {
+                        listBtn.style.background = 'rgba(139, 92, 246, 0.3)';
+                    }
+                });
+                listBtn.addEventListener('click', () => {
+                    this._listZip(zipInput.value, listBtn);
+                });
+            }
             section.appendChild(listBtn);
             
             // 保存引用
@@ -862,16 +967,17 @@
                         justify-content: center;
                         flex-shrink: 0;
                     `;
-                    removeBtn.addEventListener('mouseenter', () => {
-                        removeBtn.style.background = 'rgba(239, 68, 68, 0.5)';
-                    });
-                    removeBtn.addEventListener('mouseleave', () => {
-                        removeBtn.style.background = 'rgba(239, 68, 68, 0.3)';
-                    });
-                    removeBtn.addEventListener('click', () => {
-                        this._selectedSources.splice(index, 1);
-                        this._updateSourceList(listContainer, emptyHint);
-                    });
+                    // 使用辅助函数注册事件
+                    this._registerButtonEvents(
+                        removeBtn,
+                        () => {
+                            this._selectedSources.splice(index, 1);
+                            this._updateSourceList(listContainer, emptyHint);
+                        },
+                        'rgba(239, 68, 68, 0.5)',
+                        'rgba(239, 68, 68, 0.3)',
+                        `ziper-remove-source-btn-${index}`
+                    );
                     item.appendChild(removeBtn);
                     
                     listContainer.appendChild(item);
@@ -1013,16 +1119,17 @@
                         justify-content: center;
                         flex-shrink: 0;
                     `;
-                    removeBtn.addEventListener('mouseenter', () => {
-                        removeBtn.style.background = 'rgba(239, 68, 68, 0.5)';
-                    });
-                    removeBtn.addEventListener('mouseleave', () => {
-                        removeBtn.style.background = 'rgba(239, 68, 68, 0.3)';
-                    });
-                    removeBtn.addEventListener('click', () => {
-                        this._selectedZipFiles.splice(index, 1);
-                        this._updateZipFileList(listContainer, emptyHint);
-                    });
+                    // 使用辅助函数注册事件
+                    this._registerButtonEvents(
+                        removeBtn,
+                        () => {
+                            this._selectedZipFiles.splice(index, 1);
+                            this._updateZipFileList(listContainer, emptyHint);
+                        },
+                        'rgba(239, 68, 68, 0.5)',
+                        'rgba(239, 68, 68, 0.3)',
+                        `ziper-remove-zip-btn-${index}`
+                    );
                     item.appendChild(removeBtn);
                     
                     listContainer.appendChild(item);
@@ -1472,10 +1579,24 @@
          * 显示消息
          */
         _showMessage: function(message, type) {
-            if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                GUIManager.showAlert(message, type === 'error' ? '错误' : '提示', type === 'error' ? 'error' : 'info');
-            } else {
-                alert(message);
+            // 使用通知提示（不打断用户）
+            if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                try {
+                    NotificationManager.createNotification(this.pid, {
+                        type: 'snapshot',
+                        title: type === 'error' ? '错误' : '提示',
+                        content: message,
+                        duration: type === 'error' ? 4000 : 3000
+                    }).catch(e => {
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('Ziper', `创建通知失败: ${e.message}`);
+                        }
+                    });
+                } catch (e) {
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.warn('Ziper', `创建通知失败: ${e.message}`);
+                    }
+                }
             }
         },
         
@@ -1506,12 +1627,14 @@
                 type: 'GUI',
                 version: '1.0.0',
                 description: 'Zip压缩工具',
-                author: 'ZerOS',
-                copyright: '© 2024',
+                author: 'ZerOS Team',
+                copyright: '© 2025 ZerOS',
                 permissions: typeof PermissionManager !== 'undefined' ? [
                     PermissionManager.PERMISSION.GUI_WINDOW_CREATE,
                     PermissionManager.PERMISSION.KERNEL_DISK_READ,
-                    PermissionManager.PERMISSION.KERNEL_DISK_WRITE
+                    PermissionManager.PERMISSION.KERNEL_DISK_WRITE,
+                    PermissionManager.PERMISSION.SYSTEM_NOTIFICATION,
+                    PermissionManager.PERMISSION.EVENT_LISTENER
                 ] : [],
                 metadata: {
                     allowMultipleInstances: true

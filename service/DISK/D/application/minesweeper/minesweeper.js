@@ -135,9 +135,10 @@
                         title: '扫雷',
                         icon: icon,
                         onClose: () => {
-                            if (typeof ProcessManager !== 'undefined') {
-                                ProcessManager.killProgram(this.pid);
-                            }
+                            // onClose 回调只做清理工作，不调用 _closeWindow 或 unregisterWindow
+                            // 窗口关闭由 GUIManager._closeWindow 统一处理
+                            // _closeWindow 会在窗口关闭后检查该 PID 是否还有其他窗口，如果没有，会 kill 进程
+                            // 这样可以确保程序多实例（不同 PID）互不影响
                         }
                     });
                     
@@ -904,9 +905,10 @@
                 version: '1.0.0',
                 description: '经典扫雷游戏，仿Windows风格',
                 author: 'ZerOS Team',
-                copyright: '© 2024',
+                copyright: '© 2025 ZerOS',
                 permissions: typeof PermissionManager !== 'undefined' ? [
-                    PermissionManager.PERMISSION.GUI_WINDOW_CREATE
+                    PermissionManager.PERMISSION.GUI_WINDOW_CREATE,
+                    PermissionManager.PERMISSION.EVENT_LISTENER
                 ] : [],
                 metadata: {
                     allowMultipleInstances: true

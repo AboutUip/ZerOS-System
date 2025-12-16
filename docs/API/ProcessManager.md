@@ -439,6 +439,25 @@ const allProcesses = ProcessManager.getProcessInfo();
 - `Drag.createFileDrag` - 创建文件拖拽（需要 `DRAG_FILE` 权限）
 - `Drag.createWindowDrag` - 创建窗口拖拽（需要 `DRAG_WINDOW` 权限）
 - `Drag.getProcessDrags` - 获取进程拖拽会话（需要 `DRAG_ELEMENT` 权限）
+- `Geography.getCurrentPosition` - 获取当前位置（需要 `GEOGRAPHY_LOCATION` 权限）
+- `Geography.clearCache` - 清除位置缓存（需要 `GEOGRAPHY_LOCATION` 权限）
+- `Geography.isSupported` - 检查是否支持地理位置（需要 `GEOGRAPHY_LOCATION` 权限）
+- `Geography.getCachedLocation` - 获取缓存的位置（需要 `GEOGRAPHY_LOCATION` 权限）
+- `Crypt.generateKeyPair` - 生成密钥对（需要 `CRYPT_GENERATE_KEY` 权限）
+- `Crypt.importKeyPair` - 导入密钥对（需要 `CRYPT_IMPORT_KEY` 权限）
+- `Crypt.getKeyInfo` - 获取密钥信息（无需权限）
+- `Crypt.listKeys` - 列出所有密钥（无需权限）
+- `Crypt.deleteKey` - 删除密钥（需要 `CRYPT_DELETE_KEY` 权限）
+- `Crypt.setDefaultKey` - 设置默认密钥（需要 `CRYPT_DELETE_KEY` 权限）
+- `Crypt.encrypt` - 加密数据（需要 `CRYPT_ENCRYPT` 权限）
+- `Crypt.decrypt` - 解密数据（需要 `CRYPT_DECRYPT` 权限）
+- `Crypt.md5` - MD5 哈希（需要 `CRYPT_MD5` 权限）
+- `Crypt.randomInt` - 生成随机整数（需要 `CRYPT_RANDOM` 权限）
+- `Crypt.randomFloat` - 生成随机浮点数（需要 `CRYPT_RANDOM` 权限）
+- `Crypt.randomBoolean` - 生成随机布尔值（需要 `CRYPT_RANDOM` 权限）
+- `Crypt.randomString` - 生成随机字符串（需要 `CRYPT_RANDOM` 权限）
+- `Crypt.randomChoice` - 从数组随机选择（需要 `CRYPT_RANDOM` 权限）
+- `Crypt.shuffle` - 打乱数组（需要 `CRYPT_RANDOM` 权限）
 
 **示例**:
 ```javascript

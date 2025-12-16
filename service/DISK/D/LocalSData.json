@@ -10,7 +10,7 @@
         "icon": "D:/application/filemanager/filemanager.svg",
         "description": "文件管理器",
         "position": {
-          "x": 2047.15283203125,
+          "x": 1566,
           "y": 298.15277099609375
         },
         "createdAt": 1765486731837
@@ -41,15 +41,12 @@
       },
       {
         "id": 4,
-        "programName": "zeroide",
-        "name": "ZeroIDE",
-        "icon": "D:/application/zeroide/zeroide.svg",
-        "description": "ZeroIDE",
-        "position": {
-          "x": 489,
-          "y": 753.3916625976562
-        },
-        "createdAt": 1765609500486
+        "programName": "snake",
+        "name": "贪吃蛇",
+        "icon": "D:/application/snake/snake.svg",
+        "description": "贪吃蛇",
+        "position": null,
+        "createdAt": 1765924910097
       }
     ],
     "musicplayer.settings": {
@@ -251,7 +248,7 @@
         "lyrics": null
       }
     },
-    "system.desktopBackground": "local_D__cache_random_anime_bg_1765805484088_jpg",
+    "system.desktopBackground": "local_D__cache_random_anime_bg_1765929423475_jpg",
     "system.localDesktopBackgrounds": [
       {
         "id": "local_C___back2_png",
@@ -294,10 +291,76 @@
         "name": "random_anime_bg_1765805484088.jpg",
         "description": "本地图片: D:/cache/random_anime_bg_1765805484088.jpg",
         "path": "D:/cache/random_anime_bg_1765805484088.jpg"
+      },
+      {
+        "id": "local_D__cache_random_anime_bg_1765910734419_jpg",
+        "name": "random_anime_bg_1765910734419.jpg",
+        "description": "本地图片: D:/cache/random_anime_bg_1765910734419.jpg",
+        "path": "D:/cache/random_anime_bg_1765910734419.jpg"
+      },
+      {
+        "id": "local_D__cache_random_anime_bg_1765910739745_jpg",
+        "name": "random_anime_bg_1765910739745.jpg",
+        "description": "本地图片: D:/cache/random_anime_bg_1765910739745.jpg",
+        "path": "D:/cache/random_anime_bg_1765910739745.jpg"
+      },
+      {
+        "id": "local_D__cache_random_anime_bg_1765913025265_jpg",
+        "name": "random_anime_bg_1765913025265.jpg",
+        "description": "本地图片: D:/cache/random_anime_bg_1765913025265.jpg",
+        "path": "D:/cache/random_anime_bg_1765913025265.jpg"
+      },
+      {
+        "id": "local_D__cache_random_anime_bg_1765929370818_jpg",
+        "name": "random_anime_bg_1765929370818.jpg",
+        "description": "本地图片: D:/cache/random_anime_bg_1765929370818.jpg",
+        "path": "D:/cache/random_anime_bg_1765929370818.jpg"
+      },
+      {
+        "id": "local_D__cache_random_anime_bg_1765929374579_jpg",
+        "name": "random_anime_bg_1765929374579.jpg",
+        "description": "本地图片: D:/cache/random_anime_bg_1765929374579.jpg",
+        "path": "D:/cache/random_anime_bg_1765929374579.jpg"
+      },
+      {
+        "id": "local_D__cache_random_anime_bg_1765929383668_jpg",
+        "name": "random_anime_bg_1765929383668.jpg",
+        "description": "本地图片: D:/cache/random_anime_bg_1765929383668.jpg",
+        "path": "D:/cache/random_anime_bg_1765929383668.jpg"
+      },
+      {
+        "id": "local_D__cache_random_anime_bg_1765929392027_jpg",
+        "name": "random_anime_bg_1765929392027.jpg",
+        "description": "本地图片: D:/cache/random_anime_bg_1765929392027.jpg",
+        "path": "D:/cache/random_anime_bg_1765929392027.jpg"
+      },
+      {
+        "id": "local_D__cache_random_anime_bg_1765929393367_jpg",
+        "name": "random_anime_bg_1765929393367.jpg",
+        "description": "本地图片: D:/cache/random_anime_bg_1765929393367.jpg",
+        "path": "D:/cache/random_anime_bg_1765929393367.jpg"
+      },
+      {
+        "id": "local_D__cache_random_anime_bg_1765929394081_jpg",
+        "name": "random_anime_bg_1765929394081.jpg",
+        "description": "本地图片: D:/cache/random_anime_bg_1765929394081.jpg",
+        "path": "D:/cache/random_anime_bg_1765929394081.jpg"
+      },
+      {
+        "id": "local_D__cache_random_anime_bg_1765929404693_jpg",
+        "name": "random_anime_bg_1765929404693.jpg",
+        "description": "本地图片: D:/cache/random_anime_bg_1765929404693.jpg",
+        "path": "D:/cache/random_anime_bg_1765929404693.jpg"
+      },
+      {
+        "id": "local_D__cache_random_anime_bg_1765929423475_jpg",
+        "name": "random_anime_bg_1765929423475.jpg",
+        "description": "本地图片: D:/cache/random_anime_bg_1765929423475.jpg",
+        "path": "D:/cache/random_anime_bg_1765929423475.jpg"
       }
     ],
     "taskbarPosition": "bottom",
-    "system.animationPreset": "elegant",
+    "system.animationPreset": "smooth",
     "desktop.autoArrange": true,
     "desktop.arrangement": "list",
     "system.theme": "default",
@@ -312,9 +375,15 @@
       }
     ],
     "taskbar.pinnedPrograms": [
-      "terminal"
+      "terminal",
+      "kernelchecker"
     ],
-    "system.randomAnimeBgStatus": "success"
+    "system.randomAnimeBgStatus": "success",
+    "cryptDrive.keys": {
+      "keys": {},
+      "defaultKeyId": null
+    },
+    "snake.highScore": 460
   },
   "programs": {}
 }

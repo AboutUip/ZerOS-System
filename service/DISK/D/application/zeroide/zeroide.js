@@ -8,6 +8,8 @@
     const ZEROIDE = {
         pid: null,
         window: null,
+        themeChangeUnsubscribe: null,
+        styleChangeUnsubscribe: null,
         
         // Ace Editor 实例
         editor: null,
@@ -87,9 +89,10 @@
                         title: 'ZeroIDE',
                         icon: icon,
                         onClose: () => {
-                            if (typeof ProcessManager !== 'undefined') {
-                                ProcessManager.killProgram(this.pid);
-                            }
+                            // onClose 回调只做清理工作，不调用 _closeWindow 或 unregisterWindow
+                            // 窗口关闭由 GUIManager._closeWindow 统一处理
+                            // _closeWindow 会在窗口关闭后检查该 PID 是否还有其他窗口，如果没有，会 kill 进程
+                            // 这样可以确保程序多实例（不同 PID）互不影响
                         },
                         onMaximize: (isMaximized) => {
                             // 监听窗口最大化/还原事件，只在最大化时设置高度
@@ -116,6 +119,9 @@
                 
                 // 创建UI
                 this._createUI();
+                
+                // 设置主题监听器
+                this._setupThemeListeners();
                 
                 // 添加到GUI容器
                 guiContainer.appendChild(this.window);
@@ -153,8 +159,9 @@
             // 不设置 width 和 height，保持之前设置的固定尺寸（1000px x 600px）
             // 不设置 minHeight，保持之前设置的最小高度（400px）
             this.window.style.overflow = 'hidden';
-            this.window.style.background = '#1e1e1e';
-            this.window.style.color = '#cccccc';
+            // 使用 CSS 变量，支持主题切换
+            this.window.style.background = 'var(--theme-background-elevated, #1e1e1e)';
+            this.window.style.color = 'var(--theme-text, #cccccc)';
             this.window.style.position = 'relative';
             
             // 顶部工具栏
@@ -372,18 +379,33 @@
                 user-select: none;
                 position: relative;
             `;
-            button.addEventListener('mouseenter', () => {
-                button.style.background = '#3e3e3e';
-            });
-            button.addEventListener('mouseleave', () => {
-                if (!button.classList.contains('active')) {
-                    button.style.background = 'transparent';
-                }
-            });
-            button.addEventListener('click', (e) => {
-                e.stopPropagation();
-                onClick();
-            });
+            // 使用 EventManager 注册所有事件
+            if (typeof EventManager !== 'undefined' && this.pid) {
+                // mouseenter/mouseleave 不会冒泡，使用 registerElementEvent
+                EventManager.registerElementEvent(this.pid, button, 'mouseenter', () => {
+                    button.style.background = '#3e3e3e';
+                });
+                EventManager.registerElementEvent(this.pid, button, 'mouseleave', () => {
+                    if (!button.classList.contains('active')) {
+                        button.style.background = 'transparent';
+                    }
+                });
+                // click 事件使用 registerEventHandler 并指定 selector
+                const uniqueId = `zeroide-btn-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                button.dataset.eventId = uniqueId;
+                EventManager.registerEventHandler(this.pid, 'click', (e) => {
+                    if (button === e.target || button.contains(e.target)) {
+                        e.stopPropagation();
+                        onClick();
+                    }
+                }, {
+                    priority: 100,
+                    selector: `[data-event-id="${uniqueId}"]`
+                });
+            } else {
+                // 降级方案（不应该到达这里，因为 EventManager 应该总是可用）
+                KernelLogger.warn("ZeroIDE", "EventManager 不可用，使用降级方案");
+            }
             return button;
         },
         
@@ -471,19 +493,29 @@
                         menuItem.style.opacity = '0.5';
                         menuItem.style.cursor = 'not-allowed';
                     } else {
-                        menuItem.addEventListener('mouseenter', () => {
-                            menuItem.style.background = '#37373d';
-                        });
-                        menuItem.addEventListener('mouseleave', () => {
-                            menuItem.style.background = 'transparent';
-                        });
-                        menuItem.addEventListener('click', (e) => {
-                            e.stopPropagation();
-                            if (item.action) {
-                                item.action();
-                            }
-                            this._hideMenu();
-                        });
+                        // 使用 EventManager 注册事件
+                        if (typeof EventManager !== 'undefined' && this.pid) {
+                            EventManager.registerElementEvent(this.pid, menuItem, 'mouseenter', () => {
+                                menuItem.style.background = '#37373d';
+                            });
+                            EventManager.registerElementEvent(this.pid, menuItem, 'mouseleave', () => {
+                                menuItem.style.background = 'transparent';
+                            });
+                            const uniqueId = `zeroide-menu-item-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                            menuItem.dataset.eventId = uniqueId;
+                            EventManager.registerEventHandler(this.pid, 'click', (e) => {
+                                if (menuItem === e.target || menuItem.contains(e.target)) {
+                                    e.stopPropagation();
+                                    if (item.action) {
+                                        item.action();
+                                    }
+                                    this._hideMenu();
+                                }
+                            }, {
+                                priority: 100,
+                                selector: `[data-event-id="${uniqueId}"]`
+                            });
+                        }
                     }
                     
                     menu.appendChild(menuItem);
@@ -505,20 +537,36 @@
             this.window.appendChild(menu);
             this.activeMenu = menu;
             
-            // 点击外部关闭菜单
-            const closeMenu = (e) => {
-                if (!menu.contains(e.target) && !menuButton.contains(e.target)) {
-                    this._hideMenu();
-                    document.removeEventListener('click', closeMenu, true);
-                    document.removeEventListener('mousedown', closeMenu, true);
-                }
-            };
-            
-            // 延迟添加监听器，避免立即触发
-            setTimeout(() => {
-                document.addEventListener('click', closeMenu, true);
-                document.addEventListener('mousedown', closeMenu, true);
-            }, 10);
+            // 点击外部关闭菜单（使用 EventManager）
+            if (typeof EventManager !== 'undefined' && this.pid) {
+                const closeMenu = (e) => {
+                    if (!menu.contains(e.target) && !menuButton.contains(e.target)) {
+                        this._hideMenu();
+                        if (this._menuClickHandlerId) {
+                            EventManager.unregisterEventHandler(this._menuClickHandlerId);
+                            this._menuClickHandlerId = null;
+                        }
+                        if (this._menuMousedownHandlerId) {
+                            EventManager.unregisterEventHandler(this._menuMousedownHandlerId);
+                            this._menuMousedownHandlerId = null;
+                        }
+                    }
+                };
+                
+                // 延迟添加监听器，避免立即触发
+                setTimeout(() => {
+                    this._menuClickHandlerId = EventManager.registerEventHandler(this.pid, 'click', closeMenu, {
+                        priority: 50,
+                        useCapture: true
+                    });
+                    this._menuMousedownHandlerId = EventManager.registerEventHandler(this.pid, 'mousedown', closeMenu, {
+                        priority: 50,
+                        useCapture: true
+                    });
+                }, 10);
+            } else {
+                KernelLogger.error("ZeroIDE", "EventManager 不可用，无法注册菜单关闭事件");
+            }
         },
         
         /**
@@ -858,16 +906,26 @@
                 }
             });
             
-            // 同时监听键盘事件，确保快捷键生效
-            this.editor.container.addEventListener('keydown', (e) => {
-                if ((e.ctrlKey || e.metaKey) && e.key === 's') {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    if (this.activeFile) {
-                        this._saveFile();
+            // 同时监听键盘事件，确保快捷键生效（使用 EventManager）
+            if (typeof EventManager !== 'undefined' && this.pid) {
+                this._editorKeydownHandlerId = EventManager.registerEventHandler(this.pid, 'keydown', (e) => {
+                    // 检查事件是否发生在编辑器容器内
+                    if (this.editor && this.editor.container && (this.editor.container === e.target || this.editor.container.contains(e.target))) {
+                        if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            if (this.activeFile) {
+                                this._saveFile();
+                            }
+                        }
                     }
-                }
-            }, true);
+                }, {
+                    priority: 100,
+                    selector: null // 在处理器内部检查元素
+                });
+            } else {
+                KernelLogger.error("ZeroIDE", "EventManager 不可用，无法注册键盘快捷键");
+            }
             
             // Ctrl+O 打开文件
             this.editor.commands.addCommand({
@@ -1362,18 +1420,28 @@
                 opacity: 0.7;
                 transition: opacity 0.2s, background 0.2s;
             `;
-            btn.addEventListener('mouseenter', () => {
-                btn.style.background = '#3e3e3e';
-                btn.style.opacity = '1';
-            });
-            btn.addEventListener('mouseleave', () => {
-                btn.style.background = 'transparent';
-                btn.style.opacity = '0.7';
-            });
-            btn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                onClick();
-            });
+            // 使用 EventManager 注册事件
+            if (typeof EventManager !== 'undefined' && this.pid) {
+                EventManager.registerElementEvent(this.pid, btn, 'mouseenter', () => {
+                    btn.style.background = '#3e3e3e';
+                    btn.style.opacity = '1';
+                });
+                EventManager.registerElementEvent(this.pid, btn, 'mouseleave', () => {
+                    btn.style.background = 'transparent';
+                    btn.style.opacity = '0.7';
+                });
+                const uniqueId = `zeroide-action-btn-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                btn.dataset.eventId = uniqueId;
+                EventManager.registerEventHandler(this.pid, 'click', (e) => {
+                    if (btn === e.target || btn.contains(e.target)) {
+                        e.stopPropagation();
+                        onClick();
+                    }
+                }, {
+                    priority: 100,
+                    selector: `[data-event-id="${uniqueId}"]`
+                });
+            }
             return btn;
         },
         
@@ -1494,49 +1562,78 @@
             node.appendChild(label);
             node.appendChild(actionsContainer);
             
-            // 事件处理
-            if (item.type === 'directory') {
-                // 单击展开/折叠
-                node.addEventListener('click', (e) => {
-                    if (e.target.closest('.zeroide-tree-actions')) return;
-                    e.stopPropagation();
-                    this._toggleDirectory(node, item.path);
+            // 事件处理（使用 EventManager）
+            if (typeof EventManager !== 'undefined' && this.pid) {
+                const uniqueId = `zeroide-tree-node-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                node.dataset.eventId = uniqueId;
+                
+                if (item.type === 'directory') {
+                    // 单击展开/折叠
+                    EventManager.registerEventHandler(this.pid, 'click', (e) => {
+                        if (node === e.target || node.contains(e.target)) {
+                            if (e.target.closest('.zeroide-tree-actions')) return;
+                            e.stopPropagation();
+                            this._toggleDirectory(node, item.path);
+                        }
+                    }, {
+                        priority: 100,
+                        selector: `[data-event-id="${uniqueId}"]`
+                    });
+                    // 双击进入
+                    EventManager.registerEventHandler(this.pid, 'dblclick', async (e) => {
+                        if (node === e.target || node.contains(e.target)) {
+                            e.stopPropagation();
+                            await this._loadDirectory(item.path);
+                        }
+                    }, {
+                        priority: 100,
+                        selector: `[data-event-id="${uniqueId}"]`
+                    });
+                } else {
+                    // 单击选中，双击打开
+                    EventManager.registerEventHandler(this.pid, 'click', (e) => {
+                        if (node === e.target || node.contains(e.target)) {
+                            if (e.target.closest('.zeroide-tree-actions')) return;
+                            e.stopPropagation();
+                            this._selectFileTreeNode(node);
+                        }
+                    }, {
+                        priority: 100,
+                        selector: `[data-event-id="${uniqueId}"]`
+                    });
+                    EventManager.registerEventHandler(this.pid, 'dblclick', async (e) => {
+                        if (node === e.target || node.contains(e.target)) {
+                            e.stopPropagation();
+                            await this._openFile(item.path);
+                        }
+                    }, {
+                        priority: 100,
+                        selector: `[data-event-id="${uniqueId}"]`
+                    });
+                }
+                
+                // 悬停显示操作按钮
+                EventManager.registerElementEvent(this.pid, node, 'mouseenter', () => {
+                    node.style.background = '#2a2d2e';
+                    actionsContainer.style.display = 'flex';
                 });
-                // 双击进入
-                node.addEventListener('dblclick', async (e) => {
-                    e.stopPropagation();
-                    await this._loadDirectory(item.path);
+                EventManager.registerElementEvent(this.pid, node, 'mouseleave', () => {
+                    node.style.background = 'transparent';
+                    actionsContainer.style.display = 'none';
                 });
-            } else {
-                // 单击选中，双击打开
-                node.addEventListener('click', (e) => {
-                    if (e.target.closest('.zeroide-tree-actions')) return;
-                    e.stopPropagation();
-                    // 选中文件（高亮显示）
-                    this._selectFileTreeNode(node);
-                });
-                node.addEventListener('dblclick', async (e) => {
-                    e.stopPropagation();
-                    await this._openFile(item.path);
+                
+                // 右键菜单
+                EventManager.registerEventHandler(this.pid, 'contextmenu', (e) => {
+                    if (node === e.target || node.contains(e.target)) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        this._showFileTreeContextMenu(e, item);
+                    }
+                }, {
+                    priority: 100,
+                    selector: `[data-event-id="${uniqueId}"]`
                 });
             }
-            
-            // 悬停显示操作按钮
-            node.addEventListener('mouseenter', () => {
-                node.style.background = '#2a2d2e';
-                actionsContainer.style.display = 'flex';
-            });
-            node.addEventListener('mouseleave', () => {
-                node.style.background = 'transparent';
-                actionsContainer.style.display = 'none';
-            });
-            
-            // 右键菜单
-            node.addEventListener('contextmenu', (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                this._showFileTreeContextMenu(e, item);
-            });
             
             return node;
         },
@@ -1564,15 +1661,27 @@
                 font-size: 12px;
                 opacity: 0.8;
             `;
-            btn.addEventListener('mouseenter', () => {
-                btn.style.background = '#3e3e3e';
-                btn.style.opacity = '1';
-            });
-            btn.addEventListener('mouseleave', () => {
-                btn.style.background = 'transparent';
-                btn.style.opacity = '0.8';
-            });
-            btn.addEventListener('click', onClick);
+            // 使用 EventManager 注册事件
+            if (typeof EventManager !== 'undefined' && this.pid) {
+                EventManager.registerElementEvent(this.pid, btn, 'mouseenter', () => {
+                    btn.style.background = '#3e3e3e';
+                    btn.style.opacity = '1';
+                });
+                EventManager.registerElementEvent(this.pid, btn, 'mouseleave', () => {
+                    btn.style.background = 'transparent';
+                    btn.style.opacity = '0.8';
+                });
+                const uniqueId = `zeroide-tree-btn-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                btn.dataset.eventId = uniqueId;
+                EventManager.registerEventHandler(this.pid, 'click', (e) => {
+                    if (btn === e.target || btn.contains(e.target)) {
+                        onClick(e);
+                    }
+                }, {
+                    priority: 100,
+                    selector: `[data-event-id="${uniqueId}"]`
+                });
+            }
             return btn;
         },
         
@@ -1818,17 +1927,32 @@
                 border-radius: 3px;
                 font-size: 16px;
             `;
-            closeBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                this._closeFile(filePath);
-            });
+            // 使用 EventManager 注册事件
+            if (typeof EventManager !== 'undefined' && this.pid) {
+                const closeBtnId = `zeroide-close-btn-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                closeBtn.dataset.eventId = closeBtnId;
+                EventManager.registerEventHandler(this.pid, 'click', (e) => {
+                    if (closeBtn === e.target || closeBtn.contains(e.target)) {
+                        e.stopPropagation();
+                        this._closeFile(filePath);
+                    }
+                }, {
+                    priority: 100,
+                    selector: `[data-event-id="${closeBtnId}"]`
+                });
+                
+                const tabId = `zeroide-tab-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                tab.dataset.eventId = tabId;
+                EventManager.registerEventHandler(this.pid, 'click', () => {
+                    this._switchToFile(filePath);
+                }, {
+                    priority: 100,
+                    selector: `[data-event-id="${tabId}"]`
+                });
+            }
             
             tab.appendChild(label);
             tab.appendChild(closeBtn);
-            
-            tab.addEventListener('click', () => {
-                this._switchToFile(filePath);
-            });
             
             return tab;
         },
@@ -2141,8 +2265,9 @@
         
         _showCommandPalette: function() {
             // TODO: 实现命令面板
-            if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                GUIManager.showAlert('命令面板功能待实现', '提示', 'info');
+            // 命令面板功能待实现，静默处理（不打断用户）
+            if (typeof KernelLogger !== 'undefined') {
+                KernelLogger.debug('ZeroIDE', '命令面板功能待实现');
             }
         },
         
@@ -2155,8 +2280,9 @@
         
         _toggleTerminal: function() {
             // TODO: 实现终端切换
-            if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                GUIManager.showAlert('终端功能待实现', '提示', 'info');
+            // 终端功能待实现，静默处理（不打断用户）
+            if (typeof KernelLogger !== 'undefined') {
+                KernelLogger.debug('ZeroIDE', '终端功能待实现');
             }
         },
         
@@ -2185,8 +2311,9 @@
         
         _showKeybindings: function() {
             // TODO: 实现快捷键设置窗口
-            if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                GUIManager.showAlert('快捷键设置功能待实现', '提示', 'info');
+            // 快捷键设置功能待实现，静默处理（不打断用户）
+            if (typeof KernelLogger !== 'undefined') {
+                KernelLogger.debug('ZeroIDE', '快捷键设置功能待实现');
             }
         },
         
@@ -2258,8 +2385,9 @@
         
         _showShortcuts: function() {
             // TODO: 实现快捷键参考窗口
-            if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                GUIManager.showAlert('快捷键参考功能待实现', '提示', 'info');
+            // 快捷键参考功能待实现，静默处理（不打断用户）
+            if (typeof KernelLogger !== 'undefined') {
+                KernelLogger.debug('ZeroIDE', '快捷键参考功能待实现');
             }
         },
         
@@ -2386,17 +2514,25 @@
                 border-radius: 4px;
                 cursor: pointer;
             `;
-            saveBtn.addEventListener('click', () => {
-                this._saveSettings();
-                // 关闭窗口
-                if (typeof GUIManager !== 'undefined' && this.settingsWindow) {
-                    const windowInfo = GUIManager.getWindowInfo(this.settingsWindow.dataset.windowId);
-                    if (windowInfo) {
-                        // 使用 unregisterWindow 关闭窗口
-                        GUIManager.unregisterWindow(windowInfo.windowId);
+            // 使用 EventManager 注册事件
+            if (typeof EventManager !== 'undefined' && this.pid) {
+                const saveBtnId = `zeroide-save-btn-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                saveBtn.dataset.eventId = saveBtnId;
+                EventManager.registerEventHandler(this.pid, 'click', () => {
+                    this._saveSettings();
+                    // 关闭窗口
+                    if (typeof GUIManager !== 'undefined' && this.settingsWindow) {
+                        const windowInfo = GUIManager.getWindowInfo(this.settingsWindow.dataset.windowId);
+                        if (windowInfo) {
+                            // 使用 unregisterWindow 关闭窗口
+                            GUIManager.unregisterWindow(windowInfo.windowId);
+                        }
                     }
-                }
-            });
+                }, {
+                    priority: 100,
+                    selector: `[data-event-id="${saveBtnId}"]`
+                });
+            }
             
             footer.appendChild(saveBtn);
             
@@ -2477,11 +2613,19 @@
                 select.appendChild(option);
             });
             
-            select.addEventListener('change', () => {
-                this.settings[key] = select.value;
-                // 实时应用设置
-                this._applySettings();
-            });
+            // 使用 EventManager 注册事件
+            if (typeof EventManager !== 'undefined' && this.pid) {
+                const selectId = `zeroide-select-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                select.dataset.eventId = selectId;
+                EventManager.registerEventHandler(this.pid, 'change', () => {
+                    this.settings[key] = select.value;
+                    // 实时应用设置
+                    this._applySettings();
+                }, {
+                    priority: 100,
+                    selector: `[data-event-id="${selectId}"]`
+                });
+            }
             
             container.appendChild(labelEl);
             container.appendChild(select);
@@ -2520,11 +2664,19 @@
                 border-radius: 4px;
             `;
             
-            input.addEventListener('change', () => {
-                this.settings[key] = parseInt(input.value);
-                // 实时应用设置
-                this._applySettings();
-            });
+            // 使用 EventManager 注册事件
+            if (typeof EventManager !== 'undefined' && this.pid) {
+                const inputId = `zeroide-input-number-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                input.dataset.eventId = inputId;
+                EventManager.registerEventHandler(this.pid, 'change', () => {
+                    this.settings[key] = parseInt(input.value);
+                    // 实时应用设置
+                    this._applySettings();
+                }, {
+                    priority: 100,
+                    selector: `[data-event-id="${inputId}"]`
+                });
+            }
             
             container.appendChild(labelEl);
             container.appendChild(input);
@@ -2561,11 +2713,19 @@
                 border-radius: 4px;
             `;
             
-            input.addEventListener('change', () => {
-                this.settings[key] = input.value;
-                // 实时应用设置
-                this._applySettings();
-            });
+            // 使用 EventManager 注册事件
+            if (typeof EventManager !== 'undefined' && this.pid) {
+                const inputId = `zeroide-input-text-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                input.dataset.eventId = inputId;
+                EventManager.registerEventHandler(this.pid, 'change', () => {
+                    this.settings[key] = input.value;
+                    // 实时应用设置
+                    this._applySettings();
+                }, {
+                    priority: 100,
+                    selector: `[data-event-id="${inputId}"]`
+                });
+            }
             
             container.appendChild(labelEl);
             container.appendChild(input);
@@ -2591,11 +2751,19 @@
                 margin-right: 8px;
             `;
             
-            input.addEventListener('change', () => {
-                this.settings[key] = input.checked;
-                // 实时应用设置
-                this._applySettings();
-            });
+            // 使用 EventManager 注册事件
+            if (typeof EventManager !== 'undefined' && this.pid) {
+                const inputId = `zeroide-input-checkbox-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                input.dataset.eventId = inputId;
+                EventManager.registerEventHandler(this.pid, 'change', () => {
+                    this.settings[key] = input.checked;
+                    // 实时应用设置
+                    this._applySettings();
+                }, {
+                    priority: 100,
+                    selector: `[data-event-id="${inputId}"]`
+                });
+            }
             
             const labelEl = document.createElement('label');
             labelEl.textContent = label;
@@ -2643,10 +2811,28 @@
          * 显示错误
          */
         _showError: function(message) {
-            if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                GUIManager.showAlert(message, '错误', 'error');
-            } else {
-                alert(message);
+            // 记录错误日志
+            if (typeof KernelLogger !== 'undefined') {
+                KernelLogger.error('ZeroIDE', message);
+            }
+            // 使用通知提示（不打断用户）
+            if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                try {
+                    NotificationManager.createNotification(this.pid, {
+                        type: 'snapshot',
+                        title: 'ZeroIDE',
+                        content: message,
+                        duration: 4000
+                    }).catch(e => {
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('ZeroIDE', `创建通知失败: ${e.message}`);
+                        }
+                    });
+                } catch (e) {
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.warn('ZeroIDE', `创建通知失败: ${e.message}`);
+                    }
+                }
             }
         },
         
@@ -2660,11 +2846,13 @@
                 version: '1.0.0',
                 description: 'ZeroIDE - 基于 Ace Editor 的完整代码编辑器',
                 author: 'ZerOS Team',
-                copyright: '© 2024',
+                copyright: '© 2025 ZerOS',
                 permissions: typeof PermissionManager !== 'undefined' ? [
                     PermissionManager.PERMISSION.GUI_WINDOW_CREATE,
                     PermissionManager.PERMISSION.KERNEL_DISK_READ,
-                    PermissionManager.PERMISSION.KERNEL_DISK_WRITE
+                    PermissionManager.PERMISSION.KERNEL_DISK_WRITE,
+                    PermissionManager.PERMISSION.SYSTEM_NOTIFICATION,
+                    PermissionManager.PERMISSION.EVENT_LISTENER
                 ] : [],
                 metadata: {
                     allowMultipleInstances: true
@@ -2826,19 +3014,7 @@
          * 删除项目（文件或文件夹）
          */
         _deleteItem: async function(itemPath, itemType) {
-            const itemName = itemPath.split('/').pop();
-            let confirmed = false;
-            const message = `确定要删除 "${itemName}" 吗？${itemType === 'directory' ? '\n（此操作不可撤销）' : ''}`;
-            if (typeof GUIManager !== 'undefined' && typeof GUIManager.showConfirm === 'function') {
-                confirmed = await GUIManager.showConfirm(
-                    message,
-                    '确认删除',
-                    itemType === 'directory' ? 'danger' : 'warning'
-                );
-            } else {
-                confirmed = confirm(message);
-            }
-            if (!confirmed) return;
+            // 直接执行删除，不显示确认弹窗
             
             try {
                 // 规范化路径
@@ -3047,19 +3223,29 @@
                         cursor: pointer;
                     `;
                     
-                    menuItemEl.addEventListener('mouseenter', () => {
-                        menuItemEl.style.background = '#37373d';
-                    });
-                    menuItemEl.addEventListener('mouseleave', () => {
-                        menuItemEl.style.background = 'transparent';
-                    });
-                    menuItemEl.addEventListener('click', (e) => {
-                        e.stopPropagation();
-                        if (menuItem.action) {
-                            menuItem.action();
-                        }
-                        menu.remove();
-                    });
+                    // 使用 EventManager 注册事件
+                    if (typeof EventManager !== 'undefined' && this.pid) {
+                        EventManager.registerElementEvent(this.pid, menuItemEl, 'mouseenter', () => {
+                            menuItemEl.style.background = '#37373d';
+                        });
+                        EventManager.registerElementEvent(this.pid, menuItemEl, 'mouseleave', () => {
+                            menuItemEl.style.background = 'transparent';
+                        });
+                        const uniqueId = `zeroide-context-menu-item-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                        menuItemEl.dataset.eventId = uniqueId;
+                        EventManager.registerEventHandler(this.pid, 'click', (e) => {
+                            if (menuItemEl === e.target || menuItemEl.contains(e.target)) {
+                                e.stopPropagation();
+                                if (menuItem.action) {
+                                    menuItem.action();
+                                }
+                                menu.remove();
+                            }
+                        }, {
+                            priority: 100,
+                            selector: `[data-event-id="${uniqueId}"]`
+                        });
+                    }
                     
                     menu.appendChild(menuItemEl);
                 }
@@ -3072,19 +3258,38 @@
             document.body.appendChild(menu);
             this.activeMenu = menu;
             
-            // 点击外部关闭菜单
-            const closeMenu = (e) => {
-                if (!menu.contains(e.target)) {
-                    menu.remove();
-                    document.removeEventListener('click', closeMenu, true);
-                    document.removeEventListener('mousedown', closeMenu, true);
-                }
-            };
-            
-            setTimeout(() => {
-                document.addEventListener('click', closeMenu, true);
-                document.addEventListener('mousedown', closeMenu, true);
-            }, 10);
+            // 点击外部关闭菜单（使用 EventManager）
+            if (typeof EventManager !== 'undefined' && this.pid) {
+                let clickHandlerId = null;
+                let mousedownHandlerId = null;
+                
+                const closeMenu = (e) => {
+                    if (!menu.contains(e.target)) {
+                        menu.remove();
+                        if (clickHandlerId) {
+                            EventManager.unregisterEventHandler(clickHandlerId);
+                            clickHandlerId = null;
+                        }
+                        if (mousedownHandlerId) {
+                            EventManager.unregisterEventHandler(mousedownHandlerId);
+                            mousedownHandlerId = null;
+                        }
+                    }
+                };
+                
+                setTimeout(() => {
+                    clickHandlerId = EventManager.registerEventHandler(this.pid, 'click', closeMenu, {
+                        priority: 50,
+                        useCapture: true
+                    });
+                    mousedownHandlerId = EventManager.registerEventHandler(this.pid, 'mousedown', closeMenu, {
+                        priority: 50,
+                        useCapture: true
+                    });
+                }, 10);
+            } else {
+                KernelLogger.error("ZeroIDE", "EventManager 不可用，无法注册菜单关闭事件");
+            }
         },
         
         __exit__: function() {
@@ -3118,7 +3323,110 @@
                 this.settingsPanel = null;
             }
             
+            // 清理主题监听器
+            if (this.themeChangeUnsubscribe) {
+                try {
+                    this.themeChangeUnsubscribe();
+                } catch (e) {}
+                this.themeChangeUnsubscribe = null;
+            }
+            if (this.styleChangeUnsubscribe) {
+                try {
+                    this.styleChangeUnsubscribe();
+                } catch (e) {}
+                this.styleChangeUnsubscribe = null;
+            }
+            
             return true;
+        },
+        
+        /**
+         * 设置主题监听器
+         */
+        _setupThemeListeners: function() {
+            if (typeof ProcessManager === 'undefined') {
+                return;
+            }
+            
+            // 监听主题变更
+            try {
+                const themeChangeListener = (themeId, theme) => {
+                    this._updateThemeColors();
+                };
+                this.themeChangeUnsubscribe = ProcessManager.onThemeChange(themeChangeListener, this.pid);
+            } catch (e) {
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.warn('ZeroIDE', '注册主题变更监听器失败', e);
+                }
+            }
+            
+            // 监听风格变更
+            try {
+                const styleChangeListener = (styleId, style) => {
+                    this._updateThemeColors();
+                };
+                this.styleChangeUnsubscribe = ProcessManager.onStyleChange(styleChangeListener, this.pid);
+            } catch (e) {
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.warn('ZeroIDE', '注册风格变更监听器失败', e);
+                }
+            }
+        },
+        
+        /**
+         * 更新主题颜色
+         */
+        _updateThemeColors: function() {
+            if (!this.window) return;
+            
+            // 获取当前主题颜色
+            const root = document.documentElement;
+            const getThemeColor = (varName, defaultValue) => {
+                return getComputedStyle(root).getPropertyValue(varName).trim() || defaultValue;
+            };
+            
+            const bg = getThemeColor('--theme-background-elevated', '#1e1e1e');
+            const bgSecondary = getThemeColor('--theme-background-secondary', '#2d2d2d');
+            const bgTertiary = getThemeColor('--theme-background-tertiary', '#252526');
+            const text = getThemeColor('--theme-text', '#cccccc');
+            const textSecondary = getThemeColor('--theme-text-secondary', '#888');
+            const border = getThemeColor('--theme-border', '#3e3e3e');
+            
+            // 更新窗口背景
+            this.window.style.background = bg;
+            this.window.style.color = text;
+            
+            // 更新工具栏
+            const toolbar = this.window.querySelector('.zeroide-toolbar');
+            if (toolbar) {
+                toolbar.style.background = bgSecondary;
+                toolbar.style.borderBottomColor = border;
+            }
+            
+            // 更新侧边栏
+            if (this.sidebar) {
+                this.sidebar.style.background = bgTertiary;
+                this.sidebar.style.borderRightColor = border;
+            }
+            
+            // 更新所有使用硬编码颜色的元素（通过遍历所有可能的元素）
+            // 注意：这是一个简化的实现，理想情况下应该使用 CSS 变量
+            const updateElementStyle = (selector, property, value) => {
+                const elements = this.window.querySelectorAll(selector);
+                elements.forEach(el => {
+                    if (el.style) {
+                        el.style[property] = value;
+                    }
+                });
+            };
+            
+            // 更新常见的硬编码颜色元素
+            updateElementStyle('.zeroide-sidebar-header', 'background', bgSecondary);
+            updateElementStyle('.zeroide-sidebar-header', 'borderBottomColor', border);
+            updateElementStyle('.zeroide-tabs-container', 'background', bgSecondary);
+            updateElementStyle('.zeroide-tabs-container', 'borderBottomColor', border);
+            updateElementStyle('.zeroide-status-bar', 'background', bgSecondary);
+            updateElementStyle('.zeroide-status-bar', 'borderTopColor', border);
         }
     };
     

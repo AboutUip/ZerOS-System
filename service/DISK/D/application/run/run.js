@@ -46,13 +46,14 @@
                     icon = ApplicationAssetManager.getIcon('run');
                 }
                 
-                GUIManager.registerWindow(pid, this.window, {
+                const windowInfo = GUIManager.registerWindow(pid, this.window, {
                     title: '运行',
                     icon: icon,
                     onClose: () => {
-                        if (typeof ProcessManager !== 'undefined') {
-                            ProcessManager.killProgram(this.pid);
-                        }
+                        // onClose 回调只做清理工作，不调用 _closeWindow 或 unregisterWindow
+                        // 窗口关闭由 GUIManager._closeWindow 统一处理
+                        // _closeWindow 会在窗口关闭后检查该 PID 是否还有其他窗口，如果没有，会 kill 进程
+                        // 这样可以确保程序多实例（不同 PID）互不影响
                     },
                     onMinimize: () => {
                         // 最小化回调
@@ -61,6 +62,10 @@
                         // 最大化回调
                     }
                 });
+                // 保存窗口ID，用于精确清理
+                if (windowInfo && windowInfo.windowId) {
+                    this.windowId = windowInfo.windowId;
+                }
             }
             
             // 创建主内容区域
@@ -152,16 +157,29 @@
                 box-sizing: border-box;
             `;
             
-            // 输入框焦点样式
-            input.addEventListener('focus', () => {
-                input.style.borderColor = 'rgba(108, 142, 255, 0.6)';
-                input.style.background = 'rgba(255, 255, 255, 0.15)';
-            });
-            
-            input.addEventListener('blur', () => {
-                input.style.borderColor = 'rgba(255, 255, 255, 0.2)';
-                input.style.background = 'rgba(255, 255, 255, 0.1)';
-            });
+            // 输入框焦点样式（使用 EventManager）
+            if (typeof EventManager !== 'undefined' && this.pid) {
+                EventManager.registerElementEvent(this.pid, input, 'focus', () => {
+                    input.style.borderColor = 'rgba(108, 142, 255, 0.6)';
+                    input.style.background = 'rgba(255, 255, 255, 0.15)';
+                });
+                
+                EventManager.registerElementEvent(this.pid, input, 'blur', () => {
+                    input.style.borderColor = 'rgba(255, 255, 255, 0.2)';
+                    input.style.background = 'rgba(255, 255, 255, 0.1)';
+                });
+            } else {
+                // 降级方案
+                input.addEventListener('focus', () => {
+                    input.style.borderColor = 'rgba(108, 142, 255, 0.6)';
+                    input.style.background = 'rgba(255, 255, 255, 0.15)';
+                });
+                
+                input.addEventListener('blur', () => {
+                    input.style.borderColor = 'rgba(255, 255, 255, 0.2)';
+                    input.style.background = 'rgba(255, 255, 255, 0.1)';
+                });
+            }
             
             // 保存输入框引用
             this.inputElement = input;
@@ -198,13 +216,18 @@
             this.suggestionsList = suggestionsList;
             suggestionsContainer.appendChild(suggestionsList);
             
-            // 输入框输入事件 - 显示建议
-            input.addEventListener('input', (e) => {
-                this._handleInput(e.target.value);
-            });
-            
-            // 输入框键盘事件 - 导航建议列表（覆盖之前的keydown事件）
-            input.addEventListener('keydown', (e) => {
+            // 输入框输入事件 - 显示建议（使用 EventManager）
+            if (typeof EventManager !== 'undefined' && this.pid) {
+                EventManager.registerElementEvent(this.pid, input, 'input', (e) => {
+                    this._handleInput(e.target.value);
+                });
+                
+                // 输入框键盘事件 - 导航建议列表
+                EventManager.registerEventHandler(this.pid, 'keydown', (e) => {
+                    // 检查事件是否发生在 input 内
+                    if (input !== e.target && !input.contains(e.target)) {
+                        return;
+                    }
                 if (e.key === 'Enter') {
                     e.preventDefault();
                     if (this.selectedIndex >= 0 && this.filteredPrograms.length > 0) {
@@ -238,21 +261,84 @@
                         this._hideSuggestions();
                     }
                 }
-            });
+                }, {
+                    priority: 100,
+                    selector: null
+                });
+            } else {
+                // 降级方案
+                input.addEventListener('input', (e) => {
+                    this._handleInput(e.target.value);
+                });
+                
+                input.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        if (this.selectedIndex >= 0 && this.filteredPrograms.length > 0) {
+                            const selectedProgram = this.filteredPrograms[this.selectedIndex];
+                            input.value = selectedProgram;
+                            this._hideSuggestions();
+                            this._handleRun();
+                        } else {
+                            this._handleRun();
+                        }
+                    } else if (e.key === 'Escape') {
+                        e.preventDefault();
+                        this._hideSuggestions();
+                        this._handleCancel();
+                    } else if (e.key === 'ArrowDown') {
+                        e.preventDefault();
+                        this._navigateSuggestions(1);
+                    } else if (e.key === 'ArrowUp') {
+                        e.preventDefault();
+                        this._navigateSuggestions(-1);
+                    } else if (e.key === 'Tab' && this.filteredPrograms.length > 0) {
+                        e.preventDefault();
+                        if (this.filteredPrograms.length === 1) {
+                            input.value = this.filteredPrograms[0];
+                            this._hideSuggestions();
+                        } else if (this.selectedIndex >= 0) {
+                            input.value = this.filteredPrograms[this.selectedIndex];
+                            this._hideSuggestions();
+                        }
+                    }
+                });
+            }
             
-            // 输入框焦点事件
-            input.addEventListener('focus', () => {
-                if (input.value.trim()) {
-                    this._handleInput(input.value);
-                }
-            });
+            // 输入框焦点事件（使用 EventManager）
+            if (typeof EventManager !== 'undefined' && this.pid) {
+                EventManager.registerElementEvent(this.pid, input, 'focus', () => {
+                    if (input.value.trim()) {
+                        this._handleInput(input.value);
+                    }
+                });
+            } else {
+                // 降级方案
+                input.addEventListener('focus', () => {
+                    if (input.value.trim()) {
+                        this._handleInput(input.value);
+                    }
+                });
+            }
             
-            // 点击外部关闭建议列表
-            document.addEventListener('click', (e) => {
-                if (!this.window.contains(e.target)) {
-                    this._hideSuggestions();
-                }
-            });
+            // 点击外部关闭建议列表（使用 EventManager）
+            if (typeof EventManager !== 'undefined' && this.pid) {
+                EventManager.registerEventHandler(this.pid, 'click', (e) => {
+                    if (!this.window.contains(e.target)) {
+                        this._hideSuggestions();
+                    }
+                }, {
+                    priority: 50,
+                    selector: null
+                });
+            } else {
+                // 降级方案
+                document.addEventListener('click', (e) => {
+                    if (!this.window.contains(e.target)) {
+                        this._hideSuggestions();
+                    }
+                });
+            }
             
             // 按钮容器
             const buttonContainer = document.createElement('div');
@@ -278,16 +364,29 @@
                 transition: all 0.2s;
             `;
             
-            // 按钮悬停效果
-            okButton.addEventListener('mouseenter', () => {
-                okButton.style.background = 'rgba(108, 142, 255, 1)';
-                okButton.style.borderColor = 'rgba(108, 142, 255, 0.8)';
-            });
-            
-            okButton.addEventListener('mouseleave', () => {
-                okButton.style.background = 'rgba(108, 142, 255, 0.8)';
-                okButton.style.borderColor = 'rgba(108, 142, 255, 0.5)';
-            });
+            // 按钮悬停效果（使用 EventManager）
+            if (typeof EventManager !== 'undefined' && this.pid) {
+                EventManager.registerElementEvent(this.pid, okButton, 'mouseenter', () => {
+                    okButton.style.background = 'rgba(108, 142, 255, 1)';
+                    okButton.style.borderColor = 'rgba(108, 142, 255, 0.8)';
+                });
+                
+                EventManager.registerElementEvent(this.pid, okButton, 'mouseleave', () => {
+                    okButton.style.background = 'rgba(108, 142, 255, 0.8)';
+                    okButton.style.borderColor = 'rgba(108, 142, 255, 0.5)';
+                });
+            } else {
+                // 降级方案
+                okButton.addEventListener('mouseenter', () => {
+                    okButton.style.background = 'rgba(108, 142, 255, 1)';
+                    okButton.style.borderColor = 'rgba(108, 142, 255, 0.8)';
+                });
+                
+                okButton.addEventListener('mouseleave', () => {
+                    okButton.style.background = 'rgba(108, 142, 255, 0.8)';
+                    okButton.style.borderColor = 'rgba(108, 142, 255, 0.5)';
+                });
+            }
             
             // 取消按钮
             const cancelButton = document.createElement('button');
@@ -305,26 +404,63 @@
                 transition: all 0.2s;
             `;
             
-            // 取消按钮悬停效果
-            cancelButton.addEventListener('mouseenter', () => {
-                cancelButton.style.background = 'rgba(255, 255, 255, 0.15)';
-                cancelButton.style.borderColor = 'rgba(255, 255, 255, 0.3)';
-            });
+            // 取消按钮悬停效果（使用 EventManager）
+            if (typeof EventManager !== 'undefined' && this.pid) {
+                EventManager.registerElementEvent(this.pid, cancelButton, 'mouseenter', () => {
+                    cancelButton.style.background = 'rgba(255, 255, 255, 0.15)';
+                    cancelButton.style.borderColor = 'rgba(255, 255, 255, 0.3)';
+                });
+                
+                EventManager.registerElementEvent(this.pid, cancelButton, 'mouseleave', () => {
+                    cancelButton.style.background = 'rgba(255, 255, 255, 0.1)';
+                    cancelButton.style.borderColor = 'rgba(255, 255, 255, 0.2)';
+                });
+            } else {
+                // 降级方案
+                cancelButton.addEventListener('mouseenter', () => {
+                    cancelButton.style.background = 'rgba(255, 255, 255, 0.15)';
+                    cancelButton.style.borderColor = 'rgba(255, 255, 255, 0.3)';
+                });
+                
+                cancelButton.addEventListener('mouseleave', () => {
+                    cancelButton.style.background = 'rgba(255, 255, 255, 0.1)';
+                    cancelButton.style.borderColor = 'rgba(255, 255, 255, 0.2)';
+                });
+            }
             
-            cancelButton.addEventListener('mouseleave', () => {
-                cancelButton.style.background = 'rgba(255, 255, 255, 0.1)';
-                cancelButton.style.borderColor = 'rgba(255, 255, 255, 0.2)';
-            });
+            // 确定按钮点击事件（使用 EventManager）
+            if (typeof EventManager !== 'undefined' && this.pid) {
+                const okButtonId = `run-ok-button-${this.pid}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                okButton.dataset.eventId = okButtonId;
+                EventManager.registerEventHandler(this.pid, 'click', () => {
+                    this._handleRun();
+                }, {
+                    priority: 100,
+                    selector: `[data-event-id="${okButtonId}"]`
+                });
+            } else {
+                // 降级方案
+                okButton.addEventListener('click', () => {
+                    this._handleRun();
+                });
+            }
             
-            // 确定按钮点击事件
-            okButton.addEventListener('click', () => {
-                this._handleRun();
-            });
-            
-            // 取消按钮点击事件
-            cancelButton.addEventListener('click', () => {
-                this._handleCancel();
-            });
+            // 取消按钮点击事件（使用 EventManager）
+            if (typeof EventManager !== 'undefined' && this.pid) {
+                const cancelButtonId = `run-cancel-button-${this.pid}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                cancelButton.dataset.eventId = cancelButtonId;
+                EventManager.registerEventHandler(this.pid, 'click', () => {
+                    this._handleCancel();
+                }, {
+                    priority: 100,
+                    selector: `[data-event-id="${cancelButtonId}"]`
+                });
+            } else {
+                // 降级方案
+                cancelButton.addEventListener('click', () => {
+                    this._handleCancel();
+                });
+            }
             
             // 组装
             buttonContainer.appendChild(okButton);
@@ -393,18 +529,37 @@
                     border-bottom: 1px solid rgba(255, 255, 255, 0.05);
                 `;
                 
-                // 悬停效果
-                item.addEventListener('mouseenter', () => {
-                    this.selectedIndex = index;
-                    this._updateSelection();
-                });
-                
-                // 点击选择
-                item.addEventListener('click', () => {
-                    this.inputElement.value = program;
-                    this._hideSuggestions();
-                    this._handleRun();
-                });
+                // 悬停效果（使用 EventManager）
+                if (typeof EventManager !== 'undefined' && this.pid) {
+                    EventManager.registerElementEvent(this.pid, item, 'mouseenter', () => {
+                        this.selectedIndex = index;
+                        this._updateSelection();
+                    });
+                    
+                    // 点击选择
+                    const itemId = `run-suggestion-item-${index}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                    item.dataset.eventId = itemId;
+                    EventManager.registerEventHandler(this.pid, 'click', () => {
+                        this.inputElement.value = program;
+                        this._hideSuggestions();
+                        this._handleRun();
+                    }, {
+                        priority: 100,
+                        selector: `[data-event-id="${itemId}"]`
+                    });
+                } else {
+                    // 降级方案
+                    item.addEventListener('mouseenter', () => {
+                        this.selectedIndex = index;
+                        this._updateSelection();
+                    });
+                    
+                    item.addEventListener('click', () => {
+                        this.inputElement.value = program;
+                        this._hideSuggestions();
+                        this._handleRun();
+                    });
+                }
                 
                 this.suggestionsList.appendChild(item);
             });
@@ -532,6 +687,27 @@
                     messageEl.parentNode.removeChild(messageEl);
                 }
             }, 2000);
+        },
+        
+        /**
+         * 信息方法
+         */
+        __info__: function() {
+            return {
+                name: '运行',
+                type: 'GUI',
+                version: '1.0.0',
+                description: '运行程序 - 快速启动程序对话框',
+                author: 'ZerOS Team',
+                copyright: '© 2025 ZerOS',
+                permissions: typeof PermissionManager !== 'undefined' ? [
+                    PermissionManager.PERMISSION.GUI_WINDOW_CREATE,
+                    PermissionManager.PERMISSION.EVENT_LISTENER
+                ] : [],
+                metadata: {
+                    allowMultipleInstances: true
+                }
+            };
         }
     };
     

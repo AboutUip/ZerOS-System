@@ -42,24 +42,20 @@
                     icon = ApplicationAssetManager.getIcon('themeanimator');
                 }
                 
-                GUIManager.registerWindow(pid, this.window, {
+                const windowInfo = GUIManager.registerWindow(pid, this.window, {
                     title: '主题与动画管理器',
                     icon: icon,
                     onClose: () => {
-                        // 调用 ProcessManager.killProgram 来终止程序
-                        // 这会触发 __exit__ 方法并清理所有资源
-                        if (typeof ProcessManager !== 'undefined' && this.pid) {
-                            ProcessManager.killProgram(this.pid).catch(e => {
-                                if (typeof KernelLogger !== 'undefined') {
-                                    KernelLogger.error('ThemeAnimator', '关闭程序失败', e);
-                                }
-                            });
-                        } else {
-                            // 降级：直接调用 __exit__
-                            this.__exit__();
-                        }
+                        // onClose 回调只做清理工作，不调用 _closeWindow 或 unregisterWindow
+                        // 窗口关闭由 GUIManager._closeWindow 统一处理
+                        // _closeWindow 会在窗口关闭后检查该 PID 是否还有其他窗口，如果没有，会 kill 进程
+                        // 这样可以确保程序多实例（不同 PID）互不影响
                     }
                 });
+                // 保存窗口ID，用于精确清理
+                if (windowInfo && windowInfo.windowId) {
+                    this.windowId = windowInfo.windowId;
+                }
             }
             
             // 创建主内容区域
@@ -131,11 +127,14 @@
                 type: 'GUI',
                 description: '系统主题与动画的调控与管理',
                 version: '1.0.0',
-                author: 'ZerOS',
+                author: 'ZerOS Team',
+                copyright: '© 2025 ZerOS',
                 permissions: typeof PermissionManager !== 'undefined' ? [
                     PermissionManager.PERMISSION.GUI_WINDOW_CREATE,
                     PermissionManager.PERMISSION.THEME_READ,
-                    PermissionManager.PERMISSION.THEME_WRITE
+                    PermissionManager.PERMISSION.THEME_WRITE,
+                    PermissionManager.PERMISSION.SYSTEM_NOTIFICATION,
+                    PermissionManager.PERMISSION.EVENT_LISTENER
                 ] : []
             };
         },
@@ -450,14 +449,31 @@
             // 创建名称元素
             const nameElement = document.createElement('div');
             nameElement.id = 'current-background-name';
-            nameElement.style.cssText = 'font-size: 18px; font-weight: 600; color: rgba(139, 92, 246, 1); margin-bottom: 8px;';
+            nameElement.style.cssText = `
+                font-size: 18px;
+                font-weight: 600;
+                color: rgba(139, 92, 246, 1);
+                margin-bottom: 8px;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+                word-break: break-all;
+            `;
             nameElement.textContent = '加载中...';
             currentBackgroundDisplay.appendChild(nameElement);
             
             // 创建描述元素
             const descElement = document.createElement('div');
             descElement.id = 'current-background-description';
-            descElement.style.cssText = 'font-size: 13px; color: rgba(215, 224, 221, 0.7); margin-bottom: 12px;';
+            descElement.style.cssText = `
+                font-size: 13px;
+                color: rgba(215, 224, 221, 0.7);
+                margin-bottom: 12px;
+                overflow: hidden;
+                word-break: break-all;
+                word-wrap: break-word;
+                line-height: 1.5;
+            `;
             descElement.textContent = '正在加载背景信息...';
             currentBackgroundDisplay.appendChild(descElement);
             
@@ -1399,10 +1415,24 @@
          */
         _openFileSelector: async function() {
             if (typeof ProcessManager === 'undefined') {
-                if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                    await GUIManager.showAlert('ProcessManager 不可用', '错误', 'error');
+                // ProcessManager 不可用，使用通知提示（不打断用户）
+                if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                    try {
+                        await NotificationManager.createNotification(this.pid, {
+                            type: 'snapshot',
+                            title: '主题管理器',
+                            content: 'ProcessManager 不可用',
+                            duration: 3000
+                        });
+                    } catch (e) {
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.error('ThemeAnimator', `ProcessManager 不可用，且创建通知失败: ${e.message}`);
+                        }
+                    }
                 } else {
-                    alert('ProcessManager 不可用');
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.error('ThemeAnimator', 'ProcessManager 不可用');
+                    }
                 }
                 return;
             }
@@ -1421,10 +1451,20 @@
                         const isVideo = videoExtensions.includes(extension);
                         
                         if (!isImage && !isVideo) {
-                            if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                                await GUIManager.showAlert('请选择图片文件（jpg, png, gif, bmp, svg, webp, ico）或视频文件（mp4, webm, ogg）', '提示', 'info');
-                            } else {
-                                alert('请选择图片文件（jpg, png, gif, bmp, svg, webp, ico）或视频文件（mp4, webm, ogg）');
+                            // 文件类型不正确，使用通知提示（不打断用户）
+                            if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                                try {
+                                    await NotificationManager.createNotification(this.pid, {
+                                        type: 'snapshot',
+                                        title: '主题管理器',
+                                        content: '请选择图片文件（jpg, png, gif, bmp, svg, webp, ico）或视频文件（mp4, webm, ogg）',
+                                        duration: 4000
+                                    });
+                                } catch (e) {
+                                    if (typeof KernelLogger !== 'undefined') {
+                                        KernelLogger.warn('ThemeAnimator', `创建通知失败: ${e.message}`);
+                                    }
+                                }
                             }
                             return;
                         }
@@ -1454,53 +1494,121 @@
                                         }
                                     }
                                     
-                                    if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                                        await GUIManager.showAlert(`背景设置成功！${isVideo ? '（视频将静音循环播放）' : ''}`, '成功', 'success');
-                                    } else {
-                                        alert(`背景设置成功！${isVideo ? '（视频将静音循环播放）' : ''}`);
+                                    // 背景设置成功，使用通知提示（不打断用户）
+                                    if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                                        try {
+                                            await NotificationManager.createNotification(this.pid, {
+                                                type: 'snapshot',
+                                                title: '设置成功',
+                                                content: `背景设置成功！${isVideo ? '（视频将静音循环播放）' : ''}`,
+                                                duration: 3000
+                                            });
+                                        } catch (e) {
+                                            if (typeof KernelLogger !== 'undefined') {
+                                                KernelLogger.warn('ThemeAnimator', `创建通知失败: ${e.message}`);
+                                            }
+                                        }
                                     }
                                 } else {
-                                    if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                                        await GUIManager.showAlert(`设置背景失败：${isVideo ? '视频' : '图片'}不存在或无法访问`, '错误', 'error');
-                                    } else {
-                                        alert(`设置背景失败：${isVideo ? '视频' : '图片'}不存在或无法访问`);
+                                    // 设置背景失败，使用通知提示（不打断用户）
+                                    if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                                        try {
+                                            await NotificationManager.createNotification(this.pid, {
+                                                type: 'snapshot',
+                                                title: '设置失败',
+                                                content: `设置背景失败：${isVideo ? '视频' : '图片'}不存在或无法访问`,
+                                                duration: 4000
+                                            });
+                                        } catch (e) {
+                                            if (typeof KernelLogger !== 'undefined') {
+                                                KernelLogger.warn('ThemeAnimator', `创建通知失败: ${e.message}`);
+                                            }
+                                        }
                                     }
                                 }
                             } catch (e) {
                                 if (typeof KernelLogger !== 'undefined') {
                                     KernelLogger.error('ThemeAnimator', '设置本地背景失败', e);
                                 }
-                                if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                                    await GUIManager.showAlert(`设置背景失败: ${e.message}`, '错误', 'error');
-                                } else {
-                                    alert(`设置背景失败: ${e.message}`);
+                                // 设置背景失败，使用通知提示（不打断用户）
+                                if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                                    try {
+                                        await NotificationManager.createNotification(this.pid, {
+                                            type: 'snapshot',
+                                            title: '设置失败',
+                                            content: `设置背景失败: ${e.message}`,
+                                            duration: 4000
+                                        });
+                                    } catch (notifError) {
+                                        if (typeof KernelLogger !== 'undefined') {
+                                            KernelLogger.warn('ThemeAnimator', `创建通知失败: ${notifError.message}`);
+                                        }
+                                    }
                                 }
                             }
                         } else {
-                            if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                                await GUIManager.showAlert('ThemeManager 不可用', '错误', 'error');
+                            // ThemeManager 不可用，使用通知提示（不打断用户）
+                            if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                                try {
+                                    await NotificationManager.createNotification(this.pid, {
+                                        type: 'snapshot',
+                                        title: '主题管理器',
+                                        content: 'ThemeManager 不可用',
+                                        duration: 3000
+                                    });
+                                } catch (e) {
+                                    if (typeof KernelLogger !== 'undefined') {
+                                        KernelLogger.error('ThemeAnimator', `ThemeManager 不可用，且创建通知失败: ${e.message}`);
+                                    }
+                                }
                             } else {
-                                alert('ThemeManager 不可用');
+                                if (typeof KernelLogger !== 'undefined') {
+                                    KernelLogger.error('ThemeAnimator', 'ThemeManager 不可用');
+                                }
                             }
                         }
                     }
                 });
                 
                 if (!fileManagerPid) {
-                    if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                        await GUIManager.showAlert('无法启动文件管理器', '错误', 'error');
+                    // 无法启动文件管理器，使用通知提示（不打断用户）
+                    if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                        try {
+                            await NotificationManager.createNotification(this.pid, {
+                                type: 'snapshot',
+                                title: '主题管理器',
+                                content: '无法启动文件管理器',
+                                duration: 3000
+                            });
+                        } catch (e) {
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.error('ThemeAnimator', `无法启动文件管理器，且创建通知失败: ${e.message}`);
+                            }
+                        }
                     } else {
-                        alert('无法启动文件管理器');
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.error('ThemeAnimator', '无法启动文件管理器');
+                        }
                     }
                 }
             } catch (e) {
                 if (typeof KernelLogger !== 'undefined') {
                     KernelLogger.error('ThemeAnimator', '打开文件选择器失败', e);
                 }
-                if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                    await GUIManager.showAlert(`打开文件选择器失败: ${e.message}`, '错误', 'error');
-                } else {
-                    alert(`打开文件选择器失败: ${e.message}`);
+                // 打开文件选择器失败，使用通知提示（不打断用户）
+                if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                    try {
+                        await NotificationManager.createNotification(this.pid, {
+                            type: 'snapshot',
+                            title: '错误',
+                            content: `打开文件选择器失败: ${e.message}`,
+                            duration: 4000
+                        });
+                    } catch (notifError) {
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('ThemeAnimator', `创建通知失败: ${notifError.message}`);
+                        }
+                    }
                 }
             }
         },
@@ -1724,9 +1832,7 @@
             
             // 防止重复请求
             if (this._loadingRandomAnimeBg) {
-                if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                    await GUIManager.showAlert('正在加载中，请稍候...', '提示', 'info');
-                }
+                // 正在加载中，静默处理（不打断用户）
                 return;
             }
             
@@ -1889,11 +1995,20 @@
                     }
                 }
                 
-                // 显示错误消息
-                if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                    await GUIManager.showAlert(`加载随机二次元背景失败: ${e.message}`, '错误', 'error');
-                } else {
-                    alert(`加载随机二次元背景失败: ${e.message}`);
+                // 显示错误消息，使用通知提示（不打断用户）
+                if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                    try {
+                        await NotificationManager.createNotification(this.pid, {
+                            type: 'snapshot',
+                            title: '加载失败',
+                            content: `加载随机二次元背景失败: ${e.message}`,
+                            duration: 4000
+                        });
+                    } catch (notifError) {
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('ThemeAnimator', `创建通知失败: ${notifError.message}`);
+                        }
+                    }
                 }
             } finally {
                 // 恢复按钮状态
@@ -1925,11 +2040,20 @@
                 }
             }
             
-            // 显示提示消息
-            if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                await GUIManager.showAlert('已取消随机二次元背景功能。刷新时将不再自动请求。', '提示', 'info');
-            } else {
-                alert('已取消随机二次元背景功能。刷新时将不再自动请求。');
+            // 显示提示消息，使用通知提示（不打断用户）
+            if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                try {
+                    await NotificationManager.createNotification(this.pid, {
+                        type: 'snapshot',
+                        title: '主题管理器',
+                        content: '已取消随机二次元背景功能。刷新时将不再自动请求。',
+                        duration: 4000
+                    });
+                } catch (e) {
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.warn('ThemeAnimator', `创建通知失败: ${e.message}`);
+                    }
+                }
             }
         },
         

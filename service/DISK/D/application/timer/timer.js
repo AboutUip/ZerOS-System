@@ -105,15 +105,20 @@
                     icon = ApplicationAssetManager.getIcon('timer');
                 }
                 
-                GUIManager.registerWindow(pid, this.window, {
+                const windowInfo = GUIManager.registerWindow(pid, this.window, {
                     title: '3D Time Compass',
                     icon: icon,
                     onClose: () => {
-                        if (typeof ProcessManager !== 'undefined') {
-                            ProcessManager.killProgram(this.pid);
-                        }
+                        // onClose 回调只做清理工作，不调用 _closeWindow 或 unregisterWindow
+                        // 窗口关闭由 GUIManager._closeWindow 统一处理
+                        // _closeWindow 会在窗口关闭后检查该 PID 是否还有其他窗口，如果没有，会 kill 进程
+                        // 这样可以确保程序多实例（不同 PID）互不影响
                     }
                 });
+                // 保存窗口ID，用于精确清理
+                if (windowInfo && windowInfo.windowId) {
+                    this.windowId = windowInfo.windowId;
+                }
             }
             
             // 创建3D场景（异步）
@@ -808,58 +813,138 @@
             
             const canvas = this.canvas;
             
-            // 鼠标按下
-            canvas.addEventListener('mousedown', (e) => {
-                this.isMouseDown = true;
-                this.mouseX = e.clientX;
-                this.mouseY = e.clientY;
-                canvas.style.cursor = 'grabbing';
-            });
-            
-            // 鼠标移动（旋转）
-            canvas.addEventListener('mousemove', (e) => {
-                if (this.isMouseDown) {
-                    const deltaX = e.clientX - this.mouseX;
-                    const deltaY = e.clientY - this.mouseY;
+            // 使用 EventManager 注册事件
+            if (typeof EventManager !== 'undefined' && this.pid) {
+                // 鼠标按下（绑定到 canvas）
+                EventManager.registerElementEvent(this.pid, canvas, 'mousedown', (e) => {
+                    // 只处理鼠标左键
+                    if (e.button !== 0) return;
                     
-                    // 旋转相机（反转水平方向）
-                    this.cameraRotationY -= deltaX * 0.01;
-                    this.cameraRotationX += deltaY * 0.01;
-                    
-                    // 限制X旋转角度（防止翻转）
-                    this.cameraRotationX = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, this.cameraRotationX));
-                    
-                    this._updateCameraPosition();
-                    
+                    this.isMouseDown = true;
                     this.mouseX = e.clientX;
                     this.mouseY = e.clientY;
-                }
-            });
-            
-            // 鼠标释放
-            canvas.addEventListener('mouseup', () => {
-                this.isMouseDown = false;
-                canvas.style.cursor = 'grab';
-            });
-            
-            // 鼠标离开画布
-            canvas.addEventListener('mouseleave', () => {
-                this.isMouseDown = false;
-                canvas.style.cursor = 'default';
-            });
-            
-            // 鼠标滚轮（缩放）
-            canvas.addEventListener('wheel', (e) => {
-                e.preventDefault();
+                    canvas.style.cursor = 'grabbing';
+                    e.preventDefault();
+                });
                 
-                const delta = e.deltaY > 0 ? 1.1 : 0.9;
-                this.cameraDistance *= delta;
+                // 鼠标移动（旋转）- 使用全局事件，因为需要在鼠标离开 canvas 后也能响应
+                EventManager.registerEventHandler(this.pid, 'mousemove', (e) => {
+                    if (this.isMouseDown) {
+                        const deltaX = e.clientX - this.mouseX;
+                        const deltaY = e.clientY - this.mouseY;
+                        
+                        // 旋转相机（反转水平方向）
+                        this.cameraRotationY -= deltaX * 0.01;
+                        this.cameraRotationX += deltaY * 0.01;
+                        
+                        // 限制X旋转角度（防止翻转）
+                        this.cameraRotationX = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, this.cameraRotationX));
+                        
+                        this._updateCameraPosition();
+                        
+                        this.mouseX = e.clientX;
+                        this.mouseY = e.clientY;
+                    }
+                }, {
+                    priority: 100,
+                    selector: null  // 不使用选择器，让处理程序自己检查 isMouseDown 状态
+                });
                 
-                // 限制缩放范围
-                this.cameraDistance = Math.max(this.minDistance, Math.min(this.maxDistance, this.cameraDistance));
+                // 鼠标释放 - 使用全局事件，因为需要在鼠标离开 canvas 后也能响应
+                EventManager.registerEventHandler(this.pid, 'mouseup', (e) => {
+                    // 只处理鼠标左键
+                    if (e.button !== 0) return;
+                    
+                    if (this.isMouseDown) {
+                        this.isMouseDown = false;
+                        canvas.style.cursor = 'grab';
+                    }
+                }, {
+                    priority: 100,
+                    selector: null  // 不使用选择器，让处理程序自己检查 isMouseDown 状态
+                });
                 
-                this._updateCameraPosition();
-            });
+                // 鼠标离开画布
+                EventManager.registerElementEvent(this.pid, canvas, 'mouseleave', () => {
+                    // 注意：不在这里重置 isMouseDown，因为用户可能还在拖动
+                    // 只有在 mouseup 时才重置
+                    canvas.style.cursor = 'default';
+                });
+                
+                // 鼠标进入画布
+                EventManager.registerElementEvent(this.pid, canvas, 'mouseenter', () => {
+                    if (!this.isMouseDown) {
+                        canvas.style.cursor = 'grab';
+                    }
+                });
+                
+                // 鼠标滚轮（缩放）
+                EventManager.registerElementEvent(this.pid, canvas, 'wheel', (e) => {
+                    e.preventDefault();
+                    
+                    const delta = e.deltaY > 0 ? 1.1 : 0.9;
+                    this.cameraDistance *= delta;
+                    
+                    // 限制缩放范围
+                    this.cameraDistance = Math.max(this.minDistance, Math.min(this.maxDistance, this.cameraDistance));
+                    
+                    this._updateCameraPosition();
+                });
+            } else {
+                // 降级方案
+                // 鼠标按下
+                canvas.addEventListener('mousedown', (e) => {
+                    this.isMouseDown = true;
+                    this.mouseX = e.clientX;
+                    this.mouseY = e.clientY;
+                    canvas.style.cursor = 'grabbing';
+                });
+                
+                // 鼠标移动（旋转）
+                canvas.addEventListener('mousemove', (e) => {
+                    if (this.isMouseDown) {
+                        const deltaX = e.clientX - this.mouseX;
+                        const deltaY = e.clientY - this.mouseY;
+                        
+                        // 旋转相机（反转水平方向）
+                        this.cameraRotationY -= deltaX * 0.01;
+                        this.cameraRotationX += deltaY * 0.01;
+                        
+                        // 限制X旋转角度（防止翻转）
+                        this.cameraRotationX = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, this.cameraRotationX));
+                        
+                        this._updateCameraPosition();
+                        
+                        this.mouseX = e.clientX;
+                        this.mouseY = e.clientY;
+                    }
+                });
+                
+                // 鼠标释放
+                canvas.addEventListener('mouseup', () => {
+                    this.isMouseDown = false;
+                    canvas.style.cursor = 'grab';
+                });
+                
+                // 鼠标离开画布
+                canvas.addEventListener('mouseleave', () => {
+                    this.isMouseDown = false;
+                    canvas.style.cursor = 'default';
+                });
+                
+                // 鼠标滚轮（缩放）
+                canvas.addEventListener('wheel', (e) => {
+                    e.preventDefault();
+                    
+                    const delta = e.deltaY > 0 ? 1.1 : 0.9;
+                    this.cameraDistance *= delta;
+                    
+                    // 限制缩放范围
+                    this.cameraDistance = Math.max(this.minDistance, Math.min(this.maxDistance, this.cameraDistance));
+                    
+                    this._updateCameraPosition();
+                });
+            }
             
             // 设置初始光标样式
             canvas.style.cursor = 'grab';
@@ -908,34 +993,68 @@
          * 退出
          */
         __exit__: async function() {
-            // 停止动画
-            if (this.animationId) {
-                cancelAnimationFrame(this.animationId);
-            }
-            
-            // 清理Three.js资源
-            if (this.scene) {
-                this.scene.traverse((object) => {
-                    if (object.geometry) object.geometry.dispose();
-                    if (object.material) {
-                        if (Array.isArray(object.material)) {
-                            object.material.forEach(material => material.dispose());
-                        } else {
-                            object.material.dispose();
+            try {
+                // 停止动画
+                if (this.animationId) {
+                    cancelAnimationFrame(this.animationId);
+                    this.animationId = null;
+                }
+                
+                // EventManager 会自动清理所有事件监听器，但如果有直接使用 addEventListener 的，需要手动清理
+                // 这里不需要手动清理，因为 EventManager 会自动处理
+                
+                // 清理Three.js资源
+                if (this.scene) {
+                    this.scene.traverse((object) => {
+                        if (object.geometry) object.geometry.dispose();
+                        if (object.material) {
+                            if (Array.isArray(object.material)) {
+                                object.material.forEach(material => material.dispose());
+                            } else {
+                                object.material.dispose();
+                            }
                         }
+                    });
+                    this.scene = null;
+                }
+                
+                if (this.renderer) {
+                    this.renderer.dispose();
+                    this.renderer = null;
+                }
+                
+                // 注销窗口（优先使用 windowId）
+                if (typeof GUIManager !== 'undefined') {
+                    if (this.windowId) {
+                        await GUIManager.unregisterWindow(this.windowId);
+                    } else if (this.pid) {
+                        await GUIManager.unregisterWindow(this.pid);
                     }
-                });
-            }
-            
-            if (this.renderer) {
-                this.renderer.dispose();
-            }
-            
-            // 注销窗口
-            if (typeof GUIManager !== 'undefined') {
-                GUIManager.unregisterWindow(this.pid);
-            } else if (this.window && this.window.parentElement) {
-                this.window.parentElement.removeChild(this.window);
+                } else if (this.window && this.window.parentElement) {
+                    this.window.parentElement.removeChild(this.window);
+                }
+                
+                // 清理所有对象引用
+                this.canvas = null;
+                this.camera = null;
+                this.clock = null;
+                this.compassGroup = null;
+                this.timeTexts = [];
+                this.currentTimeText = null;
+                this.heartParticles = [];
+                this.ribbons = [];
+                this.ambientLight = null;
+                this.pointLights = [];
+                this.fontLoader = null;
+                this.window = null;
+                this.windowId = null;
+                
+            } catch (error) {
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('TIMER', `清理资源失败: ${error.message}`, error);
+                } else {
+                    console.error('清理资源失败:', error);
+                }
             }
         },
         
@@ -948,9 +1067,12 @@
                 type: 'GUI',
                 version: '1.0.0',
                 description: '3D Time Compass - Dynamic 3D time compass with ribbon and vortex effects',
-                author: 'ZerOS',
-                copyright: '© 2024 ZerOS',
-                permissions: [],
+                author: 'ZerOS Team',
+                copyright: '© 2025 ZerOS',
+                permissions: typeof PermissionManager !== 'undefined' ? [
+                    PermissionManager.PERMISSION.GUI_WINDOW_CREATE,
+                    PermissionManager.PERMISSION.EVENT_LISTENER
+                ] : [],
                 metadata: {
                     allowMultipleInstances: false
                 }

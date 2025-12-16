@@ -1036,6 +1036,147 @@ class NodeTreeCollection {
         }
     }
 
+    // 从 PHP 服务重建 NodeTree（递归遍历目录结构）
+    async _rebuildFromPHP(rootPath = null) {
+        try {
+            KernelLogger.info("NodeTree", `开始从 PHP 服务重建 NodeTree: ${this.separateName}`);
+            
+            // 清空现有节点（保留根节点）
+            const rootNode = this.nodes.get(this.separateName);
+            this.nodes.clear();
+            if (rootNode) {
+                this.nodes.set(this.separateName, rootNode);
+            } else {
+                // 如果根节点不存在，创建它
+                const newRootNode = new Node(this.separateName, {
+                    parent: null,
+                    name: this.separateName
+                });
+                this.nodes.set(this.separateName, newRootNode);
+            }
+            
+            // 从根目录开始递归构建
+            const startPath = rootPath || this.separateName;
+            await this._rebuildDirectoryFromPHP(startPath, this.separateName);
+            
+            // 标记为已初始化
+            this.initialized = true;
+            
+            // 更新磁盘使用情况
+            try {
+                if (typeof Disk !== "undefined" && typeof Disk.update === "function") {
+                    Disk.update();
+                }
+            } catch (e) {
+                KernelLogger.warn("NodeTree", `更新磁盘使用情况失败: ${String(e)}`);
+            }
+            
+            KernelLogger.info("NodeTree", `从 PHP 服务重建 NodeTree 完成: ${this.separateName}`);
+        } catch (e) {
+            KernelLogger.error("NodeTree", `从 PHP 服务重建 NodeTree 失败: ${this.separateName}`, e);
+            throw e;
+        }
+    }
+    
+    // 递归从 PHP 服务构建目录结构
+    async _rebuildDirectoryFromPHP(dirPath, parentPath) {
+        try {
+            const phpServiceUrl = "/service/FSDirve.php";
+            const url = new URL(phpServiceUrl, window.location.origin);
+            url.searchParams.set('action', 'list_dir');
+            url.searchParams.set('path', dirPath);
+            
+            const response = await fetch(url.toString(), {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            if (!response.ok) {
+                KernelLogger.warn("NodeTree", `获取目录列表失败: ${dirPath}, HTTP ${response.status}`);
+                return;
+            }
+            
+            const contentType = response.headers.get('content-type');
+            if (!contentType || !contentType.includes('application/json')) {
+                KernelLogger.warn("NodeTree", `PHP 返回了非 JSON 响应: ${dirPath}`);
+                return;
+            }
+            
+            const result = await response.json();
+            if (result.status !== 'success' || !result.data || !result.data.items) {
+                KernelLogger.debug("NodeTree", `目录列表为空或失败: ${dirPath}`);
+                return;
+            }
+            
+            const items = result.data.items || [];
+            
+            // 确保当前目录节点存在
+            let currentNode = this.nodes.get(dirPath);
+            if (!currentNode) {
+                // 创建目录节点
+                const dirName = dirPath === this.separateName ? this.separateName : dirPath.split('/').pop();
+                currentNode = new Node(dirName, {
+                    parent: parentPath,
+                    name: dirName
+                });
+                this.nodes.set(dirPath, currentNode);
+                
+                // 添加到父节点的子节点列表
+                const parentNode = this.nodes.get(parentPath);
+                if (parentNode) {
+                    parentNode.children.set(dirName, currentNode);
+                }
+            }
+            
+            // 处理子目录和文件
+            for (const item of items) {
+                if (item.type === 'directory') {
+                    const childDirPath = dirPath === this.separateName 
+                        ? `${this.separateName}/${item.name}` 
+                        : `${dirPath}/${item.name}`;
+                    // 递归处理子目录
+                    await this._rebuildDirectoryFromPHP(childDirPath, dirPath);
+                } else if (item.type === 'file') {
+                    // 创建文件节点（简化版本，不读取文件内容）
+                    const FileTypeRef = getFileType();
+                    const fileType = FileTypeRef && FileTypeRef.GENRE ? FileTypeRef.GENRE.TEXT : 0;
+                    
+                    let fileObj;
+                    if (typeof FileFormwork !== "undefined") {
+                        fileObj = new FileFormwork(
+                            fileType,
+                            item.name,
+                            '', // 不读取文件内容，只重建结构
+                            dirPath,
+                            null
+                        );
+                        fileObj.fileSize = item.size || 0;
+                    } else {
+                        // 降级：创建简单文件对象
+                        fileObj = {
+                            fileName: item.name,
+                            fileSize: item.size || 0,
+                            fileContent: [],
+                            fileType: fileType,
+                            fileCreatTime: Date.now(),
+                            fileModifyTime: Date.now(),
+                            filePath: dirPath,
+                            fileBelongDisk: this.separateName,
+                            inited: true
+                        };
+                    }
+                    
+                    currentNode.attributes[item.name] = fileObj;
+                }
+            }
+        } catch (e) {
+            KernelLogger.warn("NodeTree", `重建目录失败: ${dirPath}`, e);
+            // 不抛出错误，允许继续处理其他目录
+        }
+    }
+    
     // 是否存在某个节点
     hasNode(path) {
         if (!this.initialized) {
@@ -1160,13 +1301,22 @@ class NodeTreeCollection {
     read_file(path, fileName) {
         if (!this.initialized) {
             KernelLogger.warn("NodeTree", "not initialized read_file");
-            return;
+            return null;
         }
         KernelLogger.debug("NodeTree", `read file ${fileName} at ${path}`);
         const target = this.nodes.get(path);
+        if (!target) {
+            KernelLogger.error("NodeTree", `read_file: 目录节点不存在: ${path}`);
+            return null;
+        }
+        const fileObj = target.attributes[fileName];
+        if (!fileObj) {
+            KernelLogger.error("NodeTree", `read_file: 文件不存在: ${path}/${fileName}`);
+            return null;
+        }
         return target.optFile(
             FileType.FILE_OPS.READ,
-            target.attributes[fileName]
+            fileObj
         );
     }
     // 写入文件（异步，等待 PHP 操作完成）
@@ -1178,7 +1328,15 @@ class NodeTreeCollection {
         }
         KernelLogger.info("NodeTree", `write file ${fileName} at ${path} writeMod=${String(writeMod)}`);
         const target = this.nodes.get(path);
+        if (!target) {
+            KernelLogger.error("NodeTree", `write_file: 目录节点不存在: ${path}`);
+            throw new Error(`目录 ${path} 不存在`);
+        }
         const fileObj = target.attributes[fileName];
+        if (!fileObj) {
+            KernelLogger.error("NodeTree", `write_file: 文件不存在: ${path}/${fileName}`);
+            throw new Error(`文件 ${path}/${fileName} 不存在，请先创建文件`);
+        }
         
         // 将写模式透传到 Node.optFile -> FileFormwork.writeFile
         target.optFile(
@@ -1285,7 +1443,12 @@ class NodeTreeCollection {
             return;
         }
         KernelLogger.info("NodeTree", `create file ${fileObj.fileName} at ${path} calling optFile`);
-        this.nodes.get(path).optFile(FileType.FILE_OPS.CREATE, fileObj);
+        const targetNode = this.nodes.get(path);
+        if (!targetNode) {
+            KernelLogger.error("NodeTree", `create_file: 目录节点不存在: ${path}`);
+            throw new Error(`目录 ${path} 不存在`);
+        }
+        targetNode.optFile(FileType.FILE_OPS.CREATE, fileObj);
         KernelLogger.info("NodeTree", `created file ${fileObj.fileName} at ${path}`);
         
         // 获取文件内容（用于 PHP 创建）
@@ -1993,7 +2156,16 @@ class NodeTreeCollection {
             return;
         }
         KernelLogger.debug("NodeTree", `optNode ${path}`);
-        const endCall = this.nodes.get(path).optChild(type, node);
+        const parentNode = this.nodes.get(path);
+        if (!parentNode) {
+            KernelLogger.warn("NodeTree", `optNode: 父节点不存在: ${path}`);
+            return;
+        }
+        const endCall = parentNode.optChild(type, node);
+        if (!endCall) {
+            KernelLogger.warn("NodeTree", `optNode: optChild 返回 null，操作失败`);
+            return;
+        }
         switch (endCall.operation) {
             case FileType.DIR_OPS.CREATE:
                 this.nodes.set(node.path(), node);

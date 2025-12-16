@@ -160,10 +160,32 @@ if (result.criticalErrors > 0) {
    - NotificationManager
    - DesktopManager
 
-6. **其他模块检查**
+6. **GUI 管理模块检查**
+   - GUIManager
+   - TaskbarManager
+   - ThemeManager
+   - NotificationManager
+   - DesktopManager
+   - ContextMenuManager
+   - EventManager
+   - PermissionManager
+
+7. **驱动层检查**
    - LStorage
-   - AnimateManager
    - NetworkManager
+   - DynamicManager
+   - MultithreadingDrive
+   - DragDrive
+   - GeographyDrive
+   - CryptDrive（加密驱动）
+     - RSA 加密/解密功能
+     - MD5 哈希功能
+     - 随机数生成功能
+     - 密钥管理功能
+
+8. **系统信息检查**
+   - SystemInformation
+   - 浏览器环境（localStorage、document.body、window）
 
 ## 使用示例
 

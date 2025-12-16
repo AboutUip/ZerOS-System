@@ -110,11 +110,31 @@
 }
 
 .current-theme-display,
-.current-style-display {
+.current-style-display,
+.current-background-display {
     padding: 16px;
     background: rgba(139, 92, 246, 0.1);
     border-radius: 8px;
     border: 1px solid rgba(139, 92, 246, 0.3);
+    overflow: hidden;
+    word-wrap: break-word;
+    box-sizing: border-box;
+}
+
+.current-background-display #current-background-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    word-break: break-all;
+    max-width: 100%;
+}
+
+.current-background-display #current-background-description {
+    overflow: hidden;
+    word-break: break-all;
+    word-wrap: break-word;
+    line-height: 1.5;
+    max-width: 100%;
 }
 
 /* 滚动条样式 */

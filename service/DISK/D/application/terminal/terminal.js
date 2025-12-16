@@ -278,36 +278,65 @@
                 bashWindow.style.zIndex = 1000 + instanceIndex;
                 }
                 
-                // 为窗口添加点击事件，激活终端实例
+                // 为窗口添加点击事件，激活终端实例（使用 EventManager）
                 // 注意：窗口焦点管理由GUIManager统一处理，这里只处理终端实例的激活
-                bashWindow.addEventListener('mousedown', (e) => {
-                    // 如果点击的是窗口本身或窗口内的元素（但不是其他窗口的元素）
-                    if (e.target.closest('.bash-window') === bashWindow) {
-                        // 找到该窗口对应的TabManager实例并激活输入框
-                        // 通过pid找到对应的实例
-                        if (this.pid) {
-                            // 尝试从TERMINAL._instances找到对应的实例
-                            if (typeof TERMINAL !== 'undefined' && TERMINAL._instances && TERMINAL._instances.has(this.pid)) {
-                                const instance = TERMINAL._instances.get(this.pid);
-                                if (instance && instance.tabManager) {
-                                    const activeTerminal = instance.tabManager.getActiveTerminal();
-                                    if (activeTerminal) {
-                                        // 确保终端实例是激活状态
-                                        if (!activeTerminal.isActive) {
-                                            activeTerminal._setActive(true);
-                                        }
-                                        // 延迟一下，确保窗口已经获得焦点状态和DOM更新完成
-                                        setTimeout(() => {
-                                            if (activeTerminal.isActive && !activeTerminal.busy) {
-                                                activeTerminal.focus();
+                if (typeof EventManager !== 'undefined' && this.pid) {
+                    const bashWindowId = `terminal-bash-window-${this.pid}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                    bashWindow.dataset.eventId = bashWindowId;
+                    EventManager.registerEventHandler(this.pid, 'mousedown', (e) => {
+                        // 如果点击的是窗口本身或窗口内的元素（但不是其他窗口的元素）
+                        if (bashWindow === e.target || bashWindow.contains(e.target)) {
+                            if (e.target.closest('.bash-window') === bashWindow) {
+                                // 找到该窗口对应的TabManager实例并激活输入框
+                                if (this.pid) {
+                                    if (typeof TERMINAL !== 'undefined' && TERMINAL._instances && TERMINAL._instances.has(this.pid)) {
+                                        const instance = TERMINAL._instances.get(this.pid);
+                                        if (instance && instance.tabManager) {
+                                            const activeTerminal = instance.tabManager.getActiveTerminal();
+                                            if (activeTerminal) {
+                                                if (!activeTerminal.isActive) {
+                                                    activeTerminal._setActive(true);
+                                                }
+                                                setTimeout(() => {
+                                                    if (activeTerminal.isActive && !activeTerminal.busy) {
+                                                        activeTerminal.focus();
+                                                    }
+                                                }, 50);
                                             }
-                                        }, 50);
+                                        }
                                     }
                                 }
                             }
                         }
-                    }
-                });
+                    }, {
+                        priority: 100,
+                        selector: `[data-event-id="${bashWindowId}"]`
+                    });
+                } else {
+                    // 降级方案
+                    bashWindow.addEventListener('mousedown', (e) => {
+                        if (e.target.closest('.bash-window') === bashWindow) {
+                            if (this.pid) {
+                                if (typeof TERMINAL !== 'undefined' && TERMINAL._instances && TERMINAL._instances.has(this.pid)) {
+                                    const instance = TERMINAL._instances.get(this.pid);
+                                    if (instance && instance.tabManager) {
+                                        const activeTerminal = instance.tabManager.getActiveTerminal();
+                                        if (activeTerminal) {
+                                            if (!activeTerminal.isActive) {
+                                                activeTerminal._setActive(true);
+                                            }
+                                            setTimeout(() => {
+                                                if (activeTerminal.isActive && !activeTerminal.busy) {
+                                                    activeTerminal.focus();
+                                                }
+                                            }, 50);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    });
+                }
                 
                 terminalContainer.appendChild(bashWindow);
             }
@@ -359,21 +388,45 @@
                         windowTitle = initArgs.cliProgramName;
                     }
                     
-                    GUIManager.registerWindow(this.pid, bashWindow, {
+                    const windowInfo = GUIManager.registerWindow(this.pid, bashWindow, {
                         title: windowTitle,
                         icon: icon,
                         onClose: () => {
+                            // 终端特殊处理：如果是 CLI 程序专用终端，需要同时关闭关联的 CLI 程序
+                            // 注意：ProcessManager.killProgram 中已经有处理逻辑，但为了确保在窗口关闭时立即关闭 CLI 程序，
+                            // 我们在这里提前处理，避免窗口关闭动画期间 CLI 程序仍在运行
                             const pool = safeGetPool();
                             if (pool && typeof pool.__GET__ === 'function') {
                                 try {
                                     const ProcessManager = pool.__GET__("KERNEL_GLOBAL_POOL", "ProcessManager");
-                                    if (ProcessManager && typeof ProcessManager.killProgram === 'function' && this.pid) {
-                                        ProcessManager.killProgram(this.pid);
+                                    if (ProcessManager && this.pid) {
+                                        const processInfo = ProcessManager.PROCESS_TABLE.get(this.pid);
+                                        // 检查是否是 CLI 程序专用终端
+                                        if (processInfo && processInfo.isCLITerminal) {
+                                            // 查找关联的 CLI 程序
+                                            let cliProgramPid = null;
+                                            for (const [p, info] of ProcessManager.PROCESS_TABLE) {
+                                                if (info.terminalPid === this.pid && info.isCLI && info.status === 'running') {
+                                                    cliProgramPid = p;
+                                                    break;
+                                                }
+                                            }
+                                            // 先关闭关联的 CLI 程序（异步，不阻塞窗口关闭）
+                                            if (cliProgramPid) {
+                                                ProcessManager.killProgram(cliProgramPid, false).catch(e => {
+                                                    console.error('关闭关联 CLI 程序失败:', e);
+                                                });
+                                            }
+                                        }
                                     }
                                 } catch (e) {
-                                    console.error('Failed to close terminal:', e);
+                                    console.error('获取 ProcessManager 失败:', e);
                                 }
                             }
+                            // onClose 回调只做清理工作，不调用 _closeWindow 或 unregisterWindow
+                            // 窗口关闭由 GUIManager._closeWindow 统一处理
+                            // _closeWindow 会在窗口关闭后检查该 PID 是否还有其他窗口，如果没有，会 kill 进程
+                            // 这样可以确保程序多实例（不同 PID）互不影响
                         },
                         onMinimize: () => {
                             // 最小化回调
@@ -388,6 +441,10 @@
                             }
                         }
                     });
+                    // 保存窗口ID，用于精确清理
+                    if (windowInfo && windowInfo.windowId) {
+                        this.windowId = windowInfo.windowId;
+                    }
                 } else {
                     // 降级方案：手动创建标题栏（保持原有逻辑）
                     const bar = document.createElement('div');
@@ -412,19 +469,42 @@
                     if (this.pid && closeDot.dataset) {
                         closeDot.dataset.pid = this.pid.toString();
                     }
-                    closeDot.addEventListener('click', () => {
-                        const pool = safeGetPool();
-                        if (pool && typeof pool.__GET__ === 'function') {
-                            try {
-                                const ProcessManager = pool.__GET__("KERNEL_GLOBAL_POOL", "ProcessManager");
-                                if (ProcessManager && typeof ProcessManager.killProgram === 'function' && this.pid) {
-                                    ProcessManager.killProgram(this.pid);
+                    // 使用 EventManager 注册事件
+                    if (typeof EventManager !== 'undefined' && this.pid) {
+                        const closeDotId = `terminal-close-dot-${this.pid}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                        closeDot.dataset.eventId = closeDotId;
+                        EventManager.registerEventHandler(this.pid, 'click', () => {
+                            const pool = safeGetPool();
+                            if (pool && typeof pool.__GET__ === 'function') {
+                                try {
+                                    const ProcessManager = pool.__GET__("KERNEL_GLOBAL_POOL", "ProcessManager");
+                                    if (ProcessManager && typeof ProcessManager.killProgram === 'function' && this.pid) {
+                                        ProcessManager.killProgram(this.pid);
+                                    }
+                                } catch (e) {
+                                    console.error('Failed to close terminal:', e);
                                 }
-                            } catch (e) {
-                                console.error('Failed to close terminal:', e);
                             }
-                        }
-                    });
+                        }, {
+                            priority: 100,
+                            selector: `[data-event-id="${closeDotId}"]`
+                        });
+                    } else {
+                        // 降级方案
+                        closeDot.addEventListener('click', () => {
+                            const pool = safeGetPool();
+                            if (pool && typeof pool.__GET__ === 'function') {
+                                try {
+                                    const ProcessManager = pool.__GET__("KERNEL_GLOBAL_POOL", "ProcessManager");
+                                    if (ProcessManager && typeof ProcessManager.killProgram === 'function' && this.pid) {
+                                        ProcessManager.killProgram(this.pid);
+                                    }
+                                } catch (e) {
+                                    console.error('Failed to close terminal:', e);
+                                }
+                            }
+                        });
+                    }
                     
                     const minDot = document.createElement('span');
                     minDot.className = `dot minimize ${this.classPrefix}-dot ${this.classPrefix}-dot-minimize`;
@@ -435,13 +515,17 @@
                     if (this.pid && minDot.dataset) {
                         minDot.dataset.pid = this.pid.toString();
                     }
-                    minDot.addEventListener('click', () => {
-                        let GUIManager = null;
-                        try {
-                            const pool = safeGetPool();
-                            if (pool && typeof pool.__GET__ === 'function') {
-                                GUIManager = pool.__GET__("KERNEL_GLOBAL_POOL", "GUIManager");
-                            }
+                    // 使用 EventManager 注册事件
+                    if (typeof EventManager !== 'undefined' && this.pid) {
+                        const minDotId = `terminal-min-dot-${this.pid}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                        minDot.dataset.eventId = minDotId;
+                        EventManager.registerEventHandler(this.pid, 'click', () => {
+                            let GUIManager = null;
+                            try {
+                                const pool = safeGetPool();
+                                if (pool && typeof pool.__GET__ === 'function') {
+                                    GUIManager = pool.__GET__("KERNEL_GLOBAL_POOL", "GUIManager");
+                                }
                         } catch (e) {
                             // 忽略错误
                         }
@@ -456,7 +540,35 @@
                         } else if (bashWindow) {
                             bashWindow.style.display = 'none';
                         }
+                    }, {
+                        priority: 100,
+                        selector: `[data-event-id="${minDotId}"]`
                     });
+                    } else {
+                        // 降级方案
+                        minDot.addEventListener('click', () => {
+                            let GUIManager = null;
+                            try {
+                                const pool = safeGetPool();
+                                if (pool && typeof pool.__GET__ === 'function') {
+                                    GUIManager = pool.__GET__("KERNEL_GLOBAL_POOL", "GUIManager");
+                                }
+                            } catch (e) {
+                                // 忽略错误
+                            }
+                            if (!GUIManager && typeof window !== 'undefined' && window.GUIManager) {
+                                GUIManager = window.GUIManager;
+                            } else if (!GUIManager && typeof globalThis !== 'undefined' && globalThis.GUIManager) {
+                                GUIManager = globalThis.GUIManager;
+                            }
+                            
+                            if (bashWindow && GUIManager && typeof GUIManager.minimizeWindow === 'function' && this.pid) {
+                                GUIManager.minimizeWindow(this.pid);
+                            } else if (bashWindow) {
+                                bashWindow.style.display = 'none';
+                            }
+                        });
+                    }
                     
                     const maxDot = document.createElement('span');
                     maxDot.className = `dot maximize ${this.classPrefix}-dot ${this.classPrefix}-dot-maximize`;
@@ -467,7 +579,11 @@
                     if (this.pid && maxDot.dataset) {
                         maxDot.dataset.pid = this.pid.toString();
                     }
-                    maxDot.addEventListener('click', () => {
+                    // 使用 EventManager 注册事件
+                    if (typeof EventManager !== 'undefined' && this.pid) {
+                        const maxDotId = `terminal-max-dot-${this.pid}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                        maxDot.dataset.eventId = maxDotId;
+                        EventManager.registerEventHandler(this.pid, 'click', () => {
                         if (!bashWindow) return;
                         
                         let GUIManager = null;
@@ -550,23 +666,23 @@
                     controls.appendChild(minDot);
                     controls.appendChild(maxDot);
                 
-                // 存储窗口管理状态
-                bashWindow._windowState = {
-                    isFullscreen: false,
-                    savedStyle: null,
-                    isDragging: false,
-                    dragStartX: 0,
-                    dragStartY: 0,
-                    dragStartLeft: 0,
-                    dragStartTop: 0,
-                    isResizing: false,
-                    resizeStartX: 0,
-                    resizeStartY: 0,
-                    resizeStartWidth: 0,
-                    resizeStartHeight: 0,
-                    resizeStartTop: 0,
-                    resizeAnchor: null  // 'bottom-right' 或 'top-right'
-                };
+                    // 存储窗口管理状态
+                    bashWindow._windowState = {
+                        isFullscreen: false,
+                        savedStyle: null,
+                        isDragging: false,
+                        dragStartX: 0,
+                        dragStartY: 0,
+                        dragStartLeft: 0,
+                        dragStartTop: 0,
+                        isResizing: false,
+                        resizeStartX: 0,
+                        resizeStartY: 0,
+                        resizeStartWidth: 0,
+                        resizeStartHeight: 0,
+                        resizeStartTop: 0,
+                        resizeAnchor: null  // 'bottom-right' 或 'top-right'
+                    };
                     // 降级方案：手动创建标题栏和拖拽功能
                     bar.style.cursor = 'move';
                     
@@ -678,73 +794,92 @@
                                 const rect = bashWindow.getBoundingClientRect();
                                 state.dragStartLeft = rect.left;
                                 state.dragStartTop = rect.top;
+                                
+                                bashWindow.style.position = 'fixed';
+                                bashWindow.style.transform = 'none';
+                                bashWindow.style.left = state.dragStartLeft + 'px';
+                                bashWindow.style.top = state.dragStartTop + 'px';
+                                bashWindow.classList.add('floating');
+                                
+                                e.preventDefault();
+                            }
+                        });
+                        
+                        // 降级方案：处理拖动和拉伸的 mousemove 和 mouseup
+                        const handleMousemove = (e) => {
+                            const state = bashWindow._windowState;
+                            if (state.isFullscreen) {
+                                if (state.isDragging) {
+                                    state.isDragging = false;
+                                }
+                                if (state.isResizing) {
+                                    state.isResizing = false;
+                                }
+                                return;
+                            }
                             
-                            bashWindow.style.position = 'fixed';
-                            bashWindow.style.transform = 'none';
-                            bashWindow.style.left = state.dragStartLeft + 'px';
-                            bashWindow.style.top = state.dragStartTop + 'px';
-                            bashWindow.classList.add('floating');
-                            
-                            e.preventDefault();
-                        }
-                    });
-                    
-                    // 降级方案：处理拖动和拉伸的 mousemove 和 mouseup
-                    const handleMousemove = (e) => {
-                        const state = bashWindow._windowState;
-                        if (state.isFullscreen) {
                             if (state.isDragging) {
-                                state.isDragging = false;
+                                const deltaX = e.clientX - state.dragStartX;
+                                const deltaY = e.clientY - state.dragStartY;
+                                bashWindow.style.left = (state.dragStartLeft + deltaX) + 'px';
+                                bashWindow.style.top = (state.dragStartTop + deltaY) + 'px';
                             }
-                            if (state.isResizing) {
-                                state.isResizing = false;
-                            }
-                            return;
-                        }
-                        
-                        if (state.isDragging) {
-                            const deltaX = e.clientX - state.dragStartX;
-                            const deltaY = e.clientY - state.dragStartY;
-                            bashWindow.style.left = (state.dragStartLeft + deltaX) + 'px';
-                            bashWindow.style.top = (state.dragStartTop + deltaY) + 'px';
-                        }
-                        
-                        if (state.isResizing) {
-                            const deltaX = e.clientX - state.resizeStartX;
-                            const deltaY = e.clientY - state.resizeStartY;
-                            const newWidth = Math.max(480, state.resizeStartWidth + deltaX);
                             
-                            if (state.resizeAnchor === 'top-right') {
-                                const newHeight = Math.max(320, state.resizeStartHeight - deltaY);
-                                const newTop = state.resizeStartTop + (state.resizeStartHeight - newHeight);
-                                bashWindow.style.width = newWidth + 'px';
-                                bashWindow.style.height = newHeight + 'px';
-                                bashWindow.style.top = newTop + 'px';
-                            } else {
-                                const newHeight = Math.max(320, state.resizeStartHeight + deltaY);
-                                bashWindow.style.width = newWidth + 'px';
-                                bashWindow.style.height = newHeight + 'px';
+                            if (state.isResizing) {
+                                const deltaX = e.clientX - state.resizeStartX;
+                                const deltaY = e.clientY - state.resizeStartY;
+                                const newWidth = Math.max(480, state.resizeStartWidth + deltaX);
+                                
+                                if (state.resizeAnchor === 'top-right') {
+                                    const newHeight = Math.max(320, state.resizeStartHeight - deltaY);
+                                    const newTop = state.resizeStartTop + (state.resizeStartHeight - newHeight);
+                                    bashWindow.style.width = newWidth + 'px';
+                                    bashWindow.style.height = newHeight + 'px';
+                                    bashWindow.style.top = newTop + 'px';
+                                } else {
+                                    const newHeight = Math.max(320, state.resizeStartHeight + deltaY);
+                                    bashWindow.style.width = newWidth + 'px';
+                                    bashWindow.style.height = newHeight + 'px';
+                                }
                             }
+                        };
+                        
+                        const handleMouseup = () => {
+                            const state = bashWindow._windowState;
+                            state.isDragging = false;
+                            state.isResizing = false;
+                        };
+                        
+                        // 使用 EventManager 注册临时拖动事件
+                        if (typeof EventManager !== 'undefined' && this.pid) {
+                            const mousemoveHandlerId = EventManager.registerEventHandler(this.pid, 'mousemove', handleMousemove, {
+                                priority: 50,
+                                once: false
+                            });
+                            
+                            const mouseupHandlerId = EventManager.registerEventHandler(this.pid, 'mouseup', handleMouseup, {
+                                priority: 50,
+                                once: true
+                            });
+                            
+                            // 存储事件处理器ID，以便后续清理
+                            if (!bashWindow._dragEventHandlers) {
+                                bashWindow._dragEventHandlers = [];
+                            }
+                            bashWindow._dragEventHandlers.push(mousemoveHandlerId, mouseupHandlerId);
+                        } else {
+                            // 降级：直接使用 addEventListener（不推荐）
+                            document.addEventListener('mousemove', handleMousemove);
+                            document.addEventListener('mouseup', handleMouseup);
+                            bashWindow._fallbackMousemove = handleMousemove;
+                            bashWindow._fallbackMouseup = handleMouseup;
                         }
-                    };
+                    }
                     
-                    const handleMouseup = () => {
-                        const state = bashWindow._windowState;
-                        state.isDragging = false;
-                        state.isResizing = false;
-                    };
-                    
-                    document.addEventListener('mousemove', handleMousemove);
-                    document.addEventListener('mouseup', handleMouseup);
-                    
-                    // 存储事件处理器，以便后续清理
-                    bashWindow._fallbackMousemove = handleMousemove;
-                    bashWindow._fallbackMouseup = handleMouseup;
-                
-                // 拉伸功能：在窗口右下角和右上角添加resizer
-                // 右下角resizer（右下角拉伸）
-                let resizer = bashWindow.querySelector(`.window-resizer.bottom-right[data-pid="${this.pid}"]`);
-                if (!resizer) {
+                    // 拉伸功能：在窗口右下角和右上角添加resizer
+                    // 右下角resizer（右下角拉伸）
+                    let resizer = bashWindow.querySelector(`.window-resizer.bottom-right[data-pid="${this.pid}"]`);
+                    if (!resizer) {
                     resizer = document.createElement('div');
                     resizer.className = `window-resizer bottom-right ${this.classPrefix}-resizer ${this.classPrefix}-resizer-bottom-right`;
                     resizer.style.cssText = `
@@ -1048,7 +1183,7 @@
                 if (titleBar && titleBar.nextSibling) {
                     bashWindow.insertBefore(this.tabsContainer, titleBar.nextSibling);
                 } else if (titleBar) {
-                bashWindow.appendChild(this.tabsContainer);
+                    bashWindow.appendChild(this.tabsContainer);
                 } else {
                     // 如果没有标题栏，添加到开头
                     bashWindow.insertBefore(this.tabsContainer, bashWindow.firstChild);
@@ -1111,8 +1246,20 @@
                     this.tabAddBtn.style.display = 'none';
                 }
             } else {
-                // 绑定添加标签页按钮
-                this.tabAddBtn.addEventListener('click', () => this.createTab());
+                // 绑定添加标签页按钮（使用 EventManager）
+                if (typeof EventManager !== 'undefined' && this.pid) {
+                    const tabAddBtnId = `terminal-tab-add-btn-${this.pid}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                    this.tabAddBtn.dataset.eventId = tabAddBtnId;
+                    EventManager.registerEventHandler(this.pid, 'click', () => {
+                        this.createTab();
+                    }, {
+                        priority: 100,
+                        selector: `[data-event-id="${tabAddBtnId}"]`
+                    });
+                } else {
+                    // 降级方案
+                    this.tabAddBtn.addEventListener('click', () => this.createTab());
+                }
             }
             
             // 创建第一个标签页（即使禁用标签页，也需要一个终端实例）
@@ -1149,14 +1296,39 @@
             tabCloseEl.textContent = '×';
             tabCloseEl.title = '关闭标签页';
             markElement(tabCloseEl);
-            tabCloseEl.addEventListener('click', (e) => {
-                e.stopPropagation();
-                this.closeTab(tabId);
-            });
+            // 使用 EventManager 注册事件
+            if (typeof EventManager !== 'undefined' && this.pid) {
+                const tabCloseElId = `terminal-tab-close-${tabId}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                tabCloseEl.dataset.eventId = tabCloseElId;
+                EventManager.registerEventHandler(this.pid, 'click', (e) => {
+                    if (tabCloseEl === e.target || tabCloseEl.contains(e.target)) {
+                        e.stopPropagation();
+                        this.closeTab(tabId);
+                    }
+                }, {
+                    priority: 100,
+                    selector: `[data-event-id="${tabCloseElId}"]`
+                });
+                
+                const tabElId = `terminal-tab-${tabId}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                tabEl.dataset.eventId = tabElId;
+                EventManager.registerEventHandler(this.pid, 'click', () => {
+                    this.switchTab(tabId);
+                }, {
+                    priority: 100,
+                    selector: `[data-event-id="${tabElId}"]`
+                });
+            } else {
+                // 降级方案
+                tabCloseEl.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    this.closeTab(tabId);
+                });
+                tabEl.addEventListener('click', () => this.switchTab(tabId));
+            }
             
             tabEl.appendChild(tabTitleEl);
             tabEl.appendChild(tabCloseEl);
-            tabEl.addEventListener('click', () => this.switchTab(tabId));
             
             this.tabsBar.appendChild(tabEl);
             
@@ -1505,7 +1677,7 @@ function escapeHtml(s){
             // 推荐使用事件监听：Terminal.on('command', handler)
             this.commandHandler = this._defaultHandler.bind(this);
             // 用于 Tab 补全的已知命令列表（可由外部修改）
-            this._completionCommands = ['clear','pwd','whoami','echo','demo','toggleview','cd','markdir','markfile','ls','tree','cat','write','rm','ps','kill','help','check','diskmanger','eval','vim','rename','mv','copy','paste','power'];
+            this._completionCommands = ['clear','pwd','whoami','echo','demo','toggleview','cd','markdir','markfile','ls','tree','cat','write','rm','ps','kill','help','check','diskmanger','eval','vim','rename','mv','copy','paste','power','exit'];
             
             // CLI程序补全缓存（从ApplicationAssetManager获取）
             this._cliProgramsCache = null;
@@ -1559,7 +1731,7 @@ function escapeHtml(s){
             const version = terminalInfo?.version || '1.0.0';
             const description = terminalInfo?.description || 'ZerOS Bash风格终端';
             const author = terminalInfo?.author || 'ZerOS Team';
-            const copyright = terminalInfo?.copyright || 'Copyright (c) 2024 ZerOS';
+            const copyright = terminalInfo?.copyright || '© 2025 ZerOS';
             
             // 简单的纯文本欢迎信息
             const welcomeText = [
@@ -1652,29 +1824,58 @@ function escapeHtml(s){
         }
 
         _bindEvents(){
-            // 将焦点放到可编辑元素
-            this.cmdEl.addEventListener('click', (e) => {
-                e.stopPropagation();
-                // 如果点击的是非活动标签页，先切换到该标签页
-                if (!this.isActive) {
-                    if (typeof tabManager !== 'undefined' && tabManager) {
-                        tabManager.switchTab(this.tabId);
-                        // switchTab 会调用 _setActive，它会处理焦点
-                        return;
+            // 使用 EventManager 注册事件
+            if (typeof EventManager !== 'undefined' && this.pid) {
+                // 将焦点放到可编辑元素
+                const cmdElId = `terminal-cmd-el-${this.tabId}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                this.cmdEl.dataset.eventId = cmdElId;
+                EventManager.registerEventHandler(this.pid, 'click', (e) => {
+                    if (this.cmdEl === e.target || this.cmdEl.contains(e.target)) {
+                        e.stopPropagation();
+                        // 如果点击的是非活动标签页，先切换到该标签页
+                        if (!this.isActive) {
+                            if (typeof tabManager !== 'undefined' && tabManager) {
+                                tabManager.switchTab(this.tabId);
+                                return;
+                            }
+                        }
+                        // 如果是活动标签页，直接获取焦点
+                        this.focus();
                     }
-                }
-                // 如果是活动标签页，直接获取焦点
-                this.focus();
-            });
-            
-            // 监听焦点事件
-            this.cmdEl.addEventListener('focus', () => {
-                this.cmdEl.classList.add('focused');
-            });
-            
-            this.cmdEl.addEventListener('blur', () => {
-                this.cmdEl.classList.remove('focused');
-            });
+                }, {
+                    priority: 100,
+                    selector: `[data-event-id="${cmdElId}"]`
+                });
+                
+                // 监听焦点事件（使用 registerElementEvent）
+                EventManager.registerElementEvent(this.pid, this.cmdEl, 'focus', () => {
+                    this.cmdEl.classList.add('focused');
+                });
+                EventManager.registerElementEvent(this.pid, this.cmdEl, 'blur', () => {
+                    this.cmdEl.classList.remove('focused');
+                });
+            } else {
+                // 降级方案
+                // 将焦点放到可编辑元素
+                this.cmdEl.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    if (!this.isActive) {
+                        if (typeof tabManager !== 'undefined' && tabManager) {
+                            tabManager.switchTab(this.tabId);
+                            return;
+                        }
+                    }
+                    this.focus();
+                });
+                
+                // 监听焦点事件
+                this.cmdEl.addEventListener('focus', () => {
+                    this.cmdEl.classList.add('focused');
+                });
+                this.cmdEl.addEventListener('blur', () => {
+                    this.cmdEl.classList.remove('focused');
+                });
+            }
             
             // 当终端实例变为可见时，如果是活动标签页，自动获取焦点
             if (this.terminalElement) {
@@ -1700,47 +1901,80 @@ function escapeHtml(s){
             // 为每个实例注册（支持多实例）
             const bashWindow = this.terminalElement ? this.terminalElement.closest('.bash-window') : null;
             
-            // 为bash-window添加点击事件（每个实例独立）
+            // 为bash-window添加点击事件（每个实例独立，使用 EventManager）
             if (bashWindow && !bashWindow._terminalClickHandlerRegistered) {
                 bashWindow._terminalClickHandlerRegistered = true;
-                bashWindow.addEventListener('click', (e) => {
-                    // 如果点击的不是输入框、按钮、链接、标签页或窗口控制按钮，聚焦到活动标签页
-                    const target = e.target;
-                    if (!target.closest('.cmd') && 
-                        !target.closest('button') && 
-                        !target.closest('a') &&
-                        !target.closest('.dot') &&
-                        !target.closest('.window-resizer') &&
-                        !target.closest('.tab')) {
-                        // 确保窗口获得焦点状态
-                        const allWindows = document.querySelectorAll('.bash-window');
-                        allWindows.forEach(win => {
-                            win.classList.remove('focused');
-                        });
-                        bashWindow.classList.add('focused');
-                        
-                        // 确保当前终端实例是激活状态
-                        if (!this.isActive) {
-                            // 如果该实例不在活动标签页，需要先切换到它
-                            // 但这里我们只处理焦点，不切换标签页
-                            // 如果用户点击了非活动标签页的窗口区域，应该先切换到该标签页
-                            // 这个逻辑已经在cmdEl的click事件中处理了
-                        }
-                        
-                        // 延迟聚焦，避免与点击事件冲突
-                        setTimeout(() => {
-                            if (this.isActive && !this.busy) {
-                                this.focus();
+                if (typeof EventManager !== 'undefined' && this.pid) {
+                    const bashWindowClickId = `terminal-bash-window-click-${this.pid}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                    bashWindow.dataset.eventId = bashWindowClickId;
+                    EventManager.registerEventHandler(this.pid, 'click', (e) => {
+                        if (bashWindow === e.target || bashWindow.contains(e.target)) {
+                            // 如果点击的不是输入框、按钮、链接、标签页或窗口控制按钮，聚焦到活动标签页
+                            const target = e.target;
+                            if (!target.closest('.cmd') && 
+                                !target.closest('button') && 
+                                !target.closest('a') &&
+                                !target.closest('.dot') &&
+                                !target.closest('.window-resizer') &&
+                                !target.closest('.tab')) {
+                                // 确保窗口获得焦点状态
+                                const allWindows = document.querySelectorAll('.bash-window');
+                                allWindows.forEach(win => {
+                                    win.classList.remove('focused');
+                                });
+                                bashWindow.classList.add('focused');
+                                
+                                if (!this.isActive) {
+                                    // 逻辑已在 cmdEl 的 click 事件中处理
+                                }
+                                
+                                setTimeout(() => {
+                                    if (this.isActive && !this.busy) {
+                                        this.focus();
+                                    }
+                                }, 50);
                             }
-                        }, 50);
-                    }
-                }, true); // 使用捕获阶段，确保优先处理
+                        }
+                    }, {
+                        priority: 100,
+                        selector: `[data-event-id="${bashWindowClickId}"]`,
+                        useCapture: true
+                    });
+                } else {
+                    // 降级方案
+                    bashWindow.addEventListener('click', (e) => {
+                        const target = e.target;
+                        if (!target.closest('.cmd') && 
+                            !target.closest('button') && 
+                            !target.closest('a') &&
+                            !target.closest('.dot') &&
+                            !target.closest('.window-resizer') &&
+                            !target.closest('.tab')) {
+                            const allWindows = document.querySelectorAll('.bash-window');
+                            allWindows.forEach(win => {
+                                win.classList.remove('focused');
+                            });
+                            bashWindow.classList.add('focused');
+                            
+                            if (!this.isActive) {
+                                // 逻辑已在 cmdEl 的 click 事件中处理
+                            }
+                            
+                            setTimeout(() => {
+                                if (this.isActive && !this.busy) {
+                                    this.focus();
+                                }
+                            }, 50);
+                        }
+                    }, true);
+                }
             }
             
             // 监听窗口焦点事件（当浏览器窗口重新获得焦点时）
-            if (!window._terminalWindowFocusHandler) {
-                window._terminalWindowFocusHandler = true;
-                window.addEventListener('focus', () => {
+            // 使用 EventManager 注册窗口焦点事件（全局只注册一次）
+            if (!window._terminalWindowFocusHandler && typeof EventManager !== 'undefined') {
+                const exploitPid = typeof ProcessManager !== 'undefined' ? ProcessManager.EXPLOIT_PID : 10000;
+                window._terminalWindowFocusHandler = EventManager.registerEventHandler(exploitPid, 'focus', () => {
                     // 延迟检查，确保窗口完全获得焦点
                     setTimeout(() => {
                         const activeTerminal = tabManager ? tabManager.getActiveTerminal() : null;
@@ -1751,10 +1985,19 @@ function escapeHtml(s){
                             }
                         }
                     }, 100);
+                }, {
+                    priority: 100,
+                    selector: null  // 监听 window 的 focus 事件
                 });
             }
 
-            this.cmdEl.addEventListener('keydown', (ev) => {
+            // 使用 EventManager 注册键盘事件
+            if (typeof EventManager !== 'undefined' && this.pid) {
+                EventManager.registerEventHandler(this.pid, 'keydown', (ev) => {
+                    // 检查事件是否发生在 cmdEl 内
+                    if (this.cmdEl !== ev.target && !this.cmdEl.contains(ev.target)) {
+                        return;
+                    }
                 // 只在活动标签页时处理键盘事件
                 if (!this.isActive) return;
                 
@@ -1838,15 +2081,21 @@ function escapeHtml(s){
                         sel.addRange(range);
                         return;
                     }
-                    // Ctrl+E: 移动到行尾
+                    // Ctrl+E: 执行 exit 命令
                     if (ev.key === 'e' || ev.key === 'E') {
                         ev.preventDefault();
-                        const range = document.createRange();
-                        range.selectNodeContents(this.cmdEl);
-                        range.collapse(false); // 移动到末尾
-                        const sel = window.getSelection();
-                        sel.removeAllRanges();
-                        sel.addRange(range);
+                        ev.stopPropagation();
+                        // 执行 exit 命令
+                        const payload = {
+                            cmdString: 'exit',
+                            args: ['exit'],
+                            env: this.env,
+                            write: this.write.bind(this),
+                            done: () => {}
+                        };
+                        this._handleCommand(payload).catch((err) => {
+                            this.write('Error while handling exit command: ' + (err && err.message ? err.message : String(err)));
+                        });
                         return;
                     }
                 }
@@ -2133,10 +2382,315 @@ function escapeHtml(s){
                     if(ev.key.length === 1 || ev.key === 'Backspace' || ev.key === 'Delete'){ this._clearCompletions(); }
                 }
                 // Allow simple navigation keys normally (no extra features)
-            });
+                }, {
+                    priority: 100,
+                    selector: null  // 全局键盘事件
+                });
+            } else {
+                // 降级方案：使用原生 addEventListener
+                // 注意：降级方案需要包含完整的键盘事件处理逻辑
+                // 为了代码简洁，这里直接使用原有的 addEventListener
+                // 如果 EventManager 不可用，终端仍可正常工作
+                this.cmdEl.addEventListener('keydown', (ev) => {
+                    // 只在活动标签页时处理键盘事件
+                    if (!this.isActive) return;
+                    
+                    // Vim模式：拦截所有键盘事件
+                    if (this._vimMode && this._vimInstance) {
+                        ev.preventDefault();
+                        ev.stopPropagation();
+                        
+                        // 清空输入框内容（防止显示输入的字符）
+                        if (this.cmdEl && this.cmdEl.textContent) {
+                            this.cmdEl.textContent = '';
+                        }
+                        
+                        // 获取键盘按键信息
+                        let key = ev.key;
+                        const ctrlKey = ev.ctrlKey;
+                        const shiftKey = ev.shiftKey;
+                        
+                        // 调试信息
+                        if (this._vimInstance.mode === 1) { // MODE_INSERT
+                            console.log(`Terminal: Vim Insert Mode - key: ${key}, ctrlKey: ${ctrlKey}, shiftKey: ${shiftKey}`);
+                        }
+                        
+                        // ev.key已经自动处理了Shift键组合
+                        // 直接传递给vim处理
+                        if (this._vimInstance && typeof this._vimInstance.handleKey === 'function') {
+                            this._vimInstance.handleKey(key, ctrlKey, shiftKey);
+                        } else {
+                            console.error('Terminal: _vimInstance.handleKey is not a function', this._vimInstance);
+                        }
+                        return;
+                    }
+                    
+                    // 键盘快捷键支持
+                    if (ev.ctrlKey || ev.metaKey) {
+                        // Ctrl+L 或 Cmd+L: 清屏
+                        if (ev.key === 'l' || ev.key === 'L') {
+                            ev.preventDefault();
+                            this.clear();
+                            this.focus();
+                            return;
+                        }
+                        // Ctrl+C: 取消当前命令（如果正在执行）
+                        if (ev.key === 'c' || ev.key === 'C') {
+                            if (this.busy) {
+                                ev.preventDefault();
+                                this.cancelCurrent();
+                                this.write('\n^C');
+                                this.focus();
+                                return;
+                            }
+                        }
+                        // Ctrl+U: 清空当前输入
+                        if (ev.key === 'u' || ev.key === 'U') {
+                            ev.preventDefault();
+                            this.cmdEl.textContent = '';
+                            this.focus();
+                            return;
+                        }
+                        // Ctrl+K: 删除光标到行尾
+                        if (ev.key === 'k' || ev.key === 'K') {
+                            ev.preventDefault();
+                            const text = this.cmdEl.textContent;
+                            const selection = window.getSelection();
+                            if (selection.rangeCount > 0) {
+                                const range = selection.getRangeAt(0);
+                                const startOffset = range.startOffset;
+                                this.cmdEl.textContent = text.substring(0, startOffset);
+                                this.focus();
+                            }
+                            return;
+                        }
+                        // Ctrl+A: 全选（移动到行首）
+                        if (ev.key === 'a' || ev.key === 'A') {
+                            ev.preventDefault();
+                            const range = document.createRange();
+                            range.selectNodeContents(this.cmdEl);
+                            range.collapse(true); // 移动到开头
+                            const sel = window.getSelection();
+                            sel.removeAllRanges();
+                            sel.addRange(range);
+                            return;
+                        }
+                        // Ctrl+E: 执行 exit 命令
+                        if (ev.key === 'e' || ev.key === 'E') {
+                            ev.preventDefault();
+                            ev.stopPropagation();
+                            // 执行 exit 命令
+                            const payload = {
+                                cmdString: 'exit',
+                                args: ['exit'],
+                                env: this.env,
+                                write: this.write.bind(this),
+                                done: () => {}
+                            };
+                            this._handleCommand(payload).catch((err) => {
+                                this.write('Error while handling exit command: ' + (err && err.message ? err.message : String(err)));
+                            });
+                            return;
+                        }
+                    }
+                    
+                    // 历史导航
+                    if(ev.key === 'ArrowUp'){
+                        ev.preventDefault();
+                        if(this.history.length === 0) return;
+                        if(this.historyIndex === -1) this.historyIndex = this.history.length - 1;
+                        else this.historyIndex = Math.max(0, this.historyIndex - 1);
+                        this.cmdEl.textContent = this.history[this.historyIndex] || '';
+                        this.focus();
+                        return;
+                    }
+                    if(ev.key === 'ArrowDown'){
+                        ev.preventDefault();
+                        if(this.history.length === 0) return;
+                        if(this.historyIndex === -1) return;
+                        this.historyIndex = this.historyIndex + 1;
+                        if(this.historyIndex >= this.history.length){
+                            this.historyIndex = -1;
+                            this.cmdEl.textContent = '';
+                        }else{
+                            this.cmdEl.textContent = this.history[this.historyIndex] || '';
+                        }
+                        this.focus();
+                        return;
+                    }
 
-            // 处理粘贴事件
-            this.cmdEl.addEventListener('paste', async (ev) => {
+                    if(ev.key === 'Enter'){
+                        ev.preventDefault();
+                        // 只在活动标签页处理 Enter 键
+                        if (!this.isActive) return;
+                        
+                        if(this.busy){
+                            this.write('Previous command still running - please wait...');
+                            return;
+                        }
+                        const raw = this.cmdEl.textContent.replace(/\u00A0/g,' ');
+                        const input = raw.replace(/\n/g,'').trim();
+                        // 如果输入非空，加入历史
+                        if(input){
+                            const hist = this.history;
+                            hist.push(input);
+                            this.history = hist; // 触发保存
+                        }
+                        this.historyIndex = -1;
+                        // 回显
+                        this._echoCommand(input);
+                        // 清空输入
+                        this.cmdEl.textContent = '';
+                        // 标记为忙，禁止输入
+                        this._setBusy(true);
+                        // 处理命令（事件驱动或向后兼容 handler），支持异步 Promise
+                        const payload = {
+                            cmdString: input,
+                            args: this._argsFrom(input),
+                            env: this.env,
+                            write: this.write.bind(this),
+                            done: () => {}
+                        };
+                        this._handleCommand(payload).then(() => {
+                            this._setBusy(false);
+                        }).catch((err) => {
+                            this.write('Error while handling command: ' + (err && err.message ? err.message : String(err)));
+                            this._setBusy(false);
+                        });
+                    }
+                    // Ctrl shortcuts
+                    if(ev.ctrlKey && ev.key === 'c'){
+                        ev.preventDefault();
+                        // cancel
+                        this.cancelCurrent();
+                        return;
+                    }
+                    if(ev.ctrlKey && ev.key === 'l'){
+                        ev.preventDefault();
+                        this.clear();
+                        return;
+                    }
+                    if(ev.ctrlKey && ev.key === 'd'){
+                        ev.preventDefault();
+                        // emulate EOF: if input empty, maybe close; here just write message
+                        const raw = this.cmdEl.textContent.replace(/\u00A0/g,' ');
+                        const input = raw.replace(/\n/g,'').trim();
+                        if(!input) this.write('logout');
+                        return;
+                    }
+                    // Tab 补全和候选选择支持（简化版本，完整逻辑在 EventManager 版本中）
+                    if(ev.key === 'Tab'){
+                        ev.preventDefault();
+                        // 如果补全面板已经可见，Tab/Shift+Tab 在候选之间循环并更新输入
+                        if(this._completionState && this._completionState.visible){
+                            if(ev.shiftKey) this._moveCompletion(-1);
+                            else this._moveCompletion(1);
+                            const cand = this._completionState.candidates[this._completionState.index];
+                            if(typeof cand !== 'undefined'){
+                                const before = this._completionState.beforeText || '';
+                                let newText = before;
+                                if(newText.length && !/\s$/.test(newText)) newText += ' ';
+                                newText += cand;
+                                this.cmdEl.textContent = newText;
+                                this._renderCompletions();
+                                this.focus();
+                            }
+                            return;
+                        }
+                        // 简化版 Tab 补全（完整逻辑在 EventManager 版本中）
+                        // 这里只处理基本的补全逻辑
+                        const raw = this.cmdEl.textContent.replace(/\u00A0/g,' ').replace(/\n/g,'');
+                        const m = raw.match(/(?:^|\s)(\S*)$/);
+                        const token = (m && m[1]) ? m[1] : '';
+                        const before = raw.slice(0, raw.length - token.length);
+                        const isFirstToken = before.trim().length === 0;
+
+                        // 异步获取候选（简化版）
+                        (async () => {
+                            let candidates = [];
+                            try{
+                                if(isFirstToken){
+                                    // 从内置命令列表获取候选
+                                    candidates = this._completionCommands.filter(c => c.indexOf(token) === 0);
+                                }else{
+                                    // 文件路径补全（简化版，使用 FileSystem.list）
+                                    const idx = token.lastIndexOf('/');
+                                    const dirPart = idx >= 0 ? token.slice(0, idx + 1) : '';
+                                    const namePrefix = idx >= 0 ? token.slice(idx + 1) : token;
+                                    const dirToList = resolvePath(this.env.cwd, dirPart || '.');
+                                    
+                                    let phpPath = dirToList;
+                                    if (/^[CD]:$/.test(phpPath)) {
+                                        phpPath = phpPath + '/';
+                                    }
+                                    
+                                    const url = new URL('/service/FSDirve.php', window.location.origin);
+                                    url.searchParams.set('action', 'list_dir');
+                                    url.searchParams.set('path', phpPath);
+                                    
+                                    try {
+                                        const response = await fetch(url.toString());
+                                        if (response.ok) {
+                                            const result = await response.json();
+                                            if (result.status === 'success' && result.data && result.data.items) {
+                                                const items = result.data.items;
+                                                const nodes = items.filter(item => item.type === 'directory').map(item => item.name + '/');
+                                                const files = items.filter(item => item.type === 'file').map(item => item.name);
+                                                candidates = nodes.concat(files).filter(n => n.indexOf(namePrefix) === 0).map(n => dirPart + n);
+                                            }
+                                        }
+                                    } catch (e) {
+                                        candidates = [];
+                                    }
+                                }
+                            }catch(e){ candidates = []; }
+
+                            if(candidates.length === 0){
+                                this._clearCompletions();
+                                return;
+                            }
+
+                            if(candidates.length === 1){
+                                const completion = candidates[0];
+                                let newText = before;
+                                if(newText.length && !/\s$/.test(newText)) newText += ' ';
+                                newText += completion;
+                                this.cmdEl.textContent = newText;
+                                this.focus();
+                                this._clearCompletions();
+                                return;
+                            }
+
+                            this._showCompletions(candidates, before, '');
+                        })();
+                        return;
+                    }
+
+                    // 在候选面板可见时，拦截上下/Enter/Escape
+                    if(this._completionState && this._completionState.visible){
+                        if(ev.key === 'ArrowDown' || ev.key === 'ArrowUp' || ev.key === 'Enter' || ev.key === 'Escape'){
+                            ev.preventDefault();
+                            if(ev.key === 'ArrowDown'){
+                                this._moveCompletion(1);
+                            }else if(ev.key === 'ArrowUp'){
+                                this._moveCompletion(-1);
+                            }else if(ev.key === 'Enter'){
+                                this._acceptCompletion();
+                            }else if(ev.key === 'Escape'){
+                                this._clearCompletions();
+                            }
+                            return;
+                        }
+                        if(ev.key.length === 1 || ev.key === 'Backspace' || ev.key === 'Delete'){ 
+                            this._clearCompletions(); 
+                        }
+                    }
+                });
+            }
+
+            // 处理粘贴事件（使用 EventManager registerElementEvent，因为 paste 不冒泡）
+            if (typeof EventManager !== 'undefined' && this.pid) {
+                EventManager.registerElementEvent(this.pid, this.cmdEl, 'paste', async (ev) => {
                 if (!this.isActive) return;
                 
                 // Vim模式：将粘贴内容传递给vim（插入模式下）
@@ -2162,9 +2716,40 @@ function escapeHtml(s){
                 ev.preventDefault();
                 const text = (ev.clipboardData || window.clipboardData).getData('text');
                 document.execCommand('insertText', false, text);
-            });
+                });
+            } else {
+                // 降级方案
+                this.cmdEl.addEventListener('paste', async (ev) => {
+                    if (!this.isActive) return;
+                    
+                    // Vim模式：将粘贴内容传递给vim（插入模式下）
+                    if (this._vimMode && this._vimInstance) {
+                        // 检查是否为插入模式（MODE_INSERT = 1）
+                        if (this._vimInstance.mode === 1) {
+                            ev.preventDefault();
+                            ev.stopPropagation();
+                            
+                            try {
+                                const text = (ev.clipboardData || window.clipboardData).getData('text');
+                                if (text) {
+                                    this._vimInstance._pasteText(text);
+                                }
+                            } catch (e) {
+                                console.error('Vim: Failed to paste', e);
+                            }
+                            return;
+                        }
+                    }
+                    
+                    // 普通模式：防止粘贴样式内容
+                    ev.preventDefault();
+                    const text = (ev.clipboardData || window.clipboardData).getData('text');
+                    document.execCommand('insertText', false, text);
+                });
+            }
             
             // 处理鼠标滚轮事件 - 在Vim模式下需要拦截，普通模式让浏览器自然滚动
+            // 注意：wheel 事件需要 passive 选项以优化性能，因此保持使用原生 addEventListener
             // 使用 passive: true 以优化性能，在普通模式下不影响滚动
             this._wheelHandler = (ev) => {
                 if (!this.isActive) return;
@@ -2206,6 +2791,21 @@ function escapeHtml(s){
                 return;
             }
             
+            // 检查是否使用了 GUIManager（如果使用了，拖动和拉伸由 GUIManager 自动处理）
+            let hasGUIManager = false;
+            try {
+                const pool = safeGetPool();
+                if (pool && typeof pool.__GET__ === 'function') {
+                    const guiMgr = pool.__GET__("KERNEL_GLOBAL_POOL", "GUIManager");
+                    hasGUIManager = (guiMgr && typeof guiMgr.registerWindow === 'function');
+                }
+            } catch (e) {
+                // 忽略错误
+            }
+            if (!hasGUIManager && typeof window !== 'undefined' && window.GUIManager) {
+                hasGUIManager = (typeof window.GUIManager.registerWindow === 'function');
+            }
+            
             // 查找该实例的窗口控制元素
             const closeDot = bashWindow.querySelector(`.dot.close${pidSelector}`);
             const minDot = bashWindow.querySelector(`.dot.minimize${pidSelector}`);
@@ -2216,172 +2816,352 @@ function escapeHtml(s){
             // 移除可能存在的旧事件监听器（通过克隆节点）
             if (closeDot && !closeDot._controlBound) {
                 closeDot._controlBound = true;
-                closeDot.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    this.minimize();
-                });
+                // 使用 EventManager 注册事件
+                if (typeof EventManager !== 'undefined' && this.pid) {
+                    const closeDotId = `terminal-close-dot-${this.pid}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                    closeDot.dataset.eventId = closeDotId;
+                    EventManager.registerEventHandler(this.pid, 'click', (e) => {
+                        e.stopPropagation();
+                        this.minimize();
+                    }, {
+                        priority: 100,
+                        selector: `[data-event-id="${closeDotId}"]`
+                    });
+                } else {
+                    // 降级方案
+                    closeDot.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        this.minimize();
+                    });
+                }
             }
             if (minDot && !minDot._controlBound) {
                 minDot._controlBound = true;
-                minDot.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    this.centerOrRestore();
-                });
+                // 使用 EventManager 注册事件
+                if (typeof EventManager !== 'undefined' && this.pid) {
+                    const minDotId = `terminal-min-dot-${this.pid}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                    minDot.dataset.eventId = minDotId;
+                    EventManager.registerEventHandler(this.pid, 'click', (e) => {
+                        e.stopPropagation();
+                        this.centerOrRestore();
+                    }, {
+                        priority: 100,
+                        selector: `[data-event-id="${minDotId}"]`
+                    });
+                } else {
+                    // 降级方案
+                    minDot.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        this.centerOrRestore();
+                    });
+                }
             }
             if (maxDot && !maxDot._controlBound) {
                 maxDot._controlBound = true;
                 // maxDot 的事件已经在 TabManager 构造函数中绑定，这里不再重复绑定
             }
 
-            // 拖拽实现（仅在较大屏幕启用）
-            // 为每个实例创建独立的拖拽状态
-            if (!this._dragState) {
-                this._dragState = {
-                    dragging: false,
-                    startX: 0,
-                    startY: 0,
-                    startLeft: 0,
-                    startTop: 0,
-                    containerLeft: 0,
-                    containerTop: 0,
-                    containerRight: 0,
-                    containerBottom: 0
-                };
-            }
-            
-            const dragState = this._dragState;
-            function isSmall(){ return window.matchMedia('(max-width:760px)').matches; }
-            
-            if(bar && win && !bar._dragBound){
+            // 拖拽实现（仅在较大屏幕启用，且未使用 GUIManager 时）
+            // 如果使用了 GUIManager，拖动功能由 GUIManager 自动处理，这里跳过
+            if (!hasGUIManager) {
+                // 为每个实例创建独立的拖拽状态
+                if (!this._dragState) {
+                    this._dragState = {
+                        dragging: false,
+                        startX: 0,
+                        startY: 0,
+                        startLeft: 0,
+                        startTop: 0,
+                        containerLeft: 0,
+                        containerTop: 0,
+                        containerRight: 0,
+                        containerBottom: 0
+                    };
+                }
+                
+                const dragState = this._dragState;
+                function isSmall(){ return window.matchMedia('(max-width:760px)').matches; }
+                
+                if(bar && win && !bar._dragBound){
                 bar._dragBound = true;
-                bar.addEventListener('mousedown', (ev) => {
-                    // 如果点击的是控制按钮，不触发拖拽
-                    if (ev.target.closest('.dot') || ev.target.closest('.controls')) {
-                        return;
-                    }
-                    
-                    if(isSmall()) return;
-                    
-                    // 检查窗口状态（全屏时不能拖拽）
-                    const state = win._windowState;
-                    if (state && state.isFullscreen) {
-                        return;
-                    }
-                    
-                    // 拖拽开始时，将窗口置于最上层
-                    const allWindows = document.querySelectorAll('.bash-window');
-                    allWindows.forEach(w => {
-                        w.classList.remove('focused');
+                // 使用 EventManager 注册拖动事件
+                if (typeof EventManager !== 'undefined' && typeof EventManager.registerDrag === 'function' && this.pid) {
+                    const windowId = `terminal-window-drag-${this.pid}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                    EventManager.registerDrag(
+                        windowId,
+                        bar,
+                        win,
+                        win._windowState,
+                        // onDragStart
+                        (ev) => {
+                            // 如果点击的是控制按钮，不触发拖拽
+                            if (ev.target.closest('.dot') || ev.target.closest('.controls')) {
+                                return;
+                            }
+                            
+                            if(isSmall()) return;
+                            
+                            // 检查窗口状态（全屏时不能拖拽）
+                            const state = win._windowState;
+                            if (state && state.isFullscreen) {
+                                return;
+                            }
+                            
+                            // 拖拽开始时，将窗口置于最上层
+                            const allWindows = document.querySelectorAll('.bash-window');
+                            allWindows.forEach(w => {
+                                w.classList.remove('focused');
+                            });
+                            win.classList.add('focused');
+                            
+                            // 获取窗口当前的实际位置
+                            const rect = win.getBoundingClientRect();
+                            const computedStyle = window.getComputedStyle(win);
+                            const currentLeft = computedStyle.left;
+                            const currentTop = computedStyle.top;
+                            const currentTransform = computedStyle.transform;
+                            
+                            // 如果窗口使用百分比定位（如 left: 50%, top: 50%），需要先转换为像素值
+                            // 否则当移除 transform 时，窗口会突然跳到百分比位置
+                            let actualLeft = rect.left;
+                            let actualTop = rect.top;
+                            
+                            // 检查是否使用百分比定位
+                            if (currentLeft.includes('%') || currentTop.includes('%')) {
+                                // 使用 getBoundingClientRect() 获取的实际像素位置
+                                actualLeft = rect.left;
+                                actualTop = rect.top;
+                            } else if (currentLeft && currentTop && currentLeft !== 'auto' && currentTop !== 'auto') {
+                                // 如果已经有像素值，直接使用（但需要考虑 transform）
+                                // 如果使用 transform 居中，getBoundingClientRect() 已经给出了实际位置
+                                actualLeft = rect.left;
+                                actualTop = rect.top;
+                            } else {
+                                // 默认使用 getBoundingClientRect() 的位置
+                                actualLeft = rect.left;
+                                actualTop = rect.top;
+                            }
+                            
+                            // 保存拖动开始时的鼠标位置和窗口位置
+                            dragState.dragging = true;
+                            dragState.startX = ev.clientX;
+                            dragState.startY = ev.clientY;
+                            dragState.startLeft = actualLeft;
+                            dragState.startTop = actualTop;
+                            
+                            // 获取容器边界（用于边界检查）
+                            const guiContainer = document.getElementById('gui-container') || document.body;
+                            const containerRect = guiContainer.getBoundingClientRect();
+                            dragState.containerLeft = containerRect.left;
+                            dragState.containerTop = containerRect.top;
+                            dragState.containerRight = containerRect.right;
+                            dragState.containerBottom = containerRect.bottom;
+                            
+                            bar.classList.add('dragging');
+                            // make window floating
+                            win.classList.add('floating');
+                            // set explicit left/top so we can move (使用计算后的实际位置)
+                            win.style.left = actualLeft + 'px';
+                            win.style.top = actualTop + 'px';
+                            win.style.transform = 'none';
+                            win.style.position = 'fixed';
+                            ev.preventDefault();
+                            ev.stopPropagation();
+                        },
+                        // onDrag
+                        (ev) => {
+                            if(!dragState.dragging) return;
+                            const dx = ev.clientX - dragState.startX;
+                            const dy = ev.clientY - dragState.startY;
+                            
+                            // 计算新位置
+                            let newLeft = dragState.startLeft + dx;
+                            let newTop = dragState.startTop + dy;
+                            
+                            // 获取窗口尺寸
+                            const winRect = win.getBoundingClientRect();
+                            const winWidth = winRect.width;
+                            const winHeight = winRect.height;
+                            
+                            // 边界检查：确保窗口左上角不超出容器范围
+                            // 获取容器边界（如果拖动过程中容器位置改变，重新获取）
+                            const guiContainer = document.getElementById('gui-container') || document.body;
+                            const containerRect = guiContainer.getBoundingClientRect();
+                            const containerLeft = containerRect.left;
+                            const containerTop = containerRect.top;
+                            const containerRight = containerRect.right;
+                            const containerBottom = containerRect.bottom;
+                            
+                            // 限制左上角位置：不能小于容器左上角
+                            newLeft = Math.max(containerLeft, newLeft);
+                            newTop = Math.max(containerTop, newTop);
+                            
+                            // 限制右下角位置：窗口右下角不能超出容器右下角
+                            // 即：newLeft + winWidth <= containerRight
+                            //     newTop + winHeight <= containerBottom
+                            newLeft = Math.min(newLeft, containerRight - winWidth);
+                            newTop = Math.min(newTop, containerBottom - winHeight);
+                            
+                            // 应用新位置
+                            win.style.left = newLeft + 'px';
+                            win.style.top = newTop + 'px';
+                        },
+                        // onDragEnd
+                        (ev) => {
+                            if(!dragState.dragging) return;
+                            dragState.dragging = false;
+                            bar.classList.remove('dragging');
+                        },
+                        ['.dot', '.controls'] // 排除的选择器
+                    );
+                } else {
+                    // 降级方案
+                    bar.addEventListener('mousedown', (ev) => {
+                        // 如果点击的是控制按钮，不触发拖拽
+                        if (ev.target.closest('.dot') || ev.target.closest('.controls')) {
+                            return;
+                        }
+                        
+                        if(isSmall()) return;
+                        
+                        // 检查窗口状态（全屏时不能拖拽）
+                        const state = win._windowState;
+                        if (state && state.isFullscreen) {
+                            return;
+                        }
+                        
+                        // 拖拽开始时，将窗口置于最上层
+                        const allWindows = document.querySelectorAll('.bash-window');
+                        allWindows.forEach(w => {
+                            w.classList.remove('focused');
+                        });
+                        win.classList.add('focused');
+                        
+                        // 获取窗口当前的实际位置
+                        const rect = win.getBoundingClientRect();
+                        const computedStyle = window.getComputedStyle(win);
+                        const currentLeft = computedStyle.left;
+                        const currentTop = computedStyle.top;
+                        const currentTransform = computedStyle.transform;
+                        
+                        // 如果窗口使用百分比定位（如 left: 50%, top: 50%），需要先转换为像素值
+                        // 否则当移除 transform 时，窗口会突然跳到百分比位置
+                        let actualLeft = rect.left;
+                        let actualTop = rect.top;
+                        
+                        // 检查是否使用百分比定位
+                        if (currentLeft.includes('%') || currentTop.includes('%')) {
+                            // 使用 getBoundingClientRect() 获取的实际像素位置
+                            actualLeft = rect.left;
+                            actualTop = rect.top;
+                        } else if (currentLeft && currentTop && currentLeft !== 'auto' && currentTop !== 'auto') {
+                            // 如果已经有像素值，直接使用（但需要考虑 transform）
+                            // 如果使用 transform 居中，getBoundingClientRect() 已经给出了实际位置
+                            actualLeft = rect.left;
+                            actualTop = rect.top;
+                        } else {
+                            // 默认使用 getBoundingClientRect() 的位置
+                            actualLeft = rect.left;
+                            actualTop = rect.top;
+                        }
+                        
+                        // 保存拖动开始时的鼠标位置和窗口位置
+                        dragState.dragging = true;
+                        dragState.startX = ev.clientX;
+                        dragState.startY = ev.clientY;
+                        dragState.startLeft = actualLeft;
+                        dragState.startTop = actualTop;
+                        
+                        // 获取容器边界（用于边界检查）
+                        const guiContainer = document.getElementById('gui-container') || document.body;
+                        const containerRect = guiContainer.getBoundingClientRect();
+                        dragState.containerLeft = containerRect.left;
+                        dragState.containerTop = containerRect.top;
+                        dragState.containerRight = containerRect.right;
+                        dragState.containerBottom = containerRect.bottom;
+                        
+                        bar.classList.add('dragging');
+                        // make window floating
+                        win.classList.add('floating');
+                        // set explicit left/top so we can move (使用计算后的实际位置)
+                        win.style.left = actualLeft + 'px';
+                        win.style.top = actualTop + 'px';
+                        win.style.transform = 'none';
+                        win.style.position = 'fixed';
+                        ev.preventDefault();
+                        ev.stopPropagation();
                     });
-                    win.classList.add('focused');
                     
-                    // 获取窗口当前的实际位置
-                    const rect = win.getBoundingClientRect();
-                    const computedStyle = window.getComputedStyle(win);
-                    const currentLeft = computedStyle.left;
-                    const currentTop = computedStyle.top;
-                    const currentTransform = computedStyle.transform;
+                    // 使用命名空间事件，避免多个实例冲突
+                    const mousemoveHandler = (ev) => {
+                        if(!dragState.dragging) return;
+                        const dx = ev.clientX - dragState.startX;
+                        const dy = ev.clientY - dragState.startY;
+                        
+                        // 计算新位置
+                        let newLeft = dragState.startLeft + dx;
+                        let newTop = dragState.startTop + dy;
+                        
+                        // 获取窗口尺寸
+                        const winRect = win.getBoundingClientRect();
+                        const winWidth = winRect.width;
+                        const winHeight = winRect.height;
+                        
+                        // 边界检查：确保窗口左上角不超出容器范围
+                        // 获取容器边界（如果拖动过程中容器位置改变，重新获取）
+                        const guiContainer = document.getElementById('gui-container') || document.body;
+                        const containerRect = guiContainer.getBoundingClientRect();
+                        const containerLeft = containerRect.left;
+                        const containerTop = containerRect.top;
+                        const containerRight = containerRect.right;
+                        const containerBottom = containerRect.bottom;
+                        
+                        // 限制左上角位置：不能小于容器左上角
+                        newLeft = Math.max(containerLeft, newLeft);
+                        newTop = Math.max(containerTop, newTop);
+                        
+                        // 限制右下角位置：窗口右下角不能超出容器右下角
+                        // 即：newLeft + winWidth <= containerRight
+                        //     newTop + winHeight <= containerBottom
+                        newLeft = Math.min(newLeft, containerRight - winWidth);
+                        newTop = Math.min(newTop, containerBottom - winHeight);
+                        
+                        // 应用新位置
+                        win.style.left = newLeft + 'px';
+                        win.style.top = newTop + 'px';
+                    };
                     
-                    // 如果窗口使用百分比定位（如 left: 50%, top: 50%），需要先转换为像素值
-                    // 否则当移除 transform 时，窗口会突然跳到百分比位置
-                    let actualLeft = rect.left;
-                    let actualTop = rect.top;
+                    const mouseupHandler = (ev) => {
+                        if(!dragState.dragging) return;
+                        dragState.dragging = false;
+                        bar.classList.remove('dragging');
+                    };
                     
-                    // 检查是否使用百分比定位
-                    if (currentLeft.includes('%') || currentTop.includes('%')) {
-                        // 使用 getBoundingClientRect() 获取的实际像素位置
-                        actualLeft = rect.left;
-                        actualTop = rect.top;
-                    } else if (currentLeft && currentTop && currentLeft !== 'auto' && currentTop !== 'auto') {
-                        // 如果已经有像素值，直接使用（但需要考虑 transform）
-                        // 如果使用 transform 居中，getBoundingClientRect() 已经给出了实际位置
-                        actualLeft = rect.left;
-                        actualTop = rect.top;
+                    // 使用 EventManager 注册临时拖动事件
+                    if (typeof EventManager !== 'undefined' && this.pid) {
+                        const mousemoveHandlerId = EventManager.registerEventHandler(this.pid, 'mousemove', mousemoveHandler, {
+                            priority: 50,
+                            once: false
+                        });
+                        
+                        const mouseupHandlerId = EventManager.registerEventHandler(this.pid, 'mouseup', mouseupHandler, {
+                            priority: 50,
+                            once: true
+                        });
+                        
+                        // 存储事件处理器ID，以便后续清理
+                        if (!this._dragEventHandlers) {
+                            this._dragEventHandlers = [];
+                        }
+                        this._dragEventHandlers.push(mousemoveHandlerId, mouseupHandlerId);
                     } else {
-                        // 默认使用 getBoundingClientRect() 的位置
-                        actualLeft = rect.left;
-                        actualTop = rect.top;
+                        // 降级：直接使用 addEventListener（不推荐）
+                        document.addEventListener('mousemove', mousemoveHandler);
+                        document.addEventListener('mouseup', mouseupHandler);
                     }
-                    
-                    // 保存拖动开始时的鼠标位置和窗口位置
-                    dragState.dragging = true;
-                    dragState.startX = ev.clientX;
-                    dragState.startY = ev.clientY;
-                    dragState.startLeft = actualLeft;
-                    dragState.startTop = actualTop;
-                    
-                    // 获取容器边界（用于边界检查）
-                    const guiContainer = document.getElementById('gui-container') || document.body;
-                    const containerRect = guiContainer.getBoundingClientRect();
-                    dragState.containerLeft = containerRect.left;
-                    dragState.containerTop = containerRect.top;
-                    dragState.containerRight = containerRect.right;
-                    dragState.containerBottom = containerRect.bottom;
-                    
-                    bar.classList.add('dragging');
-                    // make window floating
-                    win.classList.add('floating');
-                    // set explicit left/top so we can move (使用计算后的实际位置)
-                    win.style.left = actualLeft + 'px';
-                    win.style.top = actualTop + 'px';
-                    win.style.transform = 'none';
-                    win.style.position = 'fixed';
-                    ev.preventDefault();
-                    ev.stopPropagation();
-                });
-                
-                // 使用命名空间事件，避免多个实例冲突
-                const mousemoveHandler = (ev) => {
-                    if(!dragState.dragging) return;
-                    const dx = ev.clientX - dragState.startX;
-                    const dy = ev.clientY - dragState.startY;
-                    
-                    // 计算新位置
-                    let newLeft = dragState.startLeft + dx;
-                    let newTop = dragState.startTop + dy;
-                    
-                    // 获取窗口尺寸
-                    const winRect = win.getBoundingClientRect();
-                    const winWidth = winRect.width;
-                    const winHeight = winRect.height;
-                    
-                    // 边界检查：确保窗口左上角不超出容器范围
-                    // 获取容器边界（如果拖动过程中容器位置改变，重新获取）
-                    const guiContainer = document.getElementById('gui-container') || document.body;
-                    const containerRect = guiContainer.getBoundingClientRect();
-                    const containerLeft = containerRect.left;
-                    const containerTop = containerRect.top;
-                    const containerRight = containerRect.right;
-                    const containerBottom = containerRect.bottom;
-                    
-                    // 限制左上角位置：不能小于容器左上角
-                    newLeft = Math.max(containerLeft, newLeft);
-                    newTop = Math.max(containerTop, newTop);
-                    
-                    // 限制右下角位置：窗口右下角不能超出容器右下角
-                    // 即：newLeft + winWidth <= containerRight
-                    //     newTop + winHeight <= containerBottom
-                    newLeft = Math.min(newLeft, containerRight - winWidth);
-                    newTop = Math.min(newTop, containerBottom - winHeight);
-                    
-                    // 应用新位置
-                    win.style.left = newLeft + 'px';
-                    win.style.top = newTop + 'px';
-                };
-                
-                const mouseupHandler = (ev) => {
-                    if(!dragState.dragging) return;
-                    dragState.dragging = false;
-                    bar.classList.remove('dragging');
-                };
-                
-                // 存储事件处理器引用，以便后续清理
-                this._dragMousemoveHandler = mousemoveHandler;
-                this._dragMouseupHandler = mouseupHandler;
-                
-                document.addEventListener('mousemove', mousemoveHandler);
-                document.addEventListener('mouseup', mouseupHandler);
+                }
             }
+            } // 结束 if (!hasGUIManager) 块
         }
 
         // Window control APIs
@@ -2451,6 +3231,26 @@ function escapeHtml(s){
             // 使用基于pid的选择器，确保每个实例绑定自己的resizer
             const bashWindow = this.terminalElement ? this.terminalElement.closest('.bash-window') : null;
             if (!bashWindow) {
+                return;
+            }
+            
+            // 检查是否使用了 GUIManager（如果使用了，拉伸由 GUIManager 自动处理）
+            let hasGUIManager = false;
+            try {
+                const pool = safeGetPool();
+                if (pool && typeof pool.__GET__ === 'function') {
+                    const guiMgr = pool.__GET__("KERNEL_GLOBAL_POOL", "GUIManager");
+                    hasGUIManager = (guiMgr && typeof guiMgr.registerWindow === 'function');
+                }
+            } catch (e) {
+                // 忽略错误
+            }
+            if (!hasGUIManager && typeof window !== 'undefined' && window.GUIManager) {
+                hasGUIManager = (typeof window.GUIManager.registerWindow === 'function');
+            }
+            
+            // 如果使用了 GUIManager，拉伸功能由 GUIManager 自动处理，这里跳过
+            if (hasGUIManager) {
                 return;
             }
             
@@ -2579,12 +3379,28 @@ function escapeHtml(s){
                 resizeState.anchor = null;
             };
             
-            // 存储事件处理器引用，以便后续清理
-            this._resizeMousemoveHandler = mousemoveHandler;
-            this._resizeMouseupHandler = mouseupHandler;
-            
-            document.addEventListener('mousemove', mousemoveHandler);
-            document.addEventListener('mouseup', mouseupHandler);
+            // 使用 EventManager 注册临时拉伸事件
+            if (typeof EventManager !== 'undefined' && this.pid) {
+                const mousemoveHandlerId = EventManager.registerEventHandler(this.pid, 'mousemove', mousemoveHandler, {
+                    priority: 50,
+                    once: false
+                });
+                
+                const mouseupHandlerId = EventManager.registerEventHandler(this.pid, 'mouseup', mouseupHandler, {
+                    priority: 50,
+                    once: true
+                });
+                
+                // 存储事件处理器ID，以便后续清理
+                if (!this._resizeEventHandlers) {
+                    this._resizeEventHandlers = [];
+                }
+                this._resizeEventHandlers.push(mousemoveHandlerId, mouseupHandlerId);
+            } else {
+                // 降级：直接使用 addEventListener（不推荐）
+                document.addEventListener('mousemove', mousemoveHandler);
+                document.addEventListener('mouseup', mouseupHandler);
+            }
         }
 
         // apply config at runtime
@@ -2805,14 +3621,32 @@ function escapeHtml(s){
                 if(i === this._completionState.index){
                     item.style.background = '#2a2a2a';
                 }
-                // 点击选择
-                item.addEventListener('mousedown', (ev) => {
-                    ev.preventDefault();
-                    const state = this._completionState;
-                    state.index = i;
-                    this._completionState = state; // 触发保存
-                    this._acceptCompletion();
-                });
+                // 点击选择（使用 EventManager）
+                if (typeof EventManager !== 'undefined' && this.pid) {
+                    const itemId = `terminal-completion-item-${i}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                    item.dataset.eventId = itemId;
+                    EventManager.registerEventHandler(this.pid, 'mousedown', (ev) => {
+                        if (item === ev.target || item.contains(ev.target)) {
+                            ev.preventDefault();
+                            const state = this._completionState;
+                            state.index = i;
+                            this._completionState = state; // 触发保存
+                            this._acceptCompletion();
+                        }
+                    }, {
+                        priority: 100,
+                        selector: `[data-event-id="${itemId}"]`
+                    });
+                } else {
+                    // 降级方案
+                    item.addEventListener('mousedown', (ev) => {
+                        ev.preventDefault();
+                        const state = this._completionState;
+                        state.index = i;
+                        this._completionState = state; // 触发保存
+                        this._acceptCompletion();
+                    });
+                }
                 ul.appendChild(item);
             }
             this._completionBox.appendChild(ul);
@@ -3682,6 +4516,68 @@ function escapeHtml(s){
         const commandHandler = (payload) => {
         const cmd = payload.args[0];
         switch(cmd){
+            case 'exit':
+                // exit 命令：关闭当前终端程序进程
+                if (typeof ProcessManager !== 'undefined' && typeof ProcessManager.killProgram === 'function') {
+                    // 动态获取终端程序的 PID
+                    let terminalProgramPid = null;
+                    
+                    // 方法1：直接从 terminalInstance.pid 获取（最可靠的方法）
+                    if (terminalInstance && terminalInstance.pid) {
+                        terminalProgramPid = terminalInstance.pid;
+                    }
+                    // 方法2：从 terminalInstance.tabManager.pid 获取
+                    else if (terminalInstance && terminalInstance.tabManager && terminalInstance.tabManager.pid) {
+                        terminalProgramPid = terminalInstance.tabManager.pid;
+                    }
+                    // 方法3：从 TERMINAL._instances 中查找当前实例对应的 PID
+                    else if (typeof TERMINAL !== 'undefined' && TERMINAL._instances && TERMINAL._instances.size > 0) {
+                        // 遍历所有实例，找到包含当前 terminalInstance 的实例
+                        for (const [pid, instance] of TERMINAL._instances) {
+                            if (instance && instance.tabManager) {
+                                // 检查当前 terminalInstance 是否属于这个 tabManager
+                                const tabs = instance.tabManager.tabs || [];
+                                const found = tabs.some(tab => tab.terminalInstance === terminalInstance);
+                                if (found) {
+                                    terminalProgramPid = pid;
+                                    break;
+                                }
+                            }
+                        }
+                        // 如果还是找不到，使用第一个实例的 PID（降级方案）
+                        if (!terminalProgramPid) {
+                            const firstInstance = TERMINAL._instances.values().next().value;
+                            if (firstInstance && firstInstance.pid) {
+                                terminalProgramPid = firstInstance.pid;
+                            }
+                        }
+                    }
+                    // 方法4：从 ProcessManager 中查找终端进程（最后降级方案）
+                    if (!terminalProgramPid && typeof ProcessManager !== 'undefined' && typeof ProcessManager.listProcesses === 'function') {
+                        try {
+                            const processes = ProcessManager.listProcesses();
+                            const terminalProcesses = processes.filter(p => {
+                                const programName = p.programName || '';
+                                return programName.toLowerCase() === 'terminal' && p.status === 'running';
+                            });
+                            // 如果有多个终端进程，使用第一个（无法确定是哪个）
+                            if (terminalProcesses.length > 0) {
+                                terminalProgramPid = terminalProcesses[0].pid;
+                            }
+                        } catch (e) {
+                            // 忽略错误
+                        }
+                    }
+                    
+                    if (terminalProgramPid) {
+                        ProcessManager.killProgram(terminalProgramPid);
+                    } else {
+                        payload.write('exit: 无法获取终端进程ID');
+                    }
+                } else {
+                    payload.write('exit: ProcessManager 不可用');
+                }
+                break;
             case 'clear':
                 terminalInstance.clear();
                 break;
@@ -5482,7 +6378,75 @@ function escapeHtml(s){
                     check('DynamicManager', typeof DynamicManager !== 'undefined',
                         typeof DynamicManager !== 'undefined' ? '已加载' : '未加载');
                     
-                    // ========== 8. 终端环境检查 ==========
+                    // ========== 8. 驱动层检查 ==========
+                    report.push('');
+                    report.push('--- 驱动层检查 ---');
+                    
+                    // MultithreadingDrive
+                    check('MultithreadingDrive', typeof MultithreadingDrive !== 'undefined',
+                        typeof MultithreadingDrive !== 'undefined' ? '已加载' : '未加载');
+                    if (typeof MultithreadingDrive !== 'undefined') {
+                        check('MultithreadingDrive.createThread', typeof MultithreadingDrive.createThread === 'function');
+                        check('MultithreadingDrive.executeTask', typeof MultithreadingDrive.executeTask === 'function');
+                        check('MultithreadingDrive.getPoolStatus', typeof MultithreadingDrive.getPoolStatus === 'function');
+                    }
+                    
+                    // DragDrive
+                    check('DragDrive', typeof DragDrive !== 'undefined',
+                        typeof DragDrive !== 'undefined' ? '已加载' : '未加载');
+                    if (typeof DragDrive !== 'undefined') {
+                        check('DragDrive.createDragSession', typeof DragDrive.createDragSession === 'function');
+                        check('DragDrive.enableDrag', typeof DragDrive.enableDrag === 'function');
+                        check('DragDrive.registerDropZone', typeof DragDrive.registerDropZone === 'function');
+                    }
+                    
+                    // GeographyDrive
+                    check('GeographyDrive', typeof GeographyDrive !== 'undefined',
+                        typeof GeographyDrive !== 'undefined' ? '已加载' : '未加载');
+                    if (typeof GeographyDrive !== 'undefined') {
+                        check('GeographyDrive.getCurrentPosition', typeof GeographyDrive.getCurrentPosition === 'function');
+                        check('GeographyDrive.isSupported', typeof GeographyDrive.isSupported === 'function');
+                    }
+                    
+                    // CryptDrive
+                    check('CryptDrive', typeof CryptDrive !== 'undefined',
+                        typeof CryptDrive !== 'undefined' ? '已加载' : '未加载');
+                    if (typeof CryptDrive !== 'undefined') {
+                        check('CryptDrive.generateKeyPair', typeof CryptDrive.generateKeyPair === 'function');
+                        check('CryptDrive.importKeyPair', typeof CryptDrive.importKeyPair === 'function');
+                        check('CryptDrive.encrypt', typeof CryptDrive.encrypt === 'function');
+                        check('CryptDrive.decrypt', typeof CryptDrive.decrypt === 'function');
+                        check('CryptDrive.md5', typeof CryptDrive.md5 === 'function');
+                        check('CryptDrive.randomInt', typeof CryptDrive.randomInt === 'function');
+                        check('CryptDrive.randomFloat', typeof CryptDrive.randomFloat === 'function');
+                        check('CryptDrive.randomBoolean', typeof CryptDrive.randomBoolean === 'function');
+                        check('CryptDrive.randomString', typeof CryptDrive.randomString === 'function');
+                        check('CryptDrive.listKeys', typeof CryptDrive.listKeys === 'function');
+                        check('CryptDrive.deleteKey', typeof CryptDrive.deleteKey === 'function');
+                        check('CryptDrive.setDefaultKey', typeof CryptDrive.setDefaultKey === 'function');
+                        
+                        // 检查密钥列表
+                        try {
+                            const keys = CryptDrive.listKeys();
+                            if (keys && keys.length > 0) {
+                                info('已存储的密钥', `${keys.length} 个`);
+                                keys.forEach(key => {
+                                    const keyInfo = CryptDrive.getKeyInfo ? CryptDrive.getKeyInfo(key.id) : null;
+                                    if (keyInfo) {
+                                        const expired = keyInfo.expiresAt && new Date(keyInfo.expiresAt) < new Date();
+                                        const status = expired ? '已过期' : (keyInfo.isDefault ? '默认' : '正常');
+                                        info(`  密钥 ${key.id}`, `${status}${keyInfo.description ? ' - ' + keyInfo.description : ''}`);
+                                    }
+                                });
+                            } else {
+                                info('已存储的密钥', '无');
+                            }
+                        } catch (e) {
+                            warn('密钥列表', `获取失败: ${e.message}`);
+                        }
+                    }
+                    
+                    // ========== 9. 终端环境检查 ==========
                     report.push('');
                     report.push('--- 终端环境检查 ---');
                     
@@ -6138,7 +7102,7 @@ function escapeHtml(s){
                 version: '1.0.0',
                 description: 'ZerOS Bash风格终端',
                 author: 'ZerOS Team',
-                copyright: 'Copyright (c) 2024 ZerOS',
+                copyright: '© 2025 ZerOS',
                 capabilities: [
                     'command_execution',
                     'tab_management',
@@ -6151,7 +7115,8 @@ function escapeHtml(s){
                     PermissionManager.PERMISSION.KERNEL_DISK_READ,
                     PermissionManager.PERMISSION.KERNEL_DISK_WRITE,
                     PermissionManager.PERMISSION.KERNEL_DISK_LIST,
-                    PermissionManager.PERMISSION.PROCESS_MANAGE
+                    PermissionManager.PERMISSION.PROCESS_MANAGE,
+                    PermissionManager.PERMISSION.EVENT_LISTENER
                 ] : [],
                 metadata: {
                     autoStart: true,  // 终端作为系统内置程序，自动启动
@@ -6419,6 +7384,19 @@ function escapeHtml(s){
         
         // 退出方法（由 ProcessManager 调用）
         __exit__(pid, force = false) {
+            // 清理所有事件处理器（通过 EventManager）
+            if (typeof EventManager !== 'undefined' && pid) {
+                EventManager.unregisterAllHandlersForPid(pid);
+            }
+            
+            // 清理窗口焦点事件处理器（如果是最后一个终端实例）
+            if (tabManager && tabManager.tabs.length === 0 && window._terminalWindowFocusHandler) {
+                if (typeof EventManager !== 'undefined' && typeof window._terminalWindowFocusHandler === 'number') {
+                    const exploitPid = typeof ProcessManager !== 'undefined' ? ProcessManager.EXPLOIT_PID : 10000;
+                    EventManager.unregisterEventHandler(window._terminalWindowFocusHandler);
+                }
+                window._terminalWindowFocusHandler = null;
+            }
             // 获取当前实例的 tabManager
             let instanceTabManager = null;
             if (TERMINAL._instances && TERMINAL._instances.has(pid)) {
@@ -6490,12 +7468,30 @@ function escapeHtml(s){
                 TERMINAL._instances = null;
             }
             
+            // 先注销窗口（如果使用 GUIManager），确保标题栏保护机制被正确清理
+            if (typeof GUIManager !== 'undefined' && typeof GUIManager.getWindowsByPid === 'function') {
+                const windows = GUIManager.getWindowsByPid(pid);
+                for (const windowInfo of windows) {
+                    if (windowInfo.windowId && typeof GUIManager.unregisterWindow === 'function') {
+                        try {
+                            GUIManager.unregisterWindow(windowInfo.windowId);
+                        } catch (e) {
+                            // 忽略错误，继续清理
+                        }
+                    }
+                }
+            }
+            
             // 清理该实例的 DOM 元素（通过 pid 标记）
+            // 注意：在注销窗口后，窗口元素可能已经被 GUIManager 移除，所以这里只清理其他元素
             if (typeof document !== 'undefined') {
                 const elementsToRemove = document.querySelectorAll(`[data-pid="${pid}"]`);
                 elementsToRemove.forEach(el => {
                     try {
-                        el.remove();
+                        // 检查元素是否还在 DOM 中，以及是否是窗口元素（窗口元素应该已经被 GUIManager 移除）
+                        if (el.parentElement && !el.classList.contains('zos-gui-window')) {
+                            el.remove();
+                        }
                     } catch (e) {
                         // 忽略错误
                     }
