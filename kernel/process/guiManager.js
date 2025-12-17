@@ -185,9 +185,9 @@ class GUIManager {
             let newZIndex = GUIManager._baseZIndex + 1;
             for (const [wid, info] of sortedWindows) {
                 info.zIndex = newZIndex;
-                // 立即更新DOM中的z-index，确保立即生效
+                // 立即更新DOM中的z-index，确保立即生效（使用 !important）
                 if (info.window && info.window.style) {
-                    info.window.style.zIndex = newZIndex.toString();
+                    info.window.style.setProperty('z-index', newZIndex.toString(), 'important');
                 }
                 newZIndex++;
             }
@@ -233,8 +233,8 @@ class GUIManager {
         windowElement.dataset.windowId = windowId;
         windowElement.dataset.pid = pid.toString();
         
-        // 设置初始z-index（确保覆盖任何内联样式）
-        windowElement.style.zIndex = windowInfo.zIndex.toString();
+        // 设置初始z-index（确保覆盖任何内联样式，使用 !important）
+        windowElement.style.setProperty('z-index', windowInfo.zIndex.toString(), 'important');
         // 确保z-index立即生效
         windowElement.style.display = windowElement.style.display || '';
         
@@ -1472,14 +1472,55 @@ class GUIManager {
             GUIManager.restoreWindow(windowId, false);
         }
         
+        // 先移除之前焦点窗口的焦点状态并降低其 z-index，避免影响 maxZIndex 的计算
+        let prevFocusedWindowId = null;
+        if (GUIManager._focusedWindowId && GUIManager._windows.has(GUIManager._focusedWindowId)) {
+            prevFocusedWindowId = GUIManager._focusedWindowId;
+            const isSameWindow = (prevFocusedWindowId === windowId);
+            
+            // 如果当前窗口就是之前失去焦点的窗口，不需要降低它的 z-index
+            // 因为我们会立即将它设置为新的焦点窗口，z-index 会被重新计算
+            if (!isSameWindow) {
+                const prevWindowInfo = GUIManager._windows.get(GUIManager._focusedWindowId);
+                prevWindowInfo.isFocused = false;
+                prevWindowInfo.window.classList.remove('zos-window-focused');
+                // 同时移除终端窗口自己的focused类（如果存在）
+                prevWindowInfo.window.classList.remove('focused');
+                
+                // 降低失去焦点窗口的 z-index，避免错误置顶
+                // 使用窗口创建时间的后几位作为偏移量，但限制在合理范围内（最大 100）
+                // 这样确保失去焦点的窗口的 z-index 不会太高（最大 baseZIndex + 1 + 100 = 1101）
+                const baseZIndex = GUIManager._baseZIndex;
+                const timeOffset = Math.min((prevWindowInfo.createdAt % 100) || 0, 100);
+                const oldZIndex = prevWindowInfo.zIndex; // 保存降低前的值用于日志
+                const newZIndex = baseZIndex + 1 + timeOffset;
+                prevWindowInfo.zIndex = newZIndex;
+                if (prevWindowInfo.window && prevWindowInfo.window.style) {
+                    // 使用 !important 确保覆盖 CSS 规则
+                    prevWindowInfo.window.style.setProperty('z-index', newZIndex.toString(), 'important');
+                }
+                
+                KernelLogger.debug("GUIManager", `降低之前焦点窗口的 z-index: WindowID ${prevFocusedWindowId}, 从 ${oldZIndex} 降低到 ${newZIndex}`);
+            } else {
+                // 如果当前窗口就是之前失去焦点的窗口，只移除焦点状态，不降低 z-index
+                windowInfo.isFocused = false;
+                windowInfo.window.classList.remove('zos-window-focused');
+                windowInfo.window.classList.remove('focused');
+                KernelLogger.debug("GUIManager", `当前窗口就是之前失去焦点的窗口，跳过 z-index 降低: WindowID ${windowId}`);
+            }
+        }
+        
         // 更新z-index（确保焦点窗口在最前）
-        // 查找当前所有窗口的最大z-index
+        // 查找当前所有窗口的最大z-index（此时之前焦点窗口的 z-index 已经降低）
         let maxZIndex = GUIManager._baseZIndex;
+        const allZIndexes = [];
         for (const [existingWindowId, existingInfo] of GUIManager._windows) {
+            allZIndexes.push({ windowId: existingWindowId, zIndex: existingInfo.zIndex, isFocused: existingInfo.isFocused });
             if (existingWindowId !== windowId && existingInfo.zIndex > maxZIndex) {
                 maxZIndex = existingInfo.zIndex;
             }
         }
+        KernelLogger.debug("GUIManager", `计算 maxZIndex: 所有窗口的 z-index = ${JSON.stringify(allZIndexes)}, maxZIndex = ${maxZIndex}, 新焦点窗口 ${windowId} 将设置为 ${maxZIndex + 1}`);
         
         // 焦点窗口的z-index应该比所有其他窗口大
         windowInfo.zIndex = maxZIndex + 1;
@@ -1494,9 +1535,9 @@ class GUIManager {
             let newZIndex = GUIManager._baseZIndex + 1;
             for (const [wid, info] of sortedWindows) {
                 info.zIndex = newZIndex;
-                // 立即更新DOM中的z-index，确保立即生效
+                // 立即更新DOM中的z-index，确保立即生效（使用 !important 覆盖之前的 !important）
                 if (info.window && info.window.style) {
-                    info.window.style.zIndex = newZIndex.toString();
+                    info.window.style.setProperty('z-index', newZIndex.toString(), 'important');
                 }
                 newZIndex++;
             }
@@ -1508,21 +1549,57 @@ class GUIManager {
         // 立即更新DOM中的z-index，确保立即生效
         if (windowInfo.window && windowInfo.window.style) {
             // 使用!important确保覆盖任何CSS规则
-            windowInfo.window.style.setProperty('z-index', windowInfo.zIndex.toString(), 'important');
+            const newZIndexValue = windowInfo.zIndex.toString();
+            windowInfo.window.style.setProperty('z-index', newZIndexValue, 'important');
+            
+            // 立即检查所有窗口的实际 DOM z-index，确保焦点窗口确实是最高的
+            // 使用 setTimeout 确保浏览器已经应用了样式
+            setTimeout(() => {
+                const allComputedZIndexes = [];
+                let maxComputedZIndex = 0;
+                let maxComputedWindowId = null;
+                
+                for (const [wid, info] of GUIManager._windows) {
+                    if (info.window) {
+                        const computed = getComputedStyle(info.window).zIndex;
+                        const computedNum = parseInt(computed) || 0;
+                        allComputedZIndexes.push({ 
+                            windowId: wid, 
+                            zIndex: info.zIndex, 
+                            computedZIndex: computed, 
+                            computedNum: computedNum,
+                            isFocused: info.isFocused 
+                        });
+                        
+                        if (computedNum > maxComputedZIndex) {
+                            maxComputedZIndex = computedNum;
+                            maxComputedWindowId = wid;
+                        }
+                    }
+                }
+                
+                const focusedComputedZIndex = parseInt(getComputedStyle(windowInfo.window).zIndex) || 0;
+                
+                // 如果焦点窗口的 z-index 不是最高的，强制修复
+                if (focusedComputedZIndex < maxComputedZIndex && maxComputedWindowId !== windowId) {
+                    KernelLogger.warn("GUIManager", `焦点窗口 z-index 不是最高的! 所有窗口的 z-index: ${JSON.stringify(allComputedZIndexes)}, 焦点窗口 ${windowId} 的 z-index: ${focusedComputedZIndex}, 最大 z-index: ${maxComputedZIndex} (窗口 ${maxComputedWindowId})`);
+                    
+                    // 强制修复：再次设置焦点窗口的 z-index，并确保它比所有其他窗口都高
+                    const fixedZIndex = maxComputedZIndex + 1;
+                    windowInfo.zIndex = fixedZIndex;
+                    windowInfo.window.style.setProperty('z-index', fixedZIndex.toString(), 'important');
+                    
+                    KernelLogger.warn("GUIManager", `已强制修复焦点窗口 z-index: ${windowId} 设置为 ${fixedZIndex}`);
+                } else {
+                    KernelLogger.debug("GUIManager", `焦点窗口 z-index 验证通过: ${windowId} = ${focusedComputedZIndex}, 所有窗口: ${JSON.stringify(allComputedZIndexes)}`);
+                }
+            }, 0);
+            
             // 强制浏览器重新计算样式
             const currentDisplay = windowInfo.window.style.display || getComputedStyle(windowInfo.window).display;
             if (currentDisplay) {
                 windowInfo.window.style.display = currentDisplay;
             }
-        }
-        
-        // 移除之前焦点窗口的焦点状态
-        if (GUIManager._focusedWindowId && GUIManager._windows.has(GUIManager._focusedWindowId)) {
-            const prevWindowInfo = GUIManager._windows.get(GUIManager._focusedWindowId);
-            prevWindowInfo.isFocused = false;
-            prevWindowInfo.window.classList.remove('zos-window-focused');
-            // 同时移除终端窗口自己的focused类（如果存在）
-            prevWindowInfo.window.classList.remove('focused');
         }
         
         // 设置新焦点窗口

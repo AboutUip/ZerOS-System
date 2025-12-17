@@ -220,37 +220,37 @@
                     }
                 } else {
                     // 加载 LocalSData.json（LStorage 的数据）
-                    if (typeof LStorage === 'undefined') {
-                        throw new Error('LStorage 不可用');
-                    }
-                    
-                    // 确保LStorage已初始化
-                    if (!LStorage._initialized) {
-                        await LStorage.init();
-                    }
-                    
-                    // 重新加载数据（清除缓存）
-                    await LStorage._loadStorageData(false);
-                    
-                    // 直接访问_storageData（注册表编辑器需要访问完整数据）
-                    this.storageData = LStorage._storageData;
-                    
-                    if (!this.storageData) {
+                if (typeof LStorage === 'undefined') {
+                    throw new Error('LStorage 不可用');
+                }
+                
+                // 确保LStorage已初始化
+                if (!LStorage._initialized) {
+                    await LStorage.init();
+                }
+                
+                // 重新加载数据（清除缓存）
+                await LStorage._loadStorageData(false);
+                
+                // 直接访问_storageData（注册表编辑器需要访问完整数据）
+                this.storageData = LStorage._storageData;
+                
+                if (!this.storageData) {
                         if (typeof KernelLogger !== 'undefined') {
                             KernelLogger.warn('RegEdit', 'storageData 为 null，使用默认值');
                         }
-                        this.storageData = {
-                            system: {},
-                            programs: {}
-                        };
-                    } else {
-                        // 确保 system 和 programs 存在
-                        if (!this.storageData.system) {
-                            this.storageData.system = {};
-                        }
-                        if (!this.storageData.programs) {
-                            this.storageData.programs = {};
-                        }
+                    this.storageData = {
+                        system: {},
+                        programs: {}
+                    };
+                } else {
+                    // 确保 system 和 programs 存在
+                    if (!this.storageData.system) {
+                        this.storageData.system = {};
+                    }
+                    if (!this.storageData.programs) {
+                        this.storageData.programs = {};
+                    }
                         if (typeof KernelLogger !== 'undefined') {
                             KernelLogger.debug('RegEdit', `LocalSData 数据加载成功，system键数: ${Object.keys(this.storageData.system).length}, programs键数: ${Object.keys(this.storageData.programs).length}`);
                         }
@@ -320,9 +320,9 @@
                 });
                 // 如果权限不足，使用降级方案
                 if (clickId === null) {
-                    root.addEventListener('click', () => {
-                        this._selectPath('');
-                    });
+            root.addEventListener('click', () => {
+                this._selectPath('');
+            });
                 }
             } else {
                 root.addEventListener('click', () => {
@@ -457,38 +457,38 @@
             
             // 如果 EventManager 不可用或权限不足，使用降级方案
             if (!useEventManager) {
-                node.addEventListener('mouseenter', () => {
-                    if (this.selectedPath !== key) {
-                        node.style.background = 'rgba(108, 142, 255, 0.1)';
-                    }
-                });
+            node.addEventListener('mouseenter', () => {
+                if (this.selectedPath !== key) {
+                    node.style.background = 'rgba(108, 142, 255, 0.1)';
+                }
+            });
+            
+            node.addEventListener('mouseleave', () => {
+                if (this.selectedPath !== key) {
+                    node.style.background = 'transparent';
+                }
+            });
+            
+            node.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this._selectPath(key);
                 
-                node.addEventListener('mouseleave', () => {
-                    if (this.selectedPath !== key) {
-                        node.style.background = 'transparent';
-                    }
-                });
-                
-                node.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    this._selectPath(key);
-                    
-                    // 如果是对象且有子节点，展开/折叠
-                    if (hasChildren) {
-                        const wasExpanded = node.dataset.expanded === 'true';
-                        if (wasExpanded) {
-                            expandedPaths.delete(key);
-                            node.dataset.expanded = 'false';
-                        } else {
-                            expandedPaths.add(key);
-                            node.dataset.expanded = 'true';
-                        }
-                        this._renderTree(); // 重新渲染以更新展开状态
+                // 如果是对象且有子节点，展开/折叠
+                if (hasChildren) {
+                    const wasExpanded = node.dataset.expanded === 'true';
+                    if (wasExpanded) {
+                        expandedPaths.delete(key);
+                        node.dataset.expanded = 'false';
                     } else {
-                        // 没有子节点，只选择路径
-                        this._selectPath(key);
+                        expandedPaths.add(key);
+                        node.dataset.expanded = 'true';
                     }
-                });
+                    this._renderTree(); // 重新渲染以更新展开状态
+                } else {
+                    // 没有子节点，只选择路径
+                    this._selectPath(key);
+                }
+            });
             }
             
             // 注意：子节点的创建在_renderTree中处理，这里只返回当前节点
@@ -578,10 +578,29 @@
                     if (pathParts.length === 1) {
                         // data 已经是 programs 对象
                     } else {
-                        // 路径是 'programs.xxx'，需要在 programs 对象中查找键 'xxx'
-                        const keyInPrograms = pathParts.slice(1).join('.');
-                        if (data && typeof data === 'object' && keyInPrograms in data) {
-                            data = data[keyInPrograms];
+                        // 路径是 'programs.xxx.yyy.zzz'，需要逐层解析
+                        // 第一层是程序名（如 'TaskbarManager'），后续层是嵌套的键
+                        // 例如：'programs.TaskbarManager.weather:晋城市.value.code'
+                        // 应该解析为：programs['TaskbarManager']['weather:晋城市']['value']['code']
+                        
+                        // 先获取程序名（第一层）
+                        const programName = pathParts[1];
+                        if (data && typeof data === 'object' && programName in data) {
+                            data = data[programName];
+                            
+                            // 如果有更多层级，继续解析
+                            if (pathParts.length > 2) {
+                                // 从第三层开始逐层解析（跳过 'programs' 和程序名）
+                                for (let i = 2; i < pathParts.length; i++) {
+                                    const part = pathParts[i];
+                                    if (data && typeof data === 'object' && part in data) {
+                                        data = data[part];
+                                    } else {
+                                        data = null;
+                                        break;
+                                    }
+                                }
+                            }
                         } else {
                             data = null;
                         }
@@ -706,13 +725,13 @@
             
             // 如果 EventManager 不可用或权限不足，使用降级方案
             if (!useEventManager) {
-                row.addEventListener('mouseenter', () => {
-                    row.style.background = 'rgba(108, 142, 255, 0.1)';
-                });
-                
-                row.addEventListener('mouseleave', () => {
-                    row.style.background = 'transparent';
-                });
+            row.addEventListener('mouseenter', () => {
+                row.style.background = 'rgba(108, 142, 255, 0.1)';
+            });
+            
+            row.addEventListener('mouseleave', () => {
+                row.style.background = 'transparent';
+            });
                 
                 row.addEventListener('dblclick', () => {
                     if (typeof value === 'object' && value !== null) {
@@ -908,17 +927,17 @@
             textarea.value = isObject ? JSON.stringify(currentValue, null, 2) : String(currentValue);
             textarea.style.cssText = `
                 flex: 1;
-                width: 100%;
+                    width: 100%;
                 min-height: 200px;
-                background: rgba(20, 20, 30, 0.8);
-                border: 1px solid rgba(108, 142, 255, 0.3);
-                border-radius: 4px;
-                padding: 10px;
-                color: rgba(215, 224, 221, 0.9);
-                font-family: monospace;
-                font-size: 12px;
-                resize: vertical;
-                box-sizing: border-box;
+                    background: rgba(20, 20, 30, 0.8);
+                    border: 1px solid rgba(108, 142, 255, 0.3);
+                    border-radius: 4px;
+                    padding: 10px;
+                    color: rgba(215, 224, 221, 0.9);
+                    font-family: monospace;
+                    font-size: 12px;
+                    resize: vertical;
+                    box-sizing: border-box;
                 outline: none;
             `;
             content.appendChild(textarea);
@@ -935,24 +954,24 @@
             const cancelBtn = document.createElement('button');
             cancelBtn.textContent = '取消';
             cancelBtn.style.cssText = `
-                padding: 8px 20px;
-                background: rgba(100, 100, 100, 0.3);
-                border: 1px solid rgba(108, 142, 255, 0.3);
-                border-radius: 4px;
-                color: rgba(215, 224, 221, 0.9);
-                cursor: pointer;
+                        padding: 8px 20px;
+                        background: rgba(100, 100, 100, 0.3);
+                        border: 1px solid rgba(108, 142, 255, 0.3);
+                        border-radius: 4px;
+                        color: rgba(215, 224, 221, 0.9);
+                        cursor: pointer;
                 transition: all 0.2s;
             `;
             
             const saveBtn = document.createElement('button');
             saveBtn.textContent = '保存';
             saveBtn.style.cssText = `
-                padding: 8px 20px;
-                background: rgba(108, 142, 255, 0.3);
-                border: 1px solid rgba(108, 142, 255, 0.5);
-                border-radius: 4px;
-                color: rgba(215, 224, 221, 0.9);
-                cursor: pointer;
+                        padding: 8px 20px;
+                        background: rgba(108, 142, 255, 0.3);
+                        border: 1px solid rgba(108, 142, 255, 0.5);
+                        border-radius: 4px;
+                        color: rgba(215, 224, 221, 0.9);
+                        cursor: pointer;
                 transition: all 0.2s;
             `;
             
@@ -1001,28 +1020,28 @@
                 });
                 
                 EventManager.registerElementEvent(this.pid, saveBtn, 'click', async () => {
+                try {
+                    const newValueText = textarea.value.trim();
+                    let newValue;
+                    
+                    // 尝试解析JSON
                     try {
-                        const newValueText = textarea.value.trim();
-                        let newValue;
-                        
-                        // 尝试解析JSON
-                        try {
-                            newValue = JSON.parse(newValueText);
-                        } catch (e) {
-                            // 如果不是JSON，尝试按原类型转换
-                            if (valueType === 'number') {
-                                newValue = parseFloat(newValueText);
-                                if (isNaN(newValue)) {
-                                    throw new Error('无效的数字');
-                                }
-                            } else if (valueType === 'boolean') {
-                                newValue = newValueText === 'true';
-                            } else {
-                                newValue = newValueText;
+                        newValue = JSON.parse(newValueText);
+                    } catch (e) {
+                        // 如果不是JSON，尝试按原类型转换
+                        if (valueType === 'number') {
+                            newValue = parseFloat(newValueText);
+                            if (isNaN(newValue)) {
+                                throw new Error('无效的数字');
                             }
+                        } else if (valueType === 'boolean') {
+                            newValue = newValueText === 'true';
+                        } else {
+                            newValue = newValueText;
                         }
-                        
-                        await this._setValue(parentPath, key, newValue);
+                    }
+                    
+                    await this._setValue(parentPath, key, newValue);
                         
                         // 关闭窗口
                         if (windowInfo && windowInfo.windowId) {
@@ -1032,14 +1051,14 @@
                         }
                         
                         // 刷新数据
-                        this._refreshData();
-                        this._renderValues(this.selectedPath);
-                    } catch (error) {
+                    this._refreshData();
+                    this._renderValues(this.selectedPath);
+                } catch (error) {
                         if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
                             GUIManager.showAlert('保存失败: ' + error.message);
                         } else {
-                            alert('保存失败: ' + error.message);
-                        }
+                    alert('保存失败: ' + error.message);
+                }
                     }
                 });
             } else {
@@ -1092,8 +1111,8 @@
                         } else {
                             alert('保存失败: ' + error.message);
                         }
-                    }
-                });
+                }
+            });
             }
             
             // 聚焦新窗口
@@ -1173,15 +1192,15 @@
                             throw new Error('LStorage 不可用');
                         }
                         
-                        if (parentPath === 'system' || (parentPath && parentPath.startsWith('system.'))) {
-                            await LStorage.setSystemStorage(key, value);
-                        } else {
-                            // 需要手动保存整个数据
+                if (parentPath === 'system' || (parentPath && parentPath.startsWith('system.'))) {
+                    await LStorage.setSystemStorage(key, value);
+                } else {
+                    // 需要手动保存整个数据
                             // 确保 LStorage._storageData 与 this.storageData 同步
                             if (LStorage._storageData !== this.storageData) {
                                 LStorage._storageData = this.storageData;
                             }
-                            await LStorage._saveStorageData();
+                    await LStorage._saveStorageData();
                         }
                     }
                 } catch (saveError) {
@@ -1701,13 +1720,13 @@
                 });
             } else {
                 // 降级方案
-                row.addEventListener('mouseenter', () => {
-                    row.style.background = 'rgba(108, 142, 255, 0.1)';
-                });
-                
-                row.addEventListener('mouseleave', () => {
-                    row.style.background = 'transparent';
-                });
+            row.addEventListener('mouseenter', () => {
+                row.style.background = 'rgba(108, 142, 255, 0.1)';
+            });
+            
+            row.addEventListener('mouseleave', () => {
+                row.style.background = 'transparent';
+            });
             }
             
             const nameCell = document.createElement('div');
@@ -1771,15 +1790,15 @@
                 });
             } else {
                 // 降级方案
-                row.addEventListener('dblclick', () => {
-                    if (typeof value === 'object' && value !== null) {
-                        // 对象或数组，打开新窗口
-                        this._openChildWindow(key, value, parentPath);
-                    } else {
-                        // 其他类型，编辑
-                        this._editValue(parentPath, key, value);
-                    }
-                });
+            row.addEventListener('dblclick', () => {
+                if (typeof value === 'object' && value !== null) {
+                    // 对象或数组，打开新窗口
+                    this._openChildWindow(key, value, parentPath);
+                } else {
+                    // 其他类型，编辑
+                    this._editValue(parentPath, key, value);
+                }
+            });
             }
             
             row.appendChild(nameCell);
@@ -1816,13 +1835,13 @@
                 EventManager.registerElementEvent(this.pid, btn, 'click', onClick);
             } else {
                 // 降级方案
-                btn.addEventListener('mouseenter', () => {
-                    btn.style.background = 'rgba(108, 142, 255, 0.2)';
-                });
-                btn.addEventListener('mouseleave', () => {
-                    btn.style.background = 'transparent';
-                });
-                btn.addEventListener('click', onClick);
+            btn.addEventListener('mouseenter', () => {
+                btn.style.background = 'rgba(108, 142, 255, 0.2)';
+            });
+            btn.addEventListener('mouseleave', () => {
+                btn.style.background = 'transparent';
+            });
+            btn.addEventListener('click', onClick);
             }
             
             return btn;
@@ -1842,7 +1861,7 @@
                     await this._loadRegistryData();
                     if (!this.storageData || typeof this.storageData !== 'object') {
                         throw new Error('无法加载存储数据，操作已取消');
-                    }
+            }
                 }
                 
                 // 确保 system 和 programs 存在
@@ -1896,15 +1915,15 @@
                             throw new Error('LStorage 不可用');
                         }
                         
-                        if (parentPath === 'system' || (parentPath && parentPath.startsWith('system.'))) {
-                            await LStorage.deleteSystemStorage(key);
-                        } else {
-                            // 需要手动保存整个数据
+                if (parentPath === 'system' || (parentPath && parentPath.startsWith('system.'))) {
+                    await LStorage.deleteSystemStorage(key);
+                } else {
+                    // 需要手动保存整个数据
                             // 确保 LStorage._storageData 与 this.storageData 同步
                             if (LStorage._storageData !== this.storageData) {
                                 LStorage._storageData = this.storageData;
                             }
-                            await LStorage._saveStorageData();
+                    await LStorage._saveStorageData();
                         }
                     }
                 } catch (saveError) {
@@ -1928,7 +1947,7 @@
                 if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
                     GUIManager.showAlert('删除失败: ' + error.message);
                 } else {
-                    alert('删除失败: ' + error.message);
+                alert('删除失败: ' + error.message);
                 }
             }
         },
@@ -1971,7 +1990,7 @@
                 if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
                     GUIManager.showAlert('新建失败: ' + error.message);
                 } else {
-                    alert('新建失败: ' + error.message);
+                alert('新建失败: ' + error.message);
                 }
             }
         },

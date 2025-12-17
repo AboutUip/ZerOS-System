@@ -85,6 +85,28 @@ class ThemeManager {
                     KernelLogger.info("ThemeManager", "使用默认风格");
                 }
                 
+                // 预加载并注册所有本地桌面背景，确保重启后列表仍可用
+                let localBackgrounds = await LStorage.getSystemStorage('system.localDesktopBackgrounds');
+                if (Array.isArray(localBackgrounds)) {
+                    let registeredLocalCount = 0;
+                    for (const bg of localBackgrounds) {
+                        if (!bg || !bg.id || !bg.path) {
+                            KernelLogger.debug("ThemeManager", "跳过无效的本地背景数据", bg);
+                            continue;
+                        }
+                        ThemeManager.registerDesktopBackground(bg.id, {
+                            id: bg.id,
+                            name: bg.name || bg.id,
+                            description: bg.description || `本地图片: ${bg.path}`,
+                            path: bg.path
+                        });
+                        registeredLocalCount++;
+                    }
+                    KernelLogger.info("ThemeManager", `已加载本地桌面背景: ${registeredLocalCount} 个`);
+                } else {
+                    localBackgrounds = [];
+                }
+                
                 const savedBackgroundId = await LStorage.getSystemStorage(ThemeManager.STORAGE_KEY_DESKTOP_BACKGROUND);
                 // 确保 savedBackgroundId 是有效的字符串
                 if (savedBackgroundId && typeof savedBackgroundId === 'string' && savedBackgroundId.trim() !== '') {
@@ -94,7 +116,6 @@ class ThemeManager {
                         KernelLogger.info("ThemeManager", `加载保存的桌面背景: ${trimmedId}`);
                     } else if (trimmedId.startsWith('local_')) {
                         // 如果是本地图片背景ID，尝试从存储中加载本地背景信息
-                        const localBackgrounds = await LStorage.getSystemStorage('system.localDesktopBackgrounds');
                         if (localBackgrounds && Array.isArray(localBackgrounds)) {
                             // 查找匹配的本地背景
                             const localBg = localBackgrounds.find(bg => bg && bg.id === trimmedId);
@@ -2743,12 +2764,63 @@ class ThemeManager {
                     localBackgrounds.push(localBgInfo);
                 }
                 
-                // 保存到存储
-                const saveResult = await LStorage.setSystemStorage('system.localDesktopBackgrounds', localBackgrounds);
+                // 保存到存储（带重试机制）
+                let saveResult = false;
+                let retryCount = 0;
+                const maxRetries = 3;
+                let currentLocalBackgrounds = localBackgrounds;
+                
+                while (!saveResult && retryCount < maxRetries) {
+                    // 如果是重试，重新读取最新的数据，避免使用过时的数据
+                    if (retryCount > 0) {
+                        try {
+                            const latestBackgrounds = await LStorage.getSystemStorage('system.localDesktopBackgrounds');
+                            if (Array.isArray(latestBackgrounds)) {
+                                // 重新检查并更新背景信息
+                                const existingIndex = latestBackgrounds.findIndex(bg => bg && bg.id === backgroundId);
+                                if (existingIndex >= 0) {
+                                    latestBackgrounds[existingIndex] = localBgInfo;
+                                } else {
+                                    latestBackgrounds.push(localBgInfo);
+                                }
+                                currentLocalBackgrounds = latestBackgrounds;
+                                KernelLogger.debug("ThemeManager", `重试前重新读取数据: ${currentLocalBackgrounds.length} 个背景`);
+                            }
+                        } catch (readError) {
+                            KernelLogger.warn("ThemeManager", `重试前重新读取数据失败: ${readError.message}，使用原数据`);
+                        }
+                    }
+                    
+                    saveResult = await LStorage.setSystemStorage('system.localDesktopBackgrounds', currentLocalBackgrounds);
+                    
+                    if (!saveResult) {
+                        retryCount++;
+                        if (retryCount < maxRetries) {
+                            KernelLogger.debug("ThemeManager", `保存本地桌面背景信息失败，${100 * retryCount}ms 后重试 (${retryCount}/${maxRetries})`);
+                            await new Promise(resolve => setTimeout(resolve, 100 * retryCount));
+                        }
+                    }
+                }
+                
                 if (saveResult) {
-                    KernelLogger.info("ThemeManager", `本地桌面背景信息已保存: ${backgroundId}`);
+                    // 验证保存是否真的成功（重新读取验证）
+                    try {
+                        const savedBackgrounds = await LStorage.getSystemStorage('system.localDesktopBackgrounds');
+                        if (savedBackgrounds && Array.isArray(savedBackgrounds)) {
+                            const savedIndex = savedBackgrounds.findIndex(bg => bg && bg.id === backgroundId);
+                            if (savedIndex >= 0) {
+                                KernelLogger.info("ThemeManager", `本地桌面背景信息已保存并验证成功: ${backgroundId}`);
                 } else {
-                    KernelLogger.debug("ThemeManager", `本地桌面背景信息已更新，保存将在 D: 分区可用后自动完成: ${backgroundId}`);
+                                KernelLogger.warn("ThemeManager", `本地桌面背景信息保存验证失败: ${backgroundId} 未在保存的数据中找到`);
+                            }
+                        } else {
+                            KernelLogger.warn("ThemeManager", `本地桌面背景信息保存验证失败: 读取的数据不是数组`);
+                        }
+                    } catch (verifyError) {
+                        KernelLogger.warn("ThemeManager", `本地桌面背景信息保存验证失败: ${verifyError.message}`);
+                    }
+                } else {
+                    KernelLogger.warn("ThemeManager", `本地桌面背景信息保存失败（已重试 ${maxRetries} 次）: ${backgroundId}`);
                 }
             } catch (e) {
                 KernelLogger.warn("ThemeManager", `保存本地桌面背景信息失败: ${e.message}`);
@@ -2829,12 +2901,63 @@ class ThemeManager {
                     localBackgrounds.push(localBgInfo);
                 }
                 
-                // 保存到存储
-                const saveResult = await LStorage.setSystemStorage('system.localDesktopBackgrounds', localBackgrounds);
+                // 保存到存储（带重试机制）
+                let saveResult = false;
+                let retryCount = 0;
+                const maxRetries = 3;
+                let currentLocalBackgrounds = localBackgrounds;
+                
+                while (!saveResult && retryCount < maxRetries) {
+                    // 如果是重试，重新读取最新的数据，避免使用过时的数据
+                    if (retryCount > 0) {
+                        try {
+                            const latestBackgrounds = await LStorage.getSystemStorage('system.localDesktopBackgrounds');
+                            if (Array.isArray(latestBackgrounds)) {
+                                // 重新检查并更新背景信息
+                                const existingIndex = latestBackgrounds.findIndex(bg => bg && bg.id === backgroundId);
+                                if (existingIndex >= 0) {
+                                    latestBackgrounds[existingIndex] = localBgInfo;
+                                } else {
+                                    latestBackgrounds.push(localBgInfo);
+                                }
+                                currentLocalBackgrounds = latestBackgrounds;
+                                KernelLogger.debug("ThemeManager", `重试前重新读取数据: ${currentLocalBackgrounds.length} 个背景`);
+                            }
+                        } catch (readError) {
+                            KernelLogger.warn("ThemeManager", `重试前重新读取数据失败: ${readError.message}，使用原数据`);
+                        }
+                    }
+                    
+                    saveResult = await LStorage.setSystemStorage('system.localDesktopBackgrounds', currentLocalBackgrounds);
+                    
+                    if (!saveResult) {
+                        retryCount++;
+                        if (retryCount < maxRetries) {
+                            KernelLogger.debug("ThemeManager", `保存本地桌面视频背景信息失败，${100 * retryCount}ms 后重试 (${retryCount}/${maxRetries})`);
+                            await new Promise(resolve => setTimeout(resolve, 100 * retryCount));
+                        }
+                    }
+                }
+                
                 if (saveResult) {
-                    KernelLogger.info("ThemeManager", `本地桌面视频背景信息已保存: ${backgroundId}`);
+                    // 验证保存是否真的成功（重新读取验证）
+                    try {
+                        const savedBackgrounds = await LStorage.getSystemStorage('system.localDesktopBackgrounds');
+                        if (savedBackgrounds && Array.isArray(savedBackgrounds)) {
+                            const savedIndex = savedBackgrounds.findIndex(bg => bg && bg.id === backgroundId);
+                            if (savedIndex >= 0) {
+                                KernelLogger.info("ThemeManager", `本地桌面视频背景信息已保存并验证成功: ${backgroundId}`);
                 } else {
-                    KernelLogger.debug("ThemeManager", `本地桌面视频背景信息已更新，保存将在 D: 分区可用后自动完成: ${backgroundId}`);
+                                KernelLogger.warn("ThemeManager", `本地桌面视频背景信息保存验证失败: ${backgroundId} 未在保存的数据中找到`);
+                            }
+                        } else {
+                            KernelLogger.warn("ThemeManager", `本地桌面视频背景信息保存验证失败: 读取的数据不是数组`);
+                        }
+                    } catch (verifyError) {
+                        KernelLogger.warn("ThemeManager", `本地桌面视频背景信息保存验证失败: ${verifyError.message}`);
+                    }
+                } else {
+                    KernelLogger.warn("ThemeManager", `本地桌面视频背景信息保存失败（已重试 ${maxRetries} 次）: ${backgroundId}`);
                 }
             } catch (e) {
                 KernelLogger.warn("ThemeManager", `保存本地桌面视频背景信息失败: ${e.message}`);
@@ -2896,8 +3019,8 @@ class ThemeManager {
      */
     static getSystemIconPath(iconName, styleId = null) {
         const currentStyleId = styleId || ThemeManager._currentStyleId || 'ubuntu';
-        // 图标路径：assets/icons/{styleId}/{iconName}.svg
-        return `assets/icons/${currentStyleId}/${iconName}.svg`;
+        // 图标路径：test/assets/icons/{styleId}/{iconName}.svg
+        return `test/assets/icons/${currentStyleId}/${iconName}.svg`;
     }
     
     /**
@@ -2909,11 +3032,24 @@ class ThemeManager {
     static async getSystemIconSVG(iconName, styleId = null) {
         const iconPath = ThemeManager.getSystemIconPath(iconName, styleId);
         try {
+            // 将相对路径转换为绝对路径，避免受当前页面路径影响
+            let iconUrl = iconPath;
+            if (!iconUrl.startsWith('http://') && !iconUrl.startsWith('https://') && !iconUrl.startsWith('/')) {
+                // 相对路径，转换为绝对路径
+                iconUrl = '/' + iconUrl;
+            } else if (!iconUrl.startsWith('http://') && !iconUrl.startsWith('https://')) {
+                // 已经是绝对路径（以 / 开头），直接使用
+                // 如果需要，可以基于 window.location.origin 构建完整 URL
+                if (typeof window !== 'undefined' && window.location) {
+                    iconUrl = new URL(iconUrl, window.location.origin).toString();
+                }
+            }
+            
             // 使用 AbortController 设置超时，避免资源耗尽
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 5000); // 5秒超时
             
-            const response = await fetch(iconPath, { 
+            const response = await fetch(iconUrl, { 
                 signal: controller.signal,
                 cache: 'no-cache' // 禁用缓存，确保获取最新图标
             });
@@ -2923,16 +3059,16 @@ class ThemeManager {
             if (response.ok) {
                 return await response.text();
             } else {
-                KernelLogger.warn("ThemeManager", `无法加载图标: ${iconPath}，使用默认图标`);
+                KernelLogger.warn("ThemeManager", `无法加载图标: ${iconUrl} (路径: ${iconPath})，使用默认图标`);
                 // 降级：返回内联SVG
                 return ThemeManager._getDefaultIconSVG(iconName);
             }
         } catch (e) {
             // 如果是 AbortError（超时），记录更详细的错误
             if (e.name === 'AbortError') {
-                KernelLogger.warn("ThemeManager", `加载图标超时: ${iconPath}，使用默认图标`);
+                KernelLogger.warn("ThemeManager", `加载图标超时: ${iconUrl} (路径: ${iconPath})，使用默认图标`);
             } else {
-                KernelLogger.warn("ThemeManager", `加载图标失败: ${iconPath}, ${e.message}，使用默认图标`);
+                KernelLogger.warn("ThemeManager", `加载图标失败: ${iconUrl} (路径: ${iconPath}), ${e.message}，使用默认图标`);
             }
             return ThemeManager._getDefaultIconSVG(iconName);
         }

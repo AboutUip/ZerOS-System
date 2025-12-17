@@ -453,6 +453,25 @@ const APPLICATION_ASSETS = {
             supportsPreview: true,
             category: "system"  // 系统应用
         }
+    },
+    
+    // 绘图程序
+    // 仿苹果风格画板，支持绘制与导出
+    "paint": {
+        script: "D:/application/paint/paint.js",
+        styles: ["D:/application/paint/paint.css"],
+        icon: "D:/application/paint/paint.svg",
+        metadata: {
+            autoStart: false,
+            priority: 12,
+            description: "简易画板，支持铅笔/画笔/橡皮擦与导出 PNG",
+            version: "1.0.0",
+            type: "GUI",
+            alwaysShowInTaskbar: false,
+            allowMultipleInstances: true,
+            supportsPreview: false,
+            category: "tool"
+        }
     }
 };
 

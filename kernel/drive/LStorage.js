@@ -642,6 +642,18 @@ class LStorage {
                     } else {
                         KernelLogger.warn("LStorage", "桌面图标保存验证失败: 文件中没有 desktop.icons 数据");
                     }
+                    
+                    // 特别验证 localDesktopBackgrounds
+                    if (savedData.system && savedData.system['system.localDesktopBackgrounds']) {
+                        const savedBackgrounds = savedData.system['system.localDesktopBackgrounds'];
+                        const savedBgCount = Array.isArray(savedBackgrounds) ? savedBackgrounds.length : 0;
+                        const memoryBgCount = Array.isArray(LStorage._storageData.system['system.localDesktopBackgrounds']) ? LStorage._storageData.system['system.localDesktopBackgrounds'].length : 0;
+                        if (savedBgCount === memoryBgCount) {
+                            KernelLogger.info("LStorage", `本地桌面背景保存验证成功: ${savedBgCount} 个背景已确认保存到文件`);
+                        } else {
+                            KernelLogger.warn("LStorage", `本地桌面背景保存验证失败: 文件中有 ${savedBgCount} 个背景，内存中有 ${memoryBgCount} 个背景`);
+                        }
+                    }
                 } else {
                     KernelLogger.warn("LStorage", "文件保存验证失败: 无法读取保存的文件");
                 }
@@ -670,6 +682,14 @@ class LStorage {
             }
             if (systemKeys.includes('system.desktopBackground')) {
                 KernelLogger.debug("LStorage", `桌面背景已保存到文件: ${LStorage._storageData.system['system.desktopBackground']}`);
+            }
+            if (systemKeys.includes('system.localDesktopBackgrounds')) {
+                const backgroundsData = LStorage._storageData.system['system.localDesktopBackgrounds'];
+                const bgCount = Array.isArray(backgroundsData) ? backgroundsData.length : 0;
+                KernelLogger.info("LStorage", `本地桌面背景已保存到文件: ${bgCount} 个背景`);
+                if (bgCount > 0) {
+                    KernelLogger.debug("LStorage", `本地桌面背景数据示例: ${JSON.stringify(backgroundsData[bgCount - 1]).substring(0, 200)}...`);
+                }
             }
             
             // 验证保存是否真的成功（可选：读取文件验证，但会增加性能开销）
@@ -862,6 +882,24 @@ class LStorage {
                         KernelLogger.warn("LStorage", `保存后验证失败: Key=${key} 在内存中不存在`);
                         return false;
                     }
+                    
+                    // 对于数组类型，验证数组长度和内容
+                    if (Array.isArray(value) && Array.isArray(savedValue)) {
+                        if (savedValue.length !== value.length) {
+                            KernelLogger.warn("LStorage", `保存后验证失败: Key=${key} 数组长度不匹配 (期望: ${value.length}, 实际: ${savedValue.length})`);
+                            return false;
+                        }
+                        // 验证关键字段是否存在（对于 localDesktopBackgrounds）
+                        if (key === 'system.localDesktopBackgrounds' && value.length > 0) {
+                            const lastValue = value[value.length - 1];
+                            const lastSaved = savedValue[savedValue.length - 1];
+                            if (!lastSaved || lastSaved.id !== lastValue.id) {
+                                KernelLogger.warn("LStorage", `保存后验证失败: Key=${key} 最新项不匹配`);
+                                return false;
+                            }
+                        }
+                    }
+                    
                     KernelLogger.debug("LStorage", `保存验证成功: Key=${key} 已存在于内存中`);
                 } catch (verifyError) {
                     KernelLogger.warn("LStorage", `保存验证失败: ${verifyError.message}`);

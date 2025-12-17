@@ -1,0 +1,157 @@
+/* 绘图程序样式表 */
+
+/* 窗口样式（当 GUIManager 不存在时） */
+.paint-window:not(.zos-gui-window) {
+    position: absolute;
+    width: 1080px;
+    height: 760px;
+    left: 80px;
+    top: 80px;
+    display: flex;
+    flex-direction: column;
+    background: var(--theme-background, #0b0f19);
+    color: var(--theme-text, #e9ecf2);
+    font-family: "SF Pro Display", "Segoe UI", Arial, sans-serif;
+    user-select: none;
+    padding: 12px;
+    gap: 10px;
+    box-sizing: border-box;
+}
+
+/* 窗口样式（当 GUIManager 存在时） */
+.paint-window.zos-gui-window {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* 内容容器 */
+.paint-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 12px;
+    gap: 10px;
+    min-height: 0;
+    box-sizing: border-box;
+    background: var(--theme-background, #0b0f19);
+    color: var(--theme-text, #e9ecf2);
+    font-family: "SF Pro Display", "Segoe UI", Arial, sans-serif;
+    user-select: none;
+}
+
+/* 工具栏 */
+.paint-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    height: 48px;
+    min-height: 48px;
+    max-height: 48px;
+    flex: 0 0 48px;
+    box-sizing: border-box;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    backdrop-filter: blur(8px);
+}
+
+/* 工具栏标签 */
+.paint-toolbar > span {
+    margin-left: 12px;
+}
+
+/* 工具栏按钮（基础样式） */
+.paint-toolbar button {
+    padding: 6px 12px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.04);
+    color: inherit;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    height: 32px;
+    line-height: 20px;
+    box-sizing: border-box;
+    font-family: inherit;
+    font-size: 14px;
+}
+
+.paint-toolbar button:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+.paint-toolbar button:active {
+    transform: scale(0.98);
+}
+
+/* 工具栏按钮（主要按钮） */
+.paint-toolbar button.primary {
+    background: linear-gradient(135deg, #6dd5fa, #7f60f9);
+    color: #fff;
+    border: none;
+}
+
+.paint-toolbar button.primary:hover {
+    background: linear-gradient(135deg, #7de5ff, #8f70ff);
+}
+
+/* 工具栏按钮（危险按钮） */
+.paint-toolbar button.danger {
+    background: linear-gradient(135deg, #ff6b6b, #f06595);
+    color: #fff;
+    border: none;
+}
+
+.paint-toolbar button.danger:hover {
+    background: linear-gradient(135deg, #ff7b7b, #ff75a5);
+}
+
+/* 工具栏按钮（选中状态） */
+.paint-toolbar button.active {
+    background: rgba(255, 255, 255, 0.12);
+    border-color: rgba(255, 255, 255, 0.5);
+    opacity: 1;
+}
+
+/* 工具栏按钮（未选中状态） */
+.paint-toolbar button:not(.active) {
+    opacity: 0.65;
+}
+
+/* 颜色选择器 */
+.paint-toolbar input[type="color"] {
+    width: 36px;
+    height: 28px;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+}
+
+/* 线宽滑块 */
+.paint-toolbar input[type="range"] {
+    width: 120px;
+}
+
+/* 画布容器 */
+.paint-canvas-wrap {
+    flex: 1;
+    min-height: 360px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    background: #111827;
+    position: relative;
+    overflow: hidden;
+}
+
+/* 画布 */
+.paint-canvas-wrap canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+    cursor: crosshair;
+    border-radius: 12px;
+}
+

@@ -36,13 +36,11 @@ class TaskbarManager {
     // 全局快捷键监听是否已注册
     static _globalShortcutsRegistered = false;
     
-    // 天气数据缓存
-    static _weatherCache = {
-        data: null,           // 缓存的天气数据
-        timestamp: null,      // 缓存时间戳
-        cityName: null,        // 缓存的城市名称
-        expireTime: 30 * 60 * 1000  // 缓存过期时间（30分钟）
-    };
+    // 天气缓存键前缀
+    static WEATHER_CACHE_PREFIX = 'weather:';
+    
+    // 天气缓存生命周期（12小时）
+    static WEATHER_CACHE_TTL = 12 * 60 * 60 * 1000;
     
     // 正在进行的天气数据加载请求（用于防止并发重复请求）
     static _pendingWeatherRequest = null;
@@ -4315,14 +4313,6 @@ class TaskbarManager {
         
         weatherContainer.style.cssText = baseStyle;
         
-        // 鼠标悬停效果
-        weatherContainer.addEventListener('mouseenter', () => {
-            weatherContainer.style.background = 'rgba(255, 255, 255, 0.08)';
-        });
-        weatherContainer.addEventListener('mouseleave', () => {
-            weatherContainer.style.background = 'transparent';
-        });
-        
         // 天气图标
         const weatherIcon = document.createElement('div');
         weatherIcon.className = 'taskbar-weather-icon';
@@ -4404,8 +4394,87 @@ class TaskbarManager {
         tooltip.textContent = '天气';
         weatherContainer.appendChild(tooltip);
         
-        // 点击事件：显示天气详情面板
+        // 刷新按钮
+        const refreshButton = document.createElement('div');
+        refreshButton.className = 'taskbar-weather-refresh';
+        refreshButton.innerHTML = '🔄';
+        refreshButton.style.cssText = `
+            position: absolute;
+            top: 2px;
+            right: 2px;
+            width: 16px;
+            height: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            cursor: pointer;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+            border-radius: 4px;
+            background: rgba(0, 0, 0, 0.3);
+            z-index: 10;
+        `;
+        
+        // 鼠标悬停时显示刷新按钮
+        weatherContainer.addEventListener('mouseenter', () => {
+            weatherContainer.style.background = 'rgba(255, 255, 255, 0.08)';
+            refreshButton.style.opacity = '0.7';
+        });
+        weatherContainer.addEventListener('mouseleave', () => {
+            weatherContainer.style.background = 'transparent';
+            refreshButton.style.opacity = '0';
+        });
+        
+        // 刷新按钮悬停效果
+        refreshButton.addEventListener('mouseenter', (e) => {
+            e.stopPropagation();
+            refreshButton.style.opacity = '1';
+            refreshButton.style.background = 'rgba(0, 0, 0, 0.5)';
+        });
+        refreshButton.addEventListener('mouseleave', (e) => {
+            e.stopPropagation();
+            refreshButton.style.opacity = '0.7';
+            refreshButton.style.background = 'rgba(0, 0, 0, 0.3)';
+        });
+        
+        // 刷新按钮点击事件：强制刷新天气数据
+        refreshButton.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            
+            // 添加旋转动画
+            refreshButton.style.transition = 'transform 0.5s ease';
+            refreshButton.style.transform = 'rotate(360deg)';
+            
+            // 获取天气相关的元素
+            const tempText = weatherContainer.querySelector('.taskbar-weather-temp');
+            const descText = weatherContainer.querySelector('.taskbar-weather-desc');
+            const iconElement = weatherContainer.querySelector('.taskbar-weather-icon');
+            
+            try {
+                // 强制刷新天气数据
+                await TaskbarManager._loadWeatherData(weatherContainer, tempText, descText, iconElement, true);
+                KernelLogger.debug("TaskbarManager", "天气数据已强制刷新");
+            } catch (error) {
+                KernelLogger.warn("TaskbarManager", `强制刷新天气数据失败: ${error.message}`);
+            } finally {
+                // 重置旋转动画
+                setTimeout(() => {
+                    refreshButton.style.transform = 'rotate(0deg)';
+                }, 500);
+            }
+        });
+        
+        // 设置容器为相对定位，以便刷新按钮绝对定位
+        weatherContainer.style.position = 'relative';
+        weatherContainer.appendChild(refreshButton);
+        
+        // 点击事件：显示天气详情面板（点击刷新按钮时不触发）
         weatherContainer.addEventListener('click', (e) => {
+            // 如果点击的是刷新按钮，不显示面板
+            if (e.target === refreshButton || refreshButton.contains(e.target)) {
+                return;
+            }
             e.stopPropagation();
             TaskbarManager._toggleWeatherPanel(weatherContainer);
         });
@@ -4455,52 +4524,103 @@ class TaskbarManager {
     }
     
     /**
+     * 更新天气UI
+     * @param {HTMLElement} container - 天气容器元素
+     * @param {HTMLElement} tempText - 温度文本元素
+     * @param {HTMLElement} descText - 描述文本元素
+     * @param {HTMLElement} iconElement - 图标元素
+     * @param {Object} weatherData - 天气数据
+     */
+    static _updateWeatherUI(container, tempText, descText, iconElement, weatherData) {
+        if (!weatherData || !weatherData.data) {
+            return;
+        }
+        
+        const today = weatherData.data.today;
+        
+        // 更新温度文本（如果存在）
+        if (tempText) {
+            if (today && today.current_temp) {
+                tempText.textContent = today.current_temp;
+            } else if (weatherData.data.low_temperature !== undefined) {
+                tempText.textContent = `${weatherData.data.low_temperature}℃`;
+            } else {
+                tempText.textContent = '--℃';
+            }
+        }
+        
+        // 更新描述文本（如果存在）
+        if (descText && today && today.current_cond) {
+            descText.textContent = today.current_cond;
+        }
+        
+        // 根据天气条件更新图标
+        if (iconElement && today && today.current_cond) {
+            const condition = today.current_cond.toLowerCase();
+            if (condition.includes('晴')) {
+                iconElement.textContent = '☀️';
+            } else if (condition.includes('云')) {
+                iconElement.textContent = '☁️';
+            } else if (condition.includes('雨')) {
+                iconElement.textContent = '🌧️';
+            } else if (condition.includes('雪')) {
+                iconElement.textContent = '❄️';
+            } else if (condition.includes('雾') || condition.includes('霾')) {
+                iconElement.textContent = '🌫️';
+            } else {
+                iconElement.textContent = '🌤️';
+            }
+        }
+        
+        // 更新工具提示（包含温度信息，特别是垂直布局时）
+        const tooltip = container.querySelector('.taskbar-icon-tooltip');
+        if (tooltip && weatherData.data.city) {
+            const tempInfo = today && today.current_temp ? today.current_temp : (weatherData.data.low_temperature !== undefined ? `${weatherData.data.low_temperature}℃` : '');
+            const condInfo = today && today.current_cond ? today.current_cond : '天气';
+            tooltip.textContent = `${weatherData.data.city} ${tempInfo} ${condInfo}`;
+        }
+        
+        // 保存天气数据到容器，以便在面板中显示
+        container._weatherData = weatherData.data;
+    }
+    
+    /**
      * 加载天气数据
-     * @param {HTMLElement} container 天气容器
-     * @param {HTMLElement} tempText 温度文本元素
-     * @param {HTMLElement} descText 描述文本元素（可选）
-     * @param {HTMLElement} iconElement 图标元素
-     * @param {boolean} forceRefresh 是否强制刷新（忽略缓存）
+     * 工作流程：
+     * 1. 实时获取地理位置（不缓存）
+     * 2. 检查该城市的天气缓存（CacheDrive，12小时生命周期）
+     * 3. 如果缓存存在且未过期，使用缓存
+     * 4. 如果缓存不存在或过期，实时请求天气并更新缓存
+     * 
+     * @param {HTMLElement} container - 天气容器元素
+     * @param {HTMLElement} tempText - 温度文本元素
+     * @param {HTMLElement} descText - 描述文本元素（可选）
+     * @param {HTMLElement} iconElement - 图标元素
+     * @param {boolean} forceRefresh - 是否强制刷新（忽略缓存）
      */
     static async _loadWeatherData(container, tempText, descText, iconElement, forceRefresh = false) {
         try {
-            // 检查缓存是否有效
-            const now = Date.now();
-            const cache = TaskbarManager._weatherCache;
-            const isCacheValid = !forceRefresh && 
-                                cache.data && 
-                                cache.timestamp && 
-                                (now - cache.timestamp) < cache.expireTime;
-            
-            let weatherData;
-            let cityName;
-            
-            if (isCacheValid) {
-                // 使用缓存数据
-                KernelLogger.debug("TaskbarManager", "使用缓存的天气数据");
-                weatherData = cache.data;
-                cityName = cache.cityName;
-            } else {
                 // 检查是否有正在进行的请求，如果有则等待该请求完成（防止并发重复请求）
                 if (TaskbarManager._pendingWeatherRequest) {
                     KernelLogger.debug("TaskbarManager", "检测到正在进行的天气数据请求，等待其完成");
                     try {
                         const result = await TaskbarManager._pendingWeatherRequest;
-                        weatherData = result.weatherData;
-                        cityName = result.cityName;
+                    const weatherData = result.weatherData;
+                    const cityName = result.cityName;
+                    
+                    // 更新UI
+                    TaskbarManager._updateWeatherUI(container, tempText, descText, iconElement, weatherData);
+                    return;
                     } catch (error) {
                         // 如果之前的请求失败，继续执行新的请求
                         KernelLogger.debug("TaskbarManager", "之前的天气数据请求失败，继续执行新请求");
-                        // 继续执行下面的代码
                     }
                 }
                 
-                // 如果没有缓存且没有正在进行的请求，发起新请求
-                if (!weatherData) {
                     // 创建新的请求 Promise
                     const requestPromise = (async () => {
-                        // 缓存无效或强制刷新，从API获取
-                        KernelLogger.debug("TaskbarManager", "从API获取天气数据");
+                // 1. 实时获取地理位置（不缓存）
+                KernelLogger.debug("TaskbarManager", "实时获取地理位置");
                         
                         let requestCityName = null;
                         
@@ -4522,135 +4642,163 @@ class TaskbarManager {
                                 throw new Error('GeographyDrive 未加载');
                             }
                         } catch (geoError) {
-                            // GeographyDrive 失败，尝试使用 BOM 方法作为后备
-                            KernelLogger.warn("TaskbarManager", `GeographyDrive 获取城市名称失败: ${geoError.message}，尝试使用 BOM 方法作为后备`);
+                    // GeographyDrive 失败，尝试使用 BOM 方法作为后备
+                    KernelLogger.warn("TaskbarManager", `GeographyDrive 获取城市名称失败: ${geoError.message}，尝试使用 BOM 方法作为后备`);
+                    
+                    try {
+                        // 尝试使用原生地理位置 API + 反向地理编码
+                        if (typeof GeographyDrive !== 'undefined' && navigator.geolocation) {
+                            KernelLogger.debug("TaskbarManager", "尝试使用原生地理位置 API 作为后备（需要浏览器权限）");
                             
-                            try {
-                                // 尝试使用原生地理位置 API + 反向地理编码
-                                if (typeof GeographyDrive !== 'undefined' && navigator.geolocation) {
-                                    KernelLogger.debug("TaskbarManager", "尝试使用原生地理位置 API 作为后备（需要浏览器权限）");
-                                    
-                                    // 使用 GeographyDrive 的高精度定位（会触发浏览器权限请求，但这是后备方案）
-                                    const location = await GeographyDrive.getCurrentPosition({
-                                        enableHighAccuracy: true,  // 启用高精度定位
-                                        timeout: 10000,
-                                        maximumAge: 0
-                                    });
-                                    
-                                    if (location && location.name) {
-                                        requestCityName = location.name;
-                                        KernelLogger.info("TaskbarManager", `通过 BOM 方法获取城市名称: ${requestCityName}`);
-                                    } else {
-                                        throw new Error('BOM 方法未返回城市名称');
-                                    }
-                                } else {
-                                    throw new Error('浏览器不支持地理位置 API');
-                                }
-                            } catch (bomError) {
-                                // BOM 方法也失败，降级到直接调用 API
-                                KernelLogger.warn("TaskbarManager", `BOM 方法失败: ${bomError.message}，降级到直接调用 API`);
-                                
+                            // 使用 GeographyDrive 的高精度定位（会触发浏览器权限请求，但这是后备方案）
+                            const location = await GeographyDrive.getCurrentPosition({
+                                enableHighAccuracy: true,  // 启用高精度定位
+                                timeout: 10000,
+                                maximumAge: 0
+                            });
+                            
+                            if (location && location.name) {
+                                requestCityName = location.name;
+                                KernelLogger.info("TaskbarManager", `通过 BOM 方法获取城市名称: ${requestCityName}`);
+                            } else {
+                                throw new Error('BOM 方法未返回城市名称');
+                            }
+                        } else {
+                            throw new Error('浏览器不支持地理位置 API');
+                        }
+                    } catch (bomError) {
+                        // BOM 方法也失败，降级到直接调用 API
+                        KernelLogger.warn("TaskbarManager", `BOM 方法失败: ${bomError.message}，降级到直接调用 API`);
+                            
+                        try {
+                            const cityResponse = await fetch('https://api-v1.cenguigui.cn/api/UserInfo/apilet.php');
+                            if (!cityResponse.ok) {
+                                throw new Error(`获取城市信息失败: ${cityResponse.status}`);
+                            }
+                            
+                            // 先读取文本内容（避免响应流被重复读取）
+                            const cityText = await cityResponse.text();
+                            
+                            // 检查响应类型
+                            const contentType = cityResponse.headers.get('content-type') || '';
+                            const isJson = contentType.includes('application/json');
+                            
+                            let cityData;
+                            if (isJson) {
                                 try {
-                                    const cityResponse = await fetch('https://api-v1.cenguigui.cn/api/UserInfo/apilet.php');
-                                    if (!cityResponse.ok) {
-                                        throw new Error(`获取城市信息失败: ${cityResponse.status}`);
-                                    }
-                                    
-                                    // 先读取文本内容（避免响应流被重复读取）
-                                    const cityText = await cityResponse.text();
-                                    
-                                    // 检查响应类型
-                                    const contentType = cityResponse.headers.get('content-type') || '';
-                                    const isJson = contentType.includes('application/json');
-                                    
-                                    let cityData;
-                                    if (isJson) {
-                                        try {
-                                            // 尝试解析 JSON
-                                            cityData = JSON.parse(cityText);
-                                        } catch (jsonError) {
-                                            // JSON 解析失败
-                                            KernelLogger.error("TaskbarManager", `城市信息 API JSON 解析失败，响应内容: ${cityText.substring(0, 500)}`);
-                                            throw new Error(`城市信息 API 返回了无效的 JSON 响应`);
-                                        }
-                                    } else {
-                                        // 响应不是 JSON，可能是 HTML 错误页面
-                                        KernelLogger.error("TaskbarManager", `城市信息 API 返回了非 JSON 响应 (Content-Type: ${contentType})，响应内容: ${cityText.substring(0, 500)}`);
-                                        throw new Error(`城市信息 API 返回了非 JSON 响应 (可能是服务器错误)`);
-                                    }
-                                    
-                                    if (!cityData || cityData.code !== '200' || !cityData.data || cityData.data.length === 0) {
-                                        throw new Error('城市信息数据无效');
-                                    }
-                                    
-                                    // 获取城市名称（使用第一个结果）
-                                    requestCityName = cityData.data[0].name;
-                                } catch (cityApiError) {
-                                    // 城市信息 API 也失败，尝试使用缓存的城市名称
-                                    KernelLogger.warn("TaskbarManager", `城市信息 API 失败: ${cityApiError.message}，尝试使用缓存的城市名称`);
-                                    
-                                    if (cache.cityName) {
-                                        requestCityName = cache.cityName;
-                                        KernelLogger.info("TaskbarManager", `使用缓存的城市名称: ${requestCityName}`);
-                                    } else {
-                                        // 如果缓存也没有，使用默认城市
-                                        requestCityName = '晋城'; // 默认城市
-                                        KernelLogger.warn("TaskbarManager", `所有获取城市名称的方法都失败，使用默认城市: ${requestCityName}`);
-                                    }
+                                    // 尝试解析 JSON
+                                    cityData = JSON.parse(cityText);
+                                } catch (jsonError) {
+                                    // JSON 解析失败
+                                    KernelLogger.error("TaskbarManager", `城市信息 API JSON 解析失败，响应内容: ${cityText.substring(0, 500)}`);
+                                    throw new Error(`城市信息 API 返回了无效的 JSON 响应`);
                                 }
+                            } else {
+                                // 响应不是 JSON，可能是 HTML 错误页面
+                                KernelLogger.error("TaskbarManager", `城市信息 API 返回了非 JSON 响应 (Content-Type: ${contentType})，响应内容: ${cityText.substring(0, 500)}`);
+                                throw new Error(`城市信息 API 返回了非 JSON 响应 (可能是服务器错误)`);
+                            }
+                            
+                            if (!cityData || cityData.code !== '200' || !cityData.data || cityData.data.length === 0) {
+                                throw new Error('城市信息数据无效');
+                            }
+                            
+                            // 获取城市名称（使用第一个结果）
+                            requestCityName = cityData.data[0].name;
+                        } catch (cityApiError) {
+                            // 城市信息 API 也失败，使用默认城市
+                            requestCityName = '晋城'; // 默认城市
+                            KernelLogger.warn("TaskbarManager", `所有获取城市名称的方法都失败，使用默认城市: ${requestCityName}`);
+                        }
+                    }
+                }
+                
+                // 确保有城市名称
+                if (!requestCityName) {
+                    // 最后的后备方案：使用默认城市
+                    requestCityName = '晋城';
+                    KernelLogger.warn("TaskbarManager", `城市名称为空，使用默认城市: ${requestCityName}`);
+                }
+                
+                // 2. 检查该城市的天气缓存
+                const cacheKey = `${TaskbarManager.WEATHER_CACHE_PREFIX}${requestCityName}`;
+                let weatherData = null;
+                
+                if (!forceRefresh && typeof CacheDrive !== 'undefined') {
+                    try {
+                        // 检查缓存是否存在且未过期
+                        const hasCache = await CacheDrive.has(cacheKey, { programName: 'TaskbarManager' });
+                        
+                        if (hasCache) {
+                            // 缓存存在且未过期，使用缓存
+                            KernelLogger.debug("TaskbarManager", `使用缓存的天气数据: ${requestCityName}`);
+                            weatherData = await CacheDrive.get(cacheKey, null, { programName: 'TaskbarManager' });
+                            
+                            if (weatherData) {
+                                return { weatherData, cityName: requestCityName };
                             }
                         }
-                        
-                        // 确保有城市名称
-                        if (!requestCityName) {
-                            // 最后的后备方案：使用默认城市
-                            requestCityName = '晋城';
-                            KernelLogger.warn("TaskbarManager", `城市名称为空，使用默认城市: ${requestCityName}`);
-                        }
-                        
-                        // 获取天气信息
+                    } catch (cacheError) {
+                        KernelLogger.debug("TaskbarManager", `检查缓存失败: ${cacheError.message}，将请求新数据`);
+                    }
+                }
+                
+                // 3. 缓存不存在或过期，实时请求天气
+                KernelLogger.debug("TaskbarManager", `从API获取天气数据: ${requestCityName}`);
+                
                         const weatherResponse = await fetch(`https://api-v1.cenguigui.cn/api/WeatherInfo/?city=${encodeURIComponent(requestCityName)}`);
                         if (!weatherResponse.ok) {
                             throw new Error(`获取天气信息失败: ${weatherResponse.status}`);
                         }
                         
-                        // 先读取文本内容（避免响应流被重复读取）
-                        const weatherText = await weatherResponse.text();
-                        
-                        // 检查响应类型
-                        const weatherContentType = weatherResponse.headers.get('content-type') || '';
-                        const isWeatherJson = weatherContentType.includes('application/json');
-                        
-                        let requestWeatherData;
-                        if (isWeatherJson) {
-                            try {
-                                // 尝试解析 JSON
-                                requestWeatherData = JSON.parse(weatherText);
-                            } catch (jsonError) {
-                                // JSON 解析失败
-                                KernelLogger.error("TaskbarManager", `天气 API JSON 解析失败，响应内容: ${weatherText.substring(0, 500)}`);
-                                throw new Error(`天气 API 返回了无效的 JSON 响应`);
-                            }
-                        } else {
-                            // 响应不是 JSON，可能是 HTML 错误页面
-                            KernelLogger.error("TaskbarManager", `天气 API 返回了非 JSON 响应 (Content-Type: ${weatherContentType})，响应内容: ${weatherText.substring(0, 500)}`);
-                            throw new Error(`天气 API 返回了非 JSON 响应 (可能是服务器错误)`);
-                        }
-                        
+                // 先读取文本内容（避免响应流被重复读取）
+                const weatherText = await weatherResponse.text();
+                
+                // 检查响应类型
+                const weatherContentType = weatherResponse.headers.get('content-type') || '';
+                const isWeatherJson = weatherContentType.includes('application/json');
+                
+                let requestWeatherData;
+                if (isWeatherJson) {
+                    try {
+                        // 尝试解析 JSON
+                        requestWeatherData = JSON.parse(weatherText);
+                    } catch (jsonError) {
+                        // JSON 解析失败
+                        KernelLogger.error("TaskbarManager", `天气 API JSON 解析失败，响应内容: ${weatherText.substring(0, 500)}`);
+                        throw new Error(`天气 API 返回了无效的 JSON 响应`);
+                    }
+                } else {
+                    // 响应不是 JSON，可能是 HTML 错误页面
+                    KernelLogger.error("TaskbarManager", `天气 API 返回了非 JSON 响应 (Content-Type: ${weatherContentType})，响应内容: ${weatherText.substring(0, 500)}`);
+                    throw new Error(`天气 API 返回了非 JSON 响应 (可能是服务器错误)`);
+                }
+                
                         if (!requestWeatherData || requestWeatherData.code !== 200 || !requestWeatherData.data) {
                             throw new Error('天气数据无效');
                         }
                         
-                        // 更新缓存
-                        cache.data = requestWeatherData;
-                        cache.timestamp = now;
-                        cache.cityName = requestCityName;
+                // 4. 将天气响应加入缓存（12小时生命周期）
+                if (typeof CacheDrive !== 'undefined') {
+                    try {
+                        await CacheDrive.set(cacheKey, requestWeatherData, {
+                            programName: 'TaskbarManager',
+                            ttl: TaskbarManager.WEATHER_CACHE_TTL
+                        });
+                        KernelLogger.debug("TaskbarManager", `天气数据已缓存: ${requestCityName}，生命周期12小时`);
+                    } catch (cacheError) {
+                        KernelLogger.warn("TaskbarManager", `保存天气缓存失败: ${cacheError.message}`);
+                    }
+                }
                         
                         return { weatherData: requestWeatherData, cityName: requestCityName };
                     })();
                     
                     // 保存请求 Promise，以便并发调用可以等待
                     TaskbarManager._pendingWeatherRequest = requestPromise;
+            
+            let weatherData;
+            let cityName;
                     
                     try {
                         const result = await requestPromise;
@@ -4662,122 +4810,18 @@ class TaskbarManager {
                         // 请求失败，清除 pending 状态
                         TaskbarManager._pendingWeatherRequest = null;
                         throw error;
-                    }
-                }
             }
             
             // 更新UI
-            const today = weatherData.data.today;
+            TaskbarManager._updateWeatherUI(container, tempText, descText, iconElement, weatherData);
             
-            // 更新温度文本（如果存在）
-            if (tempText) {
-                if (today && today.current_temp) {
-                    tempText.textContent = today.current_temp;
-                } else if (weatherData.data.low_temperature !== undefined) {
-                    tempText.textContent = `${weatherData.data.low_temperature}℃`;
-                } else {
-                    tempText.textContent = '--℃';
-                }
-            }
-            
-            // 更新描述文本（如果存在）
-            if (descText && today && today.current_cond) {
-                descText.textContent = today.current_cond;
-            }
-            
-            // 根据天气条件更新图标
-            if (iconElement && today && today.current_cond) {
-                const condition = today.current_cond.toLowerCase();
-                if (condition.includes('晴')) {
-                    iconElement.textContent = '☀️';
-                } else if (condition.includes('云')) {
-                    iconElement.textContent = '☁️';
-                } else if (condition.includes('雨')) {
-                    iconElement.textContent = '🌧️';
-                } else if (condition.includes('雪')) {
-                    iconElement.textContent = '❄️';
-                } else if (condition.includes('雾') || condition.includes('霾')) {
-                    iconElement.textContent = '🌫️';
-                } else {
-                    iconElement.textContent = '🌤️';
-                }
-            }
-            
-            // 更新工具提示（包含温度信息，特别是垂直布局时）
-            const tooltip = container.querySelector('.taskbar-icon-tooltip');
-            if (tooltip && weatherData.data.city) {
-                const tempInfo = today && today.current_temp ? today.current_temp : (weatherData.data.low_temperature !== undefined ? `${weatherData.data.low_temperature}℃` : '');
-                const condInfo = today && today.current_cond ? today.current_cond : '天气';
-                tooltip.textContent = `${weatherData.data.city} ${tempInfo} ${condInfo}`;
-            }
-            
-            // 保存天气数据到容器，以便在面板中显示
-            container._weatherData = weatherData.data;
-            
-            // 设置自动刷新（每30分钟，强制刷新以更新缓存）
+            // 设置自动刷新（每30分钟，重新检查缓存）
             setTimeout(() => {
-                TaskbarManager._loadWeatherData(container, tempText, descText, iconElement, true);
+                TaskbarManager._loadWeatherData(container, tempText, descText, iconElement, false);
             }, 30 * 60 * 1000);
             
         } catch (error) {
             KernelLogger.warn("TaskbarManager", `加载天气数据失败: ${error.message}`);
-            
-            // 如果API失败但有缓存数据，尝试使用缓存
-            const cache = TaskbarManager._weatherCache;
-            if (cache.data && cache.timestamp) {
-                KernelLogger.info("TaskbarManager", "API失败，尝试使用缓存的天气数据");
-                try {
-                    const today = cache.data.data.today;
-                    
-                    // 更新温度文本（如果存在）
-                    if (tempText) {
-                        if (today && today.current_temp) {
-                            tempText.textContent = today.current_temp;
-                        } else if (cache.data.data.low_temperature !== undefined) {
-                            tempText.textContent = `${cache.data.data.low_temperature}℃`;
-                        } else {
-                            tempText.textContent = '--℃';
-                        }
-                    }
-                    
-                    // 更新描述文本（如果存在）
-                    if (descText && today && today.current_cond) {
-                        descText.textContent = today.current_cond;
-                    }
-                    
-                    // 根据天气条件更新图标
-                    if (iconElement && today && today.current_cond) {
-                        const condition = today.current_cond.toLowerCase();
-                        if (condition.includes('晴')) {
-                            iconElement.textContent = '☀️';
-                        } else if (condition.includes('云')) {
-                            iconElement.textContent = '☁️';
-                        } else if (condition.includes('雨')) {
-                            iconElement.textContent = '🌧️';
-                        } else if (condition.includes('雪')) {
-                            iconElement.textContent = '❄️';
-                        } else if (condition.includes('雾') || condition.includes('霾')) {
-                            iconElement.textContent = '🌫️';
-                        } else {
-                            iconElement.textContent = '🌤️';
-                        }
-                    }
-                    
-                    // 更新工具提示
-                    const tooltip = container.querySelector('.taskbar-icon-tooltip');
-                    if (tooltip && cache.data.data.city) {
-                        const tempInfo = today && today.current_temp ? today.current_temp : (cache.data.data.low_temperature !== undefined ? `${cache.data.data.low_temperature}℃` : '');
-                        const condInfo = today && today.current_cond ? today.current_cond : '天气';
-                        tooltip.textContent = `${cache.data.data.city} ${tempInfo} ${condInfo}`;
-                    }
-                    
-                    // 保存天气数据到容器
-                    container._weatherData = cache.data.data;
-                    return; // 成功使用缓存，直接返回
-                } catch (cacheError) {
-                    KernelLogger.warn("TaskbarManager", `使用缓存数据失败: ${cacheError.message}`);
-                }
-            }
             
             // 如果缓存也不可用，显示错误信息
             if (tempText) {
@@ -10057,8 +10101,8 @@ class TaskbarManager {
                     eventContext.preventDefault();
                     eventContext.stopImmediatePropagation();
                 } else {
-                    e.preventDefault();
-                    e.stopPropagation();
+                e.preventDefault();
+                e.stopPropagation();
                     e.stopImmediatePropagation();
                 }
                 
