@@ -458,6 +458,12 @@ const allProcesses = ProcessManager.getProcessInfo();
 - `Crypt.randomString` - 生成随机字符串（需要 `CRYPT_RANDOM` 权限）
 - `Crypt.randomChoice` - 从数组随机选择（需要 `CRYPT_RANDOM` 权限）
 - `Crypt.shuffle` - 打乱数组（需要 `CRYPT_RANDOM` 权限）
+- `Cache.set` - 设置缓存（需要 `CACHE_WRITE` 权限）
+- `Cache.get` - 获取缓存（需要 `CACHE_READ` 权限）
+- `Cache.has` - 检查缓存是否存在（需要 `CACHE_READ` 权限）
+- `Cache.delete` - 删除缓存（需要 `CACHE_WRITE` 权限）
+- `Cache.clear` - 清空缓存（需要 `CACHE_WRITE` 权限）
+- `Cache.getStats` - 获取缓存统计（需要 `CACHE_READ` 权限）
 
 **示例**:
 ```javascript

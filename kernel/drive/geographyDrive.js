@@ -137,12 +137,51 @@ class GeographyDrive {
                 KernelLogger.info("GeographyDrive", "第三方 API 获取位置信息成功");
             } catch (error) {
                 KernelLogger.error("GeographyDrive", `第三方 API 获取位置信息失败: ${error.message}`);
-                // 如果原生 API 也失败了，抛出错误
-                if (!nativeLocation) {
-                    throw new Error(`获取位置信息失败: ${error.message}`);
+                
+                // 如果原生 API 成功但第三方 API 失败，尝试使用反向地理编码获取城市名称
+                if (nativeLocation) {
+                    KernelLogger.warn("GeographyDrive", "第三方 API 失败，尝试使用反向地理编码获取城市名称");
+                    try {
+                        apiLocation = await GeographyDrive._getLocationFromReverseGeocoding(nativeLocation);
+                        if (apiLocation && apiLocation.name) {
+                            KernelLogger.info("GeographyDrive", "反向地理编码成功，获取到城市名称");
+                        } else {
+                            KernelLogger.warn("GeographyDrive", "反向地理编码未返回城市名称，仅使用原生 API 数据");
+                        }
+                    } catch (reverseError) {
+                        KernelLogger.warn("GeographyDrive", `反向地理编码失败: ${reverseError.message}，仅使用原生 API 数据`);
+                    }
+                } else {
+                    // 如果原生 API 也失败了，尝试使用 BOM 方法作为后备
+                    KernelLogger.warn("GeographyDrive", "第三方 API 失败且原生 API 未启用，尝试使用 BOM 后备方案");
+                    try {
+                        // 尝试使用原生 API 作为后备（即使未明确启用高精度）
+                        if (navigator.geolocation) {
+                            KernelLogger.debug("GeographyDrive", "尝试使用原生地理位置 API 作为后备（需要浏览器权限）");
+                            nativeLocation = await GeographyDrive._getNativeLocation(timeout, maximumAge);
+                            if (nativeLocation) {
+                                // 使用反向地理编码获取城市名称
+                                try {
+                                    apiLocation = await GeographyDrive._getLocationFromReverseGeocoding(nativeLocation);
+                                    if (apiLocation && apiLocation.name) {
+                                        KernelLogger.info("GeographyDrive", "BOM 后备方案成功，已获取城市名称");
+                                    }
+                                } catch (reverseError) {
+                                    KernelLogger.warn("GeographyDrive", `反向地理编码失败: ${reverseError.message}`);
+                                }
+                            }
+                        } else {
+                            throw new Error('浏览器不支持地理位置 API');
+                        }
+                    } catch (bomError) {
+                        KernelLogger.error("GeographyDrive", `BOM 后备方案失败: ${bomError.message}`);
+                        // 如果是权限被拒绝，提供更详细的错误信息
+                        if (bomError.code === 'PERMISSION_DENIED') {
+                            throw new Error(`获取位置信息失败: 浏览器地理位置权限被拒绝。请允许浏览器访问您的位置信息以使用 BOM 后备方案。`);
+                        }
+                        throw new Error(`获取位置信息失败: ${error.message}`);
+                    }
                 }
-                // 如果原生 API 成功但第三方 API 失败，使用原生 API 的数据
-                KernelLogger.warn("GeographyDrive", "第三方 API 失败，仅使用原生 API 数据");
             }
             
             // 合并位置信息
@@ -202,22 +241,30 @@ class GeographyDrive {
                         timestamp: position.timestamp,
                         source: GeographyDrive.ACCURACY.HIGH
                     };
+                    KernelLogger.info("GeographyDrive", "原生地理位置 API 定位成功");
                     resolve(location);
                 },
                 (error) => {
                     let errorMessage = '未知错误';
+                    let errorCode = 'UNKNOWN';
                     switch (error.code) {
                         case error.PERMISSION_DENIED:
-                            errorMessage = '用户拒绝了地理位置请求';
+                            errorMessage = '用户拒绝了地理位置权限请求，无法使用 BOM 方法获取位置';
+                            errorCode = 'PERMISSION_DENIED';
+                            KernelLogger.warn("GeographyDrive", "浏览器地理位置权限被拒绝");
                             break;
                         case error.POSITION_UNAVAILABLE:
                             errorMessage = '位置信息不可用';
+                            errorCode = 'POSITION_UNAVAILABLE';
                             break;
                         case error.TIMEOUT:
                             errorMessage = '定位请求超时';
+                            errorCode = 'TIMEOUT';
                             break;
                     }
-                    reject(new Error(errorMessage));
+                    const geoError = new Error(errorMessage);
+                    geoError.code = errorCode;
+                    reject(geoError);
                 },
                 options
             );
@@ -251,9 +298,34 @@ class GeographyDrive {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
             
-            const data = await response.json();
+            // 先读取文本内容（避免响应流被重复读取）
+            const text = await response.text();
+            
+            // 检查响应类型
+            const contentType = response.headers.get('content-type') || '';
+            const isJson = contentType.includes('application/json');
+            
+            let data;
+            if (isJson) {
+                try {
+                    // 尝试解析 JSON
+                    data = JSON.parse(text);
+                } catch (jsonError) {
+                    // JSON 解析失败
+                    KernelLogger.error("GeographyDrive", `JSON 解析失败，响应内容: ${text.substring(0, 500)}`);
+                    throw new Error(`API 返回了无效的 JSON 响应: ${jsonError.message}`);
+                }
+            } else {
+                // 响应不是 JSON，可能是 HTML 错误页面
+                KernelLogger.error("GeographyDrive", `API 返回了非 JSON 响应 (Content-Type: ${contentType})，响应内容: ${text.substring(0, 500)}`);
+                throw new Error(`API 返回了非 JSON 响应 (可能是服务器错误页面)`);
+            }
             
             // 检查响应格式
+            if (!data || typeof data !== 'object') {
+                throw new Error('API 响应数据格式错误');
+            }
+            
             if (data.code !== '200' || !Array.isArray(data.data) || data.data.length === 0) {
                 throw new Error('API 响应格式错误或数据为空');
             }
@@ -269,6 +341,98 @@ class GeographyDrive {
             };
         } catch (error) {
             KernelLogger.error("GeographyDrive", `第三方 API 请求失败: ${error.message}`);
+            throw error;
+        }
+    }
+    
+    /**
+     * 使用反向地理编码获取城市名称（基于经纬度）
+     * @param {Object} nativeLocation - 原生 API 位置数据（包含 latitude 和 longitude）
+     * @returns {Promise<Object>} 位置信息对象（包含城市名称）
+     */
+    static async _getLocationFromReverseGeocoding(nativeLocation) {
+        try {
+            if (!nativeLocation || !nativeLocation.latitude || !nativeLocation.longitude) {
+                throw new Error('缺少经纬度信息');
+            }
+            
+            // 使用浏览器的 Intl API 进行反向地理编码
+            // 注意：Intl API 不直接支持反向地理编码，但我们可以使用其他方法
+            
+            // 方法1：使用免费的 OpenStreetMap Nominatim API（不需要 API Key）
+            const nominatimUrl = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${nativeLocation.latitude}&lon=${nativeLocation.longitude}&zoom=10&addressdetails=1`;
+            
+            KernelLogger.debug("GeographyDrive", `使用反向地理编码 API: ${nominatimUrl}`);
+            
+            const response = await fetch(nominatimUrl, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json',
+                    'User-Agent': 'ZerOS-GeographyDrive/1.0' // Nominatim 要求提供 User-Agent
+                }
+            });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
+            // 先读取文本内容（避免响应流被重复读取）
+            const text = await response.text();
+            
+            // 检查响应类型
+            const contentType = response.headers.get('content-type') || '';
+            const isJson = contentType.includes('application/json');
+            
+            let data;
+            if (isJson) {
+                try {
+                    data = JSON.parse(text);
+                } catch (jsonError) {
+                    KernelLogger.error("GeographyDrive", `反向地理编码 JSON 解析失败，响应内容: ${text.substring(0, 500)}`);
+                    throw new Error(`反向地理编码 API 返回了无效的 JSON 响应`);
+                }
+            } else {
+                KernelLogger.error("GeographyDrive", `反向地理编码 API 返回了非 JSON 响应，响应内容: ${text.substring(0, 500)}`);
+                throw new Error(`反向地理编码 API 返回了非 JSON 响应`);
+            }
+            
+            // 解析 Nominatim 响应
+            if (!data || typeof data !== 'object') {
+                throw new Error('反向地理编码响应数据格式错误');
+            }
+            
+            // 提取城市名称
+            let cityName = null;
+            if (data.address) {
+                // Nominatim 的地址结构可能包含 city, town, village, municipality 等字段
+                cityName = data.address.city || 
+                          data.address.town || 
+                          data.address.village || 
+                          data.address.municipality ||
+                          data.address.county ||
+                          data.address.state;
+            }
+            
+            // 如果没有找到城市名称，尝试从 display_name 中提取
+            if (!cityName && data.display_name) {
+                // display_name 格式通常是: "城市, 省份, 国家"
+                const parts = data.display_name.split(',');
+                if (parts.length > 0) {
+                    cityName = parts[0].trim();
+                }
+            }
+            
+            return {
+                name: cityName,
+                geo: {
+                    latitude: nativeLocation.latitude,
+                    longitude: nativeLocation.longitude
+                },
+                address: data.address || null,
+                source: GeographyDrive.ACCURACY.HIGH
+            };
+        } catch (error) {
+            KernelLogger.error("GeographyDrive", `反向地理编码失败: ${error.message}`);
             throw error;
         }
     }

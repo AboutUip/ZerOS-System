@@ -33,6 +33,7 @@
 - [AnimateManager.md](./AnimateManager.md) - 动画管理 ✅
 - [NetworkManager.md](./NetworkManager.md) - 网络管理 ✅
 - [LStorage.md](./LStorage.md) - 本地存储 ✅
+- [CacheDrive.md](./CacheDrive.md) - 缓存驱动 ✅
 - [DragDrive.md](./DragDrive.md) - 拖拽驱动 ✅
 - [GeographyDrive.md](./GeographyDrive.md) - 地理位置驱动 ✅
 - [CryptDrive.md](./CryptDrive.md) - 加密驱动 ✅
@@ -92,6 +93,7 @@
 - AnimateManager
 - NetworkManager
 - LStorage
+- CacheDrive
 - PermissionManager
 - DragDrive
 - GeographyDrive

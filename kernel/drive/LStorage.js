@@ -430,6 +430,60 @@ class LStorage {
                 }
             } catch (parseError) {
                 KernelLogger.error("LStorage", `解析存储文件失败: ${parseError.message}`, parseError);
+                
+                // 尝试从备份恢复
+                try {
+                    KernelLogger.info("LStorage", "尝试从备份文件恢复数据...");
+                    const backupPath = filePath;
+                    const backupFileName = fileName.replace('.json', '_backup.json');
+                    const backupContent = await LStorage._readFileFromPHP(backupPath, backupFileName);
+                    
+                    if (backupContent) {
+                        try {
+                            const backupData = JSON.parse(backupContent);
+                            if (backupData && typeof backupData === 'object') {
+                                KernelLogger.info("LStorage", "成功从备份文件恢复数据");
+                                LStorage._storageData = backupData;
+                                
+                                // 确保数据结构正确
+                                if (!LStorage._storageData.system) {
+                                    LStorage._storageData.system = {};
+                                }
+                                if (!LStorage._storageData.programs) {
+                                    LStorage._storageData.programs = {};
+                                }
+                                
+                                // 尝试修复并保存
+                                try {
+                                    await LStorage._saveStorageData();
+                                    KernelLogger.info("LStorage", "已从备份恢复并重新保存数据");
+                                } catch (saveError) {
+                                    KernelLogger.warn("LStorage", `从备份恢复后保存失败: ${saveError.message}`);
+                                }
+                                return;
+                            }
+                        } catch (backupParseError) {
+                            KernelLogger.warn("LStorage", `备份文件也损坏: ${backupParseError.message}`);
+                        }
+                    }
+                } catch (backupError) {
+                    KernelLogger.debug("LStorage", `无法读取备份文件: ${backupError.message}`);
+                }
+                
+                // 如果备份恢复失败，创建损坏文件的备份并初始化空数据
+                try {
+                    KernelLogger.warn("LStorage", "创建损坏文件的备份...");
+                    const corruptedContent = await LStorage._readFileFromPHP(filePath, fileName);
+                    if (corruptedContent) {
+                        const backupFileName = fileName.replace('.json', '_corrupted_' + Date.now() + '.json');
+                        await LStorage._writeFileToPHP(filePath, backupFileName, corruptedContent, 'create');
+                        KernelLogger.info("LStorage", `损坏的文件已备份为: ${backupFileName}`);
+                    }
+                } catch (backupError) {
+                    KernelLogger.warn("LStorage", `创建损坏文件备份失败: ${backupError.message}`);
+                }
+                
+                // 使用空数据结构
                 LStorage._storageData = {
                     system: {},
                     programs: {}
@@ -482,13 +536,43 @@ class LStorage {
             const fileName = LStorage.STORAGE_FILE_NAME;
             
             // 将数据转换为 JSON 字符串
-            const jsonString = JSON.stringify(LStorage._storageData, null, 2);
+            let jsonString;
+            try {
+                jsonString = JSON.stringify(LStorage._storageData, null, 2);
+            } catch (stringifyError) {
+                KernelLogger.error("LStorage", `JSON 序列化失败: ${stringifyError.message}`, stringifyError);
+                throw new Error(`JSON 序列化失败: ${stringifyError.message}`);
+            }
+            
             KernelLogger.debug("LStorage", `准备保存存储数据: ${filePath}/${fileName}, JSON 大小: ${jsonString.length} 字节`);
             
             // 验证 JSON 字符串是否有效
             if (!jsonString || jsonString === '{}' || jsonString === 'null') {
                 KernelLogger.error("LStorage", "JSON 字符串无效或为空，拒绝保存");
                 throw new Error("JSON 字符串无效或为空，无法保存");
+            }
+            
+            // 验证 JSON 字符串是否可以正确解析（双重验证）
+            try {
+                JSON.parse(jsonString);
+            } catch (parseError) {
+                KernelLogger.error("LStorage", `生成的 JSON 字符串无效，无法解析: ${parseError.message}`);
+                throw new Error(`生成的 JSON 字符串无效: ${parseError.message}`);
+            }
+            
+            // 创建备份（在保存前）
+            try {
+                const fileExists = await LStorage._fileExistsInPHP(filePath, fileName);
+                if (fileExists) {
+                    const currentContent = await LStorage._readFileFromPHP(filePath, fileName);
+                    if (currentContent) {
+                        const backupFileName = fileName.replace('.json', '_backup.json');
+                        await LStorage._writeFileToPHP(filePath, backupFileName, currentContent, 'overwrite');
+                        KernelLogger.debug("LStorage", `已创建备份文件: ${backupFileName}`);
+                    }
+                }
+            } catch (backupError) {
+                KernelLogger.warn("LStorage", `创建备份文件失败: ${backupError.message}，继续保存操作`);
             }
             
             // 特别检查 desktop.icons 是否存在
@@ -505,13 +589,40 @@ class LStorage {
             const fileExists = await LStorage._fileExistsInPHP(filePath, fileName);
             KernelLogger.debug("LStorage", `文件存在检查: ${filePath}/${fileName} = ${fileExists}`);
             
-            if (!fileExists) {
-                // 文件不存在，创建文件
-                KernelLogger.info("LStorage", `创建存储文件: ${filePath}/${fileName}`);
-                await LStorage._createFileInPHP(filePath, fileName, jsonString);
-            } else {
-                // 文件存在，写入文件（覆盖模式）
-                await LStorage._writeFileToPHP(filePath, fileName, jsonString, 'overwrite');
+            try {
+                if (!fileExists) {
+                    // 文件不存在，创建文件
+                    KernelLogger.info("LStorage", `创建存储文件: ${filePath}/${fileName}`);
+                    await LStorage._createFileInPHP(filePath, fileName, jsonString);
+                } else {
+                    // 文件存在，写入文件（覆盖模式）
+                    await LStorage._writeFileToPHP(filePath, fileName, jsonString, 'overwrite');
+                }
+            } catch (writeError) {
+                KernelLogger.error("LStorage", `写入文件失败: ${writeError.message}`, writeError);
+                // 尝试从备份恢复
+                try {
+                    const backupFileName = fileName.replace('.json', '_backup.json');
+                    const backupContent = await LStorage._readFileFromPHP(filePath, backupFileName);
+                    if (backupContent) {
+                        KernelLogger.info("LStorage", "写入失败，尝试从备份恢复数据...");
+                        const backupData = JSON.parse(backupContent);
+                        if (backupData && typeof backupData === 'object') {
+                            LStorage._storageData = backupData;
+                            // 确保数据结构正确
+                            if (!LStorage._storageData.system) {
+                                LStorage._storageData.system = {};
+                            }
+                            if (!LStorage._storageData.programs) {
+                                LStorage._storageData.programs = {};
+                            }
+                            KernelLogger.info("LStorage", "已从备份恢复数据");
+                        }
+                    }
+                } catch (recoverError) {
+                    KernelLogger.error("LStorage", `从备份恢复失败: ${recoverError.message}`);
+                }
+                throw writeError;
             }
             
             // 验证保存是否真的成功（读取文件验证）

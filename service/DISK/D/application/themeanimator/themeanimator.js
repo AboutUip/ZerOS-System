@@ -134,7 +134,13 @@
                     PermissionManager.PERMISSION.THEME_READ,
                     PermissionManager.PERMISSION.THEME_WRITE,
                     PermissionManager.PERMISSION.SYSTEM_NOTIFICATION,
-                    PermissionManager.PERMISSION.EVENT_LISTENER
+                    PermissionManager.PERMISSION.EVENT_LISTENER,
+                    PermissionManager.PERMISSION.CACHE_READ,
+                    PermissionManager.PERMISSION.CACHE_WRITE,
+                    PermissionManager.PERMISSION.KERNEL_DISK_READ,
+                    PermissionManager.PERMISSION.KERNEL_DISK_WRITE,
+                    PermissionManager.PERMISSION.KERNEL_DISK_DELETE,
+                    PermissionManager.PERMISSION.KERNEL_DISK_LIST
                 ] : []
             };
         },
@@ -2088,7 +2094,7 @@
                     }
                 }
                 
-                // 清理旧的随机二次元背景图
+                // 清理旧的随机二次元背景图（通过 CacheDrive 管理）
                 try {
                     await this._cleanupOldRandomAnimeBackgrounds();
                 } catch (e) {
@@ -2098,15 +2104,20 @@
                     }
                 }
                 
-                // 保存图片到本地（使用 base64 编码，FSDirve.php 会解码为二进制）
+                // 保存图片到本地（使用 FileSystem API）
+                if (typeof ProcessManager === 'undefined') {
+                    throw new Error('ProcessManager 不可用');
+                }
+                
+                // 提取 base64 数据部分（去掉 data:image/jpeg;base64, 前缀）
+                const base64Data = base64.split(',')[1] || base64;
+                
+                // 使用 FileSystem.write 保存图片文件（通过 PHP 服务，支持 base64）
                 const url = new URL('/service/FSDirve.php', window.location.origin);
                 url.searchParams.set('action', 'write_file');
                 url.searchParams.set('path', 'D:/cache/');
                 url.searchParams.set('fileName', fileName);
                 url.searchParams.set('writeMod', 'overwrite');
-                
-                // 提取 base64 数据部分（去掉 data:image/jpeg;base64, 前缀）
-                const base64Data = base64.split(',')[1] || base64;
                 
                 const saveResponse = await fetch(url.toString(), {
                     method: 'POST',
@@ -2128,8 +2139,32 @@
                     throw new Error(`保存文件失败: ${saveResult.message || '未知错误'}`);
                 }
                 
+                // 使用 CacheDrive 保存图片元数据（永不过期，除非功能被禁用）
+                const cacheKey = `random_anime_bg:${fileName}`;
+                const cacheValue = {
+                    filePath: filePath,
+                    fileName: fileName,
+                    timestamp: timestamp,
+                    source: 'api-v1.cenguigui.cn'
+                };
+                
+                try {
+                    await ProcessManager.callKernelAPI(
+                        this.pid,
+                        'Cache.set',
+                        [cacheKey, cacheValue, { ttl: 0 }] // 永不过期（ttl: 0）
+                    );
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.debug('ThemeAnimator', `已保存背景图缓存元数据: ${cacheKey}（永不过期）`);
+                    }
+                } catch (cacheError) {
+                    // 缓存保存失败不影响图片保存，只记录警告
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.warn('ThemeAnimator', '保存背景图缓存元数据失败', cacheError);
+                    }
+                }
+                
                 // 使用 ThemeManager 设置背景
-                // 注意：FSDirve.php 已经支持 base64 解码，会将 base64 数据解码为二进制文件保存
                 if (typeof ThemeManager !== 'undefined') {
                     const result = await ThemeManager.setLocalImageAsBackground(filePath, true);
                     
@@ -2154,6 +2189,9 @@
                                 description: '来自 api-v1.cenguigui.cn 的随机二次元图片'
                             });
                         }
+                        
+                        // 刷新背景图卡片列表，确保新加载的背景图显示在列表中
+                        this._updateBackgroundsList();
                         
                         // 成功时不显示弹窗，静默完成
                     } else {
@@ -2223,13 +2261,23 @@
                 }
             }
             
+            // 更新所有随机背景图缓存的过期时间为30分钟
+            try {
+                await this._updateRandomAnimeBgCacheExpiration(30 * 60 * 1000); // 30分钟
+            } catch (e) {
+                // 更新缓存过期时间失败不影响功能禁用，只记录警告
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.warn('ThemeAnimator', '更新背景图缓存过期时间失败', e);
+                }
+            }
+            
             // 显示提示消息，使用通知提示（不打断用户）
             if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
                 try {
                     await NotificationManager.createNotification(this.pid, {
                         type: 'snapshot',
                         title: '主题管理器',
-                        content: '已取消随机二次元背景功能。刷新时将不再自动请求。',
+                        content: '已取消随机二次元背景功能。刷新时将不再自动请求。背景图将在30分钟后自动清理。',
                         duration: 4000
                     });
                 } catch (e) {
@@ -2241,23 +2289,319 @@
         },
         
         /**
-         * 清理旧的随机二次元背景图
+         * 更新所有随机二次元背景图缓存的过期时间
+         * @param {number} ttl 过期时间（毫秒）
          */
-        _cleanupOldRandomAnimeBackgrounds: async function() {
+        _updateRandomAnimeBgCacheExpiration: async function(ttl) {
+            if (typeof ProcessManager === 'undefined') {
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.debug('ThemeAnimator', 'ProcessManager 不可用，跳过更新缓存过期时间');
+                }
+                return;
+            }
+            
             try {
-                // 列出 D:/cache/ 目录下的所有文件
-                const listUrl = new URL('/service/FSDirve.php', window.location.origin);
-                listUrl.searchParams.set('action', 'list_dir');
-                listUrl.searchParams.set('path', 'D:/cache/');
+                // 直接读取缓存元数据文件，获取所有缓存键
+                const cacheMetadataPath = 'D:/LocalCache.json';
+                let cacheMetadata = null;
                 
-                const listResponse = await fetch(listUrl.toString());
-                if (!listResponse.ok) {
-                    // 如果目录不存在或无法访问，直接返回
+                try {
+                    const readResult = await ProcessManager.callKernelAPI(
+                        this.pid,
+                        'FileSystem.read',
+                        [cacheMetadataPath]
+                    );
+                    
+                    if (readResult && readResult.status === 'success' && readResult.data && readResult.data.content) {
+                        try {
+                            cacheMetadata = JSON.parse(readResult.data.content);
+                        } catch (parseError) {
+                            // JSON 解析失败
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.warn('ThemeAnimator', '解析缓存元数据文件失败', parseError);
+                            }
+                            return;
+                        }
+                    } else {
+                        // 文件不存在或读取失败，这是正常情况（可能还没有缓存）
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.debug('ThemeAnimator', '缓存元数据文件不存在，可能还没有缓存');
+                        }
+                        return;
+                    }
+                } catch (readError) {
+                    // 文件不存在或读取失败，这是正常情况（可能还没有缓存）
+                    // 检查错误消息，如果是文件不存在，只记录调试信息
+                    const errorMessage = readError?.message || readError?.toString() || '';
+                    const isFileNotFound = errorMessage.includes('文件不存在') || 
+                                         errorMessage.includes('不存在') ||
+                                         errorMessage.includes('404') ||
+                                         errorMessage.includes('Not Found');
+                    
+                    if (isFileNotFound) {
+                        // 文件不存在是正常情况，只记录调试信息
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.debug('ThemeAnimator', '缓存元数据文件不存在，可能还没有缓存');
+                        }
+                    } else {
+                        // 其他错误，记录警告
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('ThemeAnimator', '读取缓存元数据文件失败', readError);
+                        }
+                    }
                     return;
                 }
                 
-                const listResult = await listResponse.json();
-                if (listResult.status !== 'success' || !listResult.data || !Array.isArray(listResult.data)) {
+                if (!cacheMetadata || !cacheMetadata.system || typeof cacheMetadata.system !== 'object') {
+                    return;
+                }
+                
+                // 查找所有 random_anime_bg 相关的缓存键
+                const cacheKeys = Object.keys(cacheMetadata.system).filter(key => 
+                    key.startsWith('random_anime_bg:')
+                );
+                
+                if (cacheKeys.length === 0) {
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.debug('ThemeAnimator', '没有找到需要更新的背景图缓存');
+                    }
+                    return;
+                }
+                
+                let updatedCount = 0;
+                
+                // 更新每个缓存条目的过期时间
+                for (const cacheKey of cacheKeys) {
+                    try {
+                        // 获取当前缓存值
+                        const cacheValue = await ProcessManager.callKernelAPI(
+                            this.pid,
+                            'Cache.get',
+                            [cacheKey, null]
+                        );
+                        
+                        if (cacheValue) {
+                            // 使用相同的值重新设置缓存，但更新过期时间
+                            await ProcessManager.callKernelAPI(
+                                this.pid,
+                                'Cache.set',
+                                [cacheKey, cacheValue, { ttl: ttl }]
+                            );
+                            updatedCount++;
+                            
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.debug('ThemeAnimator', `已更新缓存过期时间: ${cacheKey}，过期时间: ${ttl}ms`);
+                            }
+                        }
+                    } catch (e) {
+                        // 单个缓存条目更新失败不影响其他条目
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('ThemeAnimator', `更新缓存条目 ${cacheKey} 失败`, e);
+                        }
+                    }
+                }
+                
+                if (updatedCount > 0) {
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.info('ThemeAnimator', `已更新 ${updatedCount} 个背景图缓存的过期时间为 ${ttl}ms`);
+                    }
+                }
+            } catch (e) {
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('ThemeAnimator', '更新背景图缓存过期时间时出错', e);
+                }
+                throw e;
+            }
+        },
+        
+        /**
+         * 清理旧的随机二次元背景图（通过 CacheDrive 管理）
+         */
+        _cleanupOldRandomAnimeBackgrounds: async function() {
+            try {
+                if (typeof ProcessManager === 'undefined') {
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.debug('ThemeAnimator', 'ProcessManager 不可用，跳过清理');
+                    }
+                    return;
+                }
+                
+                // 直接读取缓存元数据文件，获取所有缓存键
+                const cacheMetadataPath = 'D:/LocalCache.json';
+                let cacheMetadata = null;
+                
+                try {
+                    const readResult = await ProcessManager.callKernelAPI(
+                        this.pid,
+                        'FileSystem.read',
+                        [cacheMetadataPath]
+                    );
+                    
+                    if (readResult && readResult.status === 'success' && readResult.data && readResult.data.content) {
+                        try {
+                            cacheMetadata = JSON.parse(readResult.data.content);
+                        } catch (parseError) {
+                            // JSON 解析失败
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.warn('ThemeAnimator', '解析缓存元数据文件失败', parseError);
+                            }
+                            return;
+                        }
+                    } else {
+                        // 文件不存在或读取失败，这是正常情况（可能还没有缓存）
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.debug('ThemeAnimator', '缓存元数据文件不存在，可能还没有缓存');
+                        }
+                        return;
+                    }
+                } catch (readError) {
+                    // 文件不存在或读取失败，这是正常情况（可能还没有缓存）
+                    // 检查错误消息，如果是文件不存在，只记录调试信息
+                    const errorMessage = readError?.message || readError?.toString() || '';
+                    const isFileNotFound = errorMessage.includes('文件不存在') || 
+                                         errorMessage.includes('不存在') ||
+                                         errorMessage.includes('404') ||
+                                         errorMessage.includes('Not Found');
+                    
+                    if (isFileNotFound) {
+                        // 文件不存在是正常情况，只记录调试信息
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.debug('ThemeAnimator', '缓存元数据文件不存在，可能还没有缓存');
+                        }
+                    } else {
+                        // 其他错误，记录警告
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('ThemeAnimator', '读取缓存元数据文件失败', readError);
+                        }
+                    }
+                    return;
+                }
+                
+                if (!cacheMetadata || !cacheMetadata.system || typeof cacheMetadata.system !== 'object') {
+                    return;
+                }
+                
+                // 查找所有 random_anime_bg 相关的缓存键
+                const cacheKeys = Object.keys(cacheMetadata.system).filter(key => 
+                    key.startsWith('random_anime_bg:')
+                );
+                
+                if (cacheKeys.length === 0) {
+                    return;
+                }
+                
+                let cleanedCount = 0;
+                
+                // 检查每个缓存条目是否过期，如果过期则删除对应的文件
+                for (const cacheKey of cacheKeys) {
+                    try {
+                        const cacheEntry = cacheMetadata.system[cacheKey];
+                        if (!cacheEntry || !cacheEntry.value) {
+                            // 缓存条目无效，直接删除
+                            await ProcessManager.callKernelAPI(
+                                this.pid,
+                                'Cache.delete',
+                                [cacheKey]
+                            ).catch(() => {});
+                            continue;
+                        }
+                        
+                        const cacheValue = cacheEntry.value;
+                        
+                        // 检查缓存是否过期（使用 Cache.has 检查，它会自动检查过期时间）
+                        const hasCache = await ProcessManager.callKernelAPI(
+                            this.pid,
+                            'Cache.has',
+                            [cacheKey]
+                        );
+                        
+                        if (!hasCache) {
+                            // 缓存已过期或不存在，删除对应的文件
+                            if (cacheValue && cacheValue.filePath) {
+                                // 尝试删除文件
+                                try {
+                                    const deleteResult = await ProcessManager.callKernelAPI(
+                                        this.pid,
+                                        'FileSystem.delete',
+                                        [cacheValue.filePath]
+                                    );
+                                    
+                                    if (deleteResult && deleteResult.status === 'success') {
+                                        // 删除缓存元数据
+                                        await ProcessManager.callKernelAPI(
+                                            this.pid,
+                                            'Cache.delete',
+                                            [cacheKey]
+                                        );
+                                        cleanedCount++;
+                                        
+                                        if (typeof KernelLogger !== 'undefined') {
+                                            KernelLogger.debug('ThemeAnimator', `已删除过期背景图: ${cacheValue.fileName || cacheKey}`);
+                                        }
+                                    }
+                                } catch (deleteError) {
+                                    // 文件删除失败，但删除缓存元数据
+                                    await ProcessManager.callKernelAPI(
+                                        this.pid,
+                                        'Cache.delete',
+                                        [cacheKey]
+                                    ).catch(() => {});
+                                    
+                                    if (typeof KernelLogger !== 'undefined') {
+                                        KernelLogger.warn('ThemeAnimator', `删除文件失败: ${cacheValue.filePath}`, deleteError);
+                                    }
+                                }
+                            } else {
+                                // 缓存值无效，直接删除缓存元数据
+                                await ProcessManager.callKernelAPI(
+                                    this.pid,
+                                    'Cache.delete',
+                                    [cacheKey]
+                                ).catch(() => {});
+                                
+                                if (typeof KernelLogger !== 'undefined') {
+                                    KernelLogger.debug('ThemeAnimator', `缓存值无效，已删除缓存元数据: ${cacheKey}`);
+                                }
+                            }
+                        }
+                    } catch (e) {
+                        // 单个缓存条目处理失败不影响其他条目
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('ThemeAnimator', `处理缓存条目 ${cacheKey} 失败`, e);
+                        }
+                    }
+                }
+                
+                if (cleanedCount > 0) {
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.debug('ThemeAnimator', `已清理 ${cleanedCount} 个过期背景图文件`);
+                    }
+                }
+            } catch (e) {
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.warn('ThemeAnimator', '清理旧背景图时出错', e);
+                }
+                // 不抛出错误，允许继续执行
+            }
+        },
+        
+        /**
+         * 清理旧的随机二次元背景图（降级方案：直接操作文件系统）
+         */
+        _cleanupOldRandomAnimeBackgroundsFallback: async function() {
+            try {
+                if (typeof ProcessManager === 'undefined') {
+                    return;
+                }
+                
+                // 列出 D:/cache/ 目录下的所有文件
+                const listResult = await ProcessManager.callKernelAPI(
+                    this.pid,
+                    'FileSystem.list',
+                    ['D:/cache/']
+                );
+                
+                if (!listResult || listResult.status !== 'success' || !Array.isArray(listResult.data)) {
                     return;
                 }
                 
@@ -2271,18 +2615,16 @@
                 // 删除所有旧的背景图文件
                 for (const file of oldBackgroundFiles) {
                     try {
-                        const deleteUrl = new URL('/service/FSDirve.php', window.location.origin);
-                        deleteUrl.searchParams.set('action', 'delete_file');
-                        deleteUrl.searchParams.set('path', 'D:/cache/');
-                        deleteUrl.searchParams.set('fileName', file.name);
+                        const filePath = `D:/cache/${file.name}`;
+                        const deleteResult = await ProcessManager.callKernelAPI(
+                            this.pid,
+                            'FileSystem.delete',
+                            [filePath]
+                        );
                         
-                        const deleteResponse = await fetch(deleteUrl.toString());
-                        if (deleteResponse.ok) {
-                            const deleteResult = await deleteResponse.json();
-                            if (deleteResult.status === 'success') {
-                                if (typeof KernelLogger !== 'undefined') {
-                                    KernelLogger.debug('ThemeAnimator', `已删除旧背景图: ${file.name}`);
-                                }
+                        if (deleteResult && deleteResult.status === 'success') {
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.debug('ThemeAnimator', `已删除旧背景图: ${file.name}`);
                             }
                         }
                     } catch (e) {
@@ -2300,9 +2642,8 @@
                 }
             } catch (e) {
                 if (typeof KernelLogger !== 'undefined') {
-                    KernelLogger.warn('ThemeAnimator', '清理旧背景图时出错', e);
+                    KernelLogger.warn('ThemeAnimator', '降级清理旧背景图时出错', e);
                 }
-                // 不抛出错误，允许继续执行
             }
         }
     };

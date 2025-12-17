@@ -1,0 +1,19 @@
+{
+  "system": {},
+  "programs": {
+    "themeanimator": {
+      "random_anime_bg:random_anime_bg_1765983395242.jpg": {
+        "value": {
+          "filePath": "D:/cache/random_anime_bg_1765983395242.jpg",
+          "fileName": "random_anime_bg_1765983395242.jpg",
+          "timestamp": 1765983395242,
+          "source": "api-v1.cenguigui.cn"
+        },
+        "expiresAt": 0,
+        "createdAt": 1765983395265,
+        "updatedAt": 1765983395265,
+        "size": 161
+      }
+    }
+  }
+}

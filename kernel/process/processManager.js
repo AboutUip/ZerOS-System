@@ -1780,6 +1780,14 @@ class ProcessManager {
             'Geography.clearCache': PermissionManager.PERMISSION.GEOGRAPHY_LOCATION,
             'Geography.isSupported': null, // 检查支持性不需要权限
             'Geography.getCachedLocation': PermissionManager.PERMISSION.GEOGRAPHY_LOCATION,
+            
+            // 缓存API
+            'Cache.set': PermissionManager.PERMISSION.CACHE_WRITE,
+            'Cache.get': PermissionManager.PERMISSION.CACHE_READ,
+            'Cache.has': PermissionManager.PERMISSION.CACHE_READ,
+            'Cache.delete': PermissionManager.PERMISSION.CACHE_WRITE,
+            'Cache.clear': PermissionManager.PERMISSION.CACHE_WRITE,
+            'Cache.getStats': PermissionManager.PERMISSION.CACHE_READ,
         };
         
         return apiPermissionMap[apiName] || null;
@@ -1840,7 +1848,7 @@ class ProcessManager {
                     // 如果 nodeTree 不存在或未初始化，尝试从 PHP 服务重建
                     if (!nodeTree || !nodeTree.initialized) {
                         if (typeof KernelLogger !== 'undefined') {
-                            KernelLogger.warn('ProcessManager', `FileSystem.read: 磁盘分区 ${diskName} 的 nodeTree 不可靠，尝试从 PHP 服务重建`);
+                            KernelLogger.info('ProcessManager', `FileSystem.read: 磁盘分区 ${diskName} 的 nodeTree 不可靠，尝试从 PHP 服务重建`);
                         }
                         
                         // 如果 nodeTree 不存在，尝试创建它
@@ -1964,7 +1972,7 @@ class ProcessManager {
                     // 如果 nodeTree 不存在或未初始化，尝试从 PHP 服务重建
                     if (!nodeTree || !nodeTree.initialized) {
                         if (typeof KernelLogger !== 'undefined') {
-                            KernelLogger.warn('ProcessManager', `FileSystem.write: 磁盘分区 ${diskName} 的 nodeTree 不可靠，尝试从 PHP 服务重建`);
+                            KernelLogger.info('ProcessManager', `FileSystem.write: 磁盘分区 ${diskName} 的 nodeTree 不可靠，尝试从 PHP 服务重建`);
                         }
                         
                         // 如果 nodeTree 不存在，尝试创建它
@@ -2043,17 +2051,136 @@ class ProcessManager {
                         actualDirPath = nodeTree.separateName || diskName;
                     }
                     
-                    const dirNode = nodeTree.getNode(actualDirPath);
+                    let dirNode = nodeTree.getNode(actualDirPath);
                     if (!dirNode) {
                         // 如果目录节点不存在，且是根目录，尝试确保根节点存在
                         if (actualDirPath === nodeTree.separateName && !nodeTree.initialized) {
                             throw new Error(`FileSystem.write: 磁盘分区未初始化: ${diskName}`);
                         }
-                        // 记录详细的错误信息
+                        
+                        // 尝试自动创建不存在的目录
                         if (typeof KernelLogger !== 'undefined') {
-                            KernelLogger.error('ProcessManager', `FileSystem.write: 目录节点不存在: ${actualDirPath}，dirPath=${dirPath}，diskName=${diskName}，separateName=${nodeTree.separateName}，initialized=${nodeTree.initialized}`);
+                            KernelLogger.info('ProcessManager', `FileSystem.write: 目录不存在，尝试自动创建: ${actualDirPath}`);
                         }
-                        throw new Error(`FileSystem.write: 目录不存在: ${actualDirPath}`);
+                        
+                        try {
+                            // 解析目录路径，逐级创建
+                            // 规范化路径：移除双斜杠，过滤空部分
+                            const normalizedPath = actualDirPath.replace(/\/+/g, '/').replace(/\/$/, '');
+                            const pathParts = normalizedPath.split('/').filter(p => p);
+                            
+                            // 移除盘符和 separateName（如果存在）
+                            const basePath = nodeTree.separateName || diskName;
+                            const dirParts = pathParts.filter(p => p !== diskName && p !== nodeTree.separateName);
+                            
+                            let currentPath = basePath;
+                            
+                            for (const dirName of dirParts) {
+                                // 构建检查路径
+                                const checkPath = currentPath === basePath ? 
+                                    `${basePath}/${dirName}` : 
+                                    `${currentPath}/${dirName}`;
+                                
+                                const checkNode = nodeTree.getNode(checkPath);
+                                if (!checkNode) {
+                                    // 目录不存在，创建它
+                                    if (typeof KernelLogger !== 'undefined') {
+                                        KernelLogger.debug('ProcessManager', `FileSystem.write: 创建目录: ${checkPath}`);
+                                    }
+                                    
+                                    // 使用 nodeTree.create_dir 创建目录
+                                    if (typeof nodeTree.create_dir === 'function') {
+                                        await nodeTree.create_dir(currentPath, dirName);
+                                    } else {
+                                        // 如果 create_dir 不可用，通过 PHP 服务创建
+                                        const phpPath = currentPath === basePath ? diskName : currentPath;
+                                        const url = new URL('/service/FSDirve.php', window.location.origin);
+                                        url.searchParams.set('action', 'create_dir');
+                                        url.searchParams.set('path', phpPath);
+                                        url.searchParams.set('name', dirName);
+                                        
+                                        const createResponse = await fetch(url.toString());
+                                        if (!createResponse.ok) {
+                                            const createResult = await createResponse.json();
+                                            throw new Error(`创建目录失败: ${createResult.message || '未知错误'}`);
+                                        }
+                                        
+                                        // 手动在 nodeTree 中添加节点
+                                        const FileTypeRef = typeof FileType !== 'undefined' ? FileType : null;
+                                        if (FileTypeRef && typeof Node !== 'undefined' && nodeTree.optNode) {
+                                            const parentNode = nodeTree.getNode(currentPath);
+                                            if (parentNode) {
+                                                const newNode = new Node(dirName, {
+                                                    parent: currentPath,
+                                                    name: dirName,
+                                                });
+                                                nodeTree.optNode(FileTypeRef.DIR_OPS.CREATE, currentPath, newNode);
+                                            }
+                                        }
+                                    }
+                                }
+                                
+                                // 更新当前路径
+                                currentPath = checkPath;
+                            }
+                            
+                            // 重新检查目录节点（使用规范化后的路径）
+                            const finalDirPath = dirParts.length === 0 ? basePath : `${basePath}/${dirParts.join('/')}`;
+                            const finalDirNode = nodeTree.getNode(finalDirPath);
+                            if (!finalDirNode) {
+                                // 如果仍然不存在，记录警告但继续（可能是 nodeTree 同步问题）
+                                if (typeof KernelLogger !== 'undefined') {
+                                    KernelLogger.warn('ProcessManager', `FileSystem.write: 目录创建后仍无法找到节点: ${finalDirPath}，将尝试继续写入`);
+                                }
+                                // 即使找不到节点，也更新 actualDirPath，后续会通过 PHP 服务写入
+                                actualDirPath = finalDirPath;
+                            } else {
+                                // 更新 actualDirPath 为实际创建的路径
+                                actualDirPath = finalDirPath;
+                            }
+                        } catch (createError) {
+                            // 如果创建目录失败，记录错误并抛出
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.error('ProcessManager', `FileSystem.write: 自动创建目录失败: ${actualDirPath}`, createError);
+                            }
+                            throw new Error(`FileSystem.write: 目录不存在且无法创建: ${actualDirPath}，错误: ${createError.message}`);
+                        }
+                    }
+                    
+                    // 重新获取目录节点（可能在创建目录后已更新）
+                    dirNode = nodeTree.getNode(actualDirPath);
+                    if (!dirNode) {
+                        // 如果仍然找不到节点，可能是 nodeTree 同步问题，尝试通过 PHP 服务直接写入
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('ProcessManager', `FileSystem.write: 无法找到目录节点: ${actualDirPath}，将通过 PHP 服务直接写入`);
+                        }
+                        // 通过 PHP 服务直接写入文件
+                        const url = new URL('/service/FSDirve.php', window.location.origin);
+                        url.searchParams.set('action', 'write_file');
+                        url.searchParams.set('path', dirPath);
+                        url.searchParams.set('fileName', fileName);
+                        url.searchParams.set('writeMod', writeMode.toLowerCase());
+                        
+                        const response = await fetch(url.toString(), {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                            body: new URLSearchParams({
+                                action: 'write_file',
+                                path: dirPath,
+                                fileName: fileName,
+                                content: typeof content === 'string' ? content : JSON.stringify(content),
+                                writeMod: writeMode.toLowerCase()
+                            })
+                        });
+                        
+                        if (!response.ok) {
+                            throw new Error(`FileSystem.write: 从 PHP 服务写入文件失败: ${path}`);
+                        }
+                        const result = await response.json();
+                        if (result.status === 'success') {
+                            return true;
+                        }
+                        throw new Error(`FileSystem.write: PHP 服务返回错误: ${result.message || '未知错误'}`);
                     }
                     
                     // 检查文件是否存在，如果不存在则先创建
@@ -2196,7 +2323,7 @@ class ProcessManager {
                     // 如果 nodeTree 不存在或未初始化，尝试从 PHP 服务重建
                     if (!nodeTree || !nodeTree.initialized) {
                         if (typeof KernelLogger !== 'undefined') {
-                            KernelLogger.warn('ProcessManager', `FileSystem.create: 磁盘分区 ${diskName} 的 nodeTree 不可靠，尝试从 PHP 服务重建`);
+                            KernelLogger.info('ProcessManager', `FileSystem.create: 磁盘分区 ${diskName} 的 nodeTree 不可靠，尝试从 PHP 服务重建`);
                         }
                         
                         // 如果 nodeTree 不存在，尝试创建它
@@ -2652,7 +2779,7 @@ class ProcessManager {
                     // 如果 nodeTree 不存在或未初始化，尝试从 PHP 服务重建
                     if (!nodeTree || !nodeTree.initialized) {
                         if (typeof KernelLogger !== 'undefined') {
-                            KernelLogger.warn('ProcessManager', `FileSystem.list: 磁盘分区 ${diskName} 的 nodeTree 不可靠，尝试从 PHP 服务重建`);
+                            KernelLogger.info('ProcessManager', `FileSystem.list: 磁盘分区 ${diskName} 的 nodeTree 不可靠，尝试从 PHP 服务重建`);
                         }
                         
                         // 如果 nodeTree 不存在，尝试创建它
@@ -3408,6 +3535,86 @@ class ProcessManager {
                     throw new Error('GeographyDrive 模块未加载');
                 }
                 return GeographyDrive.getCachedLocation();
+            },
+            
+            // 缓存API
+            'Cache.set': async (key, value, options = {}) => {
+                if (typeof CacheDrive === 'undefined') {
+                    throw new Error('CacheDrive 模块未加载');
+                }
+                if (!key || typeof key !== 'string') {
+                    throw new Error('Cache.set: key 必须是字符串');
+                }
+                // 如果 options 中没有指定 pid，使用调用者的 pid
+                const finalOptions = typeof options === 'object' && options !== null ? { ...options } : {};
+                if (pid !== null && pid !== undefined && finalOptions.pid === undefined) {
+                    finalOptions.pid = pid;
+                }
+                return await CacheDrive.set(key, value, finalOptions);
+            },
+            'Cache.get': async (key, defaultValue = null, options = {}) => {
+                if (typeof CacheDrive === 'undefined') {
+                    throw new Error('CacheDrive 模块未加载');
+                }
+                if (!key || typeof key !== 'string') {
+                    throw new Error('Cache.get: key 必须是字符串');
+                }
+                // 如果 options 中没有指定 pid，使用调用者的 pid
+                const finalOptions = typeof options === 'object' && options !== null ? { ...options } : {};
+                if (pid !== null && pid !== undefined && finalOptions.pid === undefined) {
+                    finalOptions.pid = pid;
+                }
+                return await CacheDrive.get(key, defaultValue, finalOptions);
+            },
+            'Cache.has': async (key, options = {}) => {
+                if (typeof CacheDrive === 'undefined') {
+                    throw new Error('CacheDrive 模块未加载');
+                }
+                if (!key || typeof key !== 'string') {
+                    throw new Error('Cache.has: key 必须是字符串');
+                }
+                // 如果 options 中没有指定 pid，使用调用者的 pid
+                const finalOptions = typeof options === 'object' && options !== null ? { ...options } : {};
+                if (pid !== null && pid !== undefined && finalOptions.pid === undefined) {
+                    finalOptions.pid = pid;
+                }
+                return await CacheDrive.has(key, finalOptions);
+            },
+            'Cache.delete': async (key, options = {}) => {
+                if (typeof CacheDrive === 'undefined') {
+                    throw new Error('CacheDrive 模块未加载');
+                }
+                if (!key || typeof key !== 'string') {
+                    throw new Error('Cache.delete: key 必须是字符串');
+                }
+                // 如果 options 中没有指定 pid，使用调用者的 pid
+                const finalOptions = typeof options === 'object' && options !== null ? { ...options } : {};
+                if (pid !== null && pid !== undefined && finalOptions.pid === undefined) {
+                    finalOptions.pid = pid;
+                }
+                return await CacheDrive.delete(key, finalOptions);
+            },
+            'Cache.clear': async (options = {}) => {
+                if (typeof CacheDrive === 'undefined') {
+                    throw new Error('CacheDrive 模块未加载');
+                }
+                // 如果 options 中没有指定 pid，使用调用者的 pid
+                const finalOptions = typeof options === 'object' && options !== null ? { ...options } : {};
+                if (pid !== null && pid !== undefined && finalOptions.pid === undefined) {
+                    finalOptions.pid = pid;
+                }
+                return await CacheDrive.clear(finalOptions);
+            },
+            'Cache.getStats': async (options = {}) => {
+                if (typeof CacheDrive === 'undefined') {
+                    throw new Error('CacheDrive 模块未加载');
+                }
+                // 如果 options 中没有指定 pid，使用调用者的 pid
+                const finalOptions = typeof options === 'object' && options !== null ? { ...options } : {};
+                if (pid !== null && pid !== undefined && finalOptions.pid === undefined) {
+                    finalOptions.pid = pid;
+                }
+                return await CacheDrive.getStats(finalOptions);
             },
             
             // 加密API

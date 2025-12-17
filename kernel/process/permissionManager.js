@@ -69,7 +69,11 @@ class PermissionManager {
         CRYPT_RANDOM: 'CRYPT_RANDOM',                       // 随机数生成
         
         // 事件权限
-        EVENT_LISTENER: 'EVENT_LISTENER'                    // 注册事件监听器
+        EVENT_LISTENER: 'EVENT_LISTENER',                   // 注册事件监听器
+        
+        // 缓存权限
+        CACHE_READ: 'CACHE_READ',                           // 读取缓存
+        CACHE_WRITE: 'CACHE_WRITE'                          // 写入/删除缓存
     };
     
     /**
@@ -127,6 +131,10 @@ class PermissionManager {
         
         // 事件权限（普通权限，自动授予）
         [PermissionManager.PERMISSION.EVENT_LISTENER]: PermissionManager.PERMISSION_LEVEL.NORMAL,
+        
+        // 缓存权限（普通权限，自动授予）
+        [PermissionManager.PERMISSION.CACHE_READ]: PermissionManager.PERMISSION_LEVEL.NORMAL,
+        [PermissionManager.PERMISSION.CACHE_WRITE]: PermissionManager.PERMISSION_LEVEL.NORMAL,
         
         // 危险权限（需要明确授权）
         [PermissionManager.PERMISSION.PROCESS_MANAGE]: PermissionManager.PERMISSION_LEVEL.DANGEROUS,

@@ -13,6 +13,7 @@
         storageData: null,
         refreshTimer: null,
         childWindows: [], // 子窗口列表
+        currentStorageType: 'localSData', // 当前编辑的存储类型：'localSData' 或 'localCache'
         
         __init__: async function(pid, initArgs) {
             this.pid = pid;
@@ -176,39 +177,83 @@
          */
         _loadRegistryData: async function() {
             try {
-                if (typeof LStorage === 'undefined') {
-                    throw new Error('LStorage 不可用');
-                }
-                
-                // 确保LStorage已初始化
-                if (!LStorage._initialized) {
-                    await LStorage.init();
-                }
-                
-                // 重新加载数据（清除缓存）
-                await LStorage._loadStorageData(false);
-                
-                // 直接访问_storageData（注册表编辑器需要访问完整数据）
-                this.storageData = LStorage._storageData;
-                
-                if (!this.storageData) {
-                    if (typeof KernelLogger !== 'undefined') {
-                        KernelLogger.warn('RegEdit', 'storageData 为 null，使用默认值');
+                if (this.currentStorageType === 'localCache') {
+                    // 加载 LocalCache.json（CacheDrive 的元数据）
+                    if (typeof ProcessManager === 'undefined') {
+                        throw new Error('ProcessManager 不可用');
                     }
-                    this.storageData = {
-                        system: {},
-                        programs: {}
-                    };
+                    
+                    // 确保 CacheDrive 已初始化
+                    if (typeof CacheDrive === 'undefined') {
+                        throw new Error('CacheDrive 不可用');
+                    }
+                    
+                    if (!CacheDrive._initialized) {
+                        await CacheDrive.init();
+                    }
+                    
+                    // 重新加载缓存元数据（清除缓存）
+                    await CacheDrive._loadCacheMetadata(true);
+                    
+                    // 直接访问_cacheMetadata（注册表编辑器需要访问完整数据）
+                    this.storageData = CacheDrive._cacheMetadata;
+                    
+                    if (!this.storageData) {
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('RegEdit', 'cacheMetadata 为 null，使用默认值');
+                        }
+                        this.storageData = {
+                            system: {},
+                            programs: {}
+                        };
+                    } else {
+                        // 确保 system 和 programs 存在
+                        if (!this.storageData.system) {
+                            this.storageData.system = {};
+                        }
+                        if (!this.storageData.programs) {
+                            this.storageData.programs = {};
+                        }
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.debug('RegEdit', `LocalCache 数据加载成功，system键数: ${Object.keys(this.storageData.system).length}, programs键数: ${Object.keys(this.storageData.programs).length}`);
+                        }
+                    }
                 } else {
-                    // 确保 system 和 programs 存在
-                    if (!this.storageData.system) {
-                        this.storageData.system = {};
+                    // 加载 LocalSData.json（LStorage 的数据）
+                    if (typeof LStorage === 'undefined') {
+                        throw new Error('LStorage 不可用');
                     }
-                    if (!this.storageData.programs) {
-                        this.storageData.programs = {};
+                    
+                    // 确保LStorage已初始化
+                    if (!LStorage._initialized) {
+                        await LStorage.init();
                     }
-                    if (typeof KernelLogger !== 'undefined') {
-                        KernelLogger.debug('RegEdit', `数据加载成功，system键数: ${Object.keys(this.storageData.system).length}, programs键数: ${Object.keys(this.storageData.programs).length}`);
+                    
+                    // 重新加载数据（清除缓存）
+                    await LStorage._loadStorageData(false);
+                    
+                    // 直接访问_storageData（注册表编辑器需要访问完整数据）
+                    this.storageData = LStorage._storageData;
+                    
+                    if (!this.storageData) {
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('RegEdit', 'storageData 为 null，使用默认值');
+                        }
+                        this.storageData = {
+                            system: {},
+                            programs: {}
+                        };
+                    } else {
+                        // 确保 system 和 programs 存在
+                        if (!this.storageData.system) {
+                            this.storageData.system = {};
+                        }
+                        if (!this.storageData.programs) {
+                            this.storageData.programs = {};
+                        }
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.debug('RegEdit', `LocalSData 数据加载成功，system键数: ${Object.keys(this.storageData.system).length}, programs键数: ${Object.keys(this.storageData.programs).length}`);
+                        }
                     }
                 }
             } catch (error) {
@@ -266,12 +311,19 @@
                 color: rgba(215, 224, 221, 0.9);
                 font-size: 13px;
             `;
-            root.innerHTML = '<span style="margin-right: 5px;">📁</span>LocalSData';
-            // 使用 EventManager 注册点击事件
+            const rootLabel = this.currentStorageType === 'localCache' ? 'LocalCache' : 'LocalSData';
+            root.innerHTML = `<span style="margin-right: 5px;">📁</span>${rootLabel}`;
+            // 使用 EventManager 注册点击事件（如果可用且有权限）
             if (typeof EventManager !== 'undefined' && this.pid) {
-                EventManager.registerElementEvent(this.pid, root, 'click', () => {
+                const clickId = EventManager.registerElementEvent(this.pid, root, 'click', () => {
                     this._selectPath('');
                 });
+                // 如果权限不足，使用降级方案
+                if (clickId === null) {
+                    root.addEventListener('click', () => {
+                        this._selectPath('');
+                    });
+                }
             } else {
                 root.addEventListener('click', () => {
                     this._selectPath('');
@@ -362,21 +414,23 @@
                 node.style.background = 'rgba(108, 142, 255, 0.2)';
             }
             
-            // 使用 EventManager 注册鼠标事件
+            // 使用 EventManager 注册鼠标事件（如果可用且有权限）
+            let useEventManager = false;
             if (typeof EventManager !== 'undefined' && this.pid) {
-                EventManager.registerElementEvent(this.pid, node, 'mouseenter', () => {
+                // 尝试注册事件，检查返回值以确认是否有权限
+                const mouseenterId = EventManager.registerElementEvent(this.pid, node, 'mouseenter', () => {
                     if (this.selectedPath !== key) {
                         node.style.background = 'rgba(108, 142, 255, 0.1)';
                     }
                 });
                 
-                EventManager.registerElementEvent(this.pid, node, 'mouseleave', () => {
+                const mouseleaveId = EventManager.registerElementEvent(this.pid, node, 'mouseleave', () => {
                     if (this.selectedPath !== key) {
                         node.style.background = 'transparent';
                     }
                 });
                 
-                EventManager.registerElementEvent(this.pid, node, 'click', (e) => {
+                const clickId = EventManager.registerElementEvent(this.pid, node, 'click', (e) => {
                     e.stopPropagation();
                     this._selectPath(key);
                     
@@ -396,8 +450,13 @@
                         this._selectPath(key);
                     }
                 });
-            } else {
-                // 降级方案：使用原生 addEventListener
+                
+                // 如果所有事件都成功注册（返回值不为 null），则使用 EventManager
+                useEventManager = mouseenterId !== null && mouseleaveId !== null && clickId !== null;
+            }
+            
+            // 如果 EventManager 不可用或权限不足，使用降级方案
+            if (!useEventManager) {
                 node.addEventListener('mouseenter', () => {
                     if (this.selectedPath !== key) {
                         node.style.background = 'rgba(108, 142, 255, 0.1)';
@@ -619,17 +678,19 @@
                 transition: background 0.2s;
             `;
             
-            // 使用 EventManager 注册鼠标事件
+            // 使用 EventManager 注册鼠标事件（如果可用且有权限）
+            let useEventManager = false;
             if (typeof EventManager !== 'undefined' && this.pid) {
-                EventManager.registerElementEvent(this.pid, row, 'mouseenter', () => {
+                // 尝试注册事件，检查返回值以确认是否有权限
+                const mouseenterId = EventManager.registerElementEvent(this.pid, row, 'mouseenter', () => {
                     row.style.background = 'rgba(108, 142, 255, 0.1)';
                 });
                 
-                EventManager.registerElementEvent(this.pid, row, 'mouseleave', () => {
+                const mouseleaveId = EventManager.registerElementEvent(this.pid, row, 'mouseleave', () => {
                     row.style.background = 'transparent';
                 });
                 
-                EventManager.registerElementEvent(this.pid, row, 'dblclick', () => {
+                const dblclickId = EventManager.registerElementEvent(this.pid, row, 'dblclick', () => {
                     if (typeof value === 'object' && value !== null) {
                         // 对象或数组，打开新窗口
                         this._openChildWindow(key, value, parentPath);
@@ -638,8 +699,13 @@
                         this._editValue(parentPath, key, value);
                     }
                 });
-            } else {
-                // 降级方案
+                
+                // 如果所有事件都成功注册（返回值不为 null），则使用 EventManager
+                useEventManager = mouseenterId !== null && mouseleaveId !== null && dblclickId !== null;
+            }
+            
+            // 如果 EventManager 不可用或权限不足，使用降级方案
+            if (!useEventManager) {
                 row.addEventListener('mouseenter', () => {
                     row.style.background = 'rgba(108, 142, 255, 0.1)';
                 });
@@ -1045,10 +1111,6 @@
          */
         _setValue: async function(parentPath, key, value) {
             try {
-                if (typeof LStorage === 'undefined') {
-                    throw new Error('LStorage 不可用');
-                }
-                
                 // 数据完整性检查：确保 storageData 已正确加载
                 if (!this.storageData || typeof this.storageData !== 'object') {
                     if (typeof KernelLogger !== 'undefined') {
@@ -1092,17 +1154,35 @@
                 
                 target[key] = value;
                 
-                // 保存到LStorage
+                // 根据存储类型保存到不同的位置
                 try {
-                    if (parentPath === 'system' || (parentPath && parentPath.startsWith('system.'))) {
-                        await LStorage.setSystemStorage(key, value);
-                    } else {
-                        // 需要手动保存整个数据
-                        // 确保 LStorage._storageData 与 this.storageData 同步
-                        if (LStorage._storageData !== this.storageData) {
-                            LStorage._storageData = this.storageData;
+                    if (this.currentStorageType === 'localCache') {
+                        // 保存到 CacheDrive
+                        if (typeof CacheDrive === 'undefined') {
+                            throw new Error('CacheDrive 不可用');
                         }
-                        await LStorage._saveStorageData();
+                        
+                        // 确保 CacheDrive._cacheMetadata 与 this.storageData 同步
+                        if (CacheDrive._cacheMetadata !== this.storageData) {
+                            CacheDrive._cacheMetadata = this.storageData;
+                        }
+                        await CacheDrive._saveCacheMetadata();
+                    } else {
+                        // 保存到 LStorage
+                        if (typeof LStorage === 'undefined') {
+                            throw new Error('LStorage 不可用');
+                        }
+                        
+                        if (parentPath === 'system' || (parentPath && parentPath.startsWith('system.'))) {
+                            await LStorage.setSystemStorage(key, value);
+                        } else {
+                            // 需要手动保存整个数据
+                            // 确保 LStorage._storageData 与 this.storageData 同步
+                            if (LStorage._storageData !== this.storageData) {
+                                LStorage._storageData = this.storageData;
+                            }
+                            await LStorage._saveStorageData();
+                        }
                     }
                 } catch (saveError) {
                     // 保存失败，恢复数据
@@ -1397,6 +1477,44 @@
                 }
             });
             menuBar.appendChild(refreshBtn);
+            
+            // 存储类型切换按钮
+            const storageTypeBtn = document.createElement('div');
+            storageTypeBtn.className = 'regedit-storage-type-btn';
+            storageTypeBtn.style.cssText = `
+                padding: 4px 12px;
+                cursor: pointer;
+                border-radius: 4px;
+                transition: background 0.2s;
+                user-select: none;
+                color: rgba(215, 224, 221, 0.9);
+                font-size: 12px;
+                margin-left: auto;
+            `;
+            storageTypeBtn.textContent = 'LocalSData';
+            storageTypeBtn.addEventListener('mouseenter', () => {
+                storageTypeBtn.style.background = 'rgba(108, 142, 255, 0.2)';
+            });
+            storageTypeBtn.addEventListener('mouseleave', () => {
+                storageTypeBtn.style.background = 'transparent';
+            });
+            storageTypeBtn.addEventListener('click', () => {
+                // 切换存储类型
+                if (this.currentStorageType === 'localSData') {
+                    this.currentStorageType = 'localCache';
+                    storageTypeBtn.textContent = 'LocalCache';
+                } else {
+                    this.currentStorageType = 'localSData';
+                    storageTypeBtn.textContent = 'LocalSData';
+                }
+                // 重新加载数据并刷新显示
+                this._loadRegistryData().then(() => {
+                    this._renderTree();
+                    this._selectPath('');
+                });
+            });
+            menuBar.appendChild(storageTypeBtn);
+            this.storageTypeBtn = storageTypeBtn; // 保存引用以便更新文本
             
             return menuBar;
         },
@@ -1714,10 +1832,7 @@
          * 删除值
          */
         _deleteValue: async function(parentPath, key) {
-            if (!confirm(`确定要删除 "${key}" 吗？`)) {
-                return;
-            }
-            
+            // 直接删除，不显示确认对话框
             try {
                 // 数据完整性检查：确保 storageData 已正确加载
                 if (!this.storageData || typeof this.storageData !== 'object') {
@@ -1762,17 +1877,35 @@
                 
                 delete target[key];
                 
-                // 保存到LStorage
+                // 根据存储类型保存到不同的位置
                 try {
-                    if (parentPath === 'system' || (parentPath && parentPath.startsWith('system.'))) {
-                        await LStorage.deleteSystemStorage(key);
-                    } else {
-                        // 需要手动保存整个数据
-                        // 确保 LStorage._storageData 与 this.storageData 同步
-                        if (LStorage._storageData !== this.storageData) {
-                            LStorage._storageData = this.storageData;
+                    if (this.currentStorageType === 'localCache') {
+                        // 保存到 CacheDrive
+                        if (typeof CacheDrive === 'undefined') {
+                            throw new Error('CacheDrive 不可用');
                         }
-                        await LStorage._saveStorageData();
+                        
+                        // 确保 CacheDrive._cacheMetadata 与 this.storageData 同步
+                        if (CacheDrive._cacheMetadata !== this.storageData) {
+                            CacheDrive._cacheMetadata = this.storageData;
+                        }
+                        await CacheDrive._saveCacheMetadata();
+                    } else {
+                        // 保存到 LStorage
+                        if (typeof LStorage === 'undefined') {
+                            throw new Error('LStorage 不可用');
+                        }
+                        
+                        if (parentPath === 'system' || (parentPath && parentPath.startsWith('system.'))) {
+                            await LStorage.deleteSystemStorage(key);
+                        } else {
+                            // 需要手动保存整个数据
+                            // 确保 LStorage._storageData 与 this.storageData 同步
+                            if (LStorage._storageData !== this.storageData) {
+                                LStorage._storageData = this.storageData;
+                            }
+                            await LStorage._saveStorageData();
+                        }
                     }
                 } catch (saveError) {
                     // 保存失败，恢复数据
@@ -1898,7 +2031,9 @@
                 copyright: '© 2025 ZerOS',
                 permissions: typeof PermissionManager !== 'undefined' ? [
                     PermissionManager.PERMISSION.EVENT_LISTENER,
-                    PermissionManager.PERMISSION.GUI_WINDOW_CREATE
+                    PermissionManager.PERMISSION.GUI_WINDOW_CREATE,
+                    PermissionManager.PERMISSION.CACHE_READ,
+                    PermissionManager.PERMISSION.CACHE_WRITE
                 ] : [],
                 metadata: {
                     autoStart: false,

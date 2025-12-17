@@ -1998,38 +1998,43 @@ function escapeHtml(s){
                     if (this.cmdEl !== ev.target && !this.cmdEl.contains(ev.target)) {
                         return;
                     }
-                // 只在活动标签页时处理键盘事件
-                if (!this.isActive) return;
-                
-                // Vim模式：拦截所有键盘事件
-                if (this._vimMode && this._vimInstance) {
-                    ev.preventDefault();
-                    ev.stopPropagation();
                     
-                    // 清空输入框内容（防止显示输入的字符）
-                    if (this.cmdEl && this.cmdEl.textContent) {
-                        this.cmdEl.textContent = '';
+                    // 只在活动标签页时处理键盘事件
+                    if (!this.isActive) return;
+                    
+                    // Vim模式：拦截所有键盘事件
+                    if (this._vimMode && this._vimInstance) {
+                        ev.preventDefault();
+                        ev.stopPropagation();
+                        
+                        // 清空输入框内容（防止显示输入的字符）
+                        if (this.cmdEl && this.cmdEl.textContent) {
+                            this.cmdEl.textContent = '';
+                        }
+                        
+                        // 获取键盘按键信息
+                        let key = ev.key;
+                        const ctrlKey = ev.ctrlKey;
+                        const shiftKey = ev.shiftKey;
+                        
+                        // 调试信息（仅在开发模式下）
+                        if (this._vimInstance.mode === 1 && window._debugVim) { // MODE_INSERT
+                            console.log(`Terminal: Vim Insert Mode - key: ${key}, ctrlKey: ${ctrlKey}, shiftKey: ${shiftKey}`);
+                        }
+                        
+                        // ev.key已经自动处理了Shift键组合
+                        // 直接传递给vim处理
+                        if (this._vimInstance && typeof this._vimInstance.handleKey === 'function') {
+                            try {
+                                this._vimInstance.handleKey(key, ctrlKey, shiftKey);
+                            } catch (error) {
+                                console.error('Terminal: Vim handleKey error:', error);
+                            }
+                        } else {
+                            console.error('Terminal: _vimInstance.handleKey is not a function', this._vimInstance);
+                        }
+                        return;
                     }
-                    
-                    // 获取键盘按键信息
-                    let key = ev.key;
-                    const ctrlKey = ev.ctrlKey;
-                    const shiftKey = ev.shiftKey;
-                    
-                    // 调试信息
-                    if (this._vimInstance.mode === 1) { // MODE_INSERT
-                        console.log(`Terminal: Vim Insert Mode - key: ${key}, ctrlKey: ${ctrlKey}, shiftKey: ${shiftKey}`);
-                    }
-                    
-                    // ev.key已经自动处理了Shift键组合
-                    // 直接传递给vim处理
-                    if (this._vimInstance && typeof this._vimInstance.handleKey === 'function') {
-                        this._vimInstance.handleKey(key, ctrlKey, shiftKey);
-                    } else {
-                        console.error('Terminal: _vimInstance.handleKey is not a function', this._vimInstance);
-                    }
-                    return;
-                }
                 
                 // 键盘快捷键支持
                 if (ev.ctrlKey || ev.metaKey) {

@@ -53,6 +53,9 @@
             this._renderCount = 0;
             this._vimContainerElement = null; // 保存DOM元素引用
             
+            // 命令系统初始化标志（延迟初始化）
+            this._commands = null;
+            
             // 绑定键盘事件
             this._bindEvents();
         }
@@ -477,23 +480,34 @@
                     
                     const result = await response.json();
                     
-                    console.log(`Vim: Response status: ${result.status}, has data: ${!!result.data}, has content: ${!!(result.data && result.data.content)}`);
+                    console.log(`Vim: Response status: ${result.status}, has data: ${!!result.data}, has content: ${!!(result.data && result.data.content !== undefined)}`);
                     
-                    if (result.status !== 'success' || !result.data || !result.data.content) {
-                        // 文件不存在，创建新文件
-                        const errorMsg = result.message || 'File not found';
+                    // 检查响应状态
+                    if (result.status !== 'success') {
+                        // 真正的错误：PHP 返回了错误状态
+                        const errorMsg = result.message || '文件读取失败';
                         console.error(`Vim: File read failed: ${errorMsg}`);
-                        this.lines = [''];
-                        this.filename = fileName;
-                        this.filePath = resolved;
-                        this.unsavedChanges = false;
-                        this.terminalWrite(`Vim: File ${fileName} does not exist, creating new file`);
-                        this.cursorRow = 0;
-                        this.cursorCol = 0;
+                        this.terminalWrite(`Vim: Error reading file: ${errorMsg}`);
                         return;
                     }
                     
-                    const content = result.data.content;
+                    // 检查数据结构
+                    if (!result.data) {
+                        // 数据格式错误：缺少 data 字段
+                        console.error(`Vim: File read failed: 服务器返回数据格式错误（缺少 data 字段）`);
+                        this.terminalWrite(`Vim: Error reading file: 服务器返回数据格式错误`);
+                        return;
+                    }
+                    
+                    // 获取文件内容（允许空字符串或 null，这些是有效的文件内容）
+                    const content = result.data.content !== undefined ? result.data.content : null;
+                    
+                    // 如果 content 是 undefined（而不是空字符串或 null），说明数据格式有问题
+                    if (content === undefined) {
+                        console.error(`Vim: File read failed: 服务器返回数据格式错误（缺少 content 字段）`);
+                        this.terminalWrite(`Vim: Error reading file: 服务器返回数据格式错误`);
+                        return;
+                    }
                     
                     // 调试信息
                     console.log(`Vim: Reading file ${resolved}, content type: ${typeof content}, length: ${content ? content.length : 0}`);
@@ -829,171 +843,291 @@
             return baseParts.join('/');
         }
 
-        // 处理键盘输入
+        // 处理键盘输入（重构后的统一入口）
         handleKey(key, ctrlKey, shiftKey) {
-            if (this.mode === MODE_NORMAL) {
-                this._handleNormalMode(key, ctrlKey, shiftKey);
-            } else if (this.mode === MODE_INSERT) {
-                this._handleInsertMode(key, ctrlKey, shiftKey);
-            } else if (this.mode === MODE_COMMAND) {
-                this._handleCommandMode(key, ctrlKey, shiftKey);
-            } else if (this.mode === MODE_VISUAL) {
-                this._handleVisualMode(key, ctrlKey, shiftKey);
+            // 输入验证
+            if (!key || typeof key !== 'string') {
+                console.warn('Vim: Invalid key input:', key);
+                return;
+            }
+            
+            // 检查是否正在退出
+            if (this._exiting) {
+                return;
+            }
+            
+            // 过滤修饰键（它们不应该被当作输入字符处理）
+            const modifierKeys = ['Shift', 'Control', 'Alt', 'Meta', 'CapsLock', 
+                                 'NumLock', 'ScrollLock'];
+            if (modifierKeys.includes(key)) {
+                // 修饰键单独按下时不处理（它们只是修饰其他按键）
+                return;
+            }
+            
+            try {
+                // 根据当前模式分发到对应的处理方法
+                switch (this.mode) {
+                    case MODE_NORMAL:
+                        this._handleNormalMode(key, ctrlKey, shiftKey);
+                        break;
+                    case MODE_INSERT:
+                        this._handleInsertMode(key, ctrlKey, shiftKey);
+                        break;
+                    case MODE_COMMAND:
+                        this._handleCommandMode(key, ctrlKey, shiftKey);
+                        break;
+                    case MODE_VISUAL:
+                        this._handleVisualMode(key, ctrlKey, shiftKey);
+                        break;
+                    default:
+                        console.warn('Vim: Unknown mode:', this.mode);
+                        // 降级到 Normal 模式
+                        this.mode = MODE_NORMAL;
+                        this._handleNormalMode(key, ctrlKey, shiftKey);
+                }
+            } catch (error) {
+                console.error('Vim: Error handling key input:', error);
+                this.terminalWrite(`Vim Error: ${error.message || error}`);
+                // 确保状态一致
+                this._validateState();
+                this._render();
+            }
+        }
+        
+        // 统一的状态更新方法（减少重复代码）
+        _updateState(shouldRender = true) {
+            // 验证并修正状态
+            this._validateState();
+            // 保存状态到栈内存
+            this._saveStateToStack();
+            // 如果需要，重新渲染
+            if (shouldRender) {
+                this._render();
+            }
+        }
+        
+        // 状态验证和边界检查
+        _validateState() {
+            // 验证光标行位置
+            if (this.cursorRow < 0) {
+                this.cursorRow = 0;
+            }
+            if (this.cursorRow >= this.lines.length) {
+                this.cursorRow = Math.max(0, this.lines.length - 1);
+            }
+            
+            // 验证光标列位置
+            const currentLine = this._getLineFromHeap(this.cursorRow) || '';
+            if (this.cursorCol < 0) {
+                this.cursorCol = 0;
+            }
+            if (this.cursorCol > currentLine.length) {
+                this.cursorCol = currentLine.length;
+            }
+            
+            // 验证滚动偏移
+            const maxOffset = Math.max(0, this.lines.length - this.viewRows);
+            if (this.scrollOffset < 0) {
+                this.scrollOffset = 0;
+            }
+            if (this.scrollOffset > maxOffset) {
+                this.scrollOffset = maxOffset;
+            }
+            
+            // 确保至少有一行
+            if (this.lines.length === 0) {
+                this.lines = [''];
+                this.linePointers = [null];
             }
         }
 
-        // Normal模式处理
+        // Normal模式处理（重构后）
         _handleNormalMode(key, ctrlKey, shiftKey) {
+            // 特殊处理：':' 键即使需要 Shift，也应该被当作单个按键处理（进入命令模式）
+            if (key === ':') {
+                this.mode = MODE_COMMAND;
+                this.commandBuffer = ':';
+                this._updateState();
+                return;
+            }
+            
+            // 处理组合键
+            if (ctrlKey || shiftKey) {
+                this._handleNormalModeCombos(key, ctrlKey, shiftKey);
+                return;
+            }
+            
+            // 处理单个按键
             switch(key) {
                 case 'h':
                     this._moveLeft();
+                    this._updateState();
                     break;
                 case 'j':
                     this._moveDown();
+                    this._updateState();
                     break;
                 case 'k':
                     this._moveUp();
+                    this._updateState();
                     break;
                 case 'l':
                     this._moveRight();
+                    this._updateState();
                     break;
                 case 'i':
                     this.mode = MODE_INSERT;
+                    this._updateState();
                     break;
                 case 'a':
                     this._moveRight();
                     this.mode = MODE_INSERT;
+                    this._updateState();
                     break;
                 case 'A':
                     const lineA = this._getLineFromHeap(this.cursorRow) || '';
                     this.cursorCol = lineA.length;
                     this.mode = MODE_INSERT;
+                    this._updateState();
                     break;
                 case 'o':
                     this._insertLineBelow();
                     this.mode = MODE_INSERT;
+                    this._updateState();
                     break;
                 case 'O':
                     this._insertLineAbove();
                     this.mode = MODE_INSERT;
+                    this._updateState();
                     break;
                 case 'x':
                     this._deleteChar();
+                    this._updateState();
                     break;
                 case 'X':
                     if (this.cursorCol > 0) {
                         this.cursorCol--;
                         this._deleteChar();
+                        this._updateState();
                     }
                     break;
                 case 'd':
-                    if (shiftKey) {
-                        // dd - 删除当前行
-                        this._deleteLine();
-                    }
+                    // dd 在组合键处理中
                     break;
                 case 'y':
-                    if (shiftKey) {
-                        // yy - 复制当前行
-                        this._yankLine();
-                    }
+                    // yy 在组合键处理中
                     break;
                 case 'p':
                     this._paste();
+                    this._updateState();
                     break;
                 case 'P':
                     this._pasteBefore();
+                    this._updateState();
                     break;
                 case 'u':
                     // 撤销（简化实现）
                     this.terminalWrite('Undo not implemented');
+                    this._updateState();
                     break;
                 case 'v':
                     this.mode = MODE_VISUAL;
                     this.visualStartRow = this.cursorRow;
                     this.visualStartCol = this.cursorCol;
+                    this._updateState();
                     break;
-                case ':':
-                    this.mode = MODE_COMMAND;
-                    this.commandBuffer = ':';
-                    break;
+                // 注意：':' 键已经在函数开头特殊处理了，这里不再需要
                 case 'Escape':
                     // 已经在Normal模式，不做操作
                     break;
                 case '0':
                     this.cursorCol = 0;
+                    this._updateState();
                     break;
                 case '$':
-                    this.cursorCol = this.lines[this.cursorRow].length;
+                    const currentLine = this._getLineFromHeap(this.cursorRow) || '';
+                    this.cursorCol = currentLine.length;
+                    this._updateState();
                     break;
                 case 'g':
-                    if (shiftKey) {
-                        // G - 跳到最后一行
-                        this.cursorRow = this.lines.length - 1;
-                        this.cursorCol = 0;
-                    }
+                    // G 在组合键处理中
+                    break;
+                default:
+                    // 未处理的按键，不执行任何操作
                     break;
             }
-            this._render();
+        }
+        
+        // Normal模式组合键处理
+        _handleNormalModeCombos(key, ctrlKey, shiftKey) {
+            if (shiftKey && key === 'd') {
+                // dd - 删除当前行
+                this._deleteLine();
+                this._updateState();
+            } else if (shiftKey && key === 'y') {
+                // yy - 复制当前行
+                this._yankLine();
+                this._updateState();
+            } else if (shiftKey && key === 'G') {
+                // G - 跳到最后一行
+                this.cursorRow = Math.max(0, this.lines.length - 1);
+                this.cursorCol = 0;
+                this._updateState();
+            }
         }
 
-        // Insert模式处理
+        // Insert模式处理（重构后）
         _handleInsertMode(key, ctrlKey, shiftKey) {
+            // 模式切换
             if (key === 'Escape') {
                 this.mode = MODE_NORMAL;
-                this._render();
+                this._updateState();
                 return;
             }
 
-            // Ctrl+V 粘贴系统剪贴板内容
+            // 组合键处理
             if (ctrlKey && key === 'v') {
+                // Ctrl+V 粘贴系统剪贴板内容
                 this._pasteFromClipboard();
                 return;
             }
 
+            // 导航键
+            const navigationKeys = {
+                'ArrowLeft': () => { this._moveLeft(); },
+                'ArrowRight': () => { this._moveRight(); },
+                'ArrowUp': () => { this._moveUp(); },
+                'ArrowDown': () => { this._moveDown(); }
+            };
+            
+            if (navigationKeys.hasOwnProperty(key)) {
+                navigationKeys[key]();
+                this._updateState();
+                return;
+            }
+            
+            // Enter 键：插入换行
             if (key === 'Enter') {
                 this._insertNewline();
-                this._render();
+                this._updateState();
                 return;
             }
-
+            
+            // Backspace 键：删除前一个字符
             if (key === 'Backspace') {
                 this._backspace();
-                this._render();
+                this._updateState();
                 return;
             }
-
+            
+            // Delete 键：删除当前字符
             if (key === 'Delete') {
                 this._deleteChar();
-                this._render();
+                this._updateState();
                 return;
             }
 
-            if (key === 'ArrowLeft') {
-                this._moveLeft();
-                this._render();
-                return;
-            }
-
-            if (key === 'ArrowRight') {
-                this._moveRight();
-                this._render();
-                return;
-            }
-
-            if (key === 'ArrowUp') {
-                this._moveUp();
-                this._render();
-                return;
-            }
-
-            if (key === 'ArrowDown') {
-                this._moveDown();
-                this._render();
-                return;
-            }
-
-            // 处理特殊字符
+            // 特殊字符处理
             const specialChars = {
                 ' ': ' ',
                 'Space': ' ',
@@ -1002,96 +1136,153 @@
             
             if (specialChars.hasOwnProperty(key)) {
                 this._insertChar(specialChars[key]);
-                this._render();
+                this._updateState();
                 return;
             }
 
-            // 输入普通字符
-            // ev.key 已经自动处理了Shift键组合（如Shift+1会返回'!'）
-            // 所以我们直接使用key的值
-            
-            // 检查是否为可打印字符（长度1，且不是控制字符）
-            // 排除功能键（如 F1-F12, Home, End, PageUp, PageDown 等）
-            const functionKeys = ['F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8', 'F9', 'F10', 'F11', 'F12',
-                                  'Home', 'End', 'PageUp', 'PageDown', 'Insert', 'PrintScreen', 'ScrollLock',
-                                  'Pause', 'ContextMenu', 'Meta', 'Alt', 'Control', 'Shift', 'CapsLock',
-                                  'NumLock', 'AudioVolumeMute', 'AudioVolumeDown', 'AudioVolumeUp'];
-            
-            // 如果按键不在功能键列表中，且长度为1，或者是可打印字符
-            if (!functionKeys.includes(key) && key.length === 1) {
-                // 对于字母，保持原始大小写（因为ev.key已经处理了Shift）
-                // 对于其他字符，直接使用
-                let char = key;
-                // 确保字符是可打印的（ASCII 32-126 或 Unicode 可打印字符）
-                if (char.charCodeAt(0) >= 32 || char === '\t' || char === '\n') {
-                    this._insertChar(char);
-                    this._render();
-                    return;
-                }
+            // 处理浏览器键名格式（如 'Digit1' -> '1', 'KeyA' -> 'A'）
+            let actualChar = key;
+            if (key.startsWith('Digit')) {
+                actualChar = key.substring(5); // 'Digit1' -> '1'
+            } else if (key.startsWith('Key')) {
+                actualChar = key.substring(3); // 'KeyA' -> 'A'
+            }
+
+            // 普通字符输入
+            if (this._isPrintableChar(actualChar)) {
+                this._insertChar(actualChar);
+                this._updateState();
+                return;
             }
             
-            // 如果按键没有被处理，记录警告（用于调试）
-            if (key.length > 1 && !functionKeys.includes(key) && 
-                key !== 'Escape' && key !== 'Enter' && key !== 'Backspace' && key !== 'Delete' &&
-                key !== 'ArrowLeft' && key !== 'ArrowRight' && key !== 'ArrowUp' && key !== 'ArrowDown' &&
-                key !== 'Tab' && key !== 'Space') {
-                console.warn('Vim Insert Mode: 未处理的按键:', key, 'ctrlKey:', ctrlKey, 'shiftKey:', shiftKey);
+            // 未处理的按键（用于调试）
+            if (this._shouldLogUnhandledKey(key)) {
+                console.warn('Vim Insert Mode: 未处理的按键:', key, 'ctrlKey:', ctrlKey, 'shiftKey:', shiftKey, 'actualChar:', actualChar);
             }
         }
+        
+        // 检查是否为可打印字符（提取为独立方法）
+        _isPrintableChar(key) {
+            if (!key || typeof key !== 'string' || key.length === 0) {
+                return false;
+            }
+            
+            // 单字符键：检查字符码
+            if (key.length === 1) {
+                const charCode = key.charCodeAt(0);
+                // ASCII 可打印字符（32-126）或制表符(9)或换行符(10)或 Unicode 可打印字符
+                return (charCode >= 32 && charCode <= 126) || 
+                       charCode === 9 || 
+                       charCode === 10 || 
+                       (charCode > 126 && charCode < 0xD800);
+            }
+            
+            // 多字符键名：不是可打印字符
+            return false;
+        }
+        
+        // 判断是否应该记录未处理的按键（用于调试）
+        _shouldLogUnhandledKey(key) {
+            // 已知的导航和功能键
+            const knownKeys = ['Escape', 'Enter', 'Backspace', 'Delete', 
+                              'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown',
+                              'Tab', 'Space'];
+            
+            // 修饰键不应该被记录（它们不是用来输入的字符）
+            const modifierKeys = ['Shift', 'Control', 'Alt', 'Meta', 'CapsLock', 
+                                 'NumLock', 'ScrollLock'];
+            
+            // 如果按键长度大于1，且不在已知键列表中，且不是修饰键，则记录
+            return key.length > 1 && 
+                   !knownKeys.includes(key) && 
+                   !modifierKeys.includes(key);
+        }
 
-        // Command模式处理
+        // Command模式处理（重构后）
         _handleCommandMode(key, ctrlKey, shiftKey) {
+            // 模式切换
             if (key === 'Escape') {
                 this.mode = MODE_NORMAL;
                 this.commandBuffer = '';
-                this._render();
+                this._updateState();
                 return;
             }
 
+            // 执行命令
             if (key === 'Enter') {
                 this._executeCommand();
                 return;
             }
 
+            // 删除字符
             if (key === 'Backspace') {
                 if (this.commandBuffer.length > 1) {
                     this.commandBuffer = this.commandBuffer.slice(0, -1);
+                } else {
+                    // 如果只剩下 ':'，重置为 Normal 模式
+                    this.mode = MODE_NORMAL;
+                    this.commandBuffer = '';
                 }
-                this._render();
+                this._updateState();
                 return;
             }
 
+            // 处理浏览器键名格式（如 'Digit1' -> '1', 'KeyA' -> 'A'）
+            let actualChar = key;
+            if (key.startsWith('Digit')) {
+                actualChar = key.substring(5); // 'Digit1' -> '1'
+            } else if (key.startsWith('Key')) {
+                actualChar = key.substring(3); // 'KeyA' -> 'A'
+            }
+            
             // 输入命令字符
-            // ev.key已经自动处理了Shift键组合，直接使用
-            if (key.length === 1) {
-                this.commandBuffer += key;
-                this._render();
+            if (this._isCommandChar(actualChar)) {
+                this.commandBuffer += actualChar;
+                this._updateState();
             }
         }
+        
+        // 检查是否为有效的命令字符
+        _isCommandChar(key) {
+            // 允许所有可打印字符作为命令字符
+            return this._isPrintableChar(key) || key === ':' || key === '!' || key === ' ';
+        }
 
-        // Visual模式处理
+        // Visual模式处理（重构后）
         _handleVisualMode(key, ctrlKey, shiftKey) {
+            // 模式切换
+            if (key === 'Escape') {
+                this.mode = MODE_NORMAL;
+                this.visualStartRow = -1;
+                this.visualStartCol = -1;
+                this._updateState();
+                return;
+            }
+
+            // 导航键
             switch(key) {
-                case 'Escape':
-                    this.mode = MODE_NORMAL;
-                    this.visualStartRow = -1;
-                    this.visualStartCol = -1;
-                    break;
                 case 'h':
                     this._moveLeft();
+                    this._updateState();
                     break;
                 case 'j':
                     this._moveDown();
+                    this._updateState();
                     break;
                 case 'k':
                     this._moveUp();
+                    this._updateState();
                     break;
                 case 'l':
                     this._moveRight();
+                    this._updateState();
                     break;
                 case 'd':
-                    // 删除选中内容
+                    // 删除选中内容（简化实现）
                     this.mode = MODE_NORMAL;
+                    this.visualStartRow = -1;
+                    this.visualStartCol = -1;
+                    this._updateState();
                     break;
                 case 'y':
                     // 复制选中内容
@@ -1099,77 +1290,128 @@
                     this.mode = MODE_NORMAL;
                     this.visualStartRow = -1;
                     this.visualStartCol = -1;
+                    this._updateState();
+                    break;
+                default:
+                    // 未处理的按键，不执行任何操作
                     break;
             }
-            this._render();
         }
 
-        // 执行命令
-        _executeCommand() {
+        // 命令注册表（统一命令管理）
+        _initCommands() {
+            if (this._commands) return;
+            
+            this._commands = {
+                // 退出命令
+                ':q': () => {
+                    if (this.unsavedChanges) {
+                        this.terminalWrite('E37: No write since last change (add ! to override)');
+                        this._resetCommandMode();
+                        return false; // 命令未执行
+                    }
+                    this._exit();
+                    return true;
+                },
+                ':q!': () => {
+                    this._exit();
+                    return true;
+                },
+                
+                // 保存命令
+                ':w': async () => {
+                    await this.saveFile();
+                    return true;
+                },
+                ':wq': async () => {
+                    try {
+                        await this.saveFile();
+                        setTimeout(() => {
+                            this._exit();
+                        }, 200);
+                        return true;
+                    } catch (error) {
+                        console.error('Vim: Error saving file in :wq command:', error);
+                        this.terminalWrite(`Vim: Error saving file: ${error.message || error}`);
+                        this._resetCommandMode();
+                        return false;
+                    }
+                },
+                ':x': async () => {
+                    // :x 等同于 :wq
+                    return await this._commands[':wq']();
+                },
+                
+                // 帮助命令
+                ':help': () => {
+                    this.terminalWrite('Vim Help:');
+                    this.terminalWrite('  Normal mode: h/j/k/l (move), i/a/o (insert), x/dd (delete), y/p (yank/paste)');
+                    this.terminalWrite('  :w (save), :q (quit), :wq (save and quit)');
+                    this._resetCommandMode();
+                    setTimeout(() => this._render(), 1000);
+                    return true;
+                }
+            };
+        }
+        
+        // 重置命令模式
+        _resetCommandMode() {
+            this.mode = MODE_NORMAL;
+            this.commandBuffer = '';
+            this._updateState();
+        }
+        
+        // 执行命令（重构后）
+        async _executeCommand() {
             const cmd = this.commandBuffer.trim();
             
-            if (cmd === ':q') {
-                if (this.unsavedChanges) {
-                    this.terminalWrite('E37: No write since last change (add ! to override)');
-                    this.mode = MODE_NORMAL;
-                    this.commandBuffer = '';
-                    this._render();
-                    return;
-                }
-                this._exit();
-                return;
-            }
-
-            if (cmd === ':q!') {
-                this._exit();
-                return;
-            }
-
-            if (cmd === ':w') {
-                (async () => {
-                    await this.saveFile();
-                })();
-                return;
-            }
-
-            if (cmd === ':wq' || cmd === ':x') {
-                (async () => {
-                    await this.saveFile();
-                    setTimeout(() => {
-                        this._exit();
-                    }, 100);
-                })();
-                return;
-            }
-
+            // 初始化命令表
+            this._initCommands();
+            
+            // 处理带参数的命令（如 :w filename）
             if (cmd.startsWith(':w ')) {
                 const filename = cmd.substring(3).trim();
                 if (filename) {
                     this.filePath = this._resolvePath(this.terminalEnv.cwd, filename);
                     const parts = this.filePath.split('/');
                     this.filename = parts[parts.length - 1];
-                    (async () => {
+                    try {
                         await this.saveFile();
-                    })();
+                        this._resetCommandMode();
+                    } catch (error) {
+                        console.error('Vim: Error saving file:', error);
+                        this.terminalWrite(`Vim: Error saving file: ${error.message || error}`);
+                        this._resetCommandMode();
+                    }
+                    return;
+                } else {
+                    this.terminalWrite('E32: No file name');
+                    this._resetCommandMode();
                     return;
                 }
             }
-
-            if (cmd === ':help') {
-                this.terminalWrite('Vim Help:');
-                this.terminalWrite('  Normal mode: h/j/k/l (move), i/a/o (insert), x/dd (delete), y/p (yank/paste)');
-                this.terminalWrite('  :w (save), :q (quit), :wq (save and quit)');
-                this.mode = MODE_NORMAL;
-                this.commandBuffer = '';
-                setTimeout(() => this._render(), 1000);
-                return;
+            
+            // 查找并执行命令
+            const commandHandler = this._commands[cmd];
+            if (commandHandler) {
+                try {
+                    const result = await commandHandler();
+                    if (result !== false) {
+                        // 命令成功执行，如果还没有重置模式，则重置
+                        if (this.mode === MODE_COMMAND && cmd !== ':q' && cmd !== ':q!' && cmd !== ':wq' && cmd !== ':x') {
+                            this._resetCommandMode();
+                        }
+                    }
+                } catch (error) {
+                    console.error('Vim: Error executing command:', error);
+                    this.terminalWrite(`Vim Error: ${error.message || error}`);
+                    this._resetCommandMode();
+                }
+            } else {
+                // 未知命令
+                this.terminalWrite(`E492: Not an editor command: ${cmd}`);
+                this._resetCommandMode();
             }
-
-            // 未知命令
-            this.terminalWrite(`E492: Not an editor command: ${cmd}`);
-            this.mode = MODE_NORMAL;
-            this.commandBuffer = '';
-            this._render();
         }
 
         // 移动操作
@@ -1578,6 +1820,12 @@
 
         // 退出vim
         _exit() {
+            // 标记正在退出，防止重复调用
+            if (this._exiting) {
+                return;
+            }
+            this._exiting = true;
+            
             // 通知ProcessManager终止进程
             const pid = this._processPid || this.pid;
             if (pid) {
@@ -1601,14 +1849,18 @@
                         if (success) {
                             console.log(`[Vim] 进程 ${pid} 已通过ProcessManager终止`);
                         } else {
-                            console.warn(`[Vim] 进程 ${pid} 终止失败`);
+                            console.warn(`[Vim] 进程 ${pid} 终止失败，强制退出`);
                         }
+                        // 无论成功与否，都执行退出逻辑
+                        this._doExit();
                     }).catch((error) => {
                         console.error(`[Vim] 终止进程 ${pid} 时出错:`, error);
+                        // 即使出错，也执行退出逻辑
+                        this._doExit();
                     });
                 } else {
                     // ProcessManager不可用，降级处理
-                    console.warn('[Vim] ProcessManager不可用，无法正确终止进程');
+                    console.warn('[Vim] ProcessManager不可用，直接退出');
                     // 清理内存（如果pid可用）
                     if (pid && typeof MemoryManager !== 'undefined') {
                         try {
@@ -1617,17 +1869,28 @@
                             console.error('Vim: Error freeing memory', e);
                         }
                     }
+                    // 直接执行退出逻辑
+                    this._doExit();
                 }
+            } else {
+                // 没有PID，直接退出
+                this._doExit();
             }
-            
+        }
+        
+        // 执行实际的退出逻辑
+        _doExit() {
             // 显示退出消息
             this.terminalWrite('');
             this.terminalWrite('Vim exited');
             
             // 退出vim，返回终端
-            if (this.onExit) {
-                this.onExit();
-            }
+            // 使用 setTimeout 确保消息显示后再退出
+            setTimeout(() => {
+                if (this.onExit) {
+                    this.onExit();
+                }
+            }, 50);
         }
 
         // 绑定键盘事件

@@ -103,6 +103,12 @@
             "../kernel/process/processManager.js"
         ],
         
+        // 第十二层：缓存驱动器（依赖进程管理器和文件系统）
+        "../kernel/drive/cacheDrive.js": [
+            "../kernel/process/processManager.js",
+            "../kernel/fileSystem/init.js"
+        ],
+        
         // 第十二层：加密驱动器（依赖本地存储管理器和动态模块管理器）
         "../kernel/drive/cryptDrive.js": [
             "../kernel/drive/LStorage.js",
@@ -846,6 +852,16 @@
             check('GeographyDrive.clearCache', typeof GeographyDrive.clearCache === 'function');
             check('GeographyDrive.isSupported', typeof GeographyDrive.isSupported === 'function');
             check('GeographyDrive.getCachedLocation', typeof GeographyDrive.getCachedLocation === 'function');
+        }
+        
+        check('CacheDrive', typeof CacheDrive !== 'undefined');
+        if (typeof CacheDrive !== 'undefined') {
+            check('CacheDrive.set', typeof CacheDrive.set === 'function');
+            check('CacheDrive.get', typeof CacheDrive.get === 'function');
+            check('CacheDrive.has', typeof CacheDrive.has === 'function');
+            check('CacheDrive.delete', typeof CacheDrive.delete === 'function');
+            check('CacheDrive.clear', typeof CacheDrive.clear === 'function');
+            check('CacheDrive.getStats', typeof CacheDrive.getStats === 'function');
         }
         
         check('CryptDrive', typeof CryptDrive !== 'undefined');

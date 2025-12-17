@@ -4522,21 +4522,90 @@ class TaskbarManager {
                                 throw new Error('GeographyDrive 未加载');
                             }
                         } catch (geoError) {
-                            // GeographyDrive 失败，降级到直接调用 API
-                            KernelLogger.warn("TaskbarManager", `GeographyDrive 获取城市名称失败: ${geoError.message}，降级到直接调用 API`);
+                            // GeographyDrive 失败，尝试使用 BOM 方法作为后备
+                            KernelLogger.warn("TaskbarManager", `GeographyDrive 获取城市名称失败: ${geoError.message}，尝试使用 BOM 方法作为后备`);
                             
-                            const cityResponse = await fetch('https://api-v1.cenguigui.cn/api/UserInfo/apilet.php');
-                            if (!cityResponse.ok) {
-                                throw new Error(`获取城市信息失败: ${cityResponse.status}`);
+                            try {
+                                // 尝试使用原生地理位置 API + 反向地理编码
+                                if (typeof GeographyDrive !== 'undefined' && navigator.geolocation) {
+                                    KernelLogger.debug("TaskbarManager", "尝试使用原生地理位置 API 作为后备（需要浏览器权限）");
+                                    
+                                    // 使用 GeographyDrive 的高精度定位（会触发浏览器权限请求，但这是后备方案）
+                                    const location = await GeographyDrive.getCurrentPosition({
+                                        enableHighAccuracy: true,  // 启用高精度定位
+                                        timeout: 10000,
+                                        maximumAge: 0
+                                    });
+                                    
+                                    if (location && location.name) {
+                                        requestCityName = location.name;
+                                        KernelLogger.info("TaskbarManager", `通过 BOM 方法获取城市名称: ${requestCityName}`);
+                                    } else {
+                                        throw new Error('BOM 方法未返回城市名称');
+                                    }
+                                } else {
+                                    throw new Error('浏览器不支持地理位置 API');
+                                }
+                            } catch (bomError) {
+                                // BOM 方法也失败，降级到直接调用 API
+                                KernelLogger.warn("TaskbarManager", `BOM 方法失败: ${bomError.message}，降级到直接调用 API`);
+                                
+                                try {
+                                    const cityResponse = await fetch('https://api-v1.cenguigui.cn/api/UserInfo/apilet.php');
+                                    if (!cityResponse.ok) {
+                                        throw new Error(`获取城市信息失败: ${cityResponse.status}`);
+                                    }
+                                    
+                                    // 先读取文本内容（避免响应流被重复读取）
+                                    const cityText = await cityResponse.text();
+                                    
+                                    // 检查响应类型
+                                    const contentType = cityResponse.headers.get('content-type') || '';
+                                    const isJson = contentType.includes('application/json');
+                                    
+                                    let cityData;
+                                    if (isJson) {
+                                        try {
+                                            // 尝试解析 JSON
+                                            cityData = JSON.parse(cityText);
+                                        } catch (jsonError) {
+                                            // JSON 解析失败
+                                            KernelLogger.error("TaskbarManager", `城市信息 API JSON 解析失败，响应内容: ${cityText.substring(0, 500)}`);
+                                            throw new Error(`城市信息 API 返回了无效的 JSON 响应`);
+                                        }
+                                    } else {
+                                        // 响应不是 JSON，可能是 HTML 错误页面
+                                        KernelLogger.error("TaskbarManager", `城市信息 API 返回了非 JSON 响应 (Content-Type: ${contentType})，响应内容: ${cityText.substring(0, 500)}`);
+                                        throw new Error(`城市信息 API 返回了非 JSON 响应 (可能是服务器错误)`);
+                                    }
+                                    
+                                    if (!cityData || cityData.code !== '200' || !cityData.data || cityData.data.length === 0) {
+                                        throw new Error('城市信息数据无效');
+                                    }
+                                    
+                                    // 获取城市名称（使用第一个结果）
+                                    requestCityName = cityData.data[0].name;
+                                } catch (cityApiError) {
+                                    // 城市信息 API 也失败，尝试使用缓存的城市名称
+                                    KernelLogger.warn("TaskbarManager", `城市信息 API 失败: ${cityApiError.message}，尝试使用缓存的城市名称`);
+                                    
+                                    if (cache.cityName) {
+                                        requestCityName = cache.cityName;
+                                        KernelLogger.info("TaskbarManager", `使用缓存的城市名称: ${requestCityName}`);
+                                    } else {
+                                        // 如果缓存也没有，使用默认城市
+                                        requestCityName = '晋城'; // 默认城市
+                                        KernelLogger.warn("TaskbarManager", `所有获取城市名称的方法都失败，使用默认城市: ${requestCityName}`);
+                                    }
+                                }
                             }
-                            
-                            const cityData = await cityResponse.json();
-                            if (!cityData || cityData.code !== '200' || !cityData.data || cityData.data.length === 0) {
-                                throw new Error('城市信息数据无效');
-                            }
-                            
-                            // 获取城市名称（使用第一个结果）
-                            requestCityName = cityData.data[0].name;
+                        }
+                        
+                        // 确保有城市名称
+                        if (!requestCityName) {
+                            // 最后的后备方案：使用默认城市
+                            requestCityName = '晋城';
+                            KernelLogger.warn("TaskbarManager", `城市名称为空，使用默认城市: ${requestCityName}`);
                         }
                         
                         // 获取天气信息
@@ -4545,7 +4614,29 @@ class TaskbarManager {
                             throw new Error(`获取天气信息失败: ${weatherResponse.status}`);
                         }
                         
-                        const requestWeatherData = await weatherResponse.json();
+                        // 先读取文本内容（避免响应流被重复读取）
+                        const weatherText = await weatherResponse.text();
+                        
+                        // 检查响应类型
+                        const weatherContentType = weatherResponse.headers.get('content-type') || '';
+                        const isWeatherJson = weatherContentType.includes('application/json');
+                        
+                        let requestWeatherData;
+                        if (isWeatherJson) {
+                            try {
+                                // 尝试解析 JSON
+                                requestWeatherData = JSON.parse(weatherText);
+                            } catch (jsonError) {
+                                // JSON 解析失败
+                                KernelLogger.error("TaskbarManager", `天气 API JSON 解析失败，响应内容: ${weatherText.substring(0, 500)}`);
+                                throw new Error(`天气 API 返回了无效的 JSON 响应`);
+                            }
+                        } else {
+                            // 响应不是 JSON，可能是 HTML 错误页面
+                            KernelLogger.error("TaskbarManager", `天气 API 返回了非 JSON 响应 (Content-Type: ${weatherContentType})，响应内容: ${weatherText.substring(0, 500)}`);
+                            throw new Error(`天气 API 返回了非 JSON 响应 (可能是服务器错误)`);
+                        }
+                        
                         if (!requestWeatherData || requestWeatherData.code !== 200 || !requestWeatherData.data) {
                             throw new Error('天气数据无效');
                         }

@@ -64,6 +64,7 @@
 
 #### 高级驱动 API
 
+- **[CacheDrive](./API/CacheDrive.md)** - 缓存驱动：统一缓存管理、生命周期管控
 - **[CompressionDrive](./API/CompressionDrive.md)** - 压缩驱动：ZIP 文件处理
 - **[DragDrive](./API/DragDrive.md)** - 拖拽驱动：文件拖拽处理
 - **[GeographyDrive](./API/GeographyDrive.md)** - 地理驱动：地理位置相关功能
