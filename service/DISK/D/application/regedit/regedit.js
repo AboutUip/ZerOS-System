@@ -1049,6 +1049,25 @@
                     throw new Error('LStorage 不可用');
                 }
                 
+                // 数据完整性检查：确保 storageData 已正确加载
+                if (!this.storageData || typeof this.storageData !== 'object') {
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.error('RegEdit', 'storageData 未正确加载，尝试重新加载');
+                    }
+                    await this._loadRegistryData();
+                    if (!this.storageData || typeof this.storageData !== 'object') {
+                        throw new Error('无法加载存储数据，操作已取消');
+                    }
+                }
+                
+                // 确保 system 和 programs 存在
+                if (!this.storageData.system || typeof this.storageData.system !== 'object') {
+                    this.storageData.system = {};
+                }
+                if (!this.storageData.programs || typeof this.storageData.programs !== 'object') {
+                    this.storageData.programs = {};
+                }
+                
                 let target = this.storageData;
                 
                 if (parentPath === 'system') {
@@ -1074,11 +1093,25 @@
                 target[key] = value;
                 
                 // 保存到LStorage
-                if (parentPath === 'system' || (parentPath && parentPath.startsWith('system.'))) {
-                    await LStorage.setSystemStorage(key, value);
-                } else {
-                    // 需要手动保存整个数据
-                    await LStorage._saveStorageData();
+                try {
+                    if (parentPath === 'system' || (parentPath && parentPath.startsWith('system.'))) {
+                        await LStorage.setSystemStorage(key, value);
+                    } else {
+                        // 需要手动保存整个数据
+                        // 确保 LStorage._storageData 与 this.storageData 同步
+                        if (LStorage._storageData !== this.storageData) {
+                            LStorage._storageData = this.storageData;
+                        }
+                        await LStorage._saveStorageData();
+                    }
+                } catch (saveError) {
+                    // 保存失败，恢复数据
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.error('RegEdit', '保存失败，尝试恢复数据', saveError);
+                    }
+                    // 重新加载数据以恢复
+                    await this._loadRegistryData();
+                    throw new Error(`保存失败: ${saveError.message}`);
                 }
                 
                 // 重新加载数据
@@ -1686,6 +1719,25 @@
             }
             
             try {
+                // 数据完整性检查：确保 storageData 已正确加载
+                if (!this.storageData || typeof this.storageData !== 'object') {
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.error('RegEdit', 'storageData 未正确加载，尝试重新加载');
+                    }
+                    await this._loadRegistryData();
+                    if (!this.storageData || typeof this.storageData !== 'object') {
+                        throw new Error('无法加载存储数据，操作已取消');
+                    }
+                }
+                
+                // 确保 system 和 programs 存在
+                if (!this.storageData.system || typeof this.storageData.system !== 'object') {
+                    this.storageData.system = {};
+                }
+                if (!this.storageData.programs || typeof this.storageData.programs !== 'object') {
+                    this.storageData.programs = {};
+                }
+                
                 let target = this.storageData;
                 
                 if (parentPath === 'system') {
@@ -1711,11 +1763,25 @@
                 delete target[key];
                 
                 // 保存到LStorage
-                if (parentPath === 'system' || (parentPath && parentPath.startsWith('system.'))) {
-                    await LStorage.deleteSystemStorage(key);
-                } else {
-                    // 需要手动保存整个数据
-                    await LStorage._saveStorageData();
+                try {
+                    if (parentPath === 'system' || (parentPath && parentPath.startsWith('system.'))) {
+                        await LStorage.deleteSystemStorage(key);
+                    } else {
+                        // 需要手动保存整个数据
+                        // 确保 LStorage._storageData 与 this.storageData 同步
+                        if (LStorage._storageData !== this.storageData) {
+                            LStorage._storageData = this.storageData;
+                        }
+                        await LStorage._saveStorageData();
+                    }
+                } catch (saveError) {
+                    // 保存失败，恢复数据
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.error('RegEdit', '保存失败，尝试恢复数据', saveError);
+                    }
+                    // 重新加载数据以恢复
+                    await this._loadRegistryData();
+                    throw new Error(`保存失败: ${saveError.message}`);
                 }
                 
                 // 重新加载数据

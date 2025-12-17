@@ -455,12 +455,41 @@ class LStorage {
         }
         
         try {
+            // 数据完整性检查：防止保存空数据或无效数据
+            if (!LStorage._storageData || typeof LStorage._storageData !== 'object') {
+                KernelLogger.error("LStorage", "存储数据无效或为空，拒绝保存以防止数据丢失");
+                throw new Error("存储数据无效或为空，无法保存");
+            }
+            
+            // 确保 system 和 programs 存在
+            if (!LStorage._storageData.system || typeof LStorage._storageData.system !== 'object') {
+                KernelLogger.warn("LStorage", "system 数据无效，使用空对象");
+                LStorage._storageData.system = {};
+            }
+            if (!LStorage._storageData.programs || typeof LStorage._storageData.programs !== 'object') {
+                KernelLogger.warn("LStorage", "programs 数据无效，使用空对象");
+                LStorage._storageData.programs = {};
+            }
+            
+            // 检查数据是否为空（防止意外清空文件）
+            const systemKeys = Object.keys(LStorage._storageData.system);
+            const programsKeys = Object.keys(LStorage._storageData.programs);
+            if (systemKeys.length === 0 && programsKeys.length === 0) {
+                KernelLogger.warn("LStorage", "存储数据完全为空，但允许保存（可能是新文件）");
+            }
+            
             const filePath = LStorage.STORAGE_FILE_PATH;
             const fileName = LStorage.STORAGE_FILE_NAME;
             
             // 将数据转换为 JSON 字符串
             const jsonString = JSON.stringify(LStorage._storageData, null, 2);
             KernelLogger.debug("LStorage", `准备保存存储数据: ${filePath}/${fileName}, JSON 大小: ${jsonString.length} 字节`);
+            
+            // 验证 JSON 字符串是否有效
+            if (!jsonString || jsonString === '{}' || jsonString === 'null') {
+                KernelLogger.error("LStorage", "JSON 字符串无效或为空，拒绝保存");
+                throw new Error("JSON 字符串无效或为空，无法保存");
+            }
             
             // 特别检查 desktop.icons 是否存在
             if (LStorage._storageData.system && LStorage._storageData.system['desktop.icons']) {
@@ -514,13 +543,13 @@ class LStorage {
             LStorage._requestCache.readCacheTime = Date.now();
             
             // 记录保存的数据摘要（用于调试）
-            const systemKeys = Object.keys(LStorage._storageData.system || {});
+            const savedSystemKeys = Object.keys(LStorage._storageData.system || {});
             const savedDataSize = jsonString.length;
-            KernelLogger.info("LStorage", `存储数据保存成功 (大小: ${savedDataSize} 字节, 系统键: ${systemKeys.length})`);
-            if (systemKeys.length > 0) {
-                KernelLogger.debug("LStorage", `保存的系统存储键: ${systemKeys.join(', ')}`);
+            KernelLogger.info("LStorage", `存储数据保存成功 (大小: ${savedDataSize} 字节, 系统键: ${savedSystemKeys.length})`);
+            if (savedSystemKeys.length > 0) {
+                KernelLogger.debug("LStorage", `保存的系统存储键: ${savedSystemKeys.join(', ')}`);
             }
-            if (systemKeys.includes('desktop.icons')) {
+            if (savedSystemKeys.includes('desktop.icons')) {
                 const iconsData = LStorage._storageData.system['desktop.icons'];
                 const iconCount = Array.isArray(iconsData) ? iconsData.length : 0;
                 KernelLogger.info("LStorage", `桌面图标已保存到文件: ${iconCount} 个图标`);
