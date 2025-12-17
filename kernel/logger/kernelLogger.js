@@ -19,7 +19,7 @@
     
     class KernelLogger {
         // 日志级别（默认 DEBUG，显示所有日志）
-        static level = LOG_LEVEL.DEBUG;
+        static level = LOG_LEVEL.INFO;
         // locale, e.g. 'en' or 'zh-CN'
         static locale = 'zh-CN';
         // whether to include call stack in debug logs

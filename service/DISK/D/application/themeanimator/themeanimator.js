@@ -671,8 +671,8 @@
                     border-radius: 8px;
                     border: 1px solid rgba(139, 92, 246, 0.3);
                 ">
-                    <div id="current-animation-preset-name" style="font-size: 18px; font-weight: 600; color: rgba(139, 92, 246, 1); margin-bottom: 8px;">加载中...</div>
-                    <div id="current-animation-preset-description" style="font-size: 13px; color: rgba(215, 224, 221, 0.7);">正在加载动画预设信息...</div>
+                    <div id="current-animation-preset-name" style="font-size: 18px; font-weight: 600; color: rgba(139, 92, 246, 1); margin-bottom: 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; word-break: break-all;">加载中...</div>
+                    <div id="current-animation-preset-description" style="font-size: 13px; color: rgba(215, 224, 221, 0.7); overflow: hidden; word-break: break-all; word-wrap: break-word; line-height: 1.5;">正在加载动画预设信息...</div>
                 </div>
             `;
             panel.appendChild(currentSection);
@@ -912,8 +912,14 @@
                 font-weight: 600;
                 color: rgba(215, 224, 221, 0.9);
                 margin-bottom: 4px;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+                word-break: break-all;
             `;
-            name.textContent = theme.name || theme.id;
+            const nameText = theme.name || theme.id;
+            name.textContent = nameText;
+            name.title = nameText; // 添加 title 属性，鼠标悬停时显示完整文本
             card.appendChild(name);
             
             // 主题描述
@@ -923,8 +929,15 @@
                     font-size: 12px;
                     color: rgba(215, 224, 221, 0.6);
                     line-height: 1.4;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                    display: -webkit-box;
+                    -webkit-line-clamp: 2;
+                    -webkit-box-orient: vertical;
+                    word-break: break-word;
                 `;
                 desc.textContent = theme.description;
+                desc.title = theme.description; // 添加 title 属性
                 card.appendChild(desc);
             }
             
@@ -1058,8 +1071,14 @@
                 font-weight: 600;
                 color: rgba(215, 224, 221, 0.9);
                 margin-bottom: 4px;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+                word-break: break-all;
             `;
-            name.textContent = style.name || style.id;
+            const nameText = style.name || style.id;
+            name.textContent = nameText;
+            name.title = nameText; // 添加 title 属性，鼠标悬停时显示完整文本
             card.appendChild(name);
             
             // 风格描述
@@ -1069,8 +1088,15 @@
                     font-size: 12px;
                     color: rgba(215, 224, 221, 0.6);
                     line-height: 1.4;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                    display: -webkit-box;
+                    -webkit-line-clamp: 2;
+                    -webkit-box-orient: vertical;
+                    word-break: break-word;
                 `;
                 desc.textContent = style.description;
+                desc.title = style.description; // 添加 title 属性
                 card.appendChild(desc);
             }
             
@@ -1156,10 +1182,14 @@
             const descEl = this.window.querySelector('#current-style-description');
             
             if (nameEl) {
-                nameEl.textContent = style.name || style.id;
+                const nameText = style.name || style.id;
+                nameEl.textContent = nameText;
+                nameEl.title = nameText; // 添加 title 属性，鼠标悬停时显示完整文本
             }
             if (descEl) {
-                descEl.textContent = style.description || '无描述';
+                const descText = style.description || '无描述';
+                descEl.textContent = descText;
+                descEl.title = descText; // 添加 title 属性
             }
         },
         
@@ -1199,13 +1229,98 @@
                     return;
                 }
                 
+                // 检查每个背景文件是否存在，过滤掉已删除的文件
+                const validBackgrounds = [];
+                for (const background of backgrounds) {
+                    // 检查是否是本地文件路径
+                    const isLocalPath = background.path && (
+                        background.path.startsWith('C:') || 
+                        background.path.startsWith('D:') || 
+                        background.path.includes('/service/DISK/')
+                    );
+                    
+                    if (isLocalPath) {
+                        // 检查文件是否存在
+                        const exists = await this._checkFileExists(background.path);
+                        if (!exists) {
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.debug('ThemeAnimator', `背景文件不存在，已过滤: ${background.path}`);
+                            }
+                            continue; // 跳过不存在的文件
+                        }
+                    }
+                    
+                    // 文件存在或者是非本地路径（如内置背景），添加到列表
+                    validBackgrounds.push(background);
+                }
+                
+                if (validBackgrounds.length === 0) {
+                    container.innerHTML = '<p style="color: rgba(215, 224, 221, 0.7);">没有可用的背景</p>';
+                    return;
+                }
+                
                 container.innerHTML = '';
-                backgrounds.forEach(background => {
+                validBackgrounds.forEach(background => {
                     const backgroundCard = this._createBackgroundCard(background);
                     container.appendChild(backgroundCard);
                 });
             } catch (e) {
                 container.innerHTML = `<p style="color: rgba(255, 95, 87, 0.8);">加载背景列表失败: ${e.message}</p>`;
+            }
+        },
+        
+        /**
+         * 检查文件是否存在
+         * @param {string} filePath 文件路径
+         * @returns {Promise<boolean>} 文件是否存在
+         */
+        _checkFileExists: async function(filePath) {
+            try {
+                // 转换为 PHP 服务路径
+                let phpPath = filePath;
+                if (filePath.startsWith('C:')) {
+                    phpPath = 'C:' + filePath.substring(2).replace(/\\/g, '/');
+                } else if (filePath.startsWith('D:')) {
+                    phpPath = 'D:' + filePath.substring(2).replace(/\\/g, '/');
+                } else if (filePath.includes('/service/DISK/')) {
+                    // 已经是服务路径，提取实际路径
+                    const match = filePath.match(/\/service\/DISK\/([CD])\/(.+)/);
+                    if (match) {
+                        phpPath = `${match[1]}:/${match[2]}`;
+                    }
+                }
+                
+                // 确保路径格式正确
+                if (/^[CD]:$/.test(phpPath)) {
+                    phpPath = phpPath + '/';
+                }
+                
+                // 使用 PHP 服务检查文件是否存在
+                const url = new URL('/service/FSDirve.php', window.location.origin);
+                url.searchParams.set('action', 'exists');
+                url.searchParams.set('path', phpPath);
+                
+                const response = await fetch(url.toString());
+                if (!response.ok) {
+                    return false;
+                }
+                
+                const result = await response.json();
+                if (result.status === 'success' && result.data && result.data.exists && result.data.type === 'file') {
+                    // 检查文件扩展名，支持常见图片格式和视频格式
+                    const extension = filePath.toLowerCase().split('.').pop() || '';
+                    const supportedImageFormats = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp', 'ico'];
+                    const supportedVideoFormats = ['mp4', 'webm', 'ogg'];
+                    if (supportedImageFormats.includes(extension) || supportedVideoFormats.includes(extension)) {
+                        return true;
+                    }
+                }
+                return false;
+            } catch (e) {
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.warn('ThemeAnimator', `检查文件存在性失败: ${e.message}`);
+                }
+                return false;
             }
         },
         
@@ -1307,9 +1422,49 @@
                 font-weight: 600;
                 color: rgba(215, 224, 221, 0.9);
                 margin-bottom: 4px;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+                word-break: break-all;
             `;
             name.textContent = background.name || background.id;
+            name.title = background.name || background.id; // 添加 title 属性，鼠标悬停时显示完整文本
             card.appendChild(name);
+            
+            // 如果是本地文件，显示文件路径信息
+            if (isLocalPath && background.path) {
+                // 提取文件名
+                const fileName = background.path.split(/[/\\]/).pop() || background.path;
+                const fileLabel = document.createElement('div');
+                fileLabel.style.cssText = `
+                    font-size: 11px;
+                    color: rgba(215, 224, 221, 0.5);
+                    margin-bottom: 2px;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                    white-space: nowrap;
+                    word-break: break-all;
+                `;
+                fileLabel.textContent = fileName;
+                fileLabel.title = fileName; // 添加 title 属性
+                card.appendChild(fileLabel);
+                
+                // 显示文件路径标签和路径
+                const pathContainer = document.createElement('div');
+                pathContainer.style.cssText = `
+                    font-size: 10px;
+                    color: rgba(215, 224, 221, 0.4);
+                    margin-bottom: 4px;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                    white-space: nowrap;
+                    word-break: break-all;
+                `;
+                const isVideoFile = isVideo;
+                pathContainer.textContent = `${isVideoFile ? '本地视频' : '本地图片'}: ${background.path}`;
+                pathContainer.title = `${isVideoFile ? '本地视频' : '本地图片'}: ${background.path}`; // 添加 title 属性
+                card.appendChild(pathContainer);
+            }
             
             // 背景描述
             if (background.description) {
@@ -1318,8 +1473,15 @@
                     font-size: 12px;
                     color: rgba(215, 224, 221, 0.6);
                     line-height: 1.4;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                    display: -webkit-box;
+                    -webkit-line-clamp: 2;
+                    -webkit-box-orient: vertical;
+                    word-break: break-word;
                 `;
                 desc.textContent = background.description;
+                desc.title = background.description; // 添加 title 属性
                 card.appendChild(desc);
             }
             
@@ -1393,10 +1555,14 @@
             const descEl = this.window.querySelector('#current-background-description');
             
             if (nameEl) {
-                nameEl.textContent = background.name || background.id;
+                const nameText = background.name || background.id;
+                nameEl.textContent = nameText;
+                nameEl.title = nameText; // 添加 title 属性，鼠标悬停时显示完整文本
             }
             if (descEl) {
-                descEl.textContent = background.description || '无描述';
+                const descText = background.description || '无描述';
+                descEl.textContent = descText;
+                descEl.title = descText; // 添加 title 属性
             }
         },
         
@@ -1683,8 +1849,14 @@
                 font-weight: 600;
                 color: rgba(215, 224, 221, 0.9);
                 margin-bottom: 4px;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+                word-break: break-all;
             `;
-            name.textContent = preset.name || preset.id;
+            const nameText = preset.name || preset.id;
+            name.textContent = nameText;
+            name.title = nameText; // 添加 title 属性，鼠标悬停时显示完整文本
             card.appendChild(name);
             
             // 预设描述
@@ -1694,8 +1866,15 @@
                     font-size: 12px;
                     color: rgba(215, 224, 221, 0.6);
                     line-height: 1.4;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                    display: -webkit-box;
+                    -webkit-line-clamp: 2;
+                    -webkit-box-orient: vertical;
+                    word-break: break-word;
                 `;
                 desc.textContent = preset.description;
+                desc.title = preset.description; // 添加 title 属性
                 card.appendChild(desc);
             }
             
@@ -1770,10 +1949,14 @@
             const descEl = this.window.querySelector('#current-animation-preset-description');
             
             if (nameEl) {
-                nameEl.textContent = preset.name || preset.id || '未知';
+                const nameText = preset.name || preset.id || '未知';
+                nameEl.textContent = nameText;
+                nameEl.title = nameText; // 添加 title 属性，鼠标悬停时显示完整文本
             }
             if (descEl) {
-                descEl.textContent = preset.description || '无描述';
+                const descText = preset.description || '无描述';
+                descEl.textContent = descText;
+                descEl.title = descText; // 添加 title 属性
             }
         },
         
