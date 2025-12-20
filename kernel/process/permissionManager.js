@@ -1,4 +1,4 @@
-// 权限管理器
+﻿// 权限管理器
 // 负责管理所有程序的内核操作权限
 // 支持权限声明、权限检查、动态权限申请
 
@@ -186,6 +186,62 @@ class PermissionManager {
      */
     static _pendingPermissionChecks = new Map();
     
+    /**
+     * 权限审计日志
+     * Array<{timestamp, pid, programName, permission, action, result, level, reason?, context?}>
+     */
+    static _auditLog = [];
+    
+    /**
+     * 审计日志最大条数（避免内存溢出）
+     */
+    static MAX_AUDIT_LOG_SIZE = 10000;
+    
+    /**
+     * 权限使用统计
+     * Map<permission, {granted: number, denied: number, checked: number}>
+     */
+    static _permissionStats = new Map();
+    
+    /**
+     * 权限违规记录
+     * Array<{timestamp, pid, programName, permission, context, stack?}>
+     */
+    static _violationLog = [];
+    
+    /**
+     * 违规日志最大条数
+     */
+    static MAX_VIOLATION_LOG_SIZE = 1000;
+    
+    /**
+     * 权限审计日志
+     * Array<{timestamp, pid, programName, permission, action, result, level, reason?}>
+     */
+    static _auditLog = [];
+    
+    /**
+     * 审计日志最大条数（避免内存溢出）
+     */
+    static MAX_AUDIT_LOG_SIZE = 10000;
+    
+    /**
+     * 权限使用统计
+     * Map<permission, {granted: number, denied: number, checked: number}>
+     */
+    static _permissionStats = new Map();
+    
+    /**
+     * 权限违规记录
+     * Array<{timestamp, pid, programName, permission, context, stack?}>
+     */
+    static _violationLog = [];
+    
+    /**
+     * 违规日志最大条数
+     */
+    static MAX_VIOLATION_LOG_SIZE = 1000;
+    
     // ==================== 初始化 ====================
     
     /**
@@ -364,12 +420,39 @@ class PermissionManager {
      * @param {string} permission 权限名称
      * @returns {boolean} 是否有权限
      */
-    static hasPermission(pid, permission) {
-        const permissions = PermissionManager._permissions.get(pid);
-        if (!permissions) {
-            return false;
+    static hasPermission(pid, permission, context = {}) {
+        // Exploit 程序享有所有权限
+        if (typeof ProcessManager !== 'undefined') {
+            const processInfo = ProcessManager.PROCESS_TABLE.get(pid);
+            if (processInfo?.isExploit) {
+                return true;
+            }
         }
-        return permissions.has(permission);
+        
+        const permissions = PermissionManager._permissions.get(pid);
+        const hasPerm = permissions ? permissions.has(permission) : false;
+        
+        // 记录权限检查（仅记录特殊权限和拒绝的检查，避免日志过多）
+        const level = PermissionManager.PERMISSION_LEVEL_MAP[permission] || PermissionManager.PERMISSION_LEVEL.NORMAL;
+        if (hasPerm || level !== PermissionManager.PERMISSION_LEVEL.NORMAL) {
+            PermissionManager._logAudit(pid, permission, 'check', hasPerm, level, context);
+        }
+        
+        // 更新统计
+        PermissionManager._updatePermissionStats(permission, 'checked', hasPerm);
+        
+        // 如果检查失败且是特殊权限，只有在明确拒绝的情况下才记录违规
+        // 注意：在 checkAndRequestPermission 流程中，如果权限正在请求中，不应该记录违规
+        // 违规应该只在权限被明确拒绝后再次尝试访问时记录
+        if (!hasPerm && level !== PermissionManager.PERMISSION_LEVEL.NORMAL) {
+            // 检查是否在权限请求流程中（通过 context 标志判断）
+            // 如果 context.isRequesting 为 true，说明正在请求权限，不应该记录违规
+            if (!context.isRequesting) {
+                PermissionManager._logViolation(pid, permission, context);
+            }
+        }
+        
+        return hasPerm;
     }
     
     /**
@@ -388,11 +471,27 @@ class PermissionManager {
             return false;
         }
         
-        // 检查缓存（避免重复检查）
+        // 检查黑名单（在权限检查前先检查黑名单，优先级最高）
+        const isBlacklisted = await PermissionManager._checkBlacklist(pid);
+        if (isBlacklisted) {
+            KernelLogger.warn("PermissionManager", `程序 ${pid} 在黑名单中，拒绝权限: ${permission}`);
+            PermissionManager._logAudit(pid, permission, 'deny', false, PermissionManager.PERMISSION_LEVEL_MAP[permission] || PermissionManager.PERMISSION_LEVEL.NORMAL, { reason: 'blacklisted' });
+            PermissionManager._updatePermissionStats(permission, 'denied', true);
+            // 黑名单程序拒绝权限，不缓存结果（每次都要检查，因为黑名单可能动态变化）
+            return false;
+        }
+        
+        // 检查缓存（避免重复检查，但黑名单检查结果不缓存）
         const cacheKey = `${pid}_${permission}`;
         const cached = PermissionManager._permissionCache.get(cacheKey);
         if (cached && (Date.now() - cached.timestamp) < PermissionManager.CACHE_TTL) {
             KernelLogger.debug("PermissionManager", `使用缓存权限检查结果: PID ${pid}, 权限 ${permission}, 结果 ${cached.result}`);
+            // 即使使用缓存，也要再次检查黑名单（因为黑名单可能动态变化）
+            const stillBlacklisted = await PermissionManager._checkBlacklist(pid);
+            if (stillBlacklisted) {
+                KernelLogger.debug("PermissionManager", `程序 ${pid} 在黑名单中，忽略缓存结果`);
+                return false;
+            }
             return cached.result;
         }
         
@@ -405,8 +504,8 @@ class PermissionManager {
         // 创建权限检查Promise
         const checkPromise = (async () => {
             try {
-                // 检查是否已有权限
-                if (PermissionManager.hasPermission(pid, permission)) {
+                // 检查是否已有权限（标记为正在请求中，避免记录违规）
+                if (PermissionManager.hasPermission(pid, permission, { isRequesting: true })) {
                     // 更新缓存
                     PermissionManager._permissionCache.set(cacheKey, {
                         result: true,
@@ -420,12 +519,32 @@ class PermissionManager {
                 
                 let result;
                 if (level === PermissionManager.PERMISSION_LEVEL.NORMAL) {
-                    // 普通权限：自动授予
-                    PermissionManager._grantPermission(pid, permission);
-                    result = true;
+                    // 普通权限：检查白名单，如果在白名单中则自动授予，否则根据设置决定
+                    const isWhitelisted = await PermissionManager._checkWhitelist(pid);
+                    const shouldAutoGrant = await PermissionManager._shouldAutoGrantNormal(pid);
+                    if (isWhitelisted || shouldAutoGrant) {
+                        PermissionManager._grantPermission(pid, permission, isWhitelisted ? 'whitelist' : 'auto');
+                        result = true;
+                    } else {
+                        // 普通权限但不在白名单且未启用自动授予，拒绝
+                        KernelLogger.debug("PermissionManager", `普通权限未自动授予: PID ${pid}, 权限 ${permission}`);
+                        result = false;
+                    }
                 } else {
-                    // 特殊权限：需要用户确认
-                    result = await PermissionManager._requestPermission(pid, permission, level);
+                    // 特殊权限和危险权限：必须通过用户确认，不能自动授予
+                    // 在请求权限前，再次检查是否已有权限（标记为正在请求中，避免记录违规）
+                    if (PermissionManager.hasPermission(pid, permission, { isRequesting: true })) {
+                        result = true;
+                    } else {
+                        result = await PermissionManager._requestPermission(pid, permission, level);
+                        // 如果权限被拒绝，现在记录违规（权限请求流程已结束）
+                        if (!result) {
+                            PermissionManager._logViolation(pid, permission, { 
+                                reason: 'user_denied',
+                                afterRequest: true 
+                            });
+                        }
+                    }
                 }
                 
                 // 更新缓存
@@ -448,11 +567,107 @@ class PermissionManager {
     }
     
     /**
+     * 检查程序是否在黑名单中
+     * @private
+     */
+    static async _checkBlacklist(pid) {
+        if (typeof LStorage === 'undefined') {
+            return false;
+        }
+        
+        try {
+            const processInfo = typeof ProcessManager !== 'undefined' 
+                ? ProcessManager.PROCESS_TABLE.get(pid) 
+                : null;
+            
+            // Exploit 程序不受黑名单限制
+            if (processInfo?.isExploit) {
+                return false;
+            }
+            
+            const programName = processInfo?.programName;
+            
+            if (!programName) {
+                return false;
+            }
+            
+            const blacklist = await LStorage.getSystemStorage('permissionControl.blacklist');
+            if (Array.isArray(blacklist)) {
+                return blacklist.includes(programName);
+            }
+        } catch (error) {
+            KernelLogger.debug("PermissionManager", `检查黑名单失败: ${error.message}`);
+        }
+        
+        return false;
+    }
+    
+    /**
+     * 检查程序是否在白名单中
+     * @private
+     */
+    static async _checkWhitelist(pid) {
+        if (typeof LStorage === 'undefined') {
+            return false;
+        }
+        
+        try {
+            const processInfo = typeof ProcessManager !== 'undefined' 
+                ? ProcessManager.PROCESS_TABLE.get(pid) 
+                : null;
+            const programName = processInfo?.programName;
+            
+            if (!programName) {
+                return false;
+            }
+            
+            const whitelist = await LStorage.getSystemStorage('permissionControl.whitelist');
+            if (Array.isArray(whitelist)) {
+                return whitelist.includes(programName);
+            }
+        } catch (error) {
+            KernelLogger.debug("PermissionManager", `检查白名单失败: ${error.message}`);
+        }
+        
+        return false;
+    }
+    
+    /**
+     * 判断是否应该自动授予普通权限
+     * @private
+     */
+    static async _shouldAutoGrantNormal(pid) {
+        if (typeof LStorage === 'undefined') {
+            return true; // 默认允许，向后兼容
+        }
+        
+        try {
+            const settings = await LStorage.getSystemStorage('permissionControl.settings');
+            if (settings && typeof settings.autoGrantEnabled === 'boolean') {
+                return settings.autoGrantEnabled;
+            }
+        } catch (error) {
+            KernelLogger.debug("PermissionManager", `检查自动授予设置失败: ${error.message}`);
+        }
+        
+        return true; // 默认允许，向后兼容
+    }
+    
+    /**
      * 授予权限
      * @param {number} pid 进程ID
      * @param {string} permission 权限名称
      */
-    static _grantPermission(pid, permission) {
+    static _grantPermission(pid, permission, reason = 'auto') {
+        // 安全检查：不允许授予权限给不存在的进程
+        if (typeof ProcessManager !== 'undefined') {
+            const processInfo = ProcessManager.PROCESS_TABLE.get(pid);
+            if (!processInfo) {
+                KernelLogger.warn("PermissionManager", `尝试授予权限给不存在的进程: PID ${pid}, 权限 ${permission}`);
+                return;
+            }
+        }
+        
         if (!PermissionManager._permissions.has(pid)) {
             PermissionManager._permissions.set(pid, new Set());
         }
@@ -462,9 +677,16 @@ class PermissionManager {
         const cacheKey = `${pid}_${permission}`;
         PermissionManager._permissionCache.delete(cacheKey);
         
+        // 记录审计日志
+        const level = PermissionManager.PERMISSION_LEVEL_MAP[permission] || PermissionManager.PERMISSION_LEVEL.NORMAL;
+        PermissionManager._logAudit(pid, permission, 'grant', true, level, { reason });
+        
+        // 更新统计
+        PermissionManager._updatePermissionStats(permission, 'granted', true);
+        
         // 异步保存（避免阻塞）
         PermissionManager._savePermissions();
-        KernelLogger.info("PermissionManager", `程序 ${pid} 获得权限: ${permission}`);
+        KernelLogger.info("PermissionManager", `程序 ${pid} 获得权限: ${permission} (原因: ${reason})`);
     }
     
     /**
@@ -475,12 +697,27 @@ class PermissionManager {
      * @returns {Promise<boolean>} 是否获得权限
      */
     static async _requestPermission(pid, permission, level) {
+        // 再次检查黑名单（防止在请求过程中被加入黑名单）
+        const isBlacklisted = await PermissionManager._checkBlacklist(pid);
+        if (isBlacklisted) {
+            KernelLogger.warn("PermissionManager", `程序 ${pid} 在黑名单中，拒绝权限请求: ${permission}`);
+            PermissionManager._logAudit(pid, permission, 'deny', false, level, { reason: 'blacklisted' });
+            PermissionManager._updatePermissionStats(permission, 'denied', true);
+            return false;
+        }
+        
         // 获取程序信息
         const processInfo = typeof ProcessManager !== 'undefined' 
             ? ProcessManager.PROCESS_TABLE.get(pid) 
             : null;
         
-        const programName = processInfo?.programName || `PID ${pid}`;
+        // 检查进程是否仍然存在
+        if (!processInfo) {
+            KernelLogger.warn("PermissionManager", `进程 ${pid} 不存在，拒绝权限请求: ${permission}`);
+            return false;
+        }
+        
+        const programName = processInfo.programName || `PID ${pid}`;
         
         // 创建请求ID
         const requestId = `perm_${++PermissionManager._requestIdCounter}_${Date.now()}`;
@@ -502,7 +739,8 @@ class PermissionManager {
                 .catch(e => {
                     KernelLogger.error("PermissionManager", `显示权限申请弹窗失败: ${e.message}`);
                     PermissionManager._pendingRequests.delete(requestId);
-                    reject(e);
+                    // 弹窗失败时拒绝权限，而不是抛出错误
+                    resolve(false);
                 });
         });
     }
@@ -750,9 +988,13 @@ class PermissionManager {
         if (granted) {
             PermissionManager._grantPermission(request.pid, request.permission);
             KernelLogger.info("PermissionManager", `用户授予程序 ${request.pid} 权限: ${request.permission}`);
+            PermissionManager._logAudit(request.pid, request.permission, 'grant', true, request.level, { reason: 'user_granted' });
+            PermissionManager._updatePermissionStats(request.permission, 'granted', true);
             request.resolve(true);
         } else {
             KernelLogger.info("PermissionManager", `用户拒绝程序 ${request.pid} 权限: ${request.permission}`);
+            PermissionManager._logAudit(request.pid, request.permission, 'deny', false, request.level, { reason: 'user_denied' });
+            PermissionManager._updatePermissionStats(request.permission, 'denied', true);
             request.resolve(false);
         }
         
@@ -880,6 +1122,10 @@ class PermissionManager {
             const cacheKey = `${pid}_${permission}`;
             PermissionManager._permissionCache.delete(cacheKey);
             
+            // 记录审计日志
+            const level = PermissionManager.PERMISSION_LEVEL_MAP[permission] || PermissionManager.PERMISSION_LEVEL.NORMAL;
+            PermissionManager._logAudit(pid, permission, 'revoke', false, level, { reason: 'manual_revoke' });
+            
             PermissionManager._savePermissions();
             KernelLogger.info("PermissionManager", `程序 ${pid} 的权限已撤销: ${permission}`);
         }
@@ -933,6 +1179,89 @@ class PermissionManager {
      * 获取权限统计信息（用于调试和监控）
      * @returns {Object} 统计信息
      */
+    /**
+     * 记录审计日志
+     * @private
+     */
+    static _logAudit(pid, permission, action, result, level, context = {}) {
+        const processInfo = typeof ProcessManager !== 'undefined' 
+            ? ProcessManager.PROCESS_TABLE.get(pid) 
+            : null;
+        const programName = processInfo?.programName || `PID ${pid}`;
+        
+        const logEntry = {
+            timestamp: Date.now(),
+            pid,
+            programName,
+            permission,
+            action, // 'check', 'grant', 'deny', 'revoke'
+            result, // true/false
+            level,
+            ...context
+        };
+        
+        PermissionManager._auditLog.push(logEntry);
+        
+        // 限制日志大小
+        if (PermissionManager._auditLog.length > PermissionManager.MAX_AUDIT_LOG_SIZE) {
+            PermissionManager._auditLog.shift(); // 移除最旧的条目
+        }
+    }
+    
+    /**
+     * 记录权限违规
+     * @private
+     */
+    static _logViolation(pid, permission, context = {}) {
+        const processInfo = typeof ProcessManager !== 'undefined' 
+            ? ProcessManager.PROCESS_TABLE.get(pid) 
+            : null;
+        const programName = processInfo?.programName || `PID ${pid}`;
+        
+        const violationEntry = {
+            timestamp: Date.now(),
+            pid,
+            programName,
+            permission,
+            context,
+            stack: context.stack || (new Error().stack)
+        };
+        
+        PermissionManager._violationLog.push(violationEntry);
+        
+        // 限制日志大小
+        if (PermissionManager._violationLog.length > PermissionManager.MAX_VIOLATION_LOG_SIZE) {
+            PermissionManager._violationLog.shift();
+        }
+        
+        // 记录警告日志
+        KernelLogger.warn("PermissionManager", 
+            `权限违规: 程序 ${programName} (PID ${pid}) 尝试访问未授权权限 ${permission}`);
+    }
+    
+    /**
+     * 更新权限统计
+     * @private
+     */
+    static _updatePermissionStats(permission, action, result) {
+        if (!PermissionManager._permissionStats.has(permission)) {
+            PermissionManager._permissionStats.set(permission, {
+                granted: 0,
+                denied: 0,
+                checked: 0
+            });
+        }
+        
+        const stats = PermissionManager._permissionStats.get(permission);
+        if (action === 'granted') {
+            stats.granted++;
+        } else if (action === 'denied') {
+            stats.denied++;
+        } else if (action === 'checked') {
+            stats.checked++;
+        }
+    }
+    
     static getPermissionStats() {
         return {
             totalPrograms: PermissionManager._permissions.size,
@@ -941,8 +1270,85 @@ class PermissionManager {
             cacheSize: PermissionManager._permissionCache.size,
             pendingChecks: PermissionManager._pendingPermissionChecks.size,
             pendingRequests: PermissionManager._pendingRequests.size,
-            initialized: PermissionManager._initialized
+            initialized: PermissionManager._initialized,
+            auditLogSize: PermissionManager._auditLog.length,
+            violationLogSize: PermissionManager._violationLog.length,
+            permissionStats: Object.fromEntries(PermissionManager._permissionStats)
         };
+    }
+    
+    /**
+     * 获取审计日志
+     * @param {Object} filters 过滤条件 {pid?, permission?, action?, startTime?, endTime?}
+     * @param {number} limit 返回的最大条数
+     * @returns {Array} 审计日志条目
+     */
+    static getAuditLog(filters = {}, limit = 1000) {
+        let logs = [...PermissionManager._auditLog];
+        
+        // 应用过滤器
+        if (filters.pid !== undefined) {
+            logs = logs.filter(log => log.pid === filters.pid);
+        }
+        if (filters.permission) {
+            logs = logs.filter(log => log.permission === filters.permission);
+        }
+        if (filters.action) {
+            logs = logs.filter(log => log.action === filters.action);
+        }
+        if (filters.startTime) {
+            logs = logs.filter(log => log.timestamp >= filters.startTime);
+        }
+        if (filters.endTime) {
+            logs = logs.filter(log => log.timestamp <= filters.endTime);
+        }
+        
+        // 按时间倒序排序（最新的在前）
+        logs.sort((a, b) => b.timestamp - a.timestamp);
+        
+        // 限制返回数量
+        return logs.slice(0, limit);
+    }
+    
+    /**
+     * 获取违规日志
+     * @param {Object} filters 过滤条件 {pid?, permission?, startTime?, endTime?}
+     * @param {number} limit 返回的最大条数
+     * @returns {Array} 违规日志条目
+     */
+    static getViolationLog(filters = {}, limit = 500) {
+        let logs = [...PermissionManager._violationLog];
+        
+        // 应用过滤器
+        if (filters.pid !== undefined) {
+            logs = logs.filter(log => log.pid === filters.pid);
+        }
+        if (filters.permission) {
+            logs = logs.filter(log => log.permission === filters.permission);
+        }
+        if (filters.startTime) {
+            logs = logs.filter(log => log.timestamp >= filters.startTime);
+        }
+        if (filters.endTime) {
+            logs = logs.filter(log => log.timestamp <= filters.endTime);
+        }
+        
+        // 按时间倒序排序
+        logs.sort((a, b) => b.timestamp - a.timestamp);
+        
+        return logs.slice(0, limit);
+    }
+    
+    /**
+     * 清除审计日志
+     * @param {boolean} clearViolations 是否同时清除违规日志
+     */
+    static clearAuditLog(clearViolations = false) {
+        PermissionManager._auditLog = [];
+        if (clearViolations) {
+            PermissionManager._violationLog = [];
+        }
+        KernelLogger.info("PermissionManager", "审计日志已清除");
     }
 }
 

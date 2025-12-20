@@ -1,4 +1,4 @@
-// 地理位置驱动管理器
+﻿// 地理位置驱动管理器
 // 负责管理系统级的地理位置功能，包括高精度定位、低精度定位、地址信息获取等
 // 提供统一的地理位置 API 供程序使用
 
@@ -136,24 +136,26 @@ class GeographyDrive {
                 apiLocation = await GeographyDrive._getApiLocation(nativeLocation);
                 KernelLogger.info("GeographyDrive", "第三方 API 获取位置信息成功");
             } catch (error) {
-                KernelLogger.error("GeographyDrive", `第三方 API 获取位置信息失败: ${error.message}`);
+                // 第三方 API 失败，静默降级（不记录错误日志，只记录调试日志）
+                KernelLogger.debug("GeographyDrive", `第三方 API 获取位置信息失败: ${error.message}`);
                 
                 // 如果原生 API 成功但第三方 API 失败，尝试使用反向地理编码获取城市名称
                 if (nativeLocation) {
-                    KernelLogger.warn("GeographyDrive", "第三方 API 失败，尝试使用反向地理编码获取城市名称");
+                    KernelLogger.debug("GeographyDrive", "第三方 API 失败，尝试使用反向地理编码获取城市名称");
                     try {
                         apiLocation = await GeographyDrive._getLocationFromReverseGeocoding(nativeLocation);
                         if (apiLocation && apiLocation.name) {
-                            KernelLogger.info("GeographyDrive", "反向地理编码成功，获取到城市名称");
+                            KernelLogger.debug("GeographyDrive", "反向地理编码成功，获取到城市名称");
                         } else {
-                            KernelLogger.warn("GeographyDrive", "反向地理编码未返回城市名称，仅使用原生 API 数据");
+                            KernelLogger.debug("GeographyDrive", "反向地理编码未返回城市名称，仅使用原生 API 数据");
                         }
                     } catch (reverseError) {
-                        KernelLogger.warn("GeographyDrive", `反向地理编码失败: ${reverseError.message}，仅使用原生 API 数据`);
+                        // 反向地理编码失败，静默降级（只记录调试日志）
+                        KernelLogger.debug("GeographyDrive", `反向地理编码失败: ${reverseError.message}，仅使用原生 API 数据`);
                     }
                 } else {
                     // 如果原生 API 也失败了，尝试使用 BOM 方法作为后备
-                    KernelLogger.warn("GeographyDrive", "第三方 API 失败且原生 API 未启用，尝试使用 BOM 后备方案");
+                    KernelLogger.debug("GeographyDrive", "第三方 API 失败且原生 API 未启用，尝试使用 BOM 后备方案");
                     try {
                         // 尝试使用原生 API 作为后备（即使未明确启用高精度）
                         if (navigator.geolocation) {
@@ -164,22 +166,20 @@ class GeographyDrive {
                                 try {
                                     apiLocation = await GeographyDrive._getLocationFromReverseGeocoding(nativeLocation);
                                     if (apiLocation && apiLocation.name) {
-                                        KernelLogger.info("GeographyDrive", "BOM 后备方案成功，已获取城市名称");
+                                        KernelLogger.debug("GeographyDrive", "BOM 后备方案成功，已获取城市名称");
                                     }
                                 } catch (reverseError) {
-                                    KernelLogger.warn("GeographyDrive", `反向地理编码失败: ${reverseError.message}`);
+                                    // 反向地理编码失败，静默降级（只记录调试日志）
+                                    KernelLogger.debug("GeographyDrive", `反向地理编码失败: ${reverseError.message}`);
                                 }
                             }
                         } else {
                             throw new Error('浏览器不支持地理位置 API');
                         }
                     } catch (bomError) {
-                        KernelLogger.error("GeographyDrive", `BOM 后备方案失败: ${bomError.message}`);
-                        // 如果是权限被拒绝，提供更详细的错误信息
-                        if (bomError.code === 'PERMISSION_DENIED') {
-                            throw new Error(`获取位置信息失败: 浏览器地理位置权限被拒绝。请允许浏览器访问您的位置信息以使用 BOM 后备方案。`);
-                        }
-                        throw new Error(`获取位置信息失败: ${error.message}`);
+                        // BOM 后备方案失败，静默降级（只记录调试日志）
+                        KernelLogger.debug("GeographyDrive", `BOM 后备方案失败: ${bomError.message}`);
+                        // 不抛出错误，允许返回 null 或部分数据
                     }
                 }
             }
@@ -340,7 +340,8 @@ class GeographyDrive {
                 source: nativeLocation ? GeographyDrive.ACCURACY.HIGH : GeographyDrive.ACCURACY.LOW
             };
         } catch (error) {
-            KernelLogger.error("GeographyDrive", `第三方 API 请求失败: ${error.message}`);
+            // 第三方 API 请求失败，静默降级（只记录调试日志）
+            KernelLogger.debug("GeographyDrive", `第三方 API 请求失败: ${error.message}`);
             throw error;
         }
     }
@@ -388,11 +389,13 @@ class GeographyDrive {
                 try {
                     data = JSON.parse(text);
                 } catch (jsonError) {
-                    KernelLogger.error("GeographyDrive", `反向地理编码 JSON 解析失败，响应内容: ${text.substring(0, 500)}`);
+                    // JSON 解析失败，静默降级（只记录调试日志）
+                    KernelLogger.debug("GeographyDrive", `反向地理编码 JSON 解析失败，响应内容: ${text.substring(0, 500)}`);
                     throw new Error(`反向地理编码 API 返回了无效的 JSON 响应`);
                 }
             } else {
-                KernelLogger.error("GeographyDrive", `反向地理编码 API 返回了非 JSON 响应，响应内容: ${text.substring(0, 500)}`);
+                // 非 JSON 响应，静默降级（只记录调试日志）
+                KernelLogger.debug("GeographyDrive", `反向地理编码 API 返回了非 JSON 响应，响应内容: ${text.substring(0, 500)}`);
                 throw new Error(`反向地理编码 API 返回了非 JSON 响应`);
             }
             
@@ -432,7 +435,8 @@ class GeographyDrive {
                 source: GeographyDrive.ACCURACY.HIGH
             };
         } catch (error) {
-            KernelLogger.error("GeographyDrive", `反向地理编码失败: ${error.message}`);
+            // 反向地理编码失败，静默降级（只记录调试日志，因为这是降级过程中的正常情况）
+            KernelLogger.debug("GeographyDrive", `反向地理编码失败: ${error.message}`);
             throw error;
         }
     }

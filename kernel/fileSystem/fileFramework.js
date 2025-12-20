@@ -347,4 +347,4 @@ if (typeof POOL !== 'undefined' && typeof POOL.__ADD__ === 'function') {
     }
 }
 
-DependencyConfig.publishSignal("../kernel/fileSystem/fileFramework.js");
+DependencyConfig.publishSignal("../kernel/filesystem/fileFramework.js");

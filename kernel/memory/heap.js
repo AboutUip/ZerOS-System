@@ -1,4 +1,4 @@
-// 对于专一的应用程序分配堆内存(用于存放活跃的数据)
+﻿// 对于专一的应用程序分配堆内存(用于存放活跃的数据)
 KernelLogger.info("Heap", "模块初始化");
 class Heap {
     // 日志级别: 使用 LogLevel.LEVEL 枚举

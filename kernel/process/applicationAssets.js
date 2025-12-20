@@ -1,4 +1,4 @@
-// 该文件用于存放所有应用程序的启动文件和元数据
+﻿// 该文件用于存放所有应用程序的启动文件和元数据
 // 注意：程序必须禁止自动初始化（包括立即调用函数）
 // 程序只能调用依赖管理器去注册自己的加载
 // 程序必须导出 [程序名(大写全拼)] 对象，并实现 __init__ , __info__ 和 __exit__ 方法
@@ -464,13 +464,47 @@ const APPLICATION_ASSETS = {
         metadata: {
             autoStart: false,
             priority: 12,
-            description: "简易画板，支持铅笔/画笔/橡皮擦与导出 PNG",
+            description: "画板",
             version: "1.0.0",
             type: "GUI",
             alwaysShowInTaskbar: false,
             allowMultipleInstances: true,
             supportsPreview: false,
             category: "tool"
+        }
+    },
+    
+    // 密钥管理器
+    "authenticator": {
+        script: "D:/application/authenticator/authenticator.js",
+        icon: "D:/application/authenticator/authenticator.svg",
+        metadata: {
+            autoStart: false,
+            priority: 13,
+            description: "RSA管理工具",
+            version: "1.0.0",
+            type: "GUI",
+            alwaysShowInTaskbar: false,
+            allowMultipleInstances: false,
+            supportsPreview: false,
+            category: "security"
+        }
+    },
+    
+    "permissioncontrol": {
+        script: "D:/application/permissioncontrol/permissioncontrol.js",
+        styles: ["D:/application/permissioncontrol/permissioncontrol.css"],
+        icon: "D:/application/permissioncontrol/permissioncontrol.svg",
+        metadata: {
+            autoStart: false,
+            priority: 20,
+            description: "权限管控中心",
+            version: "1.0.0",
+            type: "GUI",
+            alwaysShowInTaskbar: false,
+            allowMultipleInstances: false,
+            supportsPreview: true,
+            category: "system"
         }
     }
 };

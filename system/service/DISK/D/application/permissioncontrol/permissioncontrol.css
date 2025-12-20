@@ -1,0 +1,22 @@
+/* PermissionControl 样式表 */
+
+.permissioncontrol-window {
+    background: transparent;
+}
+
+.permissioncontrol-toolbar {
+    background: rgba(20, 20, 30, 0.3);
+}
+
+.permissioncontrol-nav {
+    background: rgba(20, 20, 30, 0.3);
+}
+
+.permissioncontrol-nav-item:hover {
+    background: rgba(108, 142, 255, 0.1) !important;
+}
+
+.permissioncontrol-content-panel {
+    background: transparent;
+}
+

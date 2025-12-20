@@ -1,4 +1,4 @@
-// 内核内存访问工具
+﻿// 内核内存访问工具
 // 用于内核代码访问Exploit程序的内存空间
 // Exploit程序PID固定为10000，用于存储所有内核动态数据
 
@@ -12,8 +12,8 @@ class KernelMemory {
     static EXPLOIT_HEAP_ID = 1;
     static EXPLOIT_SHED_ID = 1;
     
-    // Exploit内存大小（1MB Heap用于存储内核数据）
-    static EXPLOIT_HEAP_SIZE = 1024 * 1024; // 1MB
+    // Exploit内存大小（2MB Heap用于存储内核数据，增加以支持更多进程和更大的数据）
+    static EXPLOIT_HEAP_SIZE = 2 * 1024 * 1024; // 2MB
     
     // 内存引用缓存（避免重复获取）
     static _memoryCache = null;
@@ -244,8 +244,10 @@ class KernelMemory {
             
             // 如果没有旧地址或新数据更大，查找空闲地址
             if (startAddr === null) {
-                // 简单的线性分配：从_nextAddress开始查找连续的空闲空间
+                // 改进的线性分配：先尝试从_nextAddress开始，如果失败则从头开始查找
                 let found = false;
+                
+                // 第一轮：从_nextAddress开始查找（优先使用连续空间）
                 for (let addr = KernelMemory._nextAddress; addr <= memory.heap.heapSize - dataSize; addr++) {
                     // 检查这个地址范围是否已被分配
                     let conflict = false;
@@ -264,9 +266,83 @@ class KernelMemory {
                     }
                 }
                 
+                // 第二轮：如果第一轮失败，从头开始查找（处理内存碎片）
                 if (!found) {
-                    KernelLogger.error("KernelMemory", `无法找到足够的内存空间 (key: ${key}, size: ${dataSize})`);
-                    return false;
+                    KernelLogger.debug("KernelMemory", `从_nextAddress(${KernelMemory._nextAddress})未找到空间，尝试从头查找 (key: ${key}, size: ${dataSize})`);
+                    for (let addr = 0; addr <= memory.heap.heapSize - dataSize; addr++) {
+                        // 检查这个地址范围是否已被分配
+                        let conflict = false;
+                        for (const [allocatedAddr, range] of KernelMemory._allocatedRanges.entries()) {
+                            if (addr < allocatedAddr + range.size && addr + dataSize > allocatedAddr) {
+                                conflict = true;
+                                break;
+                            }
+                        }
+                        
+                        if (!conflict) {
+                            startAddr = addr;
+                            found = true;
+                            KernelMemory._nextAddress = addr + dataSize;
+                            KernelLogger.debug("KernelMemory", `从头查找找到空间: addr=${addr} (key: ${key})`);
+                            break;
+                        }
+                    }
+                }
+                
+                if (!found) {
+                    // 尝试内存压缩：清理已删除的数据
+                    KernelLogger.warn("KernelMemory", `无法找到足够的内存空间，尝试清理内存 (key: ${key}, size: ${dataSize})`);
+                    
+                    // 检查是否有可以清理的无效数据
+                    let cleaned = false;
+                    for (const [allocatedAddr, range] of KernelMemory._allocatedRanges.entries()) {
+                        // 检查这个范围是否真的在使用（通过检查shed中的链接）
+                        if (memory.shed) {
+                            const addrStr = memory.shed.readResourceLink(`${range.key}_ADDR`);
+                            if (!addrStr || parseInt(addrStr) !== allocatedAddr) {
+                                // 这个地址范围已经无效，可以清理
+                                KernelLogger.debug("KernelMemory", `清理无效内存范围: addr=${allocatedAddr}, size=${range.size}, key=${range.key}`);
+                                for (let i = 0; i < range.size; i++) {
+                                    memory.heap.writeData(allocatedAddr + i, null);
+                                }
+                                KernelMemory._allocatedRanges.delete(allocatedAddr);
+                                cleaned = true;
+                            }
+                        }
+                    }
+                    
+                    // 如果清理了内存，再次尝试分配
+                    if (cleaned) {
+                        for (let addr = 0; addr <= memory.heap.heapSize - dataSize; addr++) {
+                            let conflict = false;
+                            for (const [allocatedAddr, range] of KernelMemory._allocatedRanges.entries()) {
+                                if (addr < allocatedAddr + range.size && addr + dataSize > allocatedAddr) {
+                                    conflict = true;
+                                    break;
+                                }
+                            }
+                            
+                            if (!conflict) {
+                                startAddr = addr;
+                                found = true;
+                                KernelMemory._nextAddress = addr + dataSize;
+                                KernelLogger.info("KernelMemory", `清理后找到空间: addr=${addr} (key: ${key})`);
+                                break;
+                            }
+                        }
+                    }
+                    
+                    if (!found) {
+                        // 计算已使用的内存和可用内存
+                        let totalUsed = 0;
+                        for (const [allocatedAddr, range] of KernelMemory._allocatedRanges.entries()) {
+                            totalUsed += range.size;
+                        }
+                        const available = memory.heap.heapSize - totalUsed;
+                        
+                        KernelLogger.error("KernelMemory", `无法找到足够的内存空间 (key: ${key}, size: ${dataSize}, heapSize: ${memory.heap.heapSize}, used: ${totalUsed}, available: ${available}, allocatedRanges: ${KernelMemory._allocatedRanges.size})`);
+                        return false;
+                    }
                 }
             }
             

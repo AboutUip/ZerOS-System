@@ -1,4 +1,4 @@
-// 缓存驱动
+﻿// 缓存驱动
 // 负责整个 ZerOS 系统的缓存管理
 // 统一管理内核、系统和应用程序的缓存
 // 默认缓存目录：D:/cache/
@@ -14,7 +14,7 @@ class CacheDrive {
     static CACHE_METADATA_FILE = "D:/LocalCache.json";
     
     // PHP 服务地址
-    static PHP_SERVICE_URL = "/service/FSDirve.php";
+    static PHP_SERVICE_URL = "/system/service/FSDirve.php";
     
     // 缓存元数据结构
     // {
@@ -41,6 +41,7 @@ class CacheDrive {
     // }
     static _cacheMetadata = null;
     static _initialized = false;
+    static _initializing = false;
     
     // 请求缓存（避免频繁读取文件）
     static _requestCache = {
@@ -76,6 +77,11 @@ class CacheDrive {
             KernelLogger.debug("CacheDrive", "已初始化，跳过");
             return;
         }
+        if (CacheDrive._initializing) {
+            KernelLogger.debug("CacheDrive", "正在初始化，跳过重复调用");
+            return;
+        }
+        CacheDrive._initializing = true;
         
         KernelLogger.info("CacheDrive", "初始化缓存驱动");
         
@@ -83,7 +89,7 @@ class CacheDrive {
             // 确保缓存目录存在
             await CacheDrive._ensureCacheDirectory();
             
-            // 加载缓存元数据
+            // 加载缓存元数据（可能触发过期清理），允许在初始化阶段保存
             await CacheDrive._loadCacheMetadata();
             
             CacheDrive._initialized = true;
@@ -96,6 +102,8 @@ class CacheDrive {
                 programs: {}
             };
             CacheDrive._initialized = true;
+        } finally {
+            CacheDrive._initializing = false;
         }
     }
     
@@ -438,7 +446,7 @@ class CacheDrive {
      * @returns {Promise<void>}
      */
     static async _saveCacheMetadata() {
-        if (!CacheDrive._initialized) {
+        if (!CacheDrive._initialized && !CacheDrive._initializing) {
             KernelLogger.warn("CacheDrive", "未初始化，无法保存");
             throw new Error("CacheDrive 未初始化");
         }

@@ -25,9 +25,9 @@ const MODULE_DEPENDENCIES = {
     "../kernel/typePool/fileType.js": ["../kernel/typePool/enumManager.js"],
     
     // 第四层：文件系统模块
-    "../kernel/fileSystem/fileFramework.js": ["../kernel/typePool/fileType.js"],
-    "../kernel/fileSystem/disk.js": [],
-    "../kernel/fileSystem/nodeTree.js": ["../kernel/typePool/fileType.js"],
+    "../kernel/filesystem/fileFramework.js": ["../kernel/typePool/fileType.js"],
+    "../kernel/filesystem/disk.js": [],
+    "../kernel/filesystem/nodeTree.js": ["../kernel/typePool/fileType.js"],
     
     // 第五层：内存管理模块
     "../kernel/memory/memoryManager.js": ["../kernel/typePool/logLevel.js", ...],

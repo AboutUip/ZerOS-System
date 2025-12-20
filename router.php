@@ -15,7 +15,7 @@ $requestPath = strtok($requestPath, '?');
 
 // 如果请求的是 PHP 文件或已存在的服务文件，直接返回 false（让 PHP 处理）
 if (preg_match('/\.php$/', $requestPath) || 
-    strpos($requestPath, '/service/') === 0) {
+    strpos($requestPath, '/system/service/') === 0) {
     return false;
 }
 

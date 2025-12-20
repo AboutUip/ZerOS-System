@@ -1,4 +1,4 @@
-// 本地存储管理器
+﻿// 本地存储管理器
 // 负责本地数据的管理、注册等操作
 // 所有系统依赖的本地数据和程序的本地数据都存储在 D:/LocalSData.json 文件中
 // 通过 PHP 服务 (FSDirve.php) 进行文件读写操作
@@ -11,7 +11,7 @@ class LStorage {
     static STORAGE_FILE_NAME = "LocalSData.json";
     
     // PHP 服务地址
-    static PHP_SERVICE_URL = "/service/FSDirve.php";
+    static PHP_SERVICE_URL = "/system/service/FSDirve.php";
     
     // 存储数据结构
     // {
@@ -625,40 +625,71 @@ class LStorage {
                 throw writeError;
             }
             
-            // 验证保存是否真的成功（读取文件验证）
+            // 验证保存是否真的成功（读取文件验证，带重试机制）
             try {
                 KernelLogger.debug("LStorage", `验证文件是否保存成功: ${filePath}/${fileName}`);
-                const savedContent = await LStorage._readFileFromPHP(filePath, fileName);
-                if (savedContent) {
-                    const savedData = JSON.parse(savedContent);
-                    const savedSystemKeys = Object.keys(savedData.system || {});
-                    KernelLogger.info("LStorage", `文件保存验证成功: 系统键数量=${savedSystemKeys.length}`);
-                    
-                    // 特别验证 desktop.icons
-                    if (savedData.system && savedData.system['desktop.icons']) {
-                        const savedIcons = savedData.system['desktop.icons'];
-                        const savedIconCount = Array.isArray(savedIcons) ? savedIcons.length : 0;
-                        KernelLogger.info("LStorage", `桌面图标保存验证成功: ${savedIconCount} 个图标已确认保存到文件`);
-                    } else {
-                        KernelLogger.warn("LStorage", "桌面图标保存验证失败: 文件中没有 desktop.icons 数据");
+                
+                // 添加短暂延迟，确保文件写入完成（某些文件系统可能需要）
+                await new Promise(resolve => setTimeout(resolve, 50));
+                
+                // 重试读取（最多3次）
+                let savedContent = null;
+                let retryCount = 0;
+                const maxRetries = 3;
+                
+                while (retryCount < maxRetries && !savedContent) {
+                    try {
+                        savedContent = await LStorage._readFileFromPHP(filePath, fileName);
+                        if (savedContent) {
+                            break;
+                        }
+                    } catch (readError) {
+                        KernelLogger.debug("LStorage", `验证读取失败 (尝试 ${retryCount + 1}/${maxRetries}): ${readError.message}`);
                     }
                     
-                    // 特别验证 localDesktopBackgrounds
-                    if (savedData.system && savedData.system['system.localDesktopBackgrounds']) {
-                        const savedBackgrounds = savedData.system['system.localDesktopBackgrounds'];
-                        const savedBgCount = Array.isArray(savedBackgrounds) ? savedBackgrounds.length : 0;
-                        const memoryBgCount = Array.isArray(LStorage._storageData.system['system.localDesktopBackgrounds']) ? LStorage._storageData.system['system.localDesktopBackgrounds'].length : 0;
-                        if (savedBgCount === memoryBgCount) {
-                            KernelLogger.info("LStorage", `本地桌面背景保存验证成功: ${savedBgCount} 个背景已确认保存到文件`);
+                    if (!savedContent && retryCount < maxRetries - 1) {
+                        // 等待后重试
+                        await new Promise(resolve => setTimeout(resolve, 100 * (retryCount + 1)));
+                    }
+                    retryCount++;
+                }
+                
+                if (savedContent) {
+                    try {
+                        const savedData = JSON.parse(savedContent);
+                        const savedSystemKeys = Object.keys(savedData.system || {});
+                        KernelLogger.info("LStorage", `文件保存验证成功: 系统键数量=${savedSystemKeys.length}`);
+                        
+                        // 特别验证 desktop.icons
+                        if (savedData.system && savedData.system['desktop.icons']) {
+                            const savedIcons = savedData.system['desktop.icons'];
+                            const savedIconCount = Array.isArray(savedIcons) ? savedIcons.length : 0;
+                            KernelLogger.info("LStorage", `桌面图标保存验证成功: ${savedIconCount} 个图标已确认保存到文件`);
                         } else {
-                            KernelLogger.warn("LStorage", `本地桌面背景保存验证失败: 文件中有 ${savedBgCount} 个背景，内存中有 ${memoryBgCount} 个背景`);
+                            KernelLogger.debug("LStorage", "桌面图标保存验证: 文件中没有 desktop.icons 数据（可能是正常的）");
                         }
+                        
+                        // 特别验证 localDesktopBackgrounds
+                        if (savedData.system && savedData.system['system.localDesktopBackgrounds']) {
+                            const savedBackgrounds = savedData.system['system.localDesktopBackgrounds'];
+                            const savedBgCount = Array.isArray(savedBackgrounds) ? savedBackgrounds.length : 0;
+                            const memoryBgCount = Array.isArray(LStorage._storageData.system['system.localDesktopBackgrounds']) ? LStorage._storageData.system['system.localDesktopBackgrounds'].length : 0;
+                            if (savedBgCount === memoryBgCount) {
+                                KernelLogger.info("LStorage", `本地桌面背景保存验证成功: ${savedBgCount} 个背景已确认保存到文件`);
+                            } else {
+                                KernelLogger.warn("LStorage", `本地桌面背景保存验证失败: 文件中有 ${savedBgCount} 个背景，内存中有 ${memoryBgCount} 个背景`);
+                            }
+                        }
+                    } catch (parseError) {
+                        KernelLogger.warn("LStorage", `文件保存验证失败: 无法解析读取的文件内容 - ${parseError.message}`);
                     }
                 } else {
-                    KernelLogger.warn("LStorage", "文件保存验证失败: 无法读取保存的文件");
+                    // 验证失败，但不影响保存操作（可能是文件系统延迟）
+                    KernelLogger.warn("LStorage", `文件保存验证失败: 无法读取保存的文件 (重试 ${retryCount} 次后仍失败)。文件可能已保存，但验证读取失败。`);
                 }
             } catch (verifyError) {
-                KernelLogger.warn("LStorage", `文件保存验证失败: ${verifyError.message}`, verifyError);
+                // 验证失败不应该影响保存操作
+                KernelLogger.warn("LStorage", `文件保存验证失败: ${verifyError.message}。文件可能已保存，但验证过程出错。`, verifyError);
             }
             
             // 更新缓存

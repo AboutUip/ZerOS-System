@@ -1,0 +1,88 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" width="1920" height="1080" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <!-- 宇宙风格渐变背景 -->
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#000428"/>
+      <stop offset="25%" stop-color="#004e92"/>
+      <stop offset="50%" stop-color="#000428"/>
+      <stop offset="75%" stop-color="#004e92"/>
+      <stop offset="100%" stop-color="#000428"/>
+    </linearGradient>
+    
+    <!-- 星空点阵 -->
+    <pattern id="starPattern" x="0" y="0" width="200" height="200" patternUnits="userSpaceOnUse">
+      <circle cx="50" cy="50" r="1" fill="rgba(255, 255, 255, 0.6)"/>
+      <circle cx="150" cy="80" r="0.8" fill="rgba(255, 255, 255, 0.5)"/>
+      <circle cx="80" cy="150" r="1.2" fill="rgba(255, 255, 255, 0.7)"/>
+      <circle cx="120" cy="120" r="0.6" fill="rgba(255, 255, 255, 0.4)"/>
+    </pattern>
+    
+    <!-- 宇宙光晕 -->
+    <radialGradient id="cosmicGlow" cx="50%" cy="50%">
+      <stop offset="0%" stop-color="rgba(59, 130, 246, 0.3)"/>
+      <stop offset="30%" stop-color="rgba(139, 92, 246, 0.2)"/>
+      <stop offset="60%" stop-color="rgba(59, 130, 246, 0.1)"/>
+      <stop offset="100%" stop-color="rgba(59, 130, 246, 0)"/>
+    </radialGradient>
+    
+    <!-- 星星 -->
+    <g id="star">
+      <path d="M 0 -5 L 1.5 -1.5 L 5 0 L 1.5 1.5 L 0 5 L -1.5 1.5 L -5 0 L -1.5 -1.5 Z" fill="rgba(255, 255, 255, 0.8)">
+        <animate attributeName="opacity" values="0.4;1;0.4" dur="3s" repeatCount="indefinite"/>
+      </path>
+    </g>
+  </defs>
+  
+  <!-- 主背景 -->
+  <rect width="1920" height="1080" fill="url(#bgGradient)"/>
+  
+  <!-- 星空点阵 -->
+  <rect width="1920" height="1080" fill="url(#starPattern)"/>
+  
+  <!-- 中心宇宙光晕 -->
+  <ellipse cx="960" cy="540" rx="850" ry="650" fill="url(#cosmicGlow)" opacity="0.6">
+    <animate attributeName="opacity" values="0.4;0.7;0.4" dur="8s" repeatCount="indefinite"/>
+  </ellipse>
+  
+  <!-- 星星装饰 -->
+  <g opacity="0.9">
+    <use href="#star" transform="translate(400, 250)">
+      <animate attributeName="opacity" values="0.5;1;0.5" dur="3.5s" repeatCount="indefinite"/>
+    </use>
+    <use href="#star" transform="translate(1520, 250)">
+      <animate attributeName="opacity" values="0.5;1;0.5" dur="4s" repeatCount="indefinite"/>
+    </use>
+    <use href="#star" transform="translate(400, 830)">
+      <animate attributeName="opacity" values="0.5;1;0.5" dur="3.2s" repeatCount="indefinite"/>
+    </use>
+    <use href="#star" transform="translate(1520, 830)">
+      <animate attributeName="opacity" values="0.5;1;0.5" dur="4.5s" repeatCount="indefinite"/>
+    </use>
+    <use href="#star" transform="translate(960, 200)">
+      <animate attributeName="opacity" values="0.5;1;0.5" dur="3.8s" repeatCount="indefinite"/>
+    </use>
+    <use href="#star" transform="translate(960, 880)">
+      <animate attributeName="opacity" values="0.5;1;0.5" dur="4.2s" repeatCount="indefinite"/>
+    </use>
+    <use href="#star" transform="translate(700, 400)">
+      <animate attributeName="opacity" values="0.5;1;0.5" dur="3.6s" repeatCount="indefinite"/>
+    </use>
+    <use href="#star" transform="translate(1220, 680)">
+      <animate attributeName="opacity" values="0.5;1;0.5" dur="4.3s" repeatCount="indefinite"/>
+    </use>
+  </g>
+  
+  <!-- 宇宙几何装饰 -->
+  <g opacity="0.15" stroke="rgba(59, 130, 246, 0.4)" stroke-width="2" fill="none">
+    <circle cx="300" cy="350" r="150" stroke-dasharray="8,4">
+      <animate attributeName="r" values="150;180;150" dur="12s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="1620" cy="730" r="130" stroke-dasharray="8,4">
+      <animate attributeName="r" values="130;160;130" dur="14s" repeatCount="indefinite"/>
+    </circle>
+    <ellipse cx="960" cy="540" rx="400" ry="250" stroke="rgba(139, 92, 246, 0.3)" stroke-dasharray="10,5">
+      <animate attributeName="opacity" values="0.1;0.2;0.1" dur="10s" repeatCount="indefinite"/>
+    </ellipse>
+  </g>
+</svg>
+

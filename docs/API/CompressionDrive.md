@@ -7,7 +7,7 @@
 ## 服务地址
 
 ```
-http://localhost:8089/service/CompressionDirve.php
+http://localhost:8089/system/service/CompressionDirve.php
 ```
 
 ## 请求格式
@@ -15,8 +15,8 @@ http://localhost:8089/service/CompressionDirve.php
 所有请求通过 GET 或 POST 方法发送，使用 `action` 参数指定操作类型：
 
 ```
-GET /service/CompressionDirve.php?action=<操作名>&<参数1>=<值1>&<参数2>=<值2>
-POST /service/CompressionDirve.php?action=<操作名>&<参数1>=<值1>
+GET /system/service/CompressionDirve.php?action=<操作名>&<参数1>=<值1>&<参数2>=<值2>
+POST /system/service/CompressionDirve.php?action=<操作名>&<参数1>=<值1>
 Content-Type: application/json
 Body: { "options": { ... } }
 ```
@@ -43,9 +43,9 @@ Body: { "options": { ... } }
 - 磁盘根目录：`C:` 或 `D:`
 - 子目录：`C:/path/to/dir` 或 `D:/path/to/dir`
 - 路径会自动转换为实际文件系统路径：
-  - `C:` → `service/DISK/C/`
-  - `D:` → `service/DISK/D/`
-  - `D:/application` → `service/DISK/D/application/`
+  - `C:` → `system/service/DISK/C/`
+  - `D:` → `system/service/DISK/D/`
+  - `D:/application` → `system/service/DISK/D/application/`
 
 ## ZIP 操作
 
@@ -66,7 +66,7 @@ Body: { "options": { ... } }
 
 **示例** (GET):
 ```javascript
-const url = new URL('/service/CompressionDirve.php', window.location.origin);
+const url = new URL('/system/service/CompressionDirve.php', window.location.origin);
 url.searchParams.set('action', 'compress_zip');
 url.searchParams.set('sourcePath', 'D:/application/mydir');
 url.searchParams.set('targetPath', 'D:/backup/archive.zip');
@@ -78,7 +78,7 @@ const result = await response.json();
 
 **示例** (POST - 单个路径):
 ```javascript
-const url = new URL('/service/CompressionDirve.php', window.location.origin);
+const url = new URL('/system/service/CompressionDirve.php', window.location.origin);
 url.searchParams.set('action', 'compress_zip');
 url.searchParams.set('targetPath', 'D:/backup/archive.zip');
 
@@ -100,7 +100,7 @@ const result = await response.json();
 
 **示例** (POST - 多个路径):
 ```javascript
-const url = new URL('/service/CompressionDirve.php', window.location.origin);
+const url = new URL('/system/service/CompressionDirve.php', window.location.origin);
 url.searchParams.set('action', 'compress_zip');
 url.searchParams.set('targetPath', 'D:/backup/archive.zip');
 
@@ -170,7 +170,7 @@ const result = await response.json();
 
 **示例**:
 ```javascript
-const url = new URL('/service/CompressionDirve.php', window.location.origin);
+const url = new URL('/system/service/CompressionDirve.php', window.location.origin);
 url.searchParams.set('action', 'extract_zip');
 url.searchParams.set('sourcePath', 'D:/backup/archive.zip');
 url.searchParams.set('targetPath', 'D:/extracted');
@@ -182,7 +182,7 @@ const result = await response.json();
 
 **示例** (解压特定文件):
 ```javascript
-const url = new URL('/service/CompressionDirve.php', window.location.origin);
+const url = new URL('/system/service/CompressionDirve.php', window.location.origin);
 url.searchParams.set('action', 'extract_zip');
 url.searchParams.set('sourcePath', 'D:/backup/archive.zip');
 url.searchParams.set('targetPath', 'D:/extracted');
@@ -229,7 +229,7 @@ const result = await response.json();
 
 **示例**:
 ```javascript
-const url = new URL('/service/CompressionDirve.php', window.location.origin);
+const url = new URL('/system/service/CompressionDirve.php', window.location.origin);
 url.searchParams.set('action', 'list_zip');
 url.searchParams.set('sourcePath', 'D:/backup/archive.zip');
 
@@ -301,7 +301,7 @@ const result = await response.json();
 
 **示例**:
 ```javascript
-const url = new URL('/service/CompressionDirve.php', window.location.origin);
+const url = new URL('/system/service/CompressionDirve.php', window.location.origin);
 url.searchParams.set('action', 'extract_rar');
 url.searchParams.set('sourcePath', 'D:/backup/archive.rar');
 url.searchParams.set('targetPath', 'D:/extracted');
@@ -340,7 +340,7 @@ const result = await response.json();
 
 **示例**:
 ```javascript
-const url = new URL('/service/CompressionDirve.php', window.location.origin);
+const url = new URL('/system/service/CompressionDirve.php', window.location.origin);
 url.searchParams.set('action', 'list_rar');
 url.searchParams.set('sourcePath', 'D:/backup/archive.rar');
 
@@ -379,7 +379,7 @@ const result = await response.json();
 
 **示例**:
 ```javascript
-const url = new URL('/service/CompressionDirve.php', window.location.origin);
+const url = new URL('/system/service/CompressionDirve.php', window.location.origin);
 url.searchParams.set('action', 'check_support');
 
 const response = await fetch(url.toString());
@@ -441,7 +441,7 @@ const result = await response.json();
 
 ```javascript
 class CompressionDrive {
-    static BASE_URL = '/service/CompressionDirve.php';
+    static BASE_URL = '/system/service/CompressionDirve.php';
     
     /**
      * 发送请求

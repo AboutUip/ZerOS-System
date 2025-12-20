@@ -1,4 +1,4 @@
-// 实现存放资源的数据栈(用于存放资源数据)
+﻿// 实现存放资源的数据栈(用于存放资源数据)
 KernelLogger.info("Shed", "模块初始化");
 class Shed {
     // 日志级别: 使用 LogLevel.LEVEL 枚举

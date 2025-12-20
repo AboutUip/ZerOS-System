@@ -1,4 +1,4 @@
-// NetworkManager Service Worker
+﻿// NetworkManager Service Worker
 // 拦截所有网络请求进行统一处理
 
 const CACHE_NAME = 'zeros-network-cache-v1';

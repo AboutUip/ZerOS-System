@@ -2,12 +2,12 @@
 
 ## 概述
 
-`FSDirve.php` 是 ZerOS 内核的文件系统驱动服务，提供基于 PHP 的文件和目录操作接口。所有文件实际存储在 `service/DISK/C/` 和 `service/DISK/D/` 目录下，与 `kernel/fileSystem/` 协同工作。
+`FSDirve.php` 是 ZerOS 内核的文件系统驱动服务，提供基于 PHP 的文件和目录操作接口。所有文件实际存储在 `system/service/DISK/C/` 和 `system/service/DISK/D/` 目录下，与 `kernel/filesystem/` 协同工作。
 
 ## 服务地址
 
 ```
-http://localhost:8089/service/FSDirve.php
+http://localhost:8089/system/service/FSDirve.php
 ```
 
 ## 请求格式
@@ -15,8 +15,8 @@ http://localhost:8089/service/FSDirve.php
 所有请求通过 GET 或 POST 方法发送，使用 `action` 参数指定操作类型：
 
 ```
-GET /service/FSDirve.php?action=<操作名>&<参数1>=<值1>&<参数2>=<值2>
-POST /service/FSDirve.php?action=<操作名>&<参数1>=<值1>
+GET /system/service/FSDirve.php?action=<操作名>&<参数1>=<值1>&<参数2>=<值2>
+POST /system/service/FSDirve.php?action=<操作名>&<参数1>=<值1>
 Content-Type: application/json
 Body: { "content": "..." }
 ```
@@ -43,9 +43,9 @@ Body: { "content": "..." }
 - 磁盘根目录：`C:` 或 `D:`
 - 子目录：`C:/path/to/dir` 或 `D:/path/to/dir`
 - 路径会自动转换为实际文件系统路径：
-  - `C:` → `service/DISK/C/`
-  - `D:` → `service/DISK/D/`
-  - `D:/application` → `service/DISK/D/application/`
+  - `C:` → `system/service/DISK/C/`
+  - `D:` → `system/service/DISK/D/`
+  - `D:/application` → `system/service/DISK/D/application/`
 
 ## 目录操作
 
@@ -59,7 +59,7 @@ Body: { "content": "..." }
 
 **示例**:
 ```javascript
-const url = new URL('/service/FSDirve.php', window.location.origin);
+const url = new URL('/system/service/FSDirve.php', window.location.origin);
 url.searchParams.set('action', 'create_dir');
 url.searchParams.set('path', 'D:/application');
 url.searchParams.set('name', 'mydir');
@@ -89,7 +89,7 @@ const result = await response.json();
 
 **示例**:
 ```javascript
-const url = new URL('/service/FSDirve.php', window.location.origin);
+const url = new URL('/system/service/FSDirve.php', window.location.origin);
 url.searchParams.set('action', 'delete_dir');
 url.searchParams.set('path', 'D:/application/mydir');
 
@@ -114,7 +114,7 @@ const result = await response.json();
 
 **示例**:
 ```javascript
-const url = new URL('/service/FSDirve.php', window.location.origin);
+const url = new URL('/system/service/FSDirve.php', window.location.origin);
 url.searchParams.set('action', 'list_dir');
 url.searchParams.set('path', 'D:/application');
 
@@ -164,7 +164,7 @@ const result = await response.json();
 
 **示例**:
 ```javascript
-const url = new URL('/service/FSDirve.php', window.location.origin);
+const url = new URL('/system/service/FSDirve.php', window.location.origin);
 url.searchParams.set('action', 'rename_dir');
 url.searchParams.set('path', 'D:/application');
 url.searchParams.set('oldName', 'mydir');
@@ -184,7 +184,7 @@ const result = await response.json();
 
 **示例**:
 ```javascript
-const url = new URL('/service/FSDirve.php', window.location.origin);
+const url = new URL('/system/service/FSDirve.php', window.location.origin);
 url.searchParams.set('action', 'move_dir');
 url.searchParams.set('sourcePath', 'D:/application/mydir');
 url.searchParams.set('targetPath', 'D:/application/other/mydir');
@@ -203,7 +203,7 @@ const result = await response.json();
 
 **示例**:
 ```javascript
-const url = new URL('/service/FSDirve.php', window.location.origin);
+const url = new URL('/system/service/FSDirve.php', window.location.origin);
 url.searchParams.set('action', 'copy_dir');
 url.searchParams.set('sourcePath', 'D:/application/mydir');
 url.searchParams.set('targetPath', 'D:/application/backup/mydir');
@@ -221,7 +221,7 @@ const result = await response.json();
 
 **示例**:
 ```javascript
-const url = new URL('/service/FSDirve.php', window.location.origin);
+const url = new URL('/system/service/FSDirve.php', window.location.origin);
 url.searchParams.set('action', 'delete_dir_recursive');
 url.searchParams.set('path', 'D:/application/mydir');
 
@@ -242,7 +242,7 @@ const result = await response.json();
 
 **示例** (GET):
 ```javascript
-const url = new URL('/service/FSDirve.php', window.location.origin);
+const url = new URL('/system/service/FSDirve.php', window.location.origin);
 url.searchParams.set('action', 'create_file');
 url.searchParams.set('path', 'D:/application');
 url.searchParams.set('fileName', 'test.txt');
@@ -254,7 +254,7 @@ const result = await response.json();
 
 **示例** (POST):
 ```javascript
-const url = new URL('/service/FSDirve.php', window.location.origin);
+const url = new URL('/system/service/FSDirve.php', window.location.origin);
 url.searchParams.set('action', 'create_file');
 url.searchParams.set('path', 'D:/application');
 url.searchParams.set('fileName', 'test.txt');
@@ -292,7 +292,7 @@ const result = await response.json();
 
 **示例**:
 ```javascript
-const url = new URL('/service/FSDirve.php', window.location.origin);
+const url = new URL('/system/service/FSDirve.php', window.location.origin);
 url.searchParams.set('action', 'read_file');
 url.searchParams.set('path', 'D:/application');
 url.searchParams.set('fileName', 'test.txt');
@@ -332,7 +332,7 @@ const result = await response.json();
 
 **示例** (POST):
 ```javascript
-const url = new URL('/service/FSDirve.php', window.location.origin);
+const url = new URL('/system/service/FSDirve.php', window.location.origin);
 url.searchParams.set('action', 'write_file');
 url.searchParams.set('path', 'D:/application');
 url.searchParams.set('fileName', 'test.txt');
@@ -373,7 +373,7 @@ const result = await response.json();
 
 **示例**:
 ```javascript
-const url = new URL('/service/FSDirve.php', window.location.origin);
+const url = new URL('/system/service/FSDirve.php', window.location.origin);
 url.searchParams.set('action', 'delete_file');
 url.searchParams.set('path', 'D:/application');
 url.searchParams.set('fileName', 'test.txt');
@@ -401,7 +401,7 @@ const result = await response.json();
 
 **示例**:
 ```javascript
-const url = new URL('/service/FSDirve.php', window.location.origin);
+const url = new URL('/system/service/FSDirve.php', window.location.origin);
 url.searchParams.set('action', 'rename_file');
 url.searchParams.set('path', 'D:/application');
 url.searchParams.set('oldFileName', 'test.txt');
@@ -423,7 +423,7 @@ const result = await response.json();
 
 **示例**:
 ```javascript
-const url = new URL('/service/FSDirve.php', window.location.origin);
+const url = new URL('/system/service/FSDirve.php', window.location.origin);
 url.searchParams.set('action', 'move_file');
 url.searchParams.set('sourcePath', 'D:/application');
 url.searchParams.set('sourceFileName', 'test.txt');
@@ -446,7 +446,7 @@ const result = await response.json();
 
 **示例**:
 ```javascript
-const url = new URL('/service/FSDirve.php', window.location.origin);
+const url = new URL('/system/service/FSDirve.php', window.location.origin);
 url.searchParams.set('action', 'copy_file');
 url.searchParams.set('sourcePath', 'D:/application');
 url.searchParams.set('sourceFileName', 'test.txt');
@@ -467,7 +467,7 @@ const result = await response.json();
 
 **示例**:
 ```javascript
-const url = new URL('/service/FSDirve.php', window.location.origin);
+const url = new URL('/system/service/FSDirve.php', window.location.origin);
 url.searchParams.set('action', 'get_file_info');
 url.searchParams.set('path', 'D:/application');
 url.searchParams.set('fileName', 'test.txt');
@@ -503,7 +503,7 @@ const result = await response.json();
 
 **示例**:
 ```javascript
-const url = new URL('/service/FSDirve.php', window.location.origin);
+const url = new URL('/system/service/FSDirve.php', window.location.origin);
 url.searchParams.set('action', 'exists');
 url.searchParams.set('path', 'D:/application/test.txt');
 
@@ -533,7 +533,7 @@ const result = await response.json();
 
 **示例**:
 ```javascript
-const url = new URL('/service/FSDirve.php', window.location.origin);
+const url = new URL('/system/service/FSDirve.php', window.location.origin);
 url.searchParams.set('action', 'get_disk_info');
 url.searchParams.set('disk', 'D');
 
@@ -548,7 +548,7 @@ const result = await response.json();
     "message": "磁盘信息获取成功",
     "data": {
         "disk": "D",
-        "path": "D:\\Project\\Algorithm\\ZerOS\\service\\DISK\\D",
+        "path": "D:\\Project\\Algorithm\\ZerOS\\system\\service\\DISK\\D",
         "totalSize": 2147483648,
         "usedSize": 1048576,
         "freeSize": 2146435072,
@@ -599,7 +599,7 @@ const result = await response.json();
 
 ```javascript
 class FSDirve {
-    static BASE_URL = '/service/FSDirve.php';
+    static BASE_URL = '/system/service/FSDirve.php';
     
     static async request(action, params = {}) {
         const url = new URL(this.BASE_URL, window.location.origin);

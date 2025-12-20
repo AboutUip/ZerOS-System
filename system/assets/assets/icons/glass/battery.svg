@@ -1,0 +1,12 @@
+<svg width="24" height="12" viewBox="0 0 24 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+        <linearGradient id="glass-battery-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" style="stop-color:currentColor;stop-opacity:0.9"/>
+            <stop offset="100%" style="stop-color:currentColor;stop-opacity:0.7"/>
+        </linearGradient>
+    </defs>
+    <rect x="1" y="2" width="18" height="8" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.6"/>
+    <rect x="19" y="4" width="2" height="4" rx="0.5" fill="url(#glass-battery-gradient)" opacity="0.8"/>
+    <rect id="battery-fill" x="2" y="3" width="16" height="6" rx="0.5" fill="url(#glass-battery-gradient)" opacity="0.85"/>
+</svg>
+

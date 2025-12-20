@@ -21,7 +21,7 @@ ZerOS/
 ├── kernel/                 # 内核模块
 │   ├── bootloader/        # 启动引导
 │   │   └── starter.js    # 内核启动器
-│   ├── fileSystem/        # 文件系统
+│   ├── filesystem/        # 文件系统
 │   │   ├── disk.js       # 虚拟磁盘管理
 │   │   ├── nodeTree.js   # 文件树结构
 │   │   ├── fileFramework.js # 文件对象模板
@@ -194,7 +194,7 @@ console.log('程序启动');
 - 自动保存到 localStorage
 - 启动时自动恢复
 - 每个磁盘分区独立存储
-- **PHP 后端支持**：所有文件操作通过 `FSDirve.php` 服务进行，文件实际存储在 `service/DISK/C/` 和 `service/DISK/D/` 目录下
+- **PHP 后端支持**：所有文件操作通过 `FSDirve.php` 服务进行，文件实际存储在 `system/service/DISK/C/` 和 `system/service/DISK/D/` 目录下
 
 详细 API 文档请参考 [Disk API](API/Disk.md) 和 [NodeTree API](API/NodeTree.md)
 
@@ -465,8 +465,8 @@ Exploit 程序（PID 10000）是 ZerOS Kernel 的统一数据存储中心，负�
 系统使用 `DependencyConfig` 管理模块依赖关系：
 
 ```javascript
-Dependency.addDependency("../kernel/fileSystem/nodeTree.js");
-Dependency.waitLoaded("../kernel/fileSystem/disk.js", {
+Dependency.addDependency("../kernel/filesystem/nodeTree.js");
+Dependency.waitLoaded("../kernel/filesystem/disk.js", {
     interval: 50,
     timeout: 1000
 });
@@ -493,7 +493,7 @@ POOL.__GET__("KERNEL_GLOBAL_POOL", "WORK_SPACE");
 - 存储键格式：`filesystem_<盘符>`（如 `filesystem_C:`）
 - 自动序列化和反序列化
 - 启动时自动恢复
-- **PHP 后端支持**：所有文件操作通过 `FSDirve.php` 服务进行，文件实际存储在 `service/DISK/C/` 和 `service/DISK/D/` 目录下
+- **PHP 后端支持**：所有文件操作通过 `FSDirve.php` 服务进行，文件实际存储在 `system/service/DISK/C/` 和 `system/service/DISK/D/` 目录下
 
 **内存数据管理**：
 - 所有终端数据和临时数据存储在 Exploit 程序（PID 10000）的内存中

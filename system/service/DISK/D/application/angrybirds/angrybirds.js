@@ -520,8 +520,8 @@
                 } else if (path.startsWith('/')) {
                     return path;
                 } else {
-                    // 相对路径，尝试添加 /service/DISK/D/ 前缀
-                    return `/service/DISK/D/${path}`;
+                    // 相对路径，尝试添加 /system/service/DISK/D/ 前缀
+                    return `/system/service/DISK/D/${path}`;
                 }
             };
             

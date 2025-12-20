@@ -37,7 +37,10 @@ ZerOS 程序开发遵循以下核心思维：
 3. **权限系统**
    - 所有内核 API 调用都需要相应权限
    - 程序在 `__info__` 中声明所需权限
-   - 特殊权限首次使用时需要用户确认
+   - 普通权限根据"自动授予普通权限"设置决定是否自动授予
+   - 特殊权限首次使用时需要用户确认，用户允许后会被持久化保存
+   - 权限管理系统提供完整的审计和统计功能
+   - 支持程序黑名单和白名单管理
 
 4. **模块化设计**
    - 程序应该独立、可复用
@@ -61,10 +64,10 @@ ZerOS 支持两种程序类型：
 
 ### 1. 创建程序文件
 
-在 `service/DISK/D/application/` 目录下创建你的程序目录：
+在 `system/service/DISK/D/application/` 目录下创建你的程序目录：
 
 ```
-service/DISK/D/application/
+system/service/DISK/D/application/
 └── myapp/
     ├── myapp.js          # 主程序文件（必需）
     ├── myapp.css         # 样式文件（可选）
@@ -74,7 +77,7 @@ service/DISK/D/application/
 ### 2. 编写基本程序结构
 
 ```javascript
-// service/DISK/D/application/myapp/myapp.js
+// system/service/DISK/D/application/myapp/myapp.js
 (function(window) {
     'use strict';
     
@@ -292,14 +295,14 @@ __info__: function() {
         author: 'Your Name',
         copyright: '© 2024',
         permissions: typeof PermissionManager !== 'undefined' ? [
-            PermissionManager.PERMISSION.GUI_WINDOW_CREATE,  // 创建窗口
-            PermissionManager.PERMISSION.EVENT_LISTENER,     // 注册事件
-            PermissionManager.PERMISSION.KERNEL_DISK_READ,   // 读取文件
-            PermissionManager.PERMISSION.KERNEL_DISK_WRITE,   // 写入文件
-            PermissionManager.PERMISSION.KERNEL_DISK_CREATE,  // 创建文件/目录
-            PermissionManager.PERMISSION.KERNEL_DISK_DELETE,  // 删除文件/目录
-            PermissionManager.PERMISSION.KERNEL_DISK_LIST,    // 列出目录
-            PermissionManager.PERMISSION.SYSTEM_NOTIFICATION, // 显示通知
+            PermissionManager.PERMISSION.GUI_WINDOW_CREATE,  // 创建窗口（普通权限，自动授予）
+            PermissionManager.PERMISSION.EVENT_LISTENER,     // 注册事件（普通权限，自动授予）
+            PermissionManager.PERMISSION.KERNEL_DISK_READ,   // 读取文件（普通权限，自动授予）
+            PermissionManager.PERMISSION.KERNEL_DISK_WRITE,   // 写入文件（特殊权限，需要用户确认）
+            PermissionManager.PERMISSION.KERNEL_DISK_CREATE,  // 创建文件/目录（特殊权限，需要用户确认）
+            PermissionManager.PERMISSION.KERNEL_DISK_DELETE,  // 删除文件/目录（特殊权限，需要用户确认）
+            PermissionManager.PERMISSION.KERNEL_DISK_LIST,    // 列出目录（普通权限，自动授予）
+            PermissionManager.PERMISSION.SYSTEM_NOTIFICATION, // 显示通知（特殊权限，需要用户确认）
             PermissionManager.PERMISSION.SYSTEM_STORAGE_READ, // 读取系统存储
             PermissionManager.PERMISSION.SYSTEM_STORAGE_WRITE, // 写入系统存储
             PermissionManager.PERMISSION.CRYPT_GENERATE_KEY,  // 生成密钥
@@ -967,7 +970,7 @@ const data = sharedSpace.getData('myKey');
 ### 完整的 GUI 程序示例
 
 ```javascript
-// service/DISK/D/application/myapp/myapp.js
+// system/service/DISK/D/application/myapp/myapp.js
 (function(window) {
     'use strict';
     
@@ -1134,7 +1137,7 @@ const data = sharedSpace.getData('myKey');
 ### 完整的 CLI 程序示例
 
 ```javascript
-// service/DISK/D/application/mycli/mycli.js
+// system/service/DISK/D/application/mycli/mycli.js
 (function(window) {
     'use strict';
     
@@ -1403,7 +1406,7 @@ const content = await Disk.readFile('D:/data.txt');
 await Disk.writeFile('D:/data.txt', '新内容');
 
 // 使用 FSDirve.php 服务
-const url = new URL('/service/FSDirve.php', window.location.origin);
+const url = new URL('/system/service/FSDirve.php', window.location.origin);
 url.searchParams.set('action', 'read_file');
 url.searchParams.set('path', 'D:/');
 url.searchParams.set('fileName', 'data.txt');
@@ -1449,7 +1452,7 @@ console.log(`包含 ${list.fileCount} 个文件`);
 A: 使用 FSDirve.php 的 `check_path_exists` 操作：
 
 ```javascript
-const url = new URL('/service/FSDirve.php', window.location.origin);
+const url = new URL('/system/service/FSDirve.php', window.location.origin);
 url.searchParams.set('action', 'check_path_exists');
 url.searchParams.set('path', 'D:/data.txt');
 
@@ -1466,7 +1469,7 @@ A: 使用 FSDirve.php 服务：
 
 ```javascript
 // 创建目录
-const url = new URL('/service/FSDirve.php', window.location.origin);
+const url = new URL('/system/service/FSDirve.php', window.location.origin);
 url.searchParams.set('action', 'create_dir');
 url.searchParams.set('path', 'D:/newdir');
 
@@ -1483,7 +1486,7 @@ await fetch(url.toString());
 A: 使用 FSDirve.php 的 `list_dir` 操作：
 
 ```javascript
-const url = new URL('/service/FSDirve.php', window.location.origin);
+const url = new URL('/system/service/FSDirve.php', window.location.origin);
 url.searchParams.set('action', 'list_dir');
 url.searchParams.set('path', 'D:/application');
 
@@ -1715,7 +1718,7 @@ A: 使用 ProcessManager 的路径转换功能：
 if (typeof ProcessManager !== 'undefined' && 
     typeof ProcessManager.convertVirtualPathToUrl === 'function') {
     const url = ProcessManager.convertVirtualPathToUrl('D:/application/icon.svg');
-    // 返回: http://localhost:8089/service/DISK/D/application/icon.svg
+    // 返回: http://localhost:8089/system/service/DISK/D/application/icon.svg
 }
 ```
 
@@ -2269,7 +2272,7 @@ const content = await ProcessManager.callKernelAPI(
 );
 
 // ❌ 错误：直接使用路径可能有问题
-const url = `/service/FSDirve.php?path=D:/path with spaces/file.txt`;
+const url = `/system/service/FSDirve.php?path=D:/path with spaces/file.txt`;
 ```
 
 ### Q: 如何检查文件或目录是否存在？
@@ -2381,7 +2384,7 @@ async function checkForUpdates() {
         const currentVersion = this.__info__().version;
         
         // 检查最新版本（从服务器或配置文件）
-        const response = await fetch('/service/version.json');
+        const response = await fetch('/system/service/version.json');
         const versionInfo = await response.json();
         
         if (versionInfo.latestVersion > currentVersion) {
@@ -2624,7 +2627,7 @@ if (pluginAPI) {
 
 ## 参考资源
 
-- **示例程序**: 查看 `service/DISK/D/application/` 目录下的示例程序
+- **示例程序**: 查看 `system/service/DISK/D/application/` 目录下的示例程序
   - `terminal/`: 终端程序示例
   - `vim/`: 文本编辑器示例
   - `filemanager/`: 文件管理器示例（支持选择器模式、多选功能）

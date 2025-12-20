@@ -1,4 +1,4 @@
-// 内存管理器:对于一个pid应用程序的内存管理(目前实现有堆内存Heap)
+﻿// 内存管理器:对于一个pid应用程序的内存管理(目前实现有堆内存Heap)
 KernelLogger.info("MemoryManager", "模块初始化");
 class MemoryManager {
     // 日志级别: 使用 LogLevel.LEVEL 枚举

@@ -357,7 +357,7 @@ class Disk {
             // 如果 Dependency 可用，等待 nodeTree 加载
             if (Dependency && typeof Dependency.waitLoaded === 'function') {
                 KernelLogger.debug("Disk", "等待 nodeTree 模块加载");
-                Dependency.waitLoaded("../kernel/fileSystem/nodeTree.js", {
+                Dependency.waitLoaded("../kernel/filesystem/nodeTree.js", {
                     interval: 50,
                     timeout: 1000,
                 })
@@ -756,7 +756,7 @@ if (typeof POOL !== 'undefined' && typeof POOL.__ADD__ === 'function') {
     }
 }
 
-DependencyConfig.publishSignal("../kernel/fileSystem/disk.js");
+DependencyConfig.publishSignal("../kernel/filesystem/disk.js");
 
 // 初始化缓存（在模块加载时）
 // 注意：_attachLoggingToMap 会在访问Map时自动调用，但我们需要先初始化缓存

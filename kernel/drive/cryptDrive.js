@@ -1,4 +1,4 @@
-// 加密驱动
+﻿// 加密驱动
 // 提供加密、解密、随机数生成等功能
 // 依赖 jsencrypt 库进行 RSA 加密/解密
 
@@ -124,9 +124,37 @@ class CryptDrive {
                 await LStorage.init();
             }
             
+            // 验证密钥数据
+            if (!CryptDrive._keys) {
+                KernelLogger.warn("CryptDrive", "密钥数据为空，无法保存");
+                return false;
+            }
+            
+            const keyCount = CryptDrive._keys.keys ? Object.keys(CryptDrive._keys.keys).length : 0;
+            KernelLogger.info("CryptDrive", `准备保存密钥数据: 存储键=${CryptDrive.STORAGE_KEY}, 密钥数量=${keyCount}`);
+            
             const success = await LStorage.setSystemStorage(CryptDrive.STORAGE_KEY, CryptDrive._keys);
             if (success) {
-                KernelLogger.debug("CryptDrive", "密钥数据已保存");
+                KernelLogger.info("CryptDrive", `密钥数据已保存: 存储键=${CryptDrive.STORAGE_KEY}, 密钥数量=${keyCount}`);
+                
+                // 验证保存结果
+                try {
+                    const saved = await LStorage.getSystemStorage(CryptDrive.STORAGE_KEY);
+                    if (saved && saved.keys) {
+                        const savedKeyCount = Object.keys(saved.keys).length;
+                        if (savedKeyCount === keyCount) {
+                            KernelLogger.debug("CryptDrive", `保存验证成功: 密钥数量匹配 (${savedKeyCount})`);
+                        } else {
+                            KernelLogger.warn("CryptDrive", `保存验证警告: 密钥数量不匹配 (期望: ${keyCount}, 实际: ${savedKeyCount})`);
+                        }
+                    } else {
+                        KernelLogger.warn("CryptDrive", "保存验证失败: 读取的数据为空或格式不正确");
+                    }
+                } catch (verifyError) {
+                    KernelLogger.warn("CryptDrive", `保存验证失败: ${verifyError.message}`);
+                }
+            } else {
+                KernelLogger.error("CryptDrive", `密钥数据保存失败: LStorage.setSystemStorage 返回 false`);
             }
             return success;
         } catch (error) {

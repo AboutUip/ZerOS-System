@@ -40,12 +40,12 @@
 
         <!-- 基础核心模块（按顺序加载） -->
         <!-- 1. 日志系统（最基础，无依赖） -->
-        <script src="../kernel/logger/kernelLogger.js"></script>
+        <script src="../kernel/core/logger/kernelLogger.js"></script>
         <!-- 2. 依赖管理器（依赖 KernelLogger） -->
-        <script src="../kernel/signal/dependencyConfig.js"></script>
+        <script src="../kernel/core/signal/dependencyConfig.js"></script>
         <!-- 3. 对象池（依赖 KernelLogger 和 DependencyConfig） -->
-        <script src="../kernel/signal/pool.js"></script>
+        <script src="../kernel/core/signal/pool.js"></script>
         <!-- 4. BootLoader 将自动加载所有其他内核模块 -->
-        <script src="../kernel/bootloader/starter.js"></script>
+        <script src="../bootloader/starter.js"></script>
     </body>
 </html>

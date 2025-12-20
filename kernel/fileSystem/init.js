@@ -13,7 +13,7 @@ async function init() {
         if (Dependency && typeof Dependency.waitLoaded === 'function') {
             // 等待Disk模块加载
             try {
-                await Dependency.waitLoaded("../kernel/fileSystem/disk.js", {
+                await Dependency.waitLoaded("../kernel/filesystem/disk.js", {
                     interval: 50,
                     timeout: 2000,  // 增加超时时间
                 });
@@ -88,7 +88,7 @@ async function init() {
 
     // fileSystem初始化完成
     if (typeof DependencyConfig !== 'undefined' && DependencyConfig && typeof DependencyConfig.publishSignal === 'function') {
-        DependencyConfig.publishSignal("../kernel/fileSystem/init.js");
+        DependencyConfig.publishSignal("../kernel/filesystem/init.js");
     }
     
     // 清理过期缓存（异步执行，不阻塞初始化）
@@ -113,7 +113,7 @@ async function cleanupExpiredCache() {
         const now = Date.now();
         
         // 列出 D:/cache/ 目录下的所有文件
-        const listUrl = new URL('/service/FSDirve.php', window.location.origin);
+        const listUrl = new URL('/system/service/FSDirve.php', window.location.origin);
         listUrl.searchParams.set('action', 'list_dir');
         listUrl.searchParams.set('path', 'D:/cache/');
         
@@ -148,7 +148,7 @@ async function cleanupExpiredCache() {
         let deletedCount = 0;
         for (const file of expiredFiles) {
             try {
-                const deleteUrl = new URL('/service/FSDirve.php', window.location.origin);
+                const deleteUrl = new URL('/system/service/FSDirve.php', window.location.origin);
                 deleteUrl.searchParams.set('action', 'delete_file');
                 deleteUrl.searchParams.set('path', 'D:/cache/');
                 deleteUrl.searchParams.set('fileName', file.name);

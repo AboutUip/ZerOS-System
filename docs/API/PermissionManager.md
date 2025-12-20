@@ -239,7 +239,7 @@ PermissionManager.clearPermissionCache(pid);
 PermissionManager.clearPermissionCache(null);
 ```
 
-### 统计信息
+### 审计和统计
 
 #### `getPermissionStats()`
 
@@ -252,6 +252,9 @@ PermissionManager.clearPermissionCache(null);
 - `pendingChecks` (number): 正在进行的权限检查数量
 - `pendingRequests` (number): 待处理的权限请求数量
 - `initialized` (boolean): 是否已初始化
+- `auditLogSize` (number): 审计日志条数
+- `violationLogSize` (number): 违规日志条数
+- `permissionStats` (Object): 每个权限的详细统计（granted, denied, checked）
 
 **示例**:
 ```javascript
@@ -259,16 +262,110 @@ const stats = PermissionManager.getPermissionStats();
 console.log('权限统计:', stats);
 ```
 
+#### `getAuditLog(filters, limit)`
+
+获取权限审计日志。记录所有权限检查、授予、拒绝等操作。
+
+**参数**:
+- `filters` (Object, 可选): 过滤条件
+  - `pid` (number, 可选): 进程ID
+  - `permission` (string, 可选): 权限名称
+  - `action` (string, 可选): 操作类型（'check', 'grant', 'deny', 'request'）
+  - `result` (boolean, 可选): 操作结果
+- `limit` (number, 可选): 返回的最大条数，默认 100
+
+**返回值**: `Array<Object>` - 审计日志条目数组
+- `timestamp` (number): 时间戳
+- `pid` (number): 进程ID
+- `programName` (string): 程序名称
+- `permission` (string): 权限名称
+- `action` (string): 操作类型
+- `result` (boolean): 操作结果
+- `level` (string): 权限级别
+- `context` (Object): 上下文信息
+
+**示例**:
+```javascript
+// 获取所有审计日志
+const allLogs = PermissionManager.getAuditLog();
+
+// 获取特定程序的审计日志
+const programLogs = PermissionManager.getAuditLog({ pid: 10001 }, 50);
+
+// 获取特定权限的审计日志
+const permissionLogs = PermissionManager.getAuditLog({ 
+    permission: 'KERNEL_DISK_WRITE' 
+}, 20);
+```
+
+#### `getViolationLog(filters, limit)`
+
+获取权限违规日志。记录所有未授权访问尝试。
+
+**参数**:
+- `filters` (Object, 可选): 过滤条件
+  - `pid` (number, 可选): 进程ID
+  - `permission` (string, 可选): 权限名称
+- `limit` (number, 可选): 返回的最大条数，默认 100
+
+**返回值**: `Array<Object>` - 违规日志条目数组
+- `timestamp` (number): 时间戳
+- `pid` (number): 进程ID
+- `programName` (string): 程序名称
+- `permission` (string): 权限名称
+- `context` (Object): 上下文信息
+- `stack` (string): 调用栈
+
+**示例**:
+```javascript
+// 获取所有违规记录
+const violations = PermissionManager.getViolationLog();
+
+// 获取特定程序的违规记录
+const programViolations = PermissionManager.getViolationLog({ pid: 10001 });
+
+// 获取最近的 10 条违规记录
+const recentViolations = PermissionManager.getViolationLog({}, 10);
+```
+
+#### `clearAuditLog(clearViolations)`
+
+清除审计日志和/或违规日志。
+
+**参数**:
+- `clearViolations` (boolean, 可选): 是否同时清除违规日志，默认 `false`
+
+**示例**:
+```javascript
+// 只清除审计日志
+PermissionManager.clearAuditLog();
+
+// 同时清除审计日志和违规日志
+PermissionManager.clearAuditLog(true);
+```
+
 ## 权限级别映射
 
 ### 普通权限（自动授予）
+
+普通权限会在程序启动时自动授予，或在首次使用时根据"自动授予普通权限"设置决定是否自动授予。
 
 - `KERNEL_DISK_READ` - 读取文件
 - `KERNEL_DISK_LIST` - 列出目录
 - `GUI_WINDOW_CREATE` - 创建窗口
 - `THEME_READ` - 读取主题
+- `EVENT_LISTENER` - 事件监听
+- `CACHE_READ` - 读取缓存
+- `CACHE_WRITE` - 写入缓存
+- `CRYPT_MD5` - MD5 哈希
+- `CRYPT_RANDOM` - 随机数生成
+- `DRAG_ELEMENT` - 拖拽元素
+- `DRAG_FILE` - 拖拽文件
+- `DRAG_WINDOW` - 拖拽窗口
 
 ### 特殊权限（需要用户确认）
+
+特殊权限首次使用时需要用户确认，用户允许后会被持久化保存。
 
 - `SYSTEM_NOTIFICATION` - 系统通知
 - `KERNEL_DISK_WRITE` - 写入文件
@@ -282,10 +379,20 @@ console.log('权限统计:', stats);
 - `SYSTEM_STORAGE_WRITE` - 写入系统存储
 - `THEME_WRITE` - 修改主题
 - `DESKTOP_MANAGE` - 管理桌面
+- `MULTITHREADING_CREATE` - 创建线程
+- `MULTITHREADING_EXECUTE` - 执行多线程任务
+- `GEOGRAPHY_LOCATION` - 获取地理位置
+- `CRYPT_GENERATE_KEY` - 生成密钥对
+- `CRYPT_IMPORT_KEY` - 导入密钥对
+- `CRYPT_DELETE_KEY` - 删除密钥
+- `CRYPT_ENCRYPT` - 加密数据
+- `CRYPT_DECRYPT` - 解密数据
 
 ### 危险权限（需要明确授权）
 
-- `PROCESS_MANAGE` - 管理进程
+危险权限每次使用时都可能需要用户确认，需要用户明确授权。
+
+- `PROCESS_MANAGE` - 管理进程（启动/终止其他程序）
 
 ## 使用示例
 
@@ -391,15 +498,44 @@ try {
 - 权限保存使用异步操作，不阻塞主线程
 - 初始化时异步等待依赖就绪
 
+## 权限管控功能
+
+### 黑名单和白名单
+
+权限管理系统支持程序黑名单和白名单功能，通过 `PermissionControl` 程序进行管理：
+
+- **黑名单**：黑名单中的程序会被拒绝所有权限请求（Exploit 程序除外）
+- **白名单**：白名单中的程序在请求普通权限时会自动授予
+- **自动授予设置**：可以控制是否自动授予普通权限（仅影响普通权限）
+
+### 权限审计
+
+权限管理系统提供完整的审计功能：
+
+- **审计日志**：记录所有权限检查、授予、拒绝操作
+- **违规日志**：记录所有未授权访问尝试
+- **权限统计**：统计每个权限的使用情况（授予次数、拒绝次数、检查次数）
+
+**注意**：在权限请求流程中（用户正在确认权限时），系统不会记录违规。只有在权限被明确拒绝后，程序再次尝试访问时才会记录违规。
+
+### 权限缓存
+
+- 权限检查结果会被缓存 5 秒（`CACHE_TTL`）
+- 使用缓存时仍会检查黑名单（因为黑名单可能动态变化）
+- 权限授予/撤销时自动清除相关缓存
+
 ## 注意事项
 
 1. **权限检查是强制性的**：所有需要权限的内核 API 调用都必须经过权限检查
 2. **权限被拒绝时 API 调用会被拒绝**：如果权限被拒绝，相应的 API 调用会立即抛出错误
-3. **Exploit 程序享有特权**：Exploit 程序（PID 10000）享有直接通信权限，无需权限检查
+3. **Exploit 程序享有特权**：Exploit 程序（PID 10000）享有直接通信权限，无需权限检查，不受黑名单限制
 4. **权限声明是必需的**：程序必须在 `__info__` 中声明所需权限
-5. **普通权限自动授予**：普通权限会在程序启动时自动授予，无需用户确认
-6. **特殊权限需要用户确认**：特殊权限首次使用时需要用户确认
+5. **普通权限自动授予**：普通权限会根据"自动授予普通权限"设置决定是否自动授予
+6. **特殊权限需要用户确认**：特殊权限首次使用时需要用户确认，用户允许后会被持久化保存
 7. **权限持久化**：已授予的权限会被持久化保存，下次启动时自动恢复
+8. **违规记录时机**：只有在权限被明确拒绝后，程序再次尝试访问时才会记录违规。在权限请求流程中不会记录违规
+9. **黑名单优先级最高**：黑名单检查在权限检查前进行，黑名单中的程序会被直接拒绝
+10. **权限请求流程**：在权限请求流程中，系统使用 `isRequesting` 标志避免误记录违规
 
 ## 相关文档
 
