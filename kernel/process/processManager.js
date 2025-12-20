@@ -1,4 +1,4 @@
-// 进程管理器：负责程序的执行与卸载
+﻿// 进程管理器：负责程序的执行与卸载
 // 管理进程的启动、PID分配、内存分配和程序生命周期
 
 KernelLogger.info("ProcessManager", "模块初始化");
@@ -447,13 +447,13 @@ class ProcessManager {
     /**
      * 将虚拟文件系统路径转换为实际 URL（公共方法，供其他模块使用）
      * @param {string} path 虚拟路径（如 D:/application/xxx.js）
-     * @returns {string} 实际 URL（如 /service/DISK/D/application/xxx.js）
+     * @returns {string} 实际 URL（如 /system/service/DISK/D/application/xxx.js）
      */
     static convertVirtualPathToUrl(path) {
         // 如果路径已经是 URL（以 http:// 或 https:// 或 / 开头），直接返回
         if (path.startsWith('http://') || path.startsWith('https://') || path.startsWith('/')) {
-            // 检查是否已经是 /service/DISK/ 格式
-            if (path.startsWith('/service/DISK/')) {
+            // 检查是否已经是 /system/service/DISK/ 格式
+            if (path.startsWith('/system/service/DISK/')) {
                 return path;
             }
             // 检查是否是相对路径（不以 / 开头，但也不是 D:/ 或 C:/）
@@ -464,13 +464,13 @@ class ProcessManager {
         
         // 处理虚拟路径 D:/ 或 C:/
         if (path.startsWith('D:/')) {
-            // 将 D:/application/xxx.js 转换为 /service/DISK/D/application/xxx.js
+            // 将 D:/application/xxx.js 转换为 /system/service/DISK/D/application/xxx.js
             const relativePath = path.substring(3); // 移除 "D:/"
-            return `/service/DISK/D/${relativePath}`;
+            return `/system/service/DISK/D/${relativePath}`;
         } else if (path.startsWith('C:/')) {
-            // 将 C:/xxx.js 转换为 /service/DISK/C/xxx.js
+            // 将 C:/xxx.js 转换为 /system/service/DISK/C/xxx.js
             const relativePath = path.substring(3); // 移除 "C:/"
-            return `/service/DISK/C/${relativePath}`;
+            return `/system/service/DISK/C/${relativePath}`;
         }
         
         // 其他情况直接返回原路径
@@ -1894,7 +1894,7 @@ class ProcessManager {
                     // 如果 nodeTree 仍然不存在或未初始化，直接从 PHP 服务读取
                     if (!nodeTree || !nodeTree.initialized) {
                         // 从 PHP 服务直接读取文件
-                        const url = new URL('/service/FSDirve.php', window.location.origin);
+                        const url = new URL('/system/service/FSDirve.php', window.location.origin);
                         url.searchParams.set('action', 'read_file');
                         url.searchParams.set('path', path);
                         
@@ -2017,7 +2017,7 @@ class ProcessManager {
                     // 如果 nodeTree 仍然不存在或未初始化，直接通过 PHP 服务写入
                     if (!nodeTree || !nodeTree.initialized) {
                         // 通过 PHP 服务直接写入文件
-                        const url = new URL('/service/FSDirve.php', window.location.origin);
+                        const url = new URL('/system/service/FSDirve.php', window.location.origin);
                         url.searchParams.set('action', 'write_file');
                         url.searchParams.set('path', path);
                         url.searchParams.set('content', content);
@@ -2094,7 +2094,7 @@ class ProcessManager {
                                     } else {
                                         // 如果 create_dir 不可用，通过 PHP 服务创建
                                         const phpPath = currentPath === basePath ? diskName : currentPath;
-                                        const url = new URL('/service/FSDirve.php', window.location.origin);
+                                        const url = new URL('/system/service/FSDirve.php', window.location.origin);
                                         url.searchParams.set('action', 'create_dir');
                                         url.searchParams.set('path', phpPath);
                                         url.searchParams.set('name', dirName);
@@ -2155,7 +2155,7 @@ class ProcessManager {
                             KernelLogger.warn('ProcessManager', `FileSystem.write: 无法找到目录节点: ${actualDirPath}，将通过 PHP 服务直接写入`);
                         }
                         // 通过 PHP 服务直接写入文件
-                        const url = new URL('/service/FSDirve.php', window.location.origin);
+                        const url = new URL('/system/service/FSDirve.php', window.location.origin);
                         url.searchParams.set('action', 'write_file');
                         url.searchParams.set('path', dirPath);
                         url.searchParams.set('fileName', fileName);
@@ -2372,7 +2372,7 @@ class ProcessManager {
                     }
                     
                     // 使用 PHP 服务创建
-                    const url = new URL('/service/FSDirve.php', window.location.origin);
+                    const url = new URL('/system/service/FSDirve.php', window.location.origin);
                     if (type === 'directory') {
                         url.searchParams.set('action', 'create_dir');
                         url.searchParams.set('path', phpPath);
@@ -2612,11 +2612,11 @@ class ProcessManager {
                     }
                     
                     // 使用 PHP 服务删除
-                    const url = new URL('/service/FSDirve.php', window.location.origin);
+                    const url = new URL('/system/service/FSDirve.php', window.location.origin);
                     
                     // 先检查是文件还是目录（通过尝试列出目录）
                     try {
-                        const checkUrl = new URL('/service/FSDirve.php', window.location.origin);
+                        const checkUrl = new URL('/system/service/FSDirve.php', window.location.origin);
                         checkUrl.searchParams.set('action', 'list_dir');
                         checkUrl.searchParams.set('path', phpPath);
                         
@@ -2711,7 +2711,7 @@ class ProcessManager {
                         }
                         
                         try {
-                            const phpServiceUrl = "/service/FSDirve.php";
+                            const phpServiceUrl = "/system/service/FSDirve.php";
                             const listUrl = new URL(phpServiceUrl, window.location.origin);
                             listUrl.searchParams.set('action', 'list_dir');
                             listUrl.searchParams.set('path', dirPath);
@@ -2822,7 +2822,7 @@ class ProcessManager {
                     // 如果 nodeTree 仍然不存在或未初始化，直接从 PHP 服务获取列表
                     if (!nodeTree || !nodeTree.initialized) {
                         // 从 PHP 服务直接获取目录列表
-                        const phpServiceUrl = "/service/FSDirve.php";
+                        const phpServiceUrl = "/system/service/FSDirve.php";
                         const listUrl = new URL(phpServiceUrl, window.location.origin);
                         listUrl.searchParams.set('action', 'list_dir');
                         listUrl.searchParams.set('path', dirPath);
@@ -2873,7 +2873,7 @@ class ProcessManager {
                         }
                         
                         try {
-                            const phpServiceUrl = "/service/FSDirve.php";
+                            const phpServiceUrl = "/system/service/FSDirve.php";
                             const listUrl = new URL(phpServiceUrl, window.location.origin);
                             listUrl.searchParams.set('action', 'list_dir');
                             listUrl.searchParams.set('path', dirPath);
@@ -2963,7 +2963,7 @@ class ProcessManager {
                         }
                         
                         try {
-                            const phpServiceUrl = "/service/FSDirve.php";
+                            const phpServiceUrl = "/system/service/FSDirve.php";
                             const listUrl = new URL(phpServiceUrl, window.location.origin);
                             listUrl.searchParams.set('action', 'list_dir');
                             listUrl.searchParams.set('path', dirPath);
