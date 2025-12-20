@@ -6,7 +6,7 @@
         "EVENT_LISTENER",
         "SYSTEM_NOTIFICATION"
       ],
-      "10007": [
+      "10006": [
         "GUI_WINDOW_CREATE",
         "EVENT_LISTENER"
       ]
@@ -381,7 +381,24 @@
       },
       "defaultKeyId": null
     },
-    "snake.highScore": 20
+    "snake.highScore": 20,
+    "userControl.users": {
+      "root": {
+        "level": "DEFAULT_ADMIN",
+        "password": null,
+        "avatar": "avatar_root_1766272534753.jpg",
+        "createdAt": 1766271155991,
+        "lastLogin": 1766273596787
+      },
+      "TestUser": {
+        "level": "USER",
+        "password": "b4b14cabace7c83adf7106f283b194cb",
+        "avatar": null,
+        "createdAt": 1766271155991,
+        "lastLogin": 1766271677926
+      }
+    },
+    "userControl.currentUser": "root"
   },
   "programs": {}
 }

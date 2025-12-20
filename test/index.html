@@ -36,6 +36,8 @@
                 <!-- 这是任务栏,用于显示正在运行的程序以及某些常显的程序 -->
                 <div id="taskbar" class="taskbar"></div>
             </div>
+            <!-- 锁屏界面（将在内核加载完成后显示） -->
+            <div id="lockscreen-container"></div>
         </div>
 
         <!-- 基础核心模块（按顺序加载） -->
@@ -45,7 +47,7 @@
         <script src="../kernel/core/signal/dependencyConfig.js"></script>
         <!-- 3. 对象池（依赖 KernelLogger 和 DependencyConfig） -->
         <script src="../kernel/core/signal/pool.js"></script>
-        <!-- 4. BootLoader 将自动加载所有其他内核模块 -->
+        <!-- 4. BootLoader 将自动加载所有其他内核模块（包括锁屏界面） -->
         <script src="../bootloader/starter.js"></script>
     </body>
 </html>

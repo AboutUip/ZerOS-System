@@ -399,7 +399,7 @@ PermissionManager.clearAuditLog(true);
 ### 示例 1: 在程序中声明权限
 
 ```javascript
-// test/application/myapp/myapp.js
+// system/service/DISK/D/application/myapp/myapp.js
 __info__() {
     return {
         name: 'myapp',

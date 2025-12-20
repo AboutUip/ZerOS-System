@@ -1,0 +1,223 @@
+/* ZerOS 设置程序样式 - Windows10风格，支持主题切换 */
+
+.settings-window {
+    background: transparent;
+}
+
+/* 搜索栏 */
+.settings-search-bar {
+    background: var(--theme-background-elevated, var(--theme-background-secondary, #252b35));
+    border-bottom: 1px solid var(--theme-border, rgba(139, 92, 246, 0.25));
+}
+
+.settings-search-icon {
+    color: var(--theme-text-secondary, var(--theme-text-muted, #b8c5c0));
+}
+
+.settings-search-icon svg path {
+    fill: var(--theme-text-secondary, var(--theme-text-muted, #b8c5c0));
+}
+
+.settings-search-input {
+    color: var(--theme-text, #d7e0dd);
+}
+
+.settings-search-input::placeholder {
+    color: var(--theme-text-muted, var(--theme-text-secondary, #8a9a94));
+}
+
+/* 导航面板 */
+.settings-nav-panel {
+    background: var(--theme-background-secondary, var(--theme-background-tertiary, #1a1f28));
+    border-right: 1px solid var(--theme-border, rgba(139, 92, 246, 0.25));
+}
+
+.settings-nav-item {
+    color: var(--theme-text, #d7e0dd);
+    transition: background-color 0.1s ease;
+}
+
+.settings-nav-item:hover {
+    background-color: var(--theme-background-tertiary, rgba(139, 92, 246, 0.1)) !important;
+}
+
+.settings-nav-item.active {
+    background-color: var(--theme-primary-light, rgba(139, 92, 246, 0.15)) !important;
+    color: var(--theme-primary, #8b5cf6) !important;
+}
+
+.settings-nav-item.active .settings-nav-icon svg path,
+.settings-nav-item.active .settings-nav-icon svg {
+    fill: var(--theme-primary, #8b5cf6);
+}
+
+/* 内容面板 */
+.settings-content-panel {
+    background: var(--theme-background, #050810);
+}
+
+.settings-content-container {
+    color: var(--theme-text, #d7e0dd);
+}
+
+/* 分类标题 */
+.settings-category-title,
+.settings-search-title {
+    font-family: 'Segoe UI Light', 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-weight: 300;
+    color: var(--theme-text, #d7e0dd);
+}
+
+.settings-category-description {
+    font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+    color: var(--theme-text-secondary, var(--theme-text-muted, #b8c5c0));
+}
+
+/* 设置项 */
+.settings-item {
+    margin-bottom: 32px;
+}
+
+.settings-item-title {
+    font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-weight: 400;
+    color: var(--theme-text, #d7e0dd);
+}
+
+.settings-item-description {
+    font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+    color: var(--theme-text-secondary, var(--theme-text-muted, #b8c5c0));
+    line-height: 1.5;
+}
+
+/* 开关控件 */
+.settings-toggle {
+    background: var(--theme-border, var(--theme-text-muted, #cccccc));
+    border-radius: 12px;
+    transition: background-color 0.2s ease;
+    cursor: pointer;
+}
+
+.settings-toggle:hover {
+    background: var(--theme-text-muted, #b3b3b3);
+}
+
+/* 文本输入控件 */
+.settings-text-input,
+.settings-number-input {
+    border: 1px solid var(--theme-border, rgba(139, 92, 246, 0.25));
+    border-radius: 2px;
+    font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: var(--theme-background-elevated, var(--theme-background-secondary, #252b35));
+    color: var(--theme-text, #d7e0dd);
+    transition: border-color 0.2s ease;
+}
+
+.settings-text-input:focus,
+.settings-number-input:focus {
+    border-color: var(--theme-primary, #8b5cf6);
+    outline: none;
+}
+
+.settings-text-input:hover:not(:focus),
+.settings-number-input:hover:not(:focus) {
+    border-color: var(--theme-border-dark, rgba(139, 92, 246, 0.35));
+}
+
+/* 下拉选择控件 */
+.settings-select {
+    border: 1px solid var(--theme-border, rgba(139, 92, 246, 0.25));
+    border-radius: 2px;
+    font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: var(--theme-background-elevated, var(--theme-background-secondary, #252b35));
+    color: var(--theme-text, #d7e0dd);
+    transition: border-color 0.2s ease;
+    cursor: pointer;
+}
+
+.settings-select:focus {
+    border-color: var(--theme-primary, #8b5cf6);
+    outline: none;
+}
+
+.settings-select:hover:not(:focus) {
+    border-color: var(--theme-border-dark, rgba(139, 92, 246, 0.35));
+}
+
+/* 按钮控件 */
+.settings-button {
+    background: var(--theme-primary, #8b5cf6);
+    border: 1px solid var(--theme-primary, #8b5cf6);
+    border-radius: 2px;
+    color: #ffffff;
+    font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+    transition: background-color 0.2s ease, border-color 0.2s ease;
+    cursor: pointer;
+}
+
+.settings-button:hover {
+    background: var(--theme-primary-dark, #7c3aed);
+    border-color: var(--theme-primary-dark, #7c3aed);
+}
+
+.settings-button:active {
+    background: var(--theme-primary-dark, #5a2db8);
+    border-color: var(--theme-primary-dark, #5a2db8);
+}
+
+.settings-button:focus {
+    outline: 2px solid var(--theme-primary, #8b5cf6);
+    outline-offset: 2px;
+}
+
+/* 空消息 */
+.settings-empty-message {
+    font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+    color: var(--theme-text-secondary, var(--theme-text-muted, #b8c5c0));
+}
+
+/* 搜索标题 */
+.settings-search-category-title {
+    font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-weight: 400;
+    color: var(--theme-text, #d7e0dd);
+}
+
+/* 滚动条样式（深色主题） */
+.settings-nav-panel::-webkit-scrollbar,
+.settings-content-panel::-webkit-scrollbar {
+    width: 12px;
+    height: 12px;
+}
+
+.settings-nav-panel::-webkit-scrollbar-track,
+.settings-content-panel::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.settings-nav-panel::-webkit-scrollbar-thumb,
+.settings-content-panel::-webkit-scrollbar-thumb {
+    background: var(--theme-border, rgba(139, 92, 246, 0.3));
+    border-radius: 6px;
+    border: 3px solid transparent;
+    background-clip: padding-box;
+}
+
+.settings-nav-panel::-webkit-scrollbar-thumb:hover,
+.settings-content-panel::-webkit-scrollbar-thumb:hover {
+    background: var(--theme-border-dark, rgba(139, 92, 246, 0.5));
+    background-clip: padding-box;
+}
+
+/* 响应式设计 */
+@media (max-width: 800px) {
+    .settings-nav-panel {
+        width: 180px;
+        min-width: 180px;
+        max-width: 180px;
+    }
+    
+    .settings-content-container {
+        padding: 32px 16px;
+    }
+}

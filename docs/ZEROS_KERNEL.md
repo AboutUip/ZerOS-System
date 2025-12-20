@@ -19,8 +19,6 @@
 ```
 ZerOS/
 ├── kernel/                 # 内核模块
-│   ├── bootloader/        # 启动引导
-│   │   └── starter.js    # 内核启动器
 │   ├── filesystem/        # 文件系统
 │   │   ├── disk.js       # 虚拟磁盘管理
 │   │   ├── nodeTree.js   # 文件树结构
@@ -39,13 +37,6 @@ ZerOS/
 │   │   ├── permissionManager.js # 权限管理
 │   │   ├── applicationAssetManager.js # 应用程序资源管理
 │   │   ├── applicationAssets.js # 应用程序资源映射
-│   │   ├── guiManager.js # GUI窗口管理
-│   │   ├── notificationManager.js # 通知管理
-│   │   ├── taskbarManager.js # 任务栏管理
-│   │   ├── themeManager.js # 主题管理
-│   │   ├── eventManager.js # 事件管理
-│   │   ├── contextMenuManager.js # 上下文菜单管理
-│   │   ├── desktop.js    # 桌面管理
 │   │   └── programCategories.js # 程序分类
 │   ├── drive/             # 驱动层
 │   │   ├── animateManager.js # 动画管理
@@ -68,22 +59,44 @@ ZerOS/
 │   │   ├── addressType.js # 地址类型枚举
 │   │   └── enumManager.js # 枚举管理器
 │   └── SystemInformation.js # 系统信息
-├── service/               # 服务端
-│   └── DISK/              # 虚拟磁盘存储
-│       ├── C/             # C: 盘
-│       └── D/              # D: 盘
-│           └── application/ # 应用程序目录
+├── system/                # 系统目录
+│   ├── service/           # 服务端 (PHP 文件系统驱动)
+│   │   ├── FSDirve.php    # 文件系统驱动服务
+│   │   ├── CompressionDirve.php # 压缩驱动服务
+│   │   ├── ImageProxy.php # 图片代理服务
+│   │   ├── module-proxy.php # 模块代理服务
+│   │   └── DISK/          # 虚拟磁盘存储
+│   │       ├── C/         # C: 盘
+│   │       └── D/         # D: 盘
+│   │           └── application/ # 应用程序目录
+│   ├── ui/                # UI 模块
+│   │   ├── guiManager.js  # GUI 窗口管理
+│   │   ├── themeManager.js # 主题管理
+│   │   ├── taskbarManager.js # 任务栏管理
+│   │   ├── notificationManager.js # 通知管理
+│   │   ├── eventManager.js # 事件管理
+│   │   ├── contextMenuManager.js # 上下文菜单管理
+│   │   └── desktop.js     # 桌面管理
+│   └── assets/            # 资源文件
+│       └── assets/        # 资源子目录
+│           ├── icons/     # 图标资源
+│           │   ├── glass/ # Glass 风格图标
+│           │   ├── gnome/ # GNOME 风格图标
+│           │   ├── macos/ # macOS 风格图标
+│           │   ├── material/ # Material 风格图标
+│           │   ├── ubuntu/ # Ubuntu 风格图标
+│           │   └── windows/ # Windows 风格图标
+│           └── desktopBG/ # 桌面背景
+│               ├── default.svg
+│               ├── cosmic.svg
+│               ├── cyberpunk.svg
+│               └── ...
+├── bootloader/            # 启动引导
+│   └── starter.js        # 启动器
 ├── test/                  # 测试和界面
-│   ├── application/       # 应用程序
-│   │   ├── terminal/     # 终端程序
-│   │   ├── vim/          # Vim文本编辑器
-│   │   ├── filemanager/  # 文件管理器
-│   │   ├── browser/      # 浏览器
-│   │   ├── musicplayer/  # 音乐播放器
-│   │   └── ...          # 其他应用程序
-│   ├── main.js           # 终端主程序
 │   ├── index.html        # 入口页面
-│   └── core.css          # 样式文件
+│   ├── core.css          # 样式文件
+│   └── assets/           # 测试资源
 └── docs/                 # 文档
     ├── API/              # API文档
     │   ├── README.md     # API文档索引

@@ -276,6 +276,75 @@ class TaskbarManager {
                 }
             }
             
+            // Ctrl+X: 启动设置程序（如果已运行则聚焦）
+            if (e.ctrlKey && (e.key === 'x' || e.key === 'X') && !e.shiftKey && !e.altKey && !e.metaKey) {
+                // 检查是否在输入框中（如果是，则不启动设置程序）
+                const activeElement = document.activeElement;
+                if (activeElement && (
+                    activeElement.tagName === 'INPUT' ||
+                    activeElement.tagName === 'TEXTAREA' ||
+                    activeElement.isContentEditable
+                )) {
+                    // 在输入框中，不处理（让用户正常输入）
+                    return;
+                }
+                
+                // 始终阻止默认行为（防止浏览器默认行为）
+                e.preventDefault();
+                e.stopPropagation();
+                
+                // 检查设置程序是否已在运行
+                let settingsPid = null;
+                if (typeof ProcessManager !== 'undefined' && ProcessManager.PROCESS_TABLE) {
+                    for (const [pid, processInfo] of ProcessManager.PROCESS_TABLE) {
+                        if (processInfo.programName === 'settings' && processInfo.status === 'running') {
+                            settingsPid = pid;
+                            break;
+                        }
+                    }
+                }
+                
+                if (settingsPid !== null) {
+                    // 设置程序已在运行，聚焦窗口
+                    TaskbarManager._restoreProgram(settingsPid);
+                    KernelLogger.info("TaskbarManager", `设置程序已在运行 (PID: ${settingsPid})，聚焦窗口`);
+                } else {
+                    // 设置程序未运行，启动程序
+                    if (typeof ProcessManager !== 'undefined' && typeof ProcessManager.startProgram === 'function') {
+                        ProcessManager.startProgram('settings', {})
+                            .then((pid) => {
+                                KernelLogger.info("TaskbarManager", `设置程序已启动 (PID: ${pid})`);
+                            })
+                            .catch((error) => {
+                                KernelLogger.error("TaskbarManager", `启动设置程序失败: ${error.message}`, error);
+                            });
+                    } else {
+                        KernelLogger.warn("TaskbarManager", "ProcessManager 不可用，无法启动设置程序");
+                    }
+                }
+            }
+            
+            // Ctrl+L: 锁定屏幕
+            if (e.ctrlKey && (e.key === 'l' || e.key === 'L') && !e.shiftKey && !e.altKey && !e.metaKey) {
+                // 检查是否在输入框中（如果是，则不锁定屏幕）
+                const activeElement = document.activeElement;
+                if (activeElement && (
+                    activeElement.tagName === 'INPUT' ||
+                    activeElement.tagName === 'TEXTAREA' ||
+                    activeElement.isContentEditable
+                )) {
+                    // 在输入框中，不处理（让用户正常输入）
+                    return;
+                }
+                
+                // 始终阻止默认行为（防止浏览器默认行为）
+                e.preventDefault();
+                e.stopPropagation();
+                
+                // 锁定屏幕
+                TaskbarManager._lockScreen();
+            }
+            
             // Ctrl+E: 关闭当前焦点窗口（仅在多任务选择器未激活时）
             if (e.ctrlKey && (e.key === 'e' || e.key === 'E') && !e.shiftKey && !e.altKey && !e.metaKey) {
                 // 如果多任务选择器已激活，不处理此快捷键（由多任务选择器的 Ctrl+E 处理）
@@ -504,7 +573,88 @@ class TaskbarManager {
         });
         
         TaskbarManager._globalShortcutsRegistered = true;
-        KernelLogger.info("TaskbarManager", "全局快捷键监听已注册（Ctrl+R 启动运行程序，Ctrl+E 关闭窗口，Ctrl+Q 切换最大化/最小化，Shift+E 启动文件管理器）");
+        KernelLogger.info("TaskbarManager", "全局快捷键监听已注册（Ctrl+R 启动运行程序，Ctrl+E 关闭窗口，Ctrl+Q 切换最大化/最小化，Shift+E 启动文件管理器，Ctrl+L 锁定屏幕）");
+    }
+    
+    /**
+     * 锁定屏幕
+     */
+    static _lockScreen() {
+        try {
+            // 隐藏桌面内容
+            const kernelContent = document.getElementById('kernel-content');
+            if (kernelContent) {
+                kernelContent.style.display = 'none';
+            }
+            
+            // 关闭开始菜单和其他弹窗
+            const appMenu = document.getElementById('taskbar-app-menu');
+            if (appMenu) {
+                appMenu.classList.remove('visible');
+            }
+            
+            // 关闭通知栏
+            if (typeof NotificationManager !== 'undefined' && typeof NotificationManager._hideNotificationContainer === 'function') {
+                NotificationManager._hideNotificationContainer();
+            }
+            
+            // 显示锁屏界面
+            if (typeof LockScreen === 'undefined') {
+                KernelLogger.warn("TaskbarManager", "LockScreen 未加载，无法锁定屏幕");
+                return;
+            }
+            
+            // 如果锁屏已初始化且容器存在，直接显示；否则重新初始化
+            if (LockScreen._initialized && LockScreen.container && LockScreen.container.parentElement) {
+                // 锁屏已存在且已添加到DOM，显示它
+                LockScreen.container.style.display = 'flex';
+                LockScreen.container.style.opacity = '1';
+                LockScreen.container.style.visibility = 'visible';
+                LockScreen.container.classList.remove('lockscreen-fade-out');
+                
+                // 更新用户信息和时间
+                LockScreen._updateTime();
+                LockScreen._updateUserInfo().catch(err => {
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.warn('TaskbarManager', `更新锁屏用户信息失败: ${err.message}`);
+                    }
+                });
+                
+                // 重新设置随机背景
+                LockScreen._setRandomBackground();
+                
+                // 重置密码输入状态
+                if (LockScreen.passwordInput) {
+                    LockScreen.passwordInput.value = '';
+                    LockScreen.passwordInput.classList.remove('error');
+                }
+                
+                // 隐藏密码输入区域，显示提示文字
+                const passwordContainer = document.getElementById('lockscreen-password-container');
+                const hintText = document.getElementById('lockscreen-hint');
+                if (passwordContainer) {
+                    passwordContainer.style.display = 'none';
+                }
+                if (hintText) {
+                    hintText.style.display = 'block';
+                }
+                
+                KernelLogger.info("TaskbarManager", "屏幕已锁定");
+            } else {
+                // 锁屏未初始化或容器已被删除，重新初始化
+                // 如果容器存在但不在DOM中，先清理
+                if (LockScreen.container && !LockScreen.container.parentElement) {
+                    // 容器已从DOM移除，重置初始化状态以允许重新初始化
+                    LockScreen._initialized = false;
+                }
+                LockScreen.init();
+                KernelLogger.info("TaskbarManager", "锁屏界面已初始化并显示");
+            }
+        } catch (error) {
+            if (typeof KernelLogger !== 'undefined') {
+                KernelLogger.error("TaskbarManager", `锁定屏幕失败: ${error.message}`, error);
+            }
+        }
     }
     
     /**
@@ -1163,9 +1313,11 @@ class TaskbarManager {
         const userSection = document.createElement('div');
         userSection.className = 'taskbar-start-menu-user';
         
-        // 用户头像（使用默认图标）
+        // 用户头像（动态加载）
         const userAvatar = document.createElement('div');
         userAvatar.className = 'taskbar-start-menu-user-avatar';
+        userAvatar.id = 'taskbar-start-menu-user-avatar';
+        // 默认SVG
         userAvatar.innerHTML = `
             <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <circle cx="12" cy="8" r="4" fill="currentColor" opacity="0.8"/>
@@ -1177,10 +1329,14 @@ class TaskbarManager {
         // 用户名
         const userName = document.createElement('div');
         userName.className = 'taskbar-start-menu-user-name';
+        userName.id = 'taskbar-start-menu-user-name';
         userName.textContent = '用户';
         userSection.appendChild(userName);
         
         bottomBar.appendChild(userSection);
+        
+        // 更新用户信息（异步）
+        TaskbarManager._updateStartMenuUserInfo();
         
         // 电源选项区域（右侧）
         const powerSection = document.createElement('div');
@@ -1293,6 +1449,110 @@ class TaskbarManager {
         }
         
         return menu;
+    }
+    
+    /**
+     * 更新开始菜单的用户信息（头像和用户名）
+     */
+    static async _updateStartMenuUserInfo() {
+        if (typeof UserControl === 'undefined') {
+            // 如果UserControl未加载，稍后重试
+            setTimeout(() => TaskbarManager._updateStartMenuUserInfo(), 500);
+            return;
+        }
+        
+        try {
+            await UserControl.ensureInitialized();
+            
+            const currentUser = UserControl.getCurrentUser();
+            if (!currentUser) {
+                return;
+            }
+            
+            // 更新用户名
+            const userNameEl = document.getElementById('taskbar-start-menu-user-name');
+            if (userNameEl) {
+                userNameEl.textContent = currentUser;
+            }
+            
+            // 更新用户头像
+            const userAvatarEl = document.getElementById('taskbar-start-menu-user-avatar');
+            if (!userAvatarEl) {
+                return;
+            }
+            
+            // 获取最新的用户数据（直接从UserControl获取）
+            const userData = UserControl._users && UserControl._users.get ? UserControl._users.get(currentUser) : null;
+            const avatarFileName = userData && userData.avatar ? userData.avatar : null;
+            
+            // 默认SVG
+            const defaultSvg = `
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="12" cy="8" r="4" fill="currentColor" opacity="0.8"/>
+                    <path d="M6 21c0-3.314 2.686-6 6-6s6 2.686 6 6" stroke="currentColor" stroke-width="2" fill="none" opacity="0.8"/>
+                </svg>
+            `;
+            
+            if (avatarFileName) {
+                // 使用FSDirve读取本地文件并转换为base64 data URL
+                try {
+                    const url = new URL('/system/service/FSDirve.php', window.location.origin);
+                    url.searchParams.set('action', 'read_file');
+                    url.searchParams.set('path', 'D:/cache/');
+                    url.searchParams.set('fileName', avatarFileName);
+                    url.searchParams.set('asBase64', 'true');
+                    
+                    const response = await fetch(url.toString());
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}`);
+                    }
+                    
+                    const result = await response.json();
+                    if (result.status === 'success' && result.data && result.data.content) {
+                        // 确定MIME类型
+                        const fileExt = avatarFileName.split('.').pop()?.toLowerCase() || 'jpg';
+                        const mimeType = fileExt === 'jpg' || fileExt === 'jpeg' ? 'image/jpeg' :
+                                        fileExt === 'png' ? 'image/png' :
+                                        fileExt === 'gif' ? 'image/gif' :
+                                        fileExt === 'webp' ? 'image/webp' :
+                                        fileExt === 'svg' ? 'image/svg+xml' :
+                                        fileExt === 'bmp' ? 'image/bmp' : 'image/jpeg';
+                        
+                        // 使用图片作为头像
+                        userAvatarEl.innerHTML = '';
+                        const img = document.createElement('img');
+                        img.src = `data:${mimeType};base64,${result.data.content}`;
+                        img.style.cssText = `
+                            width: 100%;
+                            height: 100%;
+                            object-fit: cover;
+                            border-radius: 50%;
+                        `;
+                        img.onerror = () => {
+                            // 如果图片加载失败，使用默认SVG
+                            userAvatarEl.innerHTML = defaultSvg;
+                        };
+                        userAvatarEl.appendChild(img);
+                        return;
+                    } else {
+                        throw new Error(result.message || '读取文件失败');
+                    }
+                } catch (error) {
+                    // 如果读取失败，使用默认SVG
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.warn('TaskbarManager', `开始菜单头像加载失败: ${avatarFileName}, 错误: ${error.message}`);
+                    }
+                    userAvatarEl.innerHTML = defaultSvg;
+                }
+            } else {
+                // 使用默认SVG
+                userAvatarEl.innerHTML = defaultSvg;
+            }
+        } catch (error) {
+            if (typeof KernelLogger !== 'undefined') {
+                KernelLogger.error('TaskbarManager', `更新开始菜单用户信息失败: ${error.message}`, error);
+            }
+        }
     }
     
     /**
@@ -1523,6 +1783,13 @@ class TaskbarManager {
             
             // 根据任务栏位置计算菜单位置
             const position = TaskbarManager._taskbarPosition || 'bottom';
+            
+            // 更新用户信息（确保显示最新的头像和用户名）
+            TaskbarManager._updateStartMenuUserInfo().catch(err => {
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.warn('TaskbarManager', `更新开始菜单用户信息失败: ${err.message}`);
+                }
+            });
             
             // 先显示菜单以获取实际尺寸
             menu.classList.add('visible');

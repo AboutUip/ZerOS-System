@@ -419,6 +419,27 @@ class LStorage {
                 KernelLogger.info("LStorage", `存储数据加载成功 (系统键: ${systemKeys.length}, 程序: ${programCount})`);
                 if (systemKeys.length > 0) {
                     KernelLogger.debug("LStorage", `系统存储键: ${systemKeys.join(', ')}`);
+                    // 特别检查 userControl.users
+                    if (systemKeys.includes('userControl.users')) {
+                        const usersData = LStorage._storageData.system['userControl.users'];
+                        if (usersData && typeof usersData === 'object') {
+                            const userCount = Object.keys(usersData).length;
+                            KernelLogger.info("LStorage", `用户数据已加载: ${userCount} 个用户`);
+                            // 记录每个用户的密码状态
+                            for (const [username, userData] of Object.entries(usersData)) {
+                                if (userData && typeof userData === 'object') {
+                                    const hasPassword = userData.password !== null && 
+                                                      userData.password !== undefined && 
+                                                      userData.password !== '';
+                                    KernelLogger.debug("LStorage", `用户 ${username}: 密码=${hasPassword ? '有' : '无'}`);
+                                }
+                            }
+                        } else {
+                            KernelLogger.warn("LStorage", `userControl.users 数据格式不正确: ${typeof usersData}`);
+                        }
+                    } else {
+                        KernelLogger.warn("LStorage", "userControl.users 键不存在于存储中");
+                    }
                 }
                 // 特别检查 desktop.icons
                 if (systemKeys.includes('desktop.icons')) {
@@ -515,14 +536,30 @@ class LStorage {
                 throw new Error("存储数据无效或为空，无法保存");
             }
             
-            // 确保 system 和 programs 存在
-            if (!LStorage._storageData.system || typeof LStorage._storageData.system !== 'object') {
-                KernelLogger.warn("LStorage", "system 数据无效，使用空对象");
-                LStorage._storageData.system = {};
+            // 确保 system 和 programs 存在（但不重置已有数据）
+            // 注意：这里只检查是否存在，如果不存在才创建，不会重置已有数据
+            if (!LStorage._storageData.hasOwnProperty('system') || !LStorage._storageData.system || typeof LStorage._storageData.system !== 'object') {
+                if (!LStorage._storageData.hasOwnProperty('system')) {
+                    // system 属性不存在，创建它
+                    LStorage._storageData.system = {};
+                } else if (LStorage._storageData.system === null || typeof LStorage._storageData.system !== 'object') {
+                    // system 存在但类型不对，记录警告但不重置（保留原有数据）
+                    KernelLogger.warn("LStorage", "system 数据类型异常，但保留现有数据");
+                    // 只有在确实是 null 或非对象时才重置
+                    if (LStorage._storageData.system === null) {
+                        LStorage._storageData.system = {};
+                    }
+                }
             }
-            if (!LStorage._storageData.programs || typeof LStorage._storageData.programs !== 'object') {
-                KernelLogger.warn("LStorage", "programs 数据无效，使用空对象");
-                LStorage._storageData.programs = {};
+            if (!LStorage._storageData.hasOwnProperty('programs') || !LStorage._storageData.programs || typeof LStorage._storageData.programs !== 'object') {
+                if (!LStorage._storageData.hasOwnProperty('programs')) {
+                    LStorage._storageData.programs = {};
+                } else if (LStorage._storageData.programs === null || typeof LStorage._storageData.programs !== 'object') {
+                    KernelLogger.warn("LStorage", "programs 数据类型异常，但保留现有数据");
+                    if (LStorage._storageData.programs === null) {
+                        LStorage._storageData.programs = {};
+                    }
+                }
             }
             
             // 检查数据是否为空（防止意外清空文件）
@@ -897,20 +934,87 @@ class LStorage {
         }
         
         try {
+            // 确保 _storageData 已初始化
+            if (!LStorage._storageData || !LStorage._storageData.system) {
+                KernelLogger.warn("LStorage", `存储数据结构未初始化，尝试重新初始化`);
+                await LStorage.init();
+            }
+            
             // 先更新内存中的数据
             LStorage._storageData.system[key] = value;
-            KernelLogger.debug("LStorage", `内存数据已更新: Key=${key}`);
+            KernelLogger.debug("LStorage", `内存数据已更新: Key=${key}, Value类型=${typeof value}, 是否为对象=${typeof value === 'object' && value !== null && !Array.isArray(value)}`);
+            
+            // 在保存前验证数据是否在内存中
+            const beforeSaveCheck = LStorage._storageData.system[key];
+            if (beforeSaveCheck === undefined || beforeSaveCheck === null) {
+                KernelLogger.error("LStorage", `保存前验证失败: Key=${key} 在内存中不存在（数据未正确设置）`);
+                return false;
+            }
+            
+            // 对于对象类型，创建深拷贝用于验证（避免在保存过程中数据被修改）
+            let valueForVerification = value;
+            if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+                try {
+                    valueForVerification = JSON.parse(JSON.stringify(value));
+                } catch (e) {
+                    KernelLogger.debug("LStorage", `无法创建深拷贝用于验证，将使用原始值: ${e.message}`);
+                    valueForVerification = value;
+                }
+            }
             
             // 尝试保存到文件系统
             try {
                 await LStorage._saveStorageData();
                 KernelLogger.info("LStorage", `系统存储写入成功: Key=${key}`);
                 
-                // 验证保存是否真的成功（读取文件验证）
+                // 验证保存是否真的成功（保存后验证内存中的数据是否仍然存在）
+                // 注意：_saveStorageData 不应该修改 _storageData.system，所以数据应该还在
                 try {
+                    // 确保从正确的存储数据结构中读取
+                    if (!LStorage._storageData || !LStorage._storageData.system) {
+                        KernelLogger.warn("LStorage", `保存后验证失败: 存储数据结构不存在`);
+                        return false;
+                    }
+                    
                     const savedValue = LStorage._storageData.system[key];
-                    if (savedValue === undefined || savedValue === null) {
-                        KernelLogger.warn("LStorage", `保存后验证失败: Key=${key} 在内存中不存在`);
+                    
+                    // 添加详细的调试信息
+                    KernelLogger.debug("LStorage", `验证数据: Key=${key}, savedValue存在=${savedValue !== undefined && savedValue !== null}, savedValue类型=${typeof savedValue}, value类型=${typeof value}`);
+                    
+                    // 对于对象类型，需要特殊处理
+                    if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+                        // 对象类型：检查是否存在且是对象
+                        if (savedValue === undefined || savedValue === null) {
+                            KernelLogger.warn("LStorage", `保存后验证失败: Key=${key} 在内存中不存在 (savedValue=${savedValue})`);
+                            return false;
+                        }
+                        if (typeof savedValue !== 'object' || Array.isArray(savedValue)) {
+                            KernelLogger.warn("LStorage", `保存后验证失败: Key=${key} 类型不匹配 (期望: object, 实际: ${typeof savedValue}, 是否为数组: ${Array.isArray(savedValue)})`);
+                            return false;
+                        }
+                        // 对于对象，检查键的数量是否匹配
+                        // 使用保存时的值（valueForVerification）而不是当前内存中的值（savedValue）
+                        // 因为内存中的数据可能在保存后被其他操作修改了
+                        const valueKeys = Object.keys(valueForVerification);
+                        const savedKeys = Object.keys(savedValue);
+                        KernelLogger.debug("LStorage", `对象验证: Key=${key}, 保存时键数=${valueKeys.length}, 当前内存键数=${savedKeys.length}`);
+                        
+                        // 如果键数量不匹配，检查是否是数据被修改了（允许这种情况，只记录警告）
+                        if (valueKeys.length !== savedKeys.length) {
+                            // 检查是否是数据被修改了（例如，程序被终止，权限被清除）
+                            const isDataModified = savedKeys.length < valueKeys.length;
+                            if (isDataModified) {
+                                // 数据可能被修改了（例如权限被清除），这是正常的，只记录调试信息
+                                KernelLogger.debug("LStorage", `对象键数量变化: Key=${key}, 保存时=${valueKeys.length}, 当前=${savedKeys.length} (可能是数据被修改)`);
+                            } else {
+                                // 键数量增加了，这不应该发生，记录警告
+                                KernelLogger.warn("LStorage", `保存后验证失败: Key=${key} 对象键数量不匹配 (期望: ${valueKeys.length}, 实际: ${savedKeys.length})`);
+                                return false;
+                            }
+                        }
+                    } else if (savedValue === undefined || savedValue === null) {
+                        // 对于非对象类型，检查是否存在
+                        KernelLogger.warn("LStorage", `保存后验证失败: Key=${key} 在内存中不存在 (savedValue=${savedValue})`);
                         return false;
                     }
                     

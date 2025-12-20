@@ -1677,7 +1677,7 @@ function escapeHtml(s){
             // 推荐使用事件监听：Terminal.on('command', handler)
             this.commandHandler = this._defaultHandler.bind(this);
             // 用于 Tab 补全的已知命令列表（可由外部修改）
-            this._completionCommands = ['clear','pwd','whoami','echo','demo','toggleview','cd','markdir','markfile','ls','tree','cat','write','rm','ps','kill','help','check','diskmanger','eval','vim','rename','mv','copy','paste','power','exit'];
+            this._completionCommands = ['clear','pwd','whoami','echo','demo','toggleview','cd','markdir','markfile','ls','tree','cat','write','rm','ps','kill','help','check','diskmanger','eval','vim','rename','mv','copy','paste','power','exit','login','su','users'];
             
             // CLI程序补全缓存（从ApplicationAssetManager获取）
             this._cliProgramsCache = null;
@@ -1693,6 +1693,31 @@ function escapeHtml(s){
             
             // 从内存初始化终端数据
             this._loadTerminalDataFromMemory();
+            
+            // 同步用户控制系统的当前用户
+            (async () => {
+                try {
+                    if (typeof UserControl !== 'undefined') {
+                        await UserControl.ensureInitialized();
+                        const currentUser = UserControl.getCurrentUser();
+                        if (currentUser && currentUser !== this.env.user) {
+                            this.env.user = currentUser;
+                            this.setUser(currentUser);
+                        } else if (this.env.user && !currentUser) {
+                            // 如果用户控制系统没有当前用户，使用终端的用户
+                            await UserControl.login(this.env.user);
+                        }
+                    }
+                } catch (e) {
+                    // 如果初始化失败，至少确保终端有默认用户
+                    if (!this.env.user) {
+                        this.env.user = 'root';
+                        this.setUser('root');
+                    }
+                    // 忽略错误，不影响终端初始化
+                    KernelLogger.debug("Terminal", `同步用户控制系统失败: ${e.message}`);
+                }
+            })();
             
             // 为了保持向后兼容，创建 history 的 getter/setter
             // 这些方法会将数据存储在 Exploit 内存中
@@ -1815,11 +1840,22 @@ function escapeHtml(s){
         }
 
         _updatePrompt(){
-            // Kali style: root prompt ends with '#'
-            const suffix = (this.env.user === 'root') ? '#' : '$';
+            // Kali style: root prompt ends with '#', 管理员也使用 '#'
+            // 检查用户级别（如果 UserControl 可用）
+            let isAdmin = false;
+            if (typeof UserControl !== 'undefined' && this.env.user) {
+                try {
+                    const userLevel = UserControl.getCurrentUserLevel();
+                    isAdmin = userLevel === UserControl.USER_LEVEL.ADMIN || 
+                             userLevel === UserControl.USER_LEVEL.DEFAULT_ADMIN;
+                } catch (e) {
+                    // 忽略错误，使用默认逻辑
+                }
+            }
+            const suffix = (this.env.user === 'root' || isAdmin) ? '#' : '$';
             // support simple promptTemplate \u= user, \h=host, \w=cwd
             let tmpl = this.config && this.config.promptTemplate ? this.config.promptTemplate : '\\u@\\h:\\w';
-            tmpl = tmpl.replace('\\u', this.env.user).replace('\\h', this.env.host).replace('\\w', this.env.cwd);
+            tmpl = tmpl.replace('\\u', this.env.user || 'root').replace('\\h', this.env.host || 'test').replace('\\w', this.env.cwd || '~');
             this.promptEl.textContent = tmpl + suffix;
         }
 
@@ -4592,6 +4628,110 @@ function escapeHtml(s){
             case 'whoami':
                 payload.write(payload.env.user);
                 break;
+            case 'login':
+                // login 命令：切换用户
+                (async () => {
+                    try {
+                        if (typeof UserControl === 'undefined') {
+                            payload.write('login: UserControl 未加载');
+                            return;
+                        }
+                        
+                        await UserControl.ensureInitialized();
+                        
+                        if (payload.args.length < 2) {
+                            payload.write('login: 用法: login <用户名>');
+                            return;
+                        }
+                        
+                        const username = payload.args[1];
+                        const success = await UserControl.login(username);
+                        
+                        if (success) {
+                            // 更新终端用户显示（setUser 会更新 env.user 并调用 _updatePrompt）
+                            terminalInstance.setUser(username);
+                            // payload.env 是对 terminalInstance.env 的引用，所以已经更新了
+                            terminalInstance._saveEnvToMemory();
+                            
+                            const userLevel = UserControl.getCurrentUserLevel();
+                            const levelText = userLevel === UserControl.USER_LEVEL.DEFAULT_ADMIN ? '默认管理员' :
+                                             userLevel === UserControl.USER_LEVEL.ADMIN ? '管理员' : '用户';
+                            payload.write(`已登录用户: ${username} (${levelText})`);
+                        } else {
+                            payload.write(`login: 登录失败: 用户 ${username} 不存在`);
+                        }
+                    } catch (error) {
+                        payload.write(`login: 错误: ${error.message}`);
+                    }
+                })();
+                break;
+            case 'su':
+                // su 命令：切换用户（与 login 相同）
+                (async () => {
+                    try {
+                        if (typeof UserControl === 'undefined') {
+                            payload.write('su: UserControl 未加载');
+                            return;
+                        }
+                        
+                        await UserControl.ensureInitialized();
+                        
+                        if (payload.args.length < 2) {
+                            payload.write('su: 用法: su <用户名>');
+                            return;
+                        }
+                        
+                        const username = payload.args[1];
+                        const success = await UserControl.login(username);
+                        
+                        if (success) {
+                            // 更新终端用户显示（setUser 会更新 env.user 并调用 _updatePrompt）
+                            terminalInstance.setUser(username);
+                            // payload.env 是对 terminalInstance.env 的引用，所以已经更新了
+                            terminalInstance._saveEnvToMemory();
+                            
+                            const userLevel = UserControl.getCurrentUserLevel();
+                            const levelText = userLevel === UserControl.USER_LEVEL.DEFAULT_ADMIN ? '默认管理员' :
+                                             userLevel === UserControl.USER_LEVEL.ADMIN ? '管理员' : '用户';
+                            payload.write(`已切换用户: ${username} (${levelText})`);
+                        } else {
+                            payload.write(`su: 切换失败: 用户 ${username} 不存在`);
+                        }
+                    } catch (error) {
+                        payload.write(`su: 错误: ${error.message}`);
+                    }
+                })();
+                break;
+            case 'users':
+                // users 命令：列出所有用户
+                (async () => {
+                    try {
+                        if (typeof UserControl === 'undefined') {
+                            payload.write('users: UserControl 未加载');
+                            return;
+                        }
+                        
+                        await UserControl.ensureInitialized();
+                        const users = UserControl.listUsers();
+                        
+                        if (users.length === 0) {
+                            payload.write('users: 没有用户');
+                            return;
+                        }
+                        
+                        const currentUser = UserControl.getCurrentUser();
+                        payload.write('用户列表:');
+                        for (const user of users) {
+                            const levelText = user.level === UserControl.USER_LEVEL.DEFAULT_ADMIN ? '默认管理员' :
+                                             user.level === UserControl.USER_LEVEL.ADMIN ? '管理员' : '用户';
+                            const current = user.username === currentUser ? ' (当前)' : '';
+                            payload.write(`  ${user.username} - ${levelText}${current}`);
+                        }
+                    } catch (error) {
+                        payload.write(`users: 错误: ${error.message}`);
+                    }
+                })();
+                break;
             case 'echo':
                 {
                     // echo 命令：输出文本
@@ -6620,6 +6760,9 @@ function escapeHtml(s){
                 payload.write(' - eval                   : 运行JavaScript表达式');
                 payload.write(' - vim [file]             : Vim文本编辑器（支持Normal/Insert/Command模式，支持鼠标滚轮滚动）');
                 payload.write(' - pwd, whoami            : 显示当前路径或当前用户');
+                payload.write(' - login <username>       : 切换用户登录');
+                payload.write(' - su <username>          : 切换用户（与 login 相同）');
+                payload.write(' - users                  : 列出所有用户及其级别');
                 payload.write(' - demo, toggleview       : 演示脚本 / 切换视图');
                 payload.write(' - power <action>         : 系统电源管理（reboot/shutdown/help）');
                 payload.write('Notes: 路径格式以盘符开头如 C:/path，或相对于当前工作目录使用 ../ 和 ./ 。');

@@ -1688,9 +1688,10 @@ class GUIManager {
      * @param {string} message 提示消息
      * @param {string} title 标题（可选）
      * @param {string} defaultValue 默认值（可选）
+     * @param {boolean} isPassword 是否为密码输入（可选，默认为false）
      * @returns {Promise<string|null>} 用户输入的值，取消返回null
      */
-    static showPrompt(message, title = '输入', defaultValue = '') {
+    static showPrompt(message, title = '输入', defaultValue = '', isPassword = false) {
         return new Promise((resolve) => {
             const dialog = GUIManager._createModalDialog({
                 title: title,
@@ -1698,6 +1699,7 @@ class GUIManager {
                 type: 'info',
                 hasInput: true,
                 inputValue: defaultValue,
+                inputType: isPassword ? 'password' : 'text',
                 buttons: [
                     {
                         text: '取消',
@@ -1921,7 +1923,7 @@ class GUIManager {
         let inputElement = null;
         if (options.hasInput) {
             inputElement = document.createElement('input');
-            inputElement.type = 'text';
+            inputElement.type = options.inputType || 'text'; // 支持密码输入类型
             inputElement.value = options.inputValue || '';
             inputElement.style.cssText = `
                 width: 100%;

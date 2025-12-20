@@ -311,6 +311,566 @@ html, body {
 }
 
 /* 内核内容容器 */
+/* 锁屏淡入动画 */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+/* ========== 锁屏界面样式 - Windows 11 风格 ========== */
+
+.lockscreen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: #000000;
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    z-index: 20000;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 60px 40px;
+    box-sizing: border-box;
+    animation: lockscreenFadeIn 0.5s ease-out;
+}
+
+@keyframes lockscreenFadeIn {
+    from {
+        opacity: 0;
+        backdrop-filter: blur(0px);
+        -webkit-backdrop-filter: blur(0px);
+    }
+    to {
+        opacity: 1;
+        backdrop-filter: blur(0px);
+        -webkit-backdrop-filter: blur(0px);
+    }
+}
+
+.lockscreen-fade-out {
+    animation: lockscreenFadeOut 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+@keyframes lockscreenFadeOut {
+    from {
+        opacity: 1;
+        transform: scale(1);
+    }
+    to {
+        opacity: 0;
+        transform: scale(1.02);
+    }
+}
+
+/* 时间显示区域（左上角） */
+.lockscreen-time-container {
+    position: absolute;
+    top: 60px;
+    left: 40px;
+    color: #ffffff;
+    text-shadow: 
+        0 2px 20px rgba(0, 0, 0, 0.8),
+        0 4px 40px rgba(0, 0, 0, 0.4),
+        0 0 60px rgba(255, 255, 255, 0.1);
+    animation: timeFadeIn 0.8s cubic-bezier(0.4, 0, 0.2, 1) 0.2s both;
+    filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.3));
+}
+
+@keyframes timeFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-20px) scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.lockscreen-time {
+    font-size: 72px;
+    font-weight: 300;
+    font-family: 'Segoe UI Light', 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+    line-height: 1;
+    margin-bottom: 8px;
+    letter-spacing: -2px;
+    text-shadow: 
+        0 2px 20px rgba(0, 0, 0, 0.9),
+        0 4px 40px rgba(0, 0, 0, 0.5),
+        0 0 80px rgba(255, 255, 255, 0.15);
+    filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.4));
+}
+
+.lockscreen-date {
+    font-size: 18px;
+    font-weight: 400;
+    font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+    opacity: 0.95;
+    letter-spacing: 0.5px;
+    text-shadow: 
+        0 2px 12px rgba(0, 0, 0, 0.7),
+        0 0 30px rgba(255, 255, 255, 0.1);
+    filter: drop-shadow(0 1px 4px rgba(0, 0, 0, 0.3));
+}
+
+/* 用户登录区域（垂直居中） */
+.lockscreen-login-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 24px;
+    animation: loginFadeIn 0.8s cubic-bezier(0.4, 0, 0.2, 1) 0.4s both;
+    filter: drop-shadow(0 8px 32px rgba(0, 0, 0, 0.3));
+}
+
+@keyframes loginFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(30px) scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+/* 用户头像 */
+.lockscreen-avatar {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.15);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #ffffff;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    cursor: pointer;
+    box-shadow: 
+        0 8px 32px rgba(0, 0, 0, 0.4),
+        0 0 0 1px rgba(255, 255, 255, 0.1) inset,
+        0 4px 16px rgba(255, 255, 255, 0.1);
+    filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.3));
+}
+
+.lockscreen-avatar:hover {
+    background: rgba(255, 255, 255, 0.25);
+    border-color: rgba(255, 255, 255, 0.5);
+    transform: scale(1.08);
+    box-shadow: 
+        0 12px 48px rgba(0, 0, 0, 0.5),
+        0 0 0 1px rgba(255, 255, 255, 0.2) inset,
+        0 6px 24px rgba(255, 255, 255, 0.15),
+        0 0 40px rgba(255, 255, 255, 0.1);
+    filter: drop-shadow(0 6px 20px rgba(0, 0, 0, 0.4));
+}
+
+.lockscreen-avatar svg {
+    width: 48px;
+    height: 48px;
+}
+
+/* 用户名容器 */
+.lockscreen-username-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    position: relative;
+}
+
+/* 用户名 */
+.lockscreen-username {
+    font-size: 24px;
+    font-weight: 400;
+    font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+    color: #ffffff;
+    text-shadow: 
+        0 2px 16px rgba(0, 0, 0, 0.8),
+        0 0 40px rgba(255, 255, 255, 0.1);
+    letter-spacing: 0.5px;
+    filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.4));
+}
+
+/* 用户切换按钮 */
+.lockscreen-user-switch {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: rgba(255, 255, 255, 0.8);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    outline: none;
+    flex-shrink: 0;
+    box-shadow: 
+        0 4px 12px rgba(0, 0, 0, 0.3),
+        0 0 0 1px rgba(255, 255, 255, 0.1) inset;
+}
+
+.lockscreen-user-switch:hover {
+    background: rgba(255, 255, 255, 0.2);
+    border-color: rgba(255, 255, 255, 0.4);
+    transform: scale(1.1);
+    box-shadow: 
+        0 6px 20px rgba(0, 0, 0, 0.4),
+        0 0 0 1px rgba(255, 255, 255, 0.2) inset,
+        0 0 20px rgba(255, 255, 255, 0.1);
+}
+
+.lockscreen-user-switch:active {
+    transform: scale(0.95);
+}
+
+.lockscreen-user-switch svg {
+    width: 16px;
+    height: 16px;
+}
+
+/* 用户列表 */
+.lockscreen-user-list {
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    margin-top: 12px;
+    background: rgba(0, 0, 0, 0.85);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 12px;
+    padding: 8px;
+    min-width: 200px;
+    display: none;
+    flex-direction: column;
+    gap: 4px;
+    z-index: 20002;
+    box-shadow: 
+        0 8px 32px rgba(0, 0, 0, 0.5),
+        0 0 0 1px rgba(255, 255, 255, 0.1) inset;
+    filter: drop-shadow(0 4px 16px rgba(0, 0, 0, 0.4));
+}
+
+/* 用户列表项 */
+.lockscreen-user-item {
+    padding: 12px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    background: transparent;
+}
+
+.lockscreen-user-item:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+/* 用户列表项选中状态在JS中动态设置 */
+
+/* 密码输入容器 */
+.lockscreen-password-container {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: rgba(255, 255, 255, 0.12);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    border-radius: 12px;
+    padding: 10px 18px;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    animation: passwordFadeIn 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 
+        0 8px 32px rgba(0, 0, 0, 0.4),
+        0 0 0 1px rgba(255, 255, 255, 0.1) inset,
+        0 2px 8px rgba(255, 255, 255, 0.1);
+    filter: drop-shadow(0 4px 16px rgba(0, 0, 0, 0.3));
+}
+
+@keyframes passwordFadeIn {
+    from {
+        opacity: 0;
+        transform: scale(0.9) translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+.lockscreen-password-container:focus-within {
+    background: rgba(255, 255, 255, 0.18);
+    border-color: rgba(255, 255, 255, 0.5);
+    box-shadow: 
+        0 12px 48px rgba(0, 0, 0, 0.5),
+        0 0 0 2px rgba(255, 255, 255, 0.2) inset,
+        0 4px 16px rgba(255, 255, 255, 0.15),
+        0 0 40px rgba(255, 255, 255, 0.1);
+    filter: drop-shadow(0 6px 24px rgba(0, 0, 0, 0.4));
+    transform: translateY(-2px);
+}
+
+/* 密码输入框 */
+.lockscreen-password-input {
+    background: transparent;
+    border: none;
+    outline: none;
+    color: #ffffff;
+    font-size: 16px;
+    font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+    width: 200px;
+    padding: 8px 0;
+    display: block;
+    flex: 1;
+}
+
+.lockscreen-password-input::placeholder {
+    color: rgba(255, 255, 255, 0.6);
+}
+
+.lockscreen-password-input.error {
+    animation: shake 0.5s ease;
+}
+
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-10px); }
+    75% { transform: translateX(10px); }
+}
+
+/* 登录按钮 */
+.lockscreen-login-button {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    outline: none;
+    flex-shrink: 0;
+    box-shadow: 
+        0 4px 16px rgba(0, 0, 0, 0.3),
+        0 0 0 1px rgba(255, 255, 255, 0.1) inset,
+        0 2px 8px rgba(255, 255, 255, 0.1);
+    filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.3));
+}
+
+.lockscreen-login-button:hover {
+    background: rgba(255, 255, 255, 0.3);
+    border-color: rgba(255, 255, 255, 0.6);
+    transform: scale(1.15);
+    box-shadow: 
+        0 8px 24px rgba(0, 0, 0, 0.4),
+        0 0 0 1px rgba(255, 255, 255, 0.2) inset,
+        0 4px 16px rgba(255, 255, 255, 0.15),
+        0 0 30px rgba(255, 255, 255, 0.1);
+    filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.4));
+}
+
+.lockscreen-login-button:active {
+    transform: scale(1.05);
+    box-shadow: 
+        0 2px 8px rgba(0, 0, 0, 0.3),
+        0 0 0 1px rgba(255, 255, 255, 0.15) inset;
+}
+
+.lockscreen-login-button svg {
+    width: 20px;
+    height: 20px;
+}
+
+/* 提示文字 */
+.lockscreen-hint {
+    position: absolute;
+    bottom: 40px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 14px;
+    font-weight: 400;
+    font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+    color: rgba(255, 255, 255, 0.85);
+    text-shadow: 
+        0 2px 12px rgba(0, 0, 0, 0.7),
+        0 0 30px rgba(255, 255, 255, 0.1);
+    animation: hintPulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    filter: drop-shadow(0 1px 4px rgba(0, 0, 0, 0.3));
+    transition: opacity 0.3s ease;
+}
+
+@keyframes hintPulse {
+    0%, 100% {
+        opacity: 0.75;
+        transform: translateY(0);
+    }
+    50% {
+        opacity: 1;
+        transform: translateY(-2px);
+    }
+}
+
+/* 加载蒙版 */
+.lockscreen-loading-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 20001;
+    opacity: 0;
+    transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    pointer-events: auto;
+}
+
+.lockscreen-loading-overlay-visible {
+    opacity: 1;
+}
+
+.lockscreen-loading-overlay-hidden {
+    opacity: 0;
+}
+
+.lockscreen-loading-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+    padding: 32px;
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 16px;
+    box-shadow: 
+        0 8px 32px rgba(0, 0, 0, 0.4),
+        0 0 0 1px rgba(255, 255, 255, 0.1) inset,
+        0 4px 16px rgba(255, 255, 255, 0.1);
+    filter: drop-shadow(0 4px 16px rgba(0, 0, 0, 0.3));
+    animation: loadingContentFadeIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    min-width: 200px;
+}
+
+@keyframes loadingContentFadeIn {
+    from {
+        opacity: 0;
+        transform: scale(0.9) translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+.lockscreen-loading-spinner {
+    width: 48px;
+    height: 48px;
+    color: rgba(255, 255, 255, 0.9);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.3));
+}
+
+.lockscreen-loading-spinner svg {
+    width: 100%;
+    height: 100%;
+    animation: loadingSpinnerRotate 1.4s linear infinite;
+}
+
+@keyframes loadingSpinnerRotate {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.lockscreen-loading-text {
+    font-size: 16px;
+    font-weight: 400;
+    font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+    color: rgba(255, 255, 255, 0.9);
+    text-align: center;
+    text-shadow: 
+        0 2px 12px rgba(0, 0, 0, 0.7),
+        0 0 30px rgba(255, 255, 255, 0.1);
+    filter: drop-shadow(0 1px 4px rgba(0, 0, 0, 0.3));
+    letter-spacing: 0.3px;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+    .lockscreen-time {
+        font-size: 48px;
+    }
+    
+    .lockscreen-date {
+        font-size: 16px;
+    }
+    
+    .lockscreen-avatar {
+        width: 60px;
+        height: 60px;
+    }
+    
+    .lockscreen-avatar svg {
+        width: 36px;
+        height: 36px;
+    }
+    
+    .lockscreen-username {
+        font-size: 20px;
+    }
+    
+    .lockscreen-password-input {
+        width: 150px;
+    }
+    
+    .lockscreen-loading-content {
+        padding: 24px;
+        min-width: 160px;
+    }
+    
+    .lockscreen-loading-spinner {
+        width: 40px;
+        height: 40px;
+    }
+    
+    .lockscreen-loading-text {
+        font-size: 14px;
+    }
+}
+
 #kernel-content,
 .kernel-content {
     position: fixed;

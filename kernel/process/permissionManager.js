@@ -706,6 +706,22 @@ class PermissionManager {
             return false;
         }
         
+        // 检查用户控制：如果当前用户无法授权此权限，直接拒绝
+        if (typeof UserControl !== 'undefined') {
+            await UserControl._ensureInitialized();
+            if (!UserControl.canGrantPermission(permission)) {
+                const currentUser = UserControl.getCurrentUser() || '未知';
+                KernelLogger.warn("PermissionManager", 
+                    `用户 ${currentUser} 无法授权高风险权限: ${permission}`);
+                PermissionManager._logAudit(pid, permission, 'deny', false, level, { 
+                    reason: 'user_level_insufficient',
+                    currentUser: currentUser
+                });
+                PermissionManager._updatePermissionStats(permission, 'denied', true);
+                return false;
+            }
+        }
+        
         // 获取程序信息
         const processInfo = typeof ProcessManager !== 'undefined' 
             ? ProcessManager.PROCESS_TABLE.get(pid) 
@@ -809,10 +825,28 @@ class PermissionManager {
         // 创建权限信息
         const permInfo = document.createElement('div');
         permInfo.className = 'permission-dialog-permission';
+        
+        // 检查用户控制信息
+        let userControlInfo = '';
+        if (typeof UserControl !== 'undefined') {
+            const currentUser = UserControl.getCurrentUser() || '未知';
+            const userLevel = UserControl.getCurrentUserLevel();
+            const canGrant = UserControl.canGrantPermission(permission);
+            
+            if (canGrant) {
+                const levelText = userLevel === UserControl.USER_LEVEL.DEFAULT_ADMIN ? '默认管理员' :
+                                 userLevel === UserControl.USER_LEVEL.ADMIN ? '管理员' : '用户';
+                userControlInfo = `<div style="font-size: 12px; color: rgba(76, 175, 80, 0.8); margin-top: 8px;">当前用户: ${currentUser} (${levelText}) - 可以授权</div>`;
+            } else {
+                userControlInfo = `<div style="font-size: 12px; color: rgba(255, 95, 87, 0.8); margin-top: 8px;">⚠️ 当前用户: ${currentUser} (用户) - 无法授权高风险权限，需要管理员</div>`;
+            }
+        }
+        
         permInfo.innerHTML = `
             <div style="font-size: 14px; color: rgba(215, 224, 221, 0.6); margin-bottom: 8px;">请求权限</div>
             <div style="font-size: 16px; color: var(--theme-text, #d7e0dd); font-weight: 500;">${permissionInfo.name}</div>
             <div style="font-size: 13px; color: rgba(215, 224, 221, 0.5); margin-top: 8px; line-height: 1.5;">${permissionInfo.description}</div>
+            ${userControlInfo}
         `;
         
         // 创建级别标签

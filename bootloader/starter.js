@@ -77,10 +77,22 @@
             "../kernel/drive/LStorage.js"
         ],
         
-        // 第十一层：权限管理器（依赖进程管理器和本地存储管理器）
+        // 第十一层：用户控制系统（依赖本地存储管理器）
+        "../kernel/core/usercontrol/userControl.js": [
+            "../kernel/drive/LStorage.js"
+        ],
+        
+        // 第十一层：锁屏界面（依赖用户控制系统和本地存储管理器，高优先级）
+        "../system/ui/lockscreen.js": [
+            "../kernel/core/usercontrol/userControl.js",
+            "../kernel/drive/LStorage.js"
+        ],
+        
+        // 第十一层：权限管理器（依赖进程管理器、本地存储管理器和用户控制系统）
         "../kernel/process/permissionManager.js": [
             "../kernel/process/processManager.js",
-            "../kernel/drive/LStorage.js"
+            "../kernel/drive/LStorage.js",
+            "../kernel/core/usercontrol/userControl.js"
         ],
         
         // 第十二层：动画管理器（依赖动态模块管理器，用于管理 animate.css）
@@ -1281,45 +1293,45 @@
                 // 等待淡出完成后再隐藏
                 await new Promise(resolve => setTimeout(resolve, 800));
                 
-                // 隐藏加载界面，显示内核内容容器
+                // 隐藏加载界面
                 if (loadingEl) {
                     loadingEl.style.display = 'none';
                 }
+                
+                // 确保内核内容容器保持隐藏（等待锁屏界面和用户登录）
                 const contentEl = document.getElementById('kernel-content');
                 if (contentEl) {
-                    contentEl.style.display = 'flex';
-                    contentEl.style.opacity = '0';
-                    contentEl.style.transition = 'opacity 0.5s ease-in';
-                    // 触发重排以应用transition
-                    void contentEl.offsetWidth;
-                    contentEl.style.opacity = '1';
+                    contentEl.style.display = 'none';
                 }
                 
-                // 初始化任务栏（如果 TaskbarManager 已加载）
-                if (typeof TaskbarManager !== 'undefined' && typeof TaskbarManager.init === 'function') {
+                // 初始化锁屏界面（如果 LockScreen 已加载）
+                if (typeof LockScreen !== 'undefined' && typeof LockScreen.init === 'function') {
                     try {
-                        // 延迟初始化，确保所有程序都已启动
+                        KernelLogger.info("BootLoader", "内核加载完成，显示锁屏界面");
+                        // 延迟初始化锁屏界面，确保所有依赖已加载
                         setTimeout(() => {
-                            TaskbarManager.init();
-                        }, 500);
+                            LockScreen.init();
+                        }, 300);
                     } catch (e) {
-                        KernelLogger.warn("BootLoader", `任务栏初始化失败: ${e.message}`);
+                        KernelLogger.warn("BootLoader", `锁屏界面初始化失败: ${e.message}`);
+                        // 如果锁屏界面初始化失败，降级到直接显示桌面
+                        if (contentEl) {
+                            contentEl.style.display = 'flex';
+                            contentEl.style.opacity = '0';
+                            contentEl.style.transition = 'opacity 0.5s ease-in';
+                            void contentEl.offsetWidth;
+                            contentEl.style.opacity = '1';
+                        }
                     }
-                }
-                
-                // 初始化通知管理器（如果 NotificationManager 已加载）
-                if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.init === 'function') {
-                    try {
-                        // 延迟初始化，确保任务栏已初始化（通知管理器依赖任务栏位置）
-                        setTimeout(() => {
-                            NotificationManager.init().then(() => {
-                                KernelLogger.info("BootLoader", "通知管理器初始化完成");
-                            }).catch(e => {
-                                KernelLogger.warn("BootLoader", `通知管理器初始化失败: ${e.message}`);
-                            });
-                        }, 1000);
-                    } catch (e) {
-                        KernelLogger.warn("BootLoader", `通知管理器初始化失败: ${e.message}`);
+                } else {
+                    KernelLogger.warn("BootLoader", "LockScreen 未加载，直接显示桌面");
+                    // 如果锁屏界面未加载，直接显示桌面（降级方案）
+                    if (contentEl) {
+                        contentEl.style.display = 'flex';
+                        contentEl.style.opacity = '0';
+                        contentEl.style.transition = 'opacity 0.5s ease-in';
+                        void contentEl.offsetWidth;
+                        contentEl.style.opacity = '1';
                     }
                 }
             }

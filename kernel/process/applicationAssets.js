@@ -491,6 +491,23 @@ const APPLICATION_ASSETS = {
         }
     },
     
+    "settings": {
+        script: "D:/application/settings/settings.js",
+        styles: ["D:/application/settings/settings.css"],
+        icon: "D:/application/settings/settings.svg",
+        metadata: {
+            autoStart: false,
+            priority: 3,
+            description: "系统设置管理",
+            version: "1.0.0",
+            type: "GUI",
+            alwaysShowInTaskbar: false,
+            allowMultipleInstances: false,
+            supportsPreview: true,
+            category: "system"
+        }
+    },
+    
     "permissioncontrol": {
         script: "D:/application/permissioncontrol/permissioncontrol.js",
         styles: ["D:/application/permissioncontrol/permissioncontrol.css"],

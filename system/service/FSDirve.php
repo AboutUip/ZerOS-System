@@ -308,7 +308,7 @@ function createFile($path, $fileName, $content = '') {
 /**
  * 读取文件
  */
-function readFileContent($path, $fileName) {
+function readFileContent($path, $fileName, $asBase64 = false) {
     $dirPath = getDirPath($path);
     if (!$dirPath) {
         sendResponse(false, '无效的路径格式', null, 400);
@@ -332,11 +332,24 @@ function readFileContent($path, $fileName) {
         sendResponse(false, '文件读取失败', null, 500);
     }
     
+    // 检测文件类型，如果是二进制文件（图片等），自动使用base64编码
+    $fileExt = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
+    $imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'svg', 'ico'];
+    $isImage = in_array($fileExt, $imageExtensions);
+    
+    // 如果请求base64编码，或者是图片文件，则使用base64编码
+    $shouldEncodeBase64 = $asBase64 || $isImage;
+    
+    if ($shouldEncodeBase64) {
+        $content = base64_encode($content);
+    }
+    
     $fileInfo = [
         'path' => $path . '/' . $fileName,
         'fileName' => $fileName,
         'size' => filesize($filePath),
         'content' => $content,
+        'isBase64' => $shouldEncodeBase64,
         'modified' => date('Y-m-d H:i:s', filemtime($filePath)),
         'created' => date('Y-m-d H:i:s', filectime($filePath))
     ];
@@ -960,10 +973,11 @@ switch ($action) {
     case 'read_file':
         $path = $_GET['path'] ?? '';
         $fileName = $_GET['fileName'] ?? '';
+        $asBase64 = isset($_GET['asBase64']) && ($_GET['asBase64'] === 'true' || $_GET['asBase64'] === '1');
         if (empty($path) || empty($fileName)) {
             sendResponse(false, '缺少必要参数: path, fileName', null, 400);
         }
-        readFileContent($path, $fileName);
+        readFileContent($path, $fileName, $asBase64);
         break;
         
     case 'write_file':
