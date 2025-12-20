@@ -11,6 +11,9 @@
 - [ProcessManager.md](./ProcessManager.md) - 进程生命周期管理 ✅
 - [PermissionManager.md](./PermissionManager.md) - 权限管理 ✅
 
+### 用户控制
+- [UserControl.md](./UserControl.md) - 用户控制系统 ✅
+
 ### 内存管理
 - [MemoryManager.md](./MemoryManager.md) - 统一内存管理器 ✅
 - [KernelMemory.md](./KernelMemory.md) - 内核动态数据存储（Exploit 程序内存管理） ✅
@@ -23,6 +26,7 @@
 - [EventManager.md](./EventManager.md) - 事件管理 ✅
 - [ContextMenuManager.md](./ContextMenuManager.md) - 上下文菜单管理 ✅
 - [DesktopManager.md](./DesktopManager.md) - 桌面管理 ✅
+- [LockScreen.md](./LockScreen.md) - 锁屏界面 ✅
 
 ### 文件系统
 - [Disk.md](./Disk.md) - 虚拟磁盘管理 ✅
@@ -83,6 +87,10 @@
 - EventManager
 - ContextMenuManager
 - DesktopManager
+- LockScreen
+
+**用户控制**
+- UserControl
 
 **文件系统**
 - Disk

@@ -41,8 +41,22 @@ ZerOS 程序开发遵循以下核心思维：
    - 特殊权限首次使用时需要用户确认，用户允许后会被持久化保存
    - 权限管理系统提供完整的审计和统计功能
    - 支持程序黑名单和白名单管理
+   - **用户级别控制**: 系统支持三种用户级别（普通用户、管理员、默认管理员），普通用户无法授权高风险权限（如加密相关权限）
 
-4. **模块化设计**
+4. **用户控制系统**
+   - 系统支持多用户管理，每个用户有独立的级别、密码和头像
+   - 默认管理员 `root` 拥有系统最高权限
+   - 用户密码使用 MD5 加密存储
+   - 用户头像存储在 `D:/cache/` 目录
+   - 通过 `UserControl` API 进行用户管理
+
+5. **锁屏界面**
+   - 系统启动时显示 Windows 11 风格的锁屏界面
+   - 支持密码验证和用户切换
+   - 可通过 `Ctrl + L` 快捷键手动锁定屏幕
+   - 锁屏背景从 `system/assets/start/` 目录随机选择
+
+6. **模块化设计**
    - 程序应该独立、可复用
    - 通过 POOL 共享空间进行程序间通信
    - 使用主题变量确保 UI 一致性
@@ -738,6 +752,127 @@ __init__: async function(pid, initArgs) {
 ```
 
 ---
+
+## 用户控制系统
+
+ZerOS 提供了完整的用户控制系统，支持多用户管理、权限级别控制和用户认证。
+
+### 用户级别
+
+系统支持三种用户级别：
+
+- **USER** (`UserControl.USER_LEVEL.USER`): 普通用户，无法授权高风险权限
+- **ADMIN** (`UserControl.USER_LEVEL.ADMIN`): 管理员，拥有完全控制权限
+- **DEFAULT_ADMIN** (`UserControl.USER_LEVEL.DEFAULT_ADMIN`): 默认管理员（系统最高权限），默认用户名为 `root`
+
+### 用户管理
+
+#### 获取当前用户信息
+
+```javascript
+// 获取当前登录的用户名
+const currentUser = UserControl.getCurrentUser();
+
+// 获取当前用户的级别
+const level = UserControl.getCurrentUserLevel();
+
+// 检查是否为管理员
+if (UserControl.isAdmin()) {
+    console.log('当前用户是管理员');
+}
+```
+
+#### 用户登录
+
+```javascript
+// 无密码用户登录
+const success = await UserControl.login('root');
+
+// 有密码用户登录
+const success = await UserControl.login('TestUser', 'password123');
+```
+
+#### 密码管理
+
+```javascript
+// 检查用户是否有密码
+const hasPassword = UserControl.hasPassword('TestUser');
+
+// 设置用户密码（管理员可以设置任何用户的密码）
+await UserControl.setPassword('TestUser', 'newpassword123');
+
+// 非管理员用户修改自己的密码（需要提供当前密码）
+await UserControl.setPassword('TestUser', 'newpassword123', 'oldpassword');
+```
+
+#### 头像管理
+
+```javascript
+// 设置用户头像（头像文件应已存在于 D:/cache/ 目录）
+await UserControl.setAvatar('root', 'avatar_root_1234567890.jpg');
+
+// 获取用户头像路径
+const avatarPath = UserControl.getAvatarPath('root');
+```
+
+#### 用户列表
+
+```javascript
+// 列出所有用户
+const users = UserControl.listUsers();
+console.log('所有用户:', users);
+// [
+//   { username: 'root', level: 'DEFAULT_ADMIN', hasPassword: false, avatar: null },
+//   { username: 'TestUser', level: 'USER', hasPassword: true, avatar: 'avatar_TestUser_1234567890.jpg' }
+// ]
+```
+
+### 权限控制
+
+普通用户无法授权高风险权限（如加密相关权限），只有管理员可以授权所有权限：
+
+```javascript
+// 检查权限是否为高风险权限
+const isHighRisk = UserControl.isHighRiskPermission('CRYPT_GENERATE_KEY');
+
+// 检查用户级别是否可以授权指定级别的权限
+const canGrant = UserControl.canGrantPermission(
+    UserControl.USER_LEVEL.USER,
+    'DANGEROUS'
+);
+```
+
+### 锁屏界面
+
+系统启动时会显示 Windows 11 风格的锁屏界面，用户需要登录后才能进入桌面。
+
+#### 手动锁定屏幕
+
+可以通过 `Ctrl + L` 快捷键手动锁定屏幕：
+
+```javascript
+// 手动锁定屏幕（内部方法，通常通过快捷键调用）
+TaskbarManager._lockScreen();
+```
+
+#### 锁屏功能特性
+
+- **随机背景**: 从 `system/assets/start/` 目录随机选择背景图片
+- **时间显示**: 左上角显示当前时间和日期
+- **用户信息**: 中央显示用户头像和用户名
+- **密码验证**: 如果用户有密码，需要输入正确密码才能登录
+- **用户切换**: 点击用户头像可以切换显示的用户
+- **加载动画**: 在登录过程中显示加载蒙版
+
+### 设置程序
+
+系统提供了内置的"设置"程序（可通过 `Ctrl + X` 快捷键启动），支持：
+
+- **用户管理**: 更新用户头像、重命名用户、设置用户密码
+- **主题管理**: 切换系统主题和桌面背景
+- **扩展性**: 支持动态注册设置分类和设置项
+
+设置程序使用 Windows 10 风格的 UI，并自动适配主题切换。
 
 ## 主题与样式
 

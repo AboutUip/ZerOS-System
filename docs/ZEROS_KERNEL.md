@@ -38,6 +38,9 @@ ZerOS/
 │   │   ├── applicationAssetManager.js # 应用程序资源管理
 │   │   ├── applicationAssets.js # 应用程序资源映射
 │   │   └── programCategories.js # 程序分类
+│   ├── core/              # 核心模块
+│   │   └── usercontrol/  # 用户控制
+│   │       └── userControl.js # 用户控制系统
 │   ├── drive/             # 驱动层
 │   │   ├── animateManager.js # 动画管理
 │   │   ├── networkManager.js # 网络管理
@@ -76,7 +79,8 @@ ZerOS/
 │   │   ├── notificationManager.js # 通知管理
 │   │   ├── eventManager.js # 事件管理
 │   │   ├── contextMenuManager.js # 上下文菜单管理
-│   │   └── desktop.js     # 桌面管理
+│   │   ├── desktop.js     # 桌面管理
+│   │   └── lockscreen.js  # 锁屏界面
 │   └── assets/            # 资源文件
 │       └── assets/        # 资源子目录
 │           ├── icons/     # 图标资源
@@ -86,11 +90,15 @@ ZerOS/
 │           │   ├── material/ # Material 风格图标
 │           │   ├── ubuntu/ # Ubuntu 风格图标
 │           │   └── windows/ # Windows 风格图标
-│           └── desktopBG/ # 桌面背景
-│               ├── default.svg
-│               ├── cosmic.svg
-│               ├── cyberpunk.svg
-│               └── ...
+│           ├── desktopBG/ # 桌面背景
+│           │   ├── default.svg
+│           │   ├── cosmic.svg
+│           │   ├── cyberpunk.svg
+│           │   └── ...
+│           └── start/     # 锁屏背景
+│               ├── bg1.jpg
+│               ├── bg2.jpg
+│               └── bg3.jpg
 ├── bootloader/            # 启动引导
 │   └── starter.js        # 启动器
 ├── test/                  # 测试和界面
@@ -117,8 +125,11 @@ ZerOS/
 8. **通知管理器初始化**：初始化 `NotificationManager`，建立通知系统
 9. **任务栏管理器初始化**：初始化 `TaskbarManager`，建立任务栏界面
 10. **文件系统初始化**：初始化磁盘分区（C:、D:）
-11. **自动启动程序**：启动标记为 `autoStart: true` 的程序（如终端程序）
-12. **终端启动**：创建终端界面，加载用户数据
+11. **用户控制系统初始化**：初始化 `UserControl`，加载用户数据并创建默认用户
+12. **锁屏界面初始化**：初始化 `LockScreen`，显示锁屏界面
+13. **用户登录**：用户在锁屏界面输入密码登录
+14. **桌面显示**：登录成功后显示系统桌面，初始化任务栏和通知管理器
+15. **自动启动程序**：启动标记为 `autoStart: true` 的程序（如终端程序）
 
 ---
 
@@ -398,6 +409,63 @@ ZerOS 提供了多个系统级驱动，扩展内核功能：
 - [DragDrive API](API/DragDrive.md)
 - [GeographyDrive API](API/GeographyDrive.md)
 - [CryptDrive API](API/CryptDrive.md)
+
+### 7. 用户控制系统 (UserControl)
+
+统一的多用户管理系统，支持用户级别控制、密码管理和权限授权控制。
+
+**特性**：
+- 三种用户级别：普通用户（USER）、管理员（ADMIN）、默认管理员（DEFAULT_ADMIN）
+- 密码管理：MD5 加密存储，支持设置和移除密码
+- 头像管理：用户头像存储在 `D:/cache/` 目录
+- 权限控制：普通用户无法授权高风险权限（如加密相关权限）
+- 数据持久化：用户数据存储在 `LStorage` 的 `userControl.users` 键中
+
+**默认用户**：
+- `root`：默认管理员，无密码
+- `TestUser`：测试用户，无密码
+
+**使用示例**：
+```javascript
+// 登录用户
+await UserControl.login('root');
+
+// 检查用户级别
+if (UserControl.isAdmin()) {
+    console.log('当前用户是管理员');
+}
+
+// 设置用户密码
+await UserControl.setPassword('TestUser', 'password123');
+```
+
+详细 API 文档请参考 [UserControl API](API/UserControl.md)
+
+### 8. 锁屏界面 (LockScreen)
+
+Windows 11 风格的登录界面，负责系统启动时的用户认证。
+
+**特性**：
+- 随机背景：从 `system/assets/start/` 目录随机选择背景图片
+- 时间显示：左上角显示当前时间和日期
+- 用户信息：中央显示用户头像和用户名
+- 密码验证：如果用户有密码，需要输入正确密码才能登录
+- 用户切换：点击用户头像可以切换显示的用户
+- 加载动画：在登录过程中显示加载蒙版
+
+**快捷键**：
+- `Ctrl + L`：手动锁定屏幕
+
+**使用示例**：
+```javascript
+// 初始化锁屏界面
+LockScreen.init();
+
+// 手动锁定屏幕（通过 TaskbarManager）
+TaskbarManager._lockScreen();
+```
+
+详细 API 文档请参考 [LockScreen API](API/LockScreen.md)
 
 ---
 

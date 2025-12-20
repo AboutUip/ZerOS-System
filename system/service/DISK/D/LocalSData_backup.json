@@ -5,10 +5,6 @@
         "GUI_WINDOW_CREATE",
         "EVENT_LISTENER",
         "SYSTEM_NOTIFICATION"
-      ],
-      "10006": [
-        "GUI_WINDOW_CREATE",
-        "EVENT_LISTENER"
       ]
     },
     "system.style": "macos",
