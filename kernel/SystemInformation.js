@@ -5,10 +5,10 @@ KernelLogger.info("SystemInformation", "模块初始化");
 
 class SystemInformation {
     // 系统版本
-    static SYSTEM_VERSION = '0.4.8';
+    static SYSTEM_VERSION = '0.5.1';
     
     // 内核版本
-    static KERNEL_VERSION = '0.5.4';
+    static KERNEL_VERSION = '0.5.7';
     
     // 构建日期
     static BUILD_DATE = new Date('2024-11-28');
@@ -32,8 +32,8 @@ class SystemInformation {
             name: '默默'
         },
         {
-            organization: 'Open AI',
-            role: 'AI 模型',
+            organization: 'AI模型',
+            role: 'AI',
             name: 'Gemini 3 Pro'
         }
     ];

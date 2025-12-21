@@ -65,6 +65,7 @@
 | [ContextMenuManager](./API/ContextMenuManager.md) | 右键菜单管理 | ✅ |
 | [NotificationManager](./API/NotificationManager.md) | 系统通知管理 | ✅ |
 | [ThemeManager](./API/ThemeManager.md) | 主题和风格系统 | ✅ |
+| [LockScreen](./API/LockScreen.md) | 锁屏界面（Windows 11 风格登录界面） | ✅ |
 
 #### 🔐 安全与加密 API
 
@@ -88,6 +89,7 @@
 | [Pool](./API/Pool.md) | 程序间数据共享 | ✅ |
 | [DependencyConfig](./API/DependencyConfig.md) | 模块依赖管理 | ✅ |
 | [Starter](./API/Starter.md) | 系统启动和初始化 | ✅ |
+| [UserControl](./API/UserControl.md) | 用户控制系统（多用户管理、权限控制） | ✅ |
 
 #### 🚀 高级驱动 API
 
@@ -96,6 +98,7 @@
 | [CompressionDrive](./API/CompressionDrive.md) | ZIP/RAR 压缩解压缩 | ✅ |
 | [DragDrive](./API/DragDrive.md) | 文件拖拽处理 | ✅ |
 | [GeographyDrive](./API/GeographyDrive.md) | 地理位置相关功能 | ✅ |
+| [SpeechDrive](./API/SpeechDrive.md) | 语音识别驱动（基于 Web Speech API） | ✅ |
 | [MultithreadingDrive](./API/MultithreadingDrive.md) | 并发处理 | ✅ |
 
 ---

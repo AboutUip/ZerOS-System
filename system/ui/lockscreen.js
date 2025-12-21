@@ -26,7 +26,7 @@ KernelLogger.info("LockScreen", "模块初始化");
         /**
          * 初始化锁屏界面
          */
-        static init() {
+        static async init() {
             if (LockScreen._initialized) {
                 KernelLogger.debug("LockScreen", "锁屏界面已初始化，跳过重复初始化");
                 return;
@@ -40,11 +40,11 @@ KernelLogger.info("LockScreen", "模块初始化");
             LockScreen.container.id = 'lockscreen';
             LockScreen.container.className = 'lockscreen';
             
-            // 设置随机背景
-            LockScreen._setRandomBackground();
+            // 设置背景（根据设置决定是否随机）
+            await LockScreen._setBackground();
             
             // 创建锁屏内容
-            LockScreen._createLockScreenContent();
+            await LockScreen._createLockScreenContent();
             
             // 添加到页面
             document.body.appendChild(LockScreen.container);
@@ -56,29 +56,294 @@ KernelLogger.info("LockScreen", "模块初始化");
             LockScreen._updateTime();
             LockScreen._updateUserInfo();
             setInterval(() => LockScreen._updateTime(), 1000);
+            
+            // 预加载下一次的每日一言（系统启动时）
+            LockScreen._preloadNextDailyQuote().catch(err => {
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.debug('LockScreen', `预加载每日一言失败: ${err.message}`);
+                }
+            });
         }
         
         /**
-         * 设置随机背景
+         * 设置背景（根据设置决定是否随机）
+         */
+        static async _setBackground() {
+            let bgPath = null;
+            
+            // 检查是否启用随机背景
+            if (typeof LStorage !== 'undefined') {
+                try {
+                    const randomBgEnabled = await LStorage.getSystemStorage('system.lockscreenRandomBg');
+                    if (randomBgEnabled !== false) {
+                        // 启用随机背景
+                        const backgrounds = ['bg1.jpg', 'bg2.jpg', 'bg3.jpg'];
+                        const randomBg = backgrounds[Math.floor(Math.random() * backgrounds.length)];
+                        bgPath = `/system/assets/start/${randomBg}`;
+                    } else {
+                        // 使用固定背景
+                        const savedBg = await LStorage.getSystemStorage('system.lockscreenBackground');
+                        if (savedBg) {
+                            // 检查是否是本地路径，如果是则转换为 PHP 服务路径
+                            if (savedBg.startsWith('C:') || savedBg.startsWith('D:')) {
+                                // 转换为 PHP 服务 URL
+                                if (savedBg.startsWith('C:')) {
+                                    bgPath = '/system/service/DISK/C' + savedBg.substring(2).replace(/\\/g, '/');
+                                } else if (savedBg.startsWith('D:')) {
+                                    bgPath = '/system/service/DISK/D' + savedBg.substring(2).replace(/\\/g, '/');
+                                }
+                            } else {
+                                // 已经是网络路径或服务路径，直接使用
+                                bgPath = savedBg;
+                            }
+                        } else {
+                            // 默认背景
+                            bgPath = `/system/assets/start/bg1.jpg`;
+                        }
+                    }
+                } catch (e) {
+                    // 如果读取失败，使用默认随机背景
+                    const backgrounds = ['bg1.jpg', 'bg2.jpg', 'bg3.jpg'];
+                    const randomBg = backgrounds[Math.floor(Math.random() * backgrounds.length)];
+                    bgPath = `/system/assets/start/${randomBg}`;
+                }
+            } else {
+                // LStorage 不可用，使用默认随机背景
+                const backgrounds = ['bg1.jpg', 'bg2.jpg', 'bg3.jpg'];
+                const randomBg = backgrounds[Math.floor(Math.random() * backgrounds.length)];
+                bgPath = `/system/assets/start/${randomBg}`;
+            }
+            
+            if (bgPath && LockScreen.container) {
+                LockScreen.container.style.backgroundImage = `url(${bgPath})`;
+                LockScreen.container.style.backgroundSize = 'cover';
+                LockScreen.container.style.backgroundPosition = 'center';
+                LockScreen.container.style.backgroundRepeat = 'no-repeat';
+            }
+        }
+        
+        /**
+         * 设置随机背景（保持向后兼容）
          */
         static _setRandomBackground() {
-            const backgrounds = ['bg1.jpg', 'bg2.jpg', 'bg3.jpg'];
-            const randomBg = backgrounds[Math.floor(Math.random() * backgrounds.length)];
-            const bgPath = `/system/assets/start/${randomBg}`;
-            
-            LockScreen.container.style.backgroundImage = `url(${bgPath})`;
-            LockScreen.container.style.backgroundSize = 'cover';
-            LockScreen.container.style.backgroundPosition = 'center';
-            LockScreen.container.style.backgroundRepeat = 'no-repeat';
+            LockScreen._setBackground();
+        }
+        
+        /**
+         * 加载每日一言（从缓存读取，使用后删除）
+         */
+        static async _loadDailyQuote() {
+            try {
+                const quoteText = document.getElementById('lockscreen-daily-quote-text');
+                if (!quoteText) {
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.debug('LockScreen', '每日一言文本元素不存在，可能容器还未添加到DOM');
+                    }
+                    return;
+                }
+                
+                // 检查每日一言组件是否启用
+                let dailyQuoteEnabled = true; // 默认启用
+                if (typeof LStorage !== 'undefined') {
+                    try {
+                        const enabled = await LStorage.getSystemStorage('system.lockscreenDailyQuote');
+                        dailyQuoteEnabled = enabled !== false; // 默认启用
+                    } catch (e) {
+                        // 读取失败，使用默认值
+                    }
+                }
+                
+                if (!dailyQuoteEnabled) {
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.debug('LockScreen', '每日一言组件已禁用');
+                    }
+                    return;
+                }
+                
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.debug('LockScreen', '开始加载每日一言');
+                }
+                
+                // 从缓存读取每日一言
+                let quote = null;
+                if (typeof ProcessManager !== 'undefined') {
+                    try {
+                        // 使用系统缓存，使用 EXPLOIT_PID 作为系统进程PID
+                        // options 中不指定 pid，让 CacheDrive 识别为系统缓存
+                        const systemPid = ProcessManager.EXPLOIT_PID || 10000;
+                        quote = await ProcessManager.callKernelAPI(
+                            systemPid,
+                            'Cache.get',
+                            ['system.dailyQuote', null, {}]
+                        );
+                    } catch (e) {
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.debug('LockScreen', `读取每日一言缓存失败: ${e.message}`);
+                        }
+                    }
+                }
+                
+                // 如果缓存存在，使用缓存并删除
+                if (quote && typeof quote === 'string' && quote.trim()) {
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.debug('LockScreen', '从缓存读取每日一言成功');
+                    }
+                    quoteText.textContent = quote.trim();
+                    
+                    // 使用后删除缓存
+                    if (typeof ProcessManager !== 'undefined') {
+                        try {
+                            const systemPid = ProcessManager.EXPLOIT_PID || 10000;
+                            await ProcessManager.callKernelAPI(
+                                systemPid,
+                                'Cache.delete',
+                                ['system.dailyQuote', {}]
+                            );
+                        } catch (e) {
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.debug('LockScreen', `删除每日一言缓存失败: ${e.message}`);
+                            }
+                        }
+                    }
+                    
+                    // 立即预加载下一次的每日一言
+                    LockScreen._preloadNextDailyQuote().catch(err => {
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.debug('LockScreen', `预加载下一次每日一言失败: ${err.message}`);
+                        }
+                    });
+                } else {
+                    // 缓存不存在，从API获取
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.debug('LockScreen', '缓存不存在，从API获取每日一言');
+                    }
+                    const response = await fetch('https://api-v1.cenguigui.cn/api/yiyan2/');
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}`);
+                    }
+                    
+                    const apiQuote = await response.text();
+                    if (apiQuote && apiQuote.trim()) {
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.debug('LockScreen', '从API获取每日一言成功');
+                        }
+                        quoteText.textContent = apiQuote.trim();
+                    } else {
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.debug('LockScreen', 'API返回空内容，使用默认文本');
+                        }
+                        quoteText.textContent = '简单就是幸福，幸福却不简单。';
+                    }
+                    
+                    // 获取后立即预加载下一次的每日一言
+                    LockScreen._preloadNextDailyQuote().catch(err => {
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.debug('LockScreen', `预加载下一次每日一言失败: ${err.message}`);
+                        }
+                    });
+                }
+            } catch (error) {
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.warn('LockScreen', `加载每日一言失败: ${error.message}`, error);
+                }
+                const quoteText = document.getElementById('lockscreen-daily-quote-text');
+                if (quoteText) {
+                    quoteText.textContent = '简单就是幸福，幸福却不简单。';
+                } else {
+                    // 如果元素不存在，尝试重新查找（可能容器还未添加到DOM）
+                    setTimeout(() => {
+                        const retryText = document.getElementById('lockscreen-daily-quote-text');
+                        if (retryText) {
+                            retryText.textContent = '简单就是幸福，幸福却不简单。';
+                        }
+                    }, 500);
+                }
+            }
+        }
+        
+        /**
+         * 预加载下一次的每日一言（系统启动时调用）
+         */
+        static async _preloadNextDailyQuote() {
+            try {
+                // 检查缓存是否已存在
+                if (typeof ProcessManager !== 'undefined') {
+                    try {
+                        const systemPid = ProcessManager.EXPLOIT_PID || 10000;
+                        const cached = await ProcessManager.callKernelAPI(
+                            systemPid,
+                            'Cache.has',
+                            ['system.dailyQuote', {}]
+                        );
+                        
+                        // 如果缓存已存在，不需要重新获取
+                        if (cached) {
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.debug('LockScreen', '每日一言缓存已存在，跳过预加载');
+                            }
+                            return;
+                        }
+                    } catch (e) {
+                        // 检查失败，继续获取
+                    }
+                }
+                
+                // 从API获取下一次的每日一言并缓存
+                const response = await fetch('https://api-v1.cenguigui.cn/api/yiyan2/');
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                
+                const quote = await response.text();
+                if (quote && quote.trim()) {
+                    // 缓存到系统缓存（永不过期，直到使用后删除）
+                    if (typeof ProcessManager !== 'undefined') {
+                        try {
+                            const systemPid = ProcessManager.EXPLOIT_PID || 10000;
+                            await ProcessManager.callKernelAPI(
+                                systemPid,
+                                'Cache.set',
+                                ['system.dailyQuote', quote.trim(), { ttl: 0 }]
+                            );
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.debug('LockScreen', '每日一言预加载成功');
+                            }
+                        } catch (e) {
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.warn('LockScreen', `缓存每日一言失败: ${e.message}`);
+                            }
+                        }
+                    }
+                }
+            } catch (error) {
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.warn('LockScreen', `预加载每日一言失败: ${error.message}`);
+                }
+            }
         }
         
         /**
          * 创建锁屏内容
          */
-        static _createLockScreenContent() {
+        static async _createLockScreenContent() {
             // 时间显示区域（左上角）
             const timeContainer = document.createElement('div');
             timeContainer.className = 'lockscreen-time-container';
+            
+            // 检查时间组件是否启用
+            let timeComponentEnabled = true; // 默认启用
+            if (typeof LStorage !== 'undefined') {
+                try {
+                    const enabled = await LStorage.getSystemStorage('system.lockscreenTimeComponent');
+                    timeComponentEnabled = enabled !== false; // 默认启用
+                } catch (e) {
+                    // 读取失败，使用默认值
+                }
+            }
+            
+            if (!timeComponentEnabled) {
+                timeContainer.style.display = 'none';
+            }
             
             const timeDisplay = document.createElement('div');
             timeDisplay.className = 'lockscreen-time';
@@ -93,6 +358,86 @@ KernelLogger.info("LockScreen", "模块初始化");
             timeContainer.appendChild(timeDisplay);
             timeContainer.appendChild(dateDisplay);
             LockScreen.container.appendChild(timeContainer);
+            
+            // 每日一言显示区域（右上角）
+            const quoteContainer = document.createElement('div');
+            quoteContainer.className = 'lockscreen-daily-quote-container';
+            
+            // 检查每日一言组件是否启用
+            let dailyQuoteEnabled = true; // 默认启用
+            if (typeof LStorage !== 'undefined') {
+                try {
+                    const enabled = await LStorage.getSystemStorage('system.lockscreenDailyQuote');
+                    dailyQuoteEnabled = enabled !== false; // 默认启用
+                } catch (e) {
+                    // 读取失败，使用默认值
+                }
+            }
+            
+            quoteContainer.style.cssText = `
+                position: absolute;
+                top: 20px;
+                right: 20px;
+                max-width: 400px;
+                padding: 16px 20px;
+                background: rgba(0, 0, 0, 0.3);
+                backdrop-filter: blur(10px);
+                border-radius: 12px;
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                color: rgba(255, 255, 255, 0.9);
+                font-size: 14px;
+                line-height: 1.6;
+                text-align: right;
+                display: ${dailyQuoteEnabled ? 'flex' : 'none'};
+                flex-direction: column;
+                align-items: flex-end;
+                gap: 8px;
+                z-index: 10;
+            `;
+            
+            if (!dailyQuoteEnabled) {
+                quoteContainer.style.display = 'none';
+            }
+            
+            const quoteIcon = document.createElement('div');
+            quoteIcon.style.cssText = `
+                font-size: 18px;
+                opacity: 0.8;
+            `;
+            quoteIcon.textContent = '💬';
+            quoteContainer.appendChild(quoteIcon);
+            
+            const quoteText = document.createElement('div');
+            quoteText.className = 'lockscreen-daily-quote-text';
+            quoteText.id = 'lockscreen-daily-quote-text';
+            quoteText.style.cssText = `
+                font-weight: 400;
+                word-wrap: break-word;
+                word-break: break-all;
+            `;
+            quoteText.textContent = '加载中...';
+            quoteContainer.appendChild(quoteText);
+            
+            LockScreen.container.appendChild(quoteContainer);
+            
+            // 加载每日一言（延迟执行，确保容器已添加到DOM）
+            if (dailyQuoteEnabled) {
+                // 使用 setTimeout 确保容器已添加到 DOM
+                setTimeout(async () => {
+                    try {
+                        await LockScreen._loadDailyQuote();
+                    } catch (err) {
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('LockScreen', `加载每日一言时出错: ${err.message}`);
+                        }
+                        // 即使出错也显示默认文本
+                        const textEl = document.getElementById('lockscreen-daily-quote-text');
+                        if (textEl) {
+                            textEl.textContent = '简单就是幸福，幸福却不简单。';
+                        }
+                    }
+                }, 200);
+            }
             
             // 用户登录区域（居中偏下）
             const loginContainer = document.createElement('div');
@@ -1088,8 +1433,8 @@ KernelLogger.info("LockScreen", "模块初始化");
                     LockScreen._checkInterval = null;
                 }
                 
-                setTimeout(() => {
-                    LockScreen.init();
+                setTimeout(async () => {
+                    await LockScreen.init();
                 }, 500);
                 return true;
             }
@@ -1145,8 +1490,8 @@ KernelLogger.info("LockScreen", "模块初始化");
             // BootLoader 应该已经调用了 LockScreen.init()，这里只作为降级方案
             if (!LockScreen._initialized && !document.getElementById('lockscreen')) {
                 KernelLogger.debug("LockScreen", "通过 kernelBootComplete 事件初始化锁屏界面（降级方案）");
-                setTimeout(() => {
-                    LockScreen.init();
+                setTimeout(async () => {
+                    await LockScreen.init();
                 }, 300);
             }
         }, { once: true });

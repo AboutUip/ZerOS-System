@@ -401,6 +401,24 @@ ThemeManager 会在 `:root` 上设置 CSS 变量，程序可以通过这些变�
 - `windows` - Windows 风格
 - `macos` - macOS 风格
 
+## 锁屏背景管理
+
+锁屏背景管理功能通过主题管理器程序（ThemeAnimator）提供，支持以下功能：
+
+- **随机锁屏壁纸开关**：启用/禁用随机背景功能
+- **自定义锁屏背景**：用户可以选择固定锁屏背景，独立于桌面背景管理
+- **发送到锁屏背景**：从桌面背景页面可以发送背景到锁屏，自动去重
+- **锁屏背景删除**：支持删除发送过来的锁屏背景（默认背景不可删除）
+
+**存储键**：
+- `system.lockscreenRandomBg`：是否启用随机锁屏壁纸（默认 `true`）
+- `system.lockscreenBackground`：自定义锁屏背景路径
+- `system.lockscreenTimeComponent`：是否显示时间组件（默认 `true`）
+- `system.lockscreenDailyQuote`：是否显示每日一言组件（默认 `true`）
+
+**相关文档**：
+- [LockScreen.md](./LockScreen.md) - 锁屏界面 API
+
 ## 注意事项
 
 1. **初始化**: 主题管理器在系统启动时自动初始化，通常不需要手动调用 `init()`
@@ -408,10 +426,12 @@ ThemeManager 会在 `:root` 上设置 CSS 变量，程序可以通过这些变�
 3. **CSS 变量**: 主题变更时会自动更新 CSS 变量，程序无需手动处理
 4. **自定义主题**: 注册自定义主题后，需要通过系统设置来应用
 5. **桌面背景**: 桌面背景图设置会自动保存和应用
+6. **锁屏背景**: 锁屏背景管理通过主题管理器程序进行，锁屏背景独立于桌面背景存储
 
 ## 相关文档
 
 - [ZEROS_KERNEL.md](../ZEROS_KERNEL.md) - 内核概述
 - [DEVELOPER_GUIDE.md](../DEVELOPER_GUIDE.md) - 开发者指南
-- [LStorage.md](./LStorage.md) - 本地存储 API（待创建）
+- [LockScreen.md](./LockScreen.md) - 锁屏界面 API
+- [LStorage.md](./LStorage.md) - 本地存储 API
 

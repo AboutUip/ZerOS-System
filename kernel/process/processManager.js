@@ -855,8 +855,38 @@ class ProcessManager {
         if (!allowMultipleInstances) {
             for (const [pid, processInfo] of ProcessManager.PROCESS_TABLE) {
                 if (processInfo.programName === programName && processInfo.status === 'running') {
-                    ProcessManager._log(1, `程序 ${programName} 已在运行 (PID: ${pid})，且不支持多开`);
-                    throw new Error(`Program ${programName} is already running (PID: ${pid}) and does not support multiple instances`);
+                    ProcessManager._log(2, `程序 ${programName} 已在运行 (PID: ${pid})，且不支持多开，聚焦现有窗口`);
+                    
+                    // 聚焦到现有程序的窗口
+                    if (typeof GUIManager !== 'undefined') {
+                        try {
+                            const windows = GUIManager.getWindowsByPid(pid);
+                            if (windows && windows.length > 0) {
+                                // 获取主窗口或第一个窗口
+                                const mainWindow = windows.find(w => w.isMainWindow) || windows[0];
+                                if (mainWindow) {
+                                    // 如果窗口已最小化，先恢复
+                                    if (mainWindow.isMinimized) {
+                                        GUIManager.restoreWindow(mainWindow.windowId, true);
+                                    } else {
+                                        // 聚焦窗口
+                                        GUIManager.focusWindow(mainWindow.windowId);
+                                    }
+                                } else {
+                                    // 如果没有找到窗口，尝试通过 PID 聚焦
+                                    GUIManager.focusWindow(pid);
+                                }
+                            } else {
+                                // 如果没有窗口，尝试通过 PID 聚焦
+                                GUIManager.focusWindow(pid);
+                            }
+                        } catch (e) {
+                            ProcessManager._log(1, `聚焦程序 ${programName} (PID: ${pid}) 的窗口失败: ${e.message}`);
+                        }
+                    }
+                    
+                    // 返回现有进程的 PID，而不是抛出错误
+                    return pid;
                 }
             }
         } else {

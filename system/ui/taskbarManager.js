@@ -579,7 +579,7 @@ class TaskbarManager {
     /**
      * 锁定屏幕
      */
-    static _lockScreen() {
+    static async _lockScreen() {
         try {
             // 隐藏桌面内容
             const kernelContent = document.getElementById('kernel-content');
@@ -620,8 +620,17 @@ class TaskbarManager {
                     }
                 });
                 
-                // 重新设置随机背景
-                LockScreen._setRandomBackground();
+                // 刷新每日一言
+                if (typeof LockScreen._loadDailyQuote === 'function') {
+                    LockScreen._loadDailyQuote().catch(err => {
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.debug('TaskbarManager', `刷新每日一言失败: ${err.message}`);
+                        }
+                    });
+                }
+                
+                // 重新设置背景（根据设置决定是否随机）
+                LockScreen._setBackground();
                 
                 // 重置密码输入状态
                 if (LockScreen.passwordInput) {
@@ -647,7 +656,7 @@ class TaskbarManager {
                     // 容器已从DOM移除，重置初始化状态以允许重新初始化
                     LockScreen._initialized = false;
                 }
-                LockScreen.init();
+                await LockScreen.init();
                 KernelLogger.info("TaskbarManager", "锁屏界面已初始化并显示");
             }
         } catch (error) {

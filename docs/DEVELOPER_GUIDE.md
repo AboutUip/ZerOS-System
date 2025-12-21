@@ -857,12 +857,70 @@ TaskbarManager._lockScreen();
 
 #### 锁屏功能特性
 
-- **随机背景**: 从 `system/assets/start/` 目录随机选择背景图片
-- **时间显示**: 左上角显示当前时间和日期
+- **锁屏背景管理**:
+  - **随机锁屏壁纸**: 从 `system/assets/start/` 目录随机选择背景图片（可开关）
+  - **自定义锁屏背景**: 支持用户选择固定锁屏背景，独立于桌面背景管理
+  - **发送到锁屏背景**: 从桌面背景页面可以发送背景到锁屏，自动去重
+  - **锁屏背景删除**: 支持删除发送过来的锁屏背景（默认背景不可删除）
+- **时间组件**: 左上角显示当前时间和日期，可开关控制（默认启用）
+- **每日一言组件**: 显示每日励志语句，智能缓存管理，可开关控制（默认启用）
 - **用户信息**: 中央显示用户头像和用户名
 - **密码验证**: 如果用户有密码，需要输入正确密码才能登录
 - **用户切换**: 点击用户头像可以切换显示的用户
 - **加载动画**: 在登录过程中显示加载蒙版
+
+#### 锁屏设置存储
+
+锁屏相关设置存储在 LStorage 中：
+
+```javascript
+// 随机锁屏壁纸开关
+system.lockscreenRandomBg: boolean  // 默认 true
+
+// 自定义锁屏背景路径
+system.lockscreenBackground: string  // 当随机壁纸关闭时使用
+
+// 时间组件开关
+system.lockscreenTimeComponent: boolean  // 默认 true
+
+// 每日一言组件开关
+system.lockscreenDailyQuote: boolean  // 默认 true
+```
+
+#### 每日一言缓存管理
+
+每日一言使用 `CacheDrive` 进行缓存管理：
+
+```javascript
+// 缓存键
+const cacheKey = 'system.dailyQuote';
+
+// 读取缓存
+const cachedQuote = await ProcessManager.callKernelAPI(
+    ProcessManager.EXPLOIT_PID,
+    'Cache.get',
+    [{ key: cacheKey }]
+);
+
+// 保存到缓存
+await ProcessManager.callKernelAPI(
+    ProcessManager.EXPLOIT_PID,
+    'Cache.set',
+    [{ key: cacheKey, value: quote, options: { ttl: 0 } }]
+);
+
+// 删除缓存
+await ProcessManager.callKernelAPI(
+    ProcessManager.EXPLOIT_PID,
+    'Cache.delete',
+    [{ key: cacheKey }]
+);
+```
+
+**缓存策略**：
+- 系统启动时自动预加载下一句每日一言到缓存
+- 显示时优先使用缓存，使用后删除缓存
+- 自动预加载下一句，确保每次显示都有内容
 
 ### 设置程序
 

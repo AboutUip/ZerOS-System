@@ -295,5 +295,5 @@ const manager = POOL.__GET__(GroupEnum.POOL, "MyManager");
 
 - [ZEROS_KERNEL.md](../ZEROS_KERNEL.md) - 内核概述
 - [DEVELOPER_GUIDE.md](../DEVELOPER_GUIDE.md) - 开发者指南
-- [DependencyConfig.md](./DependencyConfig.md) - 依赖管理 API（待创建）
+- [DependencyConfig.md](./DependencyConfig.md) - 依赖管理 API
 

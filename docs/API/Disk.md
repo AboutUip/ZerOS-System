@@ -310,6 +310,6 @@ if (cTree) {
 
 - [ZEROS_KERNEL.md](../ZEROS_KERNEL.md) - 内核概述
 - [DEVELOPER_GUIDE.md](../DEVELOPER_GUIDE.md) - 开发者指南
-- [NodeTree.md](./NodeTree.md) - 文件树 API（待创建）
+- [NodeTree.md](./NodeTree.md) - 文件树 API
 - [KernelMemory.md](./KernelMemory.md) - 内核内存 API
 

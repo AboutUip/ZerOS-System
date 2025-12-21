@@ -35,6 +35,17 @@
         // 歌曲信息缓存（保存歌名、歌词等，不保存URL和封面）
         _songInfoCache: {}, // 格式: { rid: { name, artist, album, lyrics } }
         
+        // 分页状态
+        _pagination: {
+            currentPage: 1,
+            pageSize: 30,
+            total: 0,
+            totalPages: 0,
+            currentType: null, // 'search', 'rank', 'daily', 'artist', 'playlist', 'artistSongs'
+            currentKeyword: null, // 搜索关键词
+            currentArtistId: null // 当前歌手ID
+        },
+        
         // UI元素引用
         _leftSidebar: null,
         _mainContent: null,
@@ -812,115 +823,67 @@
         _createImmersiveView: function() {
             const immersiveView = document.createElement('div');
             immersiveView.className = 'immersive-player-view';
-            immersiveView.style.cssText = `
-                position: absolute;
-                top: 0;
-                left: 0;
-                width: 100%;
-                height: 100%;
-                background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 30%, #2d1b3d 60%, #1a1a2e 100%);
-                display: none;
-                flex-direction: column;
-                z-index: 1;
-                overflow: hidden;
-                pointer-events: none;
-            `;
             
-            // 背景装饰
+            // 背景装饰层
             const bgPattern = document.createElement('div');
             bgPattern.className = 'immersive-bg-pattern';
-            bgPattern.style.cssText = `
-                position: absolute;
-                top: 0;
-                left: 0;
-                width: 100%;
-                height: 100%;
-                background-image: 
-                    radial-gradient(circle at 20% 50%, rgba(236, 65, 65, 0.1) 0%, transparent 50%),
-                    radial-gradient(circle at 80% 80%, rgba(139, 92, 246, 0.1) 0%, transparent 50%),
-                    linear-gradient(0deg, transparent 0%, rgba(0, 0, 0, 0.3) 100%);
-                pointer-events: none;
-                z-index: 0;
-            `;
             immersiveView.appendChild(bgPattern);
             
+            // 动态背景渐变（基于当前歌曲封面颜色）
+            const bgGradient = document.createElement('div');
+            bgGradient.className = 'immersive-bg-gradient';
+            immersiveView.appendChild(bgGradient);
+            
             // 关闭按钮
-            const closeBtn = document.createElement('div');
+            const closeBtn = document.createElement('button');
             closeBtn.className = 'immersive-close-btn';
-            closeBtn.innerHTML = '✕';
-            closeBtn.style.cssText = `
-                position: absolute;
-                top: 20px;
-                right: 20px;
-                width: 44px;
-                height: 44px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                background: rgba(0, 0, 0, 0.4);
-                backdrop-filter: blur(10px);
-                border-radius: 50%;
-                cursor: pointer;
-                font-size: 20px;
-                color: #e0e0e0;
-                z-index: 10;
-                transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-                pointer-events: auto;
-                border: 1px solid rgba(255, 255, 255, 0.1);
-            `;
-            closeBtn.addEventListener('mouseenter', () => {
-                closeBtn.style.background = 'rgba(236, 65, 65, 0.3)';
-                closeBtn.style.transform = 'scale(1.1) rotate(90deg)';
-                closeBtn.style.borderColor = 'rgba(236, 65, 65, 0.5)';
-            });
-            closeBtn.addEventListener('mouseleave', () => {
-                closeBtn.style.background = 'rgba(0, 0, 0, 0.4)';
-                closeBtn.style.transform = 'scale(1) rotate(0deg)';
-                closeBtn.style.borderColor = 'rgba(255, 255, 255, 0.1)';
-            });
-            closeBtn.addEventListener('click', () => {
+            closeBtn.setAttribute('aria-label', '关闭沉浸式播放');
+            closeBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>';
+            closeBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
                 this._toggleImmersiveView();
             });
             immersiveView.appendChild(closeBtn);
             
-            // 主要内容区域（使用响应式布局）
+            // 主要内容区域
             const content = document.createElement('div');
             content.className = 'immersive-content';
-            // 移除所有内联样式，使用CSS类控制
-            content.setAttribute('style', '');
+            
+            // 主布局容器
+            const mainLayout = document.createElement('div');
+            mainLayout.className = 'immersive-main-layout';
             
             // 左侧区域：封面和歌曲信息
             const leftSection = document.createElement('div');
             leftSection.className = 'immersive-left-section';
-            // 移除所有内联样式，使用CSS类控制
-            leftSection.setAttribute('style', '');
             
-            // 专辑封面（磁盘层叠样式）- 使用响应式尺寸
+            // 专辑封面容器（磁盘层叠样式）
             const coverStack = document.createElement('div');
             coverStack.className = 'immersive-cover-stack';
-            // 移除所有内联样式，使用CSS类控制
-            coverStack.setAttribute('style', '');
             
             // 底层磁盘（不旋转）
             const coverLayer1 = document.createElement('div');
             coverLayer1.className = 'immersive-cover-layer immersive-cover-layer-1';
-            // 移除所有内联样式，使用CSS类控制
-            coverLayer1.setAttribute('style', '');
-            coverLayer1.innerHTML = '<div>🎵</div>';
+            const coverLayer1Inner = document.createElement('div');
+            coverLayer1Inner.className = 'immersive-cover-inner';
+            coverLayer1Inner.textContent = '🎵';
+            coverLayer1.appendChild(coverLayer1Inner);
             
             // 中层磁盘（不旋转）
             const coverLayer2 = document.createElement('div');
             coverLayer2.className = 'immersive-cover-layer immersive-cover-layer-2';
-            // 移除所有内联样式，使用CSS类控制
-            coverLayer2.setAttribute('style', '');
-            coverLayer2.innerHTML = '<div>🎵</div>';
+            const coverLayer2Inner = document.createElement('div');
+            coverLayer2Inner.className = 'immersive-cover-inner';
+            coverLayer2Inner.textContent = '🎵';
+            coverLayer2.appendChild(coverLayer2Inner);
             
             // 顶层磁盘（旋转）
             const coverLayer3 = document.createElement('div');
             coverLayer3.className = 'immersive-cover-layer immersive-cover-layer-3 immersive-cover-top';
-            // 移除所有内联样式，使用CSS类控制
-            coverLayer3.setAttribute('style', '');
-            coverLayer3.innerHTML = '<div>🎵</div>';
+            const coverLayer3Inner = document.createElement('div');
+            coverLayer3Inner.className = 'immersive-cover-inner';
+            coverLayer3Inner.textContent = '🎵';
+            coverLayer3.appendChild(coverLayer3Inner);
             this._immersiveCover = coverLayer3;
             
             coverStack.appendChild(coverLayer1);
@@ -932,10 +895,8 @@
             // 歌曲信息
             const songInfo = document.createElement('div');
             songInfo.className = 'immersive-song-info';
-            // 移除所有内联样式，使用CSS类控制
-            songInfo.setAttribute('style', '');
             
-            const songName = document.createElement('div');
+            const songName = document.createElement('h1');
             songName.className = 'immersive-song-name';
             songName.textContent = '未播放';
             this._immersiveSongName = songName;
@@ -945,11 +906,9 @@
             artistName.textContent = '--';
             this._immersiveArtistName = artistName;
             
-            // 当前播放歌曲高亮显示
+            // 当前播放歌曲标签
             const currentSongDisplay = document.createElement('div');
             currentSongDisplay.className = 'immersive-current-song';
-            // 移除所有内联样式，使用CSS类控制
-            currentSongDisplay.setAttribute('style', '');
             this._immersiveCurrentSong = currentSongDisplay;
             
             songInfo.appendChild(songName);
@@ -960,71 +919,79 @@
             // 右侧区域：歌词和词曲信息
             const rightSection = document.createElement('div');
             rightSection.className = 'immersive-right-section';
-            // 移除所有内联样式，使用CSS类控制
-            rightSection.setAttribute('style', '');
             
             // 歌词显示区域
             const lyricsContainer = document.createElement('div');
             lyricsContainer.className = 'immersive-lyrics';
-            // 移除所有内联样式，使用CSS类控制
-            lyricsContainer.setAttribute('style', '');
             this._immersiveLyrics = lyricsContainer;
             rightSection.appendChild(lyricsContainer);
             
             // 词曲作者信息
             const creditsInfo = document.createElement('div');
             creditsInfo.className = 'immersive-credits';
-            // 移除所有内联样式，使用CSS类控制
-            creditsInfo.setAttribute('style', '');
             this._immersiveCredits = creditsInfo;
             rightSection.appendChild(creditsInfo);
             
-            // 主布局容器（使用CSS Grid/Flexbox响应式布局）
-            const mainLayout = document.createElement('div');
-            mainLayout.className = 'immersive-main-layout';
-            // 移除所有内联样式，使用CSS类控制
-            mainLayout.setAttribute('style', '');
             mainLayout.appendChild(leftSection);
             mainLayout.appendChild(rightSection);
             content.appendChild(mainLayout);
             
-            // 播放控制（底部固定）
+            // 播放控制区域（底部固定）
             const controls = document.createElement('div');
             controls.className = 'immersive-controls';
-            // 移除所有内联样式，使用CSS类控制
-            controls.setAttribute('style', '');
             
-            // 进度条
+            // 进度条容器
             const progressContainer = document.createElement('div');
             progressContainer.className = 'immersive-progress-container';
-            // 移除所有内联样式，使用CSS类控制
-            progressContainer.setAttribute('style', '');
             
-            const timeCurrent = document.createElement('div');
-            timeCurrent.className = 'immersive-time';
+            const timeCurrent = document.createElement('time');
+            timeCurrent.className = 'immersive-time immersive-time-current';
             timeCurrent.textContent = '00:00';
             this._immersiveTimeCurrent = timeCurrent;
             
             const progressBar = document.createElement('div');
             progressBar.className = 'immersive-progress-bar';
-            // 移除所有内联样式，使用CSS类控制
-            progressBar.setAttribute('style', '');
+            progressBar.setAttribute('role', 'slider');
+            progressBar.setAttribute('aria-label', '播放进度');
+            progressBar.setAttribute('tabindex', '0');
             
             const progressFill = document.createElement('div');
             progressFill.className = 'immersive-progress-fill';
-            // 移除所有内联样式，使用CSS类控制
-            progressFill.setAttribute('style', '');
+            const progressHandle = document.createElement('div');
+            progressHandle.className = 'immersive-progress-handle';
+            progressFill.appendChild(progressHandle);
             progressBar.appendChild(progressFill);
             this._immersiveProgressFill = progressFill;
             
+            // 进度条交互
+            let isDragging = false;
             progressBar.addEventListener('click', (e) => {
+                if (isDragging) return;
                 const rect = progressBar.getBoundingClientRect();
-                const percent = (e.clientX - rect.left) / rect.width;
+                const percent = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
                 this._seekTo(percent);
             });
             
-            const timeTotal = document.createElement('div');
-            timeTotal.className = 'immersive-time';
+            progressBar.addEventListener('mousedown', (e) => {
+                isDragging = true;
+                const rect = progressBar.getBoundingClientRect();
+                const updateProgress = (e) => {
+                    const percent = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+                    this._seekTo(percent);
+                };
+                const handleMouseMove = (e) => updateProgress(e);
+                const handleMouseUp = () => {
+                    isDragging = false;
+                    document.removeEventListener('mousemove', handleMouseMove);
+                    document.removeEventListener('mouseup', handleMouseUp);
+                };
+                document.addEventListener('mousemove', handleMouseMove);
+                document.addEventListener('mouseup', handleMouseUp);
+                updateProgress(e);
+            });
+            
+            const timeTotal = document.createElement('time');
+            timeTotal.className = 'immersive-time immersive-time-total';
             timeTotal.textContent = '00:00';
             this._immersiveTimeTotal = timeTotal;
             
@@ -1032,18 +999,18 @@
             progressContainer.appendChild(progressBar);
             progressContainer.appendChild(timeTotal);
             
-            // 控制按钮
+            // 控制按钮容器
             const controlButtons = document.createElement('div');
             controlButtons.className = 'immersive-control-buttons';
-            // 移除所有内联样式，使用CSS类控制
-            controlButtons.setAttribute('style', '');
             
-            const prevBtn = this._createImmersiveButton('⏮', () => this._playPrev());
+            const prevBtn = this._createImmersiveButton('prev', '⏮', () => this._playPrev());
             prevBtn.className = 'immersive-control-btn immersive-prev-btn';
-            const playBtn = this._createImmersiveButton('▶', () => this._togglePlay());
+            
+            const playBtn = this._createImmersiveButton('play', '▶', () => this._togglePlay());
             playBtn.className = 'immersive-control-btn immersive-play-button';
             this._immersivePlayButton = playBtn;
-            const nextBtn = this._createImmersiveButton('⏭', () => this._playNext());
+            
+            const nextBtn = this._createImmersiveButton('next', '⏭', () => this._playNext());
             nextBtn.className = 'immersive-control-btn immersive-next-btn';
             
             controlButtons.appendChild(prevBtn);
@@ -1059,12 +1026,11 @@
             return immersiveView;
         },
         
-        _createImmersiveButton: function(text, onClick) {
-            const btn = document.createElement('div');
-            btn.textContent = text;
+        _createImmersiveButton: function(action, text, onClick) {
+            const btn = document.createElement('button');
             btn.className = 'immersive-control-btn';
-            // 移除所有内联样式，使用CSS类控制
-            btn.setAttribute('style', '');
+            btn.setAttribute('aria-label', action);
+            btn.textContent = text;
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 onClick();
@@ -1078,7 +1044,7 @@
             this._isImmersiveMode = !this._isImmersiveMode;
             
             if (this._isImmersiveMode) {
-                this._immersiveView.style.display = 'flex';
+                this._immersiveView.classList.add('active');
                 // 更新窗口大小（确保布局正确）
                 this._updateWindowSize();
                 // 更新沉浸式页面的布局（根据宽高比）
@@ -1086,7 +1052,7 @@
                 // 更新沉浸式页面的内容
                 this._updateImmersiveView();
             } else {
-                this._immersiveView.style.display = 'none';
+                this._immersiveView.classList.remove('active');
             }
         },
         
@@ -1189,7 +1155,7 @@
             if (!this._immersiveLyrics) return;
             
             if (!this._lyrics || this._lyrics.length === 0) {
-                this._immersiveLyrics.innerHTML = '<div style="color: rgba(255, 255, 255, 0.5); padding: 60px 20px; font-size: 16px;">暂无歌词</div>';
+                this._immersiveLyrics.innerHTML = '<div class="immersive-lyrics-empty">暂无歌词</div>';
                 return;
             }
             
@@ -1200,24 +1166,16 @@
             });
             
             // 显示所有歌词，高亮当前行
-            const lyricsHTML = filteredLyrics.map((lyric, index) => {
+            this._immersiveLyrics.innerHTML = filteredLyrics.map((lyric) => {
                 // 找到原始索引
                 const originalIndex = this._lyrics.indexOf(lyric);
                 const isActive = originalIndex === this._currentLyricIndex;
                 return `
-                    <div class="lyric-line ${isActive ? 'active' : ''}" data-index="${originalIndex}" style="
-                        margin: 12px 0;
-                        transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-                        color: ${isActive ? '#ec4141' : 'rgba(255, 255, 255, 0.6)'};
-                        font-size: ${isActive ? '24px' : '18px'};
-                        font-weight: ${isActive ? '600' : '400'};
-                        opacity: ${isActive ? '1' : '0.6'};
-                        transform: ${isActive ? 'scale(1.05)' : 'scale(1)'};
-                    ">${lyric.text || ''}</div>
+                    <div class="lyric-line ${isActive ? 'active' : ''}" data-index="${originalIndex}">
+                        ${lyric.text || ''}
+                    </div>
                 `;
             }).join('');
-            
-            this._immersiveLyrics.innerHTML = lyricsHTML;
             
             // 滚动到当前歌词（延迟执行，确保DOM已更新）
             if (this._currentLyricIndex >= 0) {
@@ -1527,13 +1485,28 @@
             }
         },
         
-        async _loadPlaylists() {
+        async _loadPlaylists(page = 1) {
             try {
-                const response = await this._fetch(`${this.API_BASE}?type=new&page=1&limit=20`);
+                // 更新分页状态
+                this._pagination.currentPage = page;
+                this._pagination.currentType = 'playlist';
+                
+                const response = await this._fetch(`${this.API_BASE}?type=new&page=${page}&limit=${this._pagination.pageSize}`);
                 const data = await response.json();
                 
                 if (data.code === 200 && data.data) {
                     const playlists = Array.isArray(data.data) ? data.data : [];
+                    
+                    // 更新分页信息
+                    if (data.total !== undefined) {
+                        this._pagination.total = data.total;
+                        this._pagination.totalPages = Math.ceil(data.total / this._pagination.pageSize);
+                    } else {
+                        this._pagination.totalPages = playlists.length === this._pagination.pageSize ? page + 1 : page;
+                    }
+                    
+                    const paginationHtml = this._createPaginationHTML('playlist', page);
+                    
                     this._defaultContent.innerHTML = `
                         <h2 style="margin: 0 0 20px 0; font-size: 20px; color: #e0e0e0;">精选歌单</h2>
                         <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 20px;">
@@ -1554,7 +1527,11 @@
                                 </div>
                             `).join('')}
                         </div>
+                        ${paginationHtml}
                     `;
+                    
+                    // 绑定分页事件
+                    this._bindPaginationEvents('playlist');
                     
                     // 绑定点击事件
                     this._defaultContent.querySelectorAll('.playlist-item').forEach(item => {
@@ -1575,17 +1552,37 @@
             }
         },
         
-        async _loadRankList() {
+        async _loadRankList(page = 1) {
             try {
-                const response = await this._fetch(`${this.API_BASE}?name=热歌榜&type=rank&limit=30`);
+                // 更新分页状态
+                this._pagination.currentPage = page;
+                this._pagination.currentType = 'rank';
+                
+                const response = await this._fetch(`${this.API_BASE}?name=热歌榜&type=rank&page=${page}&limit=${this._pagination.pageSize}`);
                 const data = await response.json();
                 
                 if (data.code === 200 && data.data && data.data.musicList) {
                     const songs = data.data.musicList;
+                    
+                    // 更新分页信息
+                    if (data.total !== undefined) {
+                        this._pagination.total = data.total;
+                        this._pagination.totalPages = Math.ceil(data.total / this._pagination.pageSize);
+                    } else {
+                        this._pagination.totalPages = songs.length === this._pagination.pageSize ? page + 1 : page;
+                    }
+                    
+                    // 计算实际排名（考虑分页）
+                    const startRank = (page - 1) * this._pagination.pageSize;
+                    
+                    const paginationHtml = this._createPaginationHTML('rank', page);
+                    
                     this._defaultContent.innerHTML = `
                         <h2 style="margin: 0 0 20px 0; font-size: 20px; color: #e0e0e0;">热歌榜</h2>
                         <div class="rank-list" style="background: #252525; border-radius: 8px; overflow: hidden;">
-                            ${songs.map((song, index) => `
+                            ${songs.map((song, index) => {
+                                const rank = startRank + index + 1;
+                                return `
                                 <div class="rank-item" data-rid="${song.rid}" style="
                                     display: flex;
                                     align-items: center;
@@ -1594,17 +1591,22 @@
                                     cursor: pointer;
                                     transition: background 0.2s;
                                 ">
-                                    <div style="width: 40px; text-align: center; font-size: 16px; font-weight: bold; color: ${index < 3 ? '#ec4141' : '#999'};">
-                                        ${index + 1}
+                                    <div style="width: 40px; text-align: center; font-size: 16px; font-weight: bold; color: ${rank <= 3 ? '#ec4141' : '#999'};">
+                                        ${rank}
                                     </div>
                                     <div style="flex: 1; min-width: 0;">
                                         <div style="font-size: 14px; color: #e0e0e0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${song.name}</div>
                                         <div style="font-size: 12px; color: #999; margin-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${song.artist} - ${song.album}</div>
                                     </div>
                                 </div>
-                            `).join('')}
+                            `;
+                            }).join('')}
                         </div>
+                        ${paginationHtml}
                     `;
+                    
+                    // 绑定分页事件
+                    this._bindPaginationEvents('rank');
                     
                     // 绑定点击事件
                     this._defaultContent.querySelectorAll('.rank-item').forEach((item, index) => {
@@ -1652,13 +1654,28 @@
             }
         },
         
-        async _loadArtists() {
+        async _loadArtists(page = 1) {
             try {
-                const response = await this._fetch(`${this.API_BASE}?type=artist&page=1&limit=30`);
+                // 更新分页状态
+                this._pagination.currentPage = page;
+                this._pagination.currentType = 'artist';
+                
+                const response = await this._fetch(`${this.API_BASE}?type=artist&page=${page}&limit=${this._pagination.pageSize}`);
                 const data = await response.json();
                 
                 if (data.code === 200 && data.data) {
                     const artists = Array.isArray(data.data) ? data.data : [];
+                    
+                    // 更新分页信息
+                    if (data.total !== undefined) {
+                        this._pagination.total = data.total;
+                        this._pagination.totalPages = Math.ceil(data.total / this._pagination.pageSize);
+                    } else {
+                        this._pagination.totalPages = artists.length === this._pagination.pageSize ? page + 1 : page;
+                    }
+                    
+                    const paginationHtml = this._createPaginationHTML('artist', page);
+                    
                     this._defaultContent.innerHTML = `
                         <h2 style="margin: 0 0 20px 0; font-size: 20px; color: #e0e0e0;">热门歌手</h2>
                         <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 20px;">
@@ -1681,7 +1698,11 @@
                                 </div>
                             `).join('')}
                         </div>
+                        ${paginationHtml}
                     `;
+                    
+                    // 绑定分页事件
+                    this._bindPaginationEvents('artist');
                     
                     // 绑定点击事件
                     this._defaultContent.querySelectorAll('.artist-item').forEach(item => {
@@ -1702,13 +1723,28 @@
             }
         },
         
-        async _loadDailyRecommend() {
+        async _loadDailyRecommend(page = 1) {
             try {
-                const response = await this._fetch(`${this.API_BASE}?type=daily30`);
+                // 更新分页状态
+                this._pagination.currentPage = page;
+                this._pagination.currentType = 'daily';
+                
+                const response = await this._fetch(`${this.API_BASE}?type=daily30&page=${page}&limit=${this._pagination.pageSize}`);
                 const data = await response.json();
                 
                 if (data.code === 200 && data.data && data.data.musicList) {
                     const songs = data.data.musicList;
+                    
+                    // 更新分页信息
+                    if (data.total !== undefined) {
+                        this._pagination.total = data.total;
+                        this._pagination.totalPages = Math.ceil(data.total / this._pagination.pageSize);
+                    } else {
+                        this._pagination.totalPages = songs.length === this._pagination.pageSize ? page + 1 : page;
+                    }
+                    
+                    const paginationHtml = this._createPaginationHTML('daily', page);
+                    
                     this._defaultContent.innerHTML = `
                         <h2 style="margin: 0 0 20px 0; font-size: 20px; color: #e0e0e0;">每日30首</h2>
                         <div class="daily-list" style="background: #252525; border-radius: 8px; overflow: hidden;">
@@ -1735,7 +1771,11 @@
                                 </div>
                             `).join('')}
                         </div>
+                        ${paginationHtml}
                     `;
+                    
+                    // 绑定分页事件
+                    this._bindPaginationEvents('daily');
                     
                     // 绑定点击事件
                     this._defaultContent.querySelectorAll('.daily-item').forEach((item, index) => {
@@ -1784,19 +1824,39 @@
             }
         },
         
-        async _performSearch() {
+        async _performSearch(page = 1) {
             const keyword = this._searchInput.value.trim();
             if (!keyword) return;
             
             try {
                 this._showMessage('搜索中...');
-                const response = await this._fetch(`${this.API_BASE}?name=${encodeURIComponent(keyword)}&page=1&limit=30`);
+                
+                // 更新分页状态
+                this._pagination.currentPage = page;
+                this._pagination.currentType = 'search';
+                this._pagination.currentKeyword = keyword;
+                
+                const response = await this._fetch(`${this.API_BASE}?name=${encodeURIComponent(keyword)}&page=${page}&limit=${this._pagination.pageSize}`);
                 const data = await response.json();
                 
                 if (data.code === 200 && data.data) {
                     const songs = Array.isArray(data.data) ? data.data : [];
+                    
+                    // 更新分页信息（如果API返回了总数）
+                    if (data.total !== undefined) {
+                        this._pagination.total = data.total;
+                        this._pagination.totalPages = Math.ceil(data.total / this._pagination.pageSize);
+                    } else {
+                        // 如果没有总数，根据当前页数据估算
+                        this._pagination.totalPages = songs.length === this._pagination.pageSize ? page + 1 : page;
+                    }
+                    
                     this._searchResults.style.display = 'block';
                     this._defaultContent.style.display = 'none';
+                    
+                    // 创建分页容器
+                    const paginationHtml = this._createPaginationHTML('search', page);
+                    
                     this._searchResults.innerHTML = `
                         <h2 style="margin: 0 0 20px 0; font-size: 20px; color: #e0e0e0;">搜索结果: "${keyword}"</h2>
                         <div class="search-list" style="background: #252525; border-radius: 8px; overflow: hidden;">
@@ -1823,7 +1883,11 @@
                                 </div>
                             `).join('') : '<div style="padding: 40px; text-align: center; color: #999;">未找到相关歌曲</div>'}
                         </div>
+                        ${paginationHtml}
                     `;
+                    
+                    // 绑定分页事件
+                    this._bindPaginationEvents('search');
                     
                     // 绑定点击事件
                     this._searchResults.querySelectorAll('.search-item').forEach((item, index) => {
@@ -1872,14 +1936,247 @@
             }
         },
         
+        /**
+         * 创建分页UI
+         */
+        _createPaginationHTML: function(type, currentPage) {
+            const pag = this._pagination;
+            const totalPages = pag.totalPages || 1;
+            
+            if (totalPages <= 1) {
+                return ''; // 只有一页，不显示分页
+            }
+            
+            const prevDisabled = currentPage <= 1;
+            const nextDisabled = currentPage >= totalPages;
+            
+            return `
+                <div class="pagination-container" data-pagination-type="${type}" style="
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    gap: 8px;
+                    margin-top: 20px;
+                    padding: 16px;
+                ">
+                    <button class="pagination-btn" data-action="prev" ${prevDisabled ? 'disabled' : ''} style="
+                        padding: 8px 16px;
+                        background: ${prevDisabled ? '#1a1a1a' : '#2a2a2a'};
+                        border: 1px solid ${prevDisabled ? '#333' : '#444'};
+                        border-radius: 4px;
+                        color: ${prevDisabled ? '#666' : '#e0e0e0'};
+                        cursor: ${prevDisabled ? 'not-allowed' : 'pointer'};
+                        font-size: 14px;
+                        transition: all 0.2s;
+                    ">上一页</button>
+                    
+                    <div style="
+                        display: flex;
+                        gap: 4px;
+                        align-items: center;
+                    ">
+                        ${this._generatePageNumbers(currentPage, totalPages, type)}
+                    </div>
+                    
+                    <button class="pagination-btn" data-action="next" ${nextDisabled ? 'disabled' : ''} style="
+                        padding: 8px 16px;
+                        background: ${nextDisabled ? '#1a1a1a' : '#2a2a2a'};
+                        border: 1px solid ${nextDisabled ? '#333' : '#444'};
+                        border-radius: 4px;
+                        color: ${nextDisabled ? '#666' : '#e0e0e0'};
+                        cursor: ${nextDisabled ? 'not-allowed' : 'pointer'};
+                        font-size: 14px;
+                        transition: all 0.2s;
+                    ">下一页</button>
+                    
+                    <div style="
+                        margin-left: 16px;
+                        font-size: 14px;
+                        color: #999;
+                    ">
+                        第 ${currentPage} / ${totalPages} 页
+                    </div>
+                </div>
+            `;
+        },
         
-        async _loadArtistSongs(artistId) {
+        /**
+         * 生成页码按钮
+         */
+        _generatePageNumbers: function(currentPage, totalPages, type) {
+            const pages = [];
+            const maxVisible = 7; // 最多显示7个页码
+            
+            let startPage = Math.max(1, currentPage - Math.floor(maxVisible / 2));
+            let endPage = Math.min(totalPages, startPage + maxVisible - 1);
+            
+            if (endPage - startPage < maxVisible - 1) {
+                startPage = Math.max(1, endPage - maxVisible + 1);
+            }
+            
+            // 第一页
+            if (startPage > 1) {
+                pages.push(`<button class="pagination-page" data-page="1" data-pagination-type="${type}" style="
+                    padding: 8px 12px;
+                    background: #2a2a2a;
+                    border: 1px solid #444;
+                    border-radius: 4px;
+                    color: #e0e0e0;
+                    cursor: pointer;
+                    font-size: 14px;
+                    transition: all 0.2s;
+                ">1</button>`);
+                if (startPage > 2) {
+                    pages.push(`<span style="color: #666; padding: 0 4px;">...</span>`);
+                }
+            }
+            
+            // 中间页码
+            for (let i = startPage; i <= endPage; i++) {
+                const isActive = i === currentPage;
+                pages.push(`<button class="pagination-page" data-page="${i}" data-pagination-type="${type}" style="
+                    padding: 8px 12px;
+                    background: ${isActive ? '#ec4141' : '#2a2a2a'};
+                    border: 1px solid ${isActive ? '#ec4141' : '#444'};
+                    border-radius: 4px;
+                    color: ${isActive ? '#fff' : '#e0e0e0'};
+                    cursor: pointer;
+                    font-size: 14px;
+                    transition: all 0.2s;
+                    font-weight: ${isActive ? 'bold' : 'normal'};
+                ">${i}</button>`);
+            }
+            
+            // 最后一页
+            if (endPage < totalPages) {
+                if (endPage < totalPages - 1) {
+                    pages.push(`<span style="color: #666; padding: 0 4px;">...</span>`);
+                }
+                pages.push(`<button class="pagination-page" data-page="${totalPages}" data-pagination-type="${type}" style="
+                    padding: 8px 12px;
+                    background: #2a2a2a;
+                    border: 1px solid #444;
+                    border-radius: 4px;
+                    color: #e0e0e0;
+                    cursor: pointer;
+                    font-size: 14px;
+                    transition: all 0.2s;
+                ">${totalPages}</button>`);
+            }
+            
+            return pages.join('');
+        },
+        
+        /**
+         * 绑定分页事件
+         */
+        _bindPaginationEvents: function(type) {
+            const container = type === 'search' ? this._searchResults : this._defaultContent;
+            if (!container) return;
+            
+            const paginationContainer = container.querySelector('.pagination-container');
+            if (!paginationContainer) return;
+            
+            // 上一页/下一页按钮
+            paginationContainer.querySelectorAll('.pagination-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    if (btn.disabled) return;
+                    
+                    const action = btn.dataset.action;
+                    const currentPage = this._pagination.currentPage;
+                    
+                    if (action === 'prev' && currentPage > 1) {
+                        this._loadPage(type, currentPage - 1);
+                    } else if (action === 'next' && currentPage < this._pagination.totalPages) {
+                        this._loadPage(type, currentPage + 1);
+                    }
+                });
+                
+                // 悬停效果
+                if (!btn.disabled) {
+                    btn.addEventListener('mouseenter', () => {
+                        btn.style.background = '#3a3a3a';
+                    });
+                    btn.addEventListener('mouseleave', () => {
+                        btn.style.background = '#2a2a2a';
+                    });
+                }
+            });
+            
+            // 页码按钮
+            paginationContainer.querySelectorAll('.pagination-page').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const page = parseInt(btn.dataset.page);
+                    if (page !== this._pagination.currentPage) {
+                        this._loadPage(type, page);
+                    }
+                });
+                
+                // 悬停效果
+                if (!btn.style.background.includes('#ec4141')) {
+                    btn.addEventListener('mouseenter', () => {
+                        btn.style.background = '#3a3a3a';
+                    });
+                    btn.addEventListener('mouseleave', () => {
+                        btn.style.background = '#2a2a2a';
+                    });
+                }
+            });
+        },
+        
+        /**
+         * 加载指定页面
+         */
+        _loadPage: function(type, page) {
+            switch (type) {
+                case 'search':
+                    this._performSearch(page);
+                    break;
+                case 'rank':
+                    this._loadRankList(page);
+                    break;
+                case 'daily':
+                    this._loadDailyRecommend(page);
+                    break;
+                case 'artistSongs':
+                    this._loadArtistSongs(this._pagination.currentArtistId, page);
+                    break;
+                case 'playlist':
+                    this._loadPlaylistSongs(this._pagination.currentPlaylistId, page);
+                    break;
+                case 'artist':
+                    this._loadArtists(page);
+                    break;
+                default:
+                    console.warn('[MusicPlayer] 未知的分页类型:', type);
+            }
+        },
+        
+        
+        async _loadArtistSongs(artistId, page = 1) {
             try {
-                const response = await this._fetch(`${this.API_BASE}?id=${artistId}&page=1&limit=30&type=artistMusic`);
+                // 更新分页状态
+                this._pagination.currentPage = page;
+                this._pagination.currentType = 'artistSongs';
+                this._pagination.currentArtistId = artistId;
+                
+                const response = await this._fetch(`${this.API_BASE}?id=${artistId}&page=${page}&limit=${this._pagination.pageSize}&type=artistMusic`);
                 const data = await response.json();
                 
                 if (data.code === 200 && data.data) {
                     const songs = Array.isArray(data.data) ? data.data : [];
+                    
+                    // 更新分页信息
+                    if (data.total !== undefined) {
+                        this._pagination.total = data.total;
+                        this._pagination.totalPages = Math.ceil(data.total / this._pagination.pageSize);
+                    } else {
+                        this._pagination.totalPages = songs.length === this._pagination.pageSize ? page + 1 : page;
+                    }
+                    
+                    const paginationHtml = this._createPaginationHTML('artistSongs', page);
+                    const startIndex = (page - 1) * this._pagination.pageSize;
+                    
                     this._defaultContent.innerHTML = `
                         <div style="margin-bottom: 20px;">
                             <button class="back-button" style="
@@ -1892,7 +2189,7 @@
                                 margin-bottom: 20px;
                             ">← 返回</button>
                             <h2 style="margin: 0 0 10px 0; font-size: 20px; color: #e0e0e0;">歌手歌曲</h2>
-                            <div style="font-size: 12px; color: #999;">${songs.length} 首歌曲</div>
+                            <div style="font-size: 12px; color: #999;">${this._pagination.total || songs.length} 首歌曲</div>
                         </div>
                         <div class="artist-songs-list" style="background: #252525; border-radius: 8px; overflow: hidden;">
                             ${songs.length > 0 ? songs.map((song, index) => `
@@ -1904,7 +2201,7 @@
                                     cursor: pointer;
                                     transition: background 0.2s;
                                 ">
-                                    <div style="width: 30px; text-align: center; font-size: 14px; color: #999;">${index + 1}</div>
+                                    <div style="width: 30px; text-align: center; font-size: 14px; color: #999;">${startIndex + index + 1}</div>
                                     <img src="${song.pic || song.albumpic}" style="
                                         width: 50px;
                                         height: 50px;
@@ -1919,12 +2216,16 @@
                                 </div>
                             `).join('') : '<div style="padding: 40px; text-align: center; color: #999;">暂无歌曲</div>'}
                         </div>
+                        ${paginationHtml}
                     `;
                     
                     // 返回按钮
                     this._defaultContent.querySelector('.back-button').addEventListener('click', () => {
                         this._loadArtists();
                     });
+                    
+                    // 绑定分页事件
+                    this._bindPaginationEvents('artistSongs');
                     
                     // 绑定点击事件
                     this._defaultContent.querySelectorAll('.artist-song-item').forEach((item, index) => {
@@ -4399,9 +4700,14 @@
         },
         
         // 加载推荐歌单详情（通过API）
-        async _loadRecommendedPlaylistDetail(playlistId) {
+        async _loadRecommendedPlaylistDetail(playlistId, page = 1) {
             try {
-                const url = `${this.API_BASE}?id=${playlistId}&limit=30&type=list`;
+                // 更新分页状态
+                this._pagination.currentPage = page;
+                this._pagination.currentType = 'playlistSongs';
+                this._pagination.currentPlaylistId = playlistId;
+                
+                const url = `${this.API_BASE}?id=${playlistId}&page=${page}&limit=${this._pagination.pageSize}&type=list`;
                 console.log('[MusicPlayer] 加载推荐歌单详情，URL:', url);
                 
                 const response = await this._fetch(url);
@@ -4450,7 +4756,21 @@
                     }
                 }
                 
+                // 更新分页信息
+                if (data.total !== undefined) {
+                    this._pagination.total = data.total;
+                    this._pagination.totalPages = Math.ceil(data.total / this._pagination.pageSize);
+                } else if (playlistInfo && playlistInfo.total !== undefined) {
+                    this._pagination.total = playlistInfo.total;
+                    this._pagination.totalPages = Math.ceil(playlistInfo.total / this._pagination.pageSize);
+                } else {
+                    this._pagination.totalPages = songs.length === this._pagination.pageSize ? page + 1 : page;
+                }
+                
                 if (songs.length > 0) {
+                    const paginationHtml = this._createPaginationHTML('playlistSongs', page);
+                    const startIndex = (page - 1) * this._pagination.pageSize;
+                    
                     this._defaultContent.innerHTML = `
                         <div style="margin-bottom: 20px;">
                             <button class="back-button" style="
@@ -4464,7 +4784,7 @@
                             ">← 返回</button>
                             <h2 style="margin: 0 0 10px 0; font-size: 20px; color: #e0e0e0;">${playlistName}</h2>
                             <div style="font-size: 12px; color: #999;">
-                                ${songs.length} 首歌曲
+                                ${this._pagination.total || songs.length} 首歌曲
                                 ${playlistInfo && playlistInfo.desc ? ` · ${playlistInfo.desc}` : ''}
                                 ${playlistInfo && playlistInfo.PlayCnt ? ` · 播放 ${(playlistInfo.PlayCnt / 10000).toFixed(1)}万次` : ''}
                             </div>
@@ -4479,7 +4799,7 @@
                                     cursor: pointer;
                                     transition: background 0.2s;
                                 ">
-                                    <div style="width: 30px; text-align: center; font-size: 14px; color: #999;">${index + 1}</div>
+                                    <div style="width: 30px; text-align: center; font-size: 14px; color: #999;">${startIndex + index + 1}</div>
                                     <img src="${song.pic || ''}" style="
                                         width: 50px;
                                         height: 50px;
@@ -4494,6 +4814,7 @@
                                 </div>
                             `).join('')}
                         </div>
+                        ${paginationHtml}
                     `;
                     
                     // 返回按钮
@@ -4503,6 +4824,9 @@
                             this._loadPlaylists();
                         });
                     }
+                    
+                    // 绑定分页事件
+                    this._bindPaginationEvents('playlistSongs');
                     
                     // 绑定点击事件
                     this._defaultContent.querySelectorAll('.playlist-detail-item').forEach((item, index) => {

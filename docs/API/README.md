@@ -37,11 +37,12 @@
 - [AnimateManager.md](./AnimateManager.md) - 动画管理 ✅
 - [NetworkManager.md](./NetworkManager.md) - 网络管理 ✅
 - [LStorage.md](./LStorage.md) - 本地存储 ✅
-- [CacheDrive.md](./CacheDrive.md) - 缓存驱动 ✅
+- [CacheDrive.md](./CacheDrive.md) - 缓存驱动（统一缓存管理、生命周期管控） ✅
 - [DragDrive.md](./DragDrive.md) - 拖拽驱动 ✅
 - [GeographyDrive.md](./GeographyDrive.md) - 地理位置驱动 ✅
-- [SpeechDrive.md](./SpeechDrive.md) - 语音识别驱动 ✅
+- [SpeechDrive.md](./SpeechDrive.md) - 语音识别驱动（基于 Web Speech API） ✅
 - [CryptDrive.md](./CryptDrive.md) - 加密驱动 ✅
+- [MultithreadingDrive.md](./MultithreadingDrive.md) - 多线程驱动 ✅
 
 ### PHP 服务
 - [FSDirve.md](./FSDirve.md) - 文件系统驱动服务（PHP 后端） ✅
@@ -108,6 +109,7 @@
 - GeographyDrive
 - SpeechDrive
 - CryptDrive
+- MultithreadingDrive
 - FSDirve (PHP 服务)
 
 **基础设施**
@@ -118,8 +120,7 @@
 
 ## 文档状态
 
-- ✅ 已创建
-- ⏳ 待创建
+- ✅ 所有 API 文档已创建完成
 
 ## 相关文档
 

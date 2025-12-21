@@ -15,20 +15,86 @@
     border-radius: 0;
 }
 
-/* 沉浸式播放页面 - 完全响应式设计 */
+/* ========== 沉浸式播放页面 - 全面重构 ========== */
 .immersive-player-view {
     position: absolute;
     top: 0;
     left: 0;
     width: 100%;
     height: 100%;
-    background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 30%, #2d1b3d 60%, #1a1a2e 100%);
     display: none;
     flex-direction: column;
-    z-index: 1;
+    z-index: 1000;
     overflow: hidden;
-    animation: fadeIn 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     pointer-events: none;
+    opacity: 0;
+    transform: scale(0.95);
+    transition: opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1),
+                transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.immersive-player-view.active {
+    display: flex;
+    opacity: 1;
+    transform: scale(1);
+    pointer-events: auto;
+    animation: immersiveFadeIn 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* 背景渐变层 */
+.immersive-bg-gradient {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(135deg, 
+        #0a0a0a 0%, 
+        #1a1a2e 25%, 
+        #2d1b3d 50%, 
+        #1a1a2e 75%, 
+        #0a0a0a 100%);
+    z-index: 0;
+    transition: background 1s ease;
+}
+
+/* 背景装饰图案 */
+.immersive-bg-pattern {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-image: 
+        radial-gradient(circle at 20% 50%, rgba(236, 65, 65, 0.12) 0%, transparent 50%),
+        radial-gradient(circle at 80% 80%, rgba(139, 92, 246, 0.12) 0%, transparent 50%),
+        radial-gradient(circle at 50% 20%, rgba(59, 130, 246, 0.08) 0%, transparent 40%),
+        linear-gradient(0deg, transparent 0%, rgba(0, 0, 0, 0.4) 100%);
+    pointer-events: none;
+    z-index: 1;
+    animation: bgPatternMove 20s ease-in-out infinite;
+}
+
+@keyframes immersiveFadeIn {
+    from {
+        opacity: 0;
+        transform: scale(0.95) translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+@keyframes bgPatternMove {
+    0%, 100% {
+        transform: translate(0, 0) scale(1);
+        opacity: 1;
+    }
+    50% {
+        transform: translate(-2%, -2%) scale(1.02);
+        opacity: 0.9;
+    }
 }
 
 .immersive-content {
@@ -124,7 +190,7 @@
     margin: 0 auto;
 }
 
-/* 磁盘层 - 响应式尺寸 */
+/* 磁盘层 - 现代化设计 */
 .immersive-cover-layer {
     position: absolute;
     border-radius: 50%;
@@ -136,7 +202,39 @@
     background: linear-gradient(135deg, #2a2a2a 0%, #1a1a1a 100%);
     box-shadow: 
         0 20px 60px rgba(0, 0, 0, 0.6),
+        0 0 40px rgba(0, 0, 0, 0.4),
         inset 0 0 30px rgba(0, 0, 0, 0.5);
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.immersive-cover-inner {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    overflow: hidden;
+}
+
+.immersive-cover-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 50%;
+    display: block;
+    transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.immersive-cover-emoji {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: clamp(48px, 9.6vw, 120px);
+    opacity: 0.7;
+    transition: opacity 0.3s ease;
 }
 
 /* 底层磁盘 */
@@ -217,6 +315,7 @@
 
 /* 移除旧的封面旋转样式，已移至 .immersive-cover-top */
 
+/* 歌曲信息区域 - 现代化设计 */
 .immersive-song-info {
     text-align: center;
     color: #e0e0e0;
@@ -225,67 +324,90 @@
 }
 
 .immersive-song-name {
-    font-size: clamp(20px, 4vw, 32px);
+    font-size: clamp(24px, 5vw, 36px);
     font-weight: 700;
-    margin-bottom: clamp(8px, 1vh, 12px);
+    margin: 0 0 clamp(10px, 1.5vh, 16px) 0;
     color: #ffffff;
-    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+    text-shadow: 
+        0 2px 8px rgba(0, 0, 0, 0.6),
+        0 0 20px rgba(236, 65, 65, 0.2);
     letter-spacing: 0.5px;
     word-wrap: break-word;
     overflow-wrap: break-word;
+    line-height: 1.3;
+    transition: all 0.3s ease;
 }
 
 .immersive-artist-name {
-    font-size: clamp(14px, 2.5vw, 18px);
-    color: rgba(255, 255, 255, 0.8);
+    font-size: clamp(16px, 3vw, 20px);
+    color: rgba(255, 255, 255, 0.85);
     font-weight: 400;
-    margin-bottom: clamp(12px, 2vh, 20px);
+    margin: 0 0 clamp(16px, 2.5vh, 24px) 0;
     word-wrap: break-word;
     overflow-wrap: break-word;
+    line-height: 1.4;
+    opacity: 0.9;
+    transition: opacity 0.3s ease;
 }
 
 .immersive-current-song {
-    margin-top: clamp(12px, 2vh, 20px);
-    padding: clamp(8px, 1.5vh, 12px) clamp(12px, 2vw, 20px);
+    display: inline-block;
+    margin-top: clamp(16px, 2.5vh, 24px);
+    padding: clamp(10px, 1.8vh, 14px) clamp(16px, 3vw, 24px);
     background: rgba(236, 65, 65, 0.15);
-    backdrop-filter: blur(10px);
-    border-radius: clamp(8px, 1.5vw, 12px);
+    backdrop-filter: blur(12px);
+    border-radius: clamp(10px, 2vw, 16px);
     border: 1px solid rgba(236, 65, 65, 0.3);
-    font-size: clamp(12px, 2vw, 14px);
+    font-size: clamp(13px, 2.2vw, 15px);
     color: #ec4141;
     font-weight: 500;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     word-wrap: break-word;
     overflow-wrap: break-word;
+    box-shadow: 0 4px 12px rgba(236, 65, 65, 0.2);
 }
 
 .immersive-current-song:hover {
     background: rgba(236, 65, 65, 0.25);
     border-color: rgba(236, 65, 65, 0.5);
     transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(236, 65, 65, 0.3);
 }
 
+/* 歌词显示区域 - 现代化设计 */
 .immersive-lyrics {
     flex: 1;
     width: 100%;
     min-height: clamp(200px, 30vh, 300px);
     max-height: clamp(300px, 50vh, 500px);
     overflow-y: auto;
+    overflow-x: hidden;
     text-align: center;
-    padding: clamp(15px, 3vh, 30px) clamp(12px, 2vw, 20px);
+    padding: clamp(20px, 4vh, 40px) clamp(16px, 3vw, 24px);
     color: #e0e0e0;
-    font-size: clamp(14px, 2.5vw, 18px);
-    line-height: 2.8;
+    font-size: clamp(16px, 3vw, 20px);
+    line-height: 2.2;
     display: flex;
     flex-direction: column;
     justify-content: flex-start;
+    align-items: center;
     pointer-events: auto;
-    background: rgba(0, 0, 0, 0.2);
-    backdrop-filter: blur(10px);
-    border-radius: clamp(12px, 2vw, 16px);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(0, 0, 0, 0.25);
+    backdrop-filter: blur(16px);
+    border-radius: clamp(16px, 3vw, 20px);
+    border: 1px solid rgba(255, 255, 255, 0.12);
     animation: fadeInUp 0.6s cubic-bezier(0.4, 0, 0.2, 1) 0.3s both;
     box-sizing: border-box;
+    box-shadow: 
+        inset 0 2px 8px rgba(0, 0, 0, 0.3),
+        0 4px 16px rgba(0, 0, 0, 0.2);
+}
+
+.immersive-lyrics-empty {
+    color: rgba(255, 255, 255, 0.5);
+    padding: clamp(40px, 8vh, 80px) clamp(20px, 4vw, 40px);
+    font-size: clamp(16px, 3vw, 20px);
+    font-weight: 400;
 }
 
 .immersive-lyrics::-webkit-scrollbar {
@@ -301,63 +423,127 @@
     border-radius: 3px;
 }
 
+/* 歌词行 - 现代化设计 */
 .lyric-line {
-    margin: clamp(6px, 1vh, 10px) 0;
-    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-    color: #999;
-    font-size: clamp(14px, 2.5vw, 18px);
-    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    margin: clamp(8px, 1.5vh, 14px) 0;
+    padding: clamp(4px, 0.8vh, 8px) clamp(8px, 1.5vw, 16px);
+    transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    color: rgba(255, 255, 255, 0.5);
+    font-size: clamp(16px, 3vw, 20px);
+    font-weight: 400;
+    text-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
     transform: scale(1);
     word-wrap: break-word;
     overflow-wrap: break-word;
+    line-height: 1.6;
+    border-radius: clamp(6px, 1vw, 10px);
+    opacity: 0.6;
 }
 
 .lyric-line.active {
-    color: #ec4141;
-    font-size: clamp(18px, 4vw, 24px);
-    font-weight: bold;
-    text-shadow: 0 0 20px rgba(236, 65, 65, 0.6), 0 4px 8px rgba(0, 0, 0, 0.4);
-    transform: scale(1.05);
-    animation: lyricPulse 2s ease-in-out infinite;
+    color: #ffffff;
+    font-size: clamp(20px, 4.5vw, 28px);
+    font-weight: 600;
+    text-shadow: 
+        0 0 24px rgba(236, 65, 65, 0.8),
+        0 0 40px rgba(236, 65, 65, 0.4),
+        0 4px 12px rgba(0, 0, 0, 0.5);
+    transform: scale(1.08);
+    opacity: 1;
+    background: rgba(236, 65, 65, 0.15);
+    border: 1px solid rgba(236, 65, 65, 0.3);
+    animation: lyricPulse 2.5s ease-in-out infinite;
+    box-shadow: 
+        0 0 20px rgba(236, 65, 65, 0.3),
+        inset 0 0 20px rgba(236, 65, 65, 0.1);
 }
 
 @keyframes lyricPulse {
     0%, 100% {
-        text-shadow: 0 0 20px rgba(236, 65, 65, 0.6), 0 4px 8px rgba(0, 0, 0, 0.4);
+        text-shadow: 
+            0 0 24px rgba(236, 65, 65, 0.8),
+            0 0 40px rgba(236, 65, 65, 0.4),
+            0 4px 12px rgba(0, 0, 0, 0.5);
+        box-shadow: 
+            0 0 20px rgba(236, 65, 65, 0.3),
+            inset 0 0 20px rgba(236, 65, 65, 0.1);
     }
     50% {
-        text-shadow: 0 0 30px rgba(236, 65, 65, 0.8), 0 6px 12px rgba(0, 0, 0, 0.5);
+        text-shadow: 
+            0 0 32px rgba(236, 65, 65, 1),
+            0 0 50px rgba(236, 65, 65, 0.6),
+            0 6px 16px rgba(0, 0, 0, 0.6);
+        box-shadow: 
+            0 0 28px rgba(236, 65, 65, 0.5),
+            inset 0 0 24px rgba(236, 65, 65, 0.15);
     }
 }
 
+/* 进度条 - 现代化设计 */
 .immersive-progress-bar {
     flex: 1;
-    height: clamp(4px, 0.6vh, 6px);
-    background: rgba(255, 255, 255, 0.15);
-    border-radius: clamp(2px, 0.3vh, 3px);
+    height: clamp(5px, 0.8vh, 7px);
+    background: rgba(255, 255, 255, 0.12);
+    border-radius: clamp(3px, 0.5vh, 4px);
     cursor: pointer;
     position: relative;
     pointer-events: auto;
-    transition: height 0.2s;
+    transition: height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     min-width: 0;
+    overflow: hidden;
 }
 
 .immersive-progress-bar:hover {
-    height: clamp(6px, 0.8vh, 8px);
+    height: clamp(7px, 1vh, 9px);
+}
+
+.immersive-progress-bar:hover .immersive-progress-handle {
+    opacity: 1;
+    transform: scale(1);
 }
 
 .immersive-progress-fill {
     height: 100%;
-    background: linear-gradient(90deg, #ec4141 0%, #ff6b6b 100%);
+    background: linear-gradient(90deg, 
+        #ec4141 0%, 
+        #ff6b6b 50%,
+        #ec4141 100%);
+    background-size: 200% 100%;
     border-radius: inherit;
     width: 0%;
-    transition: width 0.1s;
+    transition: width 0.15s linear;
     position: relative;
-    box-shadow: 0 0 10px rgba(236, 65, 65, 0.5);
+    box-shadow: 
+        0 0 12px rgba(236, 65, 65, 0.6),
+        inset 0 0 8px rgba(255, 255, 255, 0.1);
+    animation: progressShimmer 3s linear infinite;
 }
 
-.immersive-progress-bar:hover .immersive-progress-fill {
-    box-shadow: 0 0 15px rgba(236, 65, 65, 0.7);
+.immersive-progress-handle {
+    position: absolute;
+    right: 0;
+    top: 50%;
+    transform: translate(50%, -50%) scale(0);
+    width: clamp(14px, 2.5vw, 18px);
+    height: clamp(14px, 2.5vw, 18px);
+    background: #ffffff;
+    border-radius: 50%;
+    box-shadow: 
+        0 0 12px rgba(236, 65, 65, 0.8),
+        0 2px 8px rgba(0, 0, 0, 0.4);
+    opacity: 0;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    pointer-events: none;
+    border: 2px solid #ec4141;
+}
+
+@keyframes progressShimmer {
+    0% {
+        background-position: 0% 0%;
+    }
+    100% {
+        background-position: 200% 0%;
+    }
 }
 
 .immersive-controls {
@@ -381,13 +567,24 @@
     box-sizing: border-box;
 }
 
+/* 时间显示 - 现代化设计 */
 .immersive-time {
-    font-size: clamp(11px, 2vw, 14px);
-    color: rgba(255, 255, 255, 0.7);
-    min-width: clamp(40px, 8vw, 50px);
+    font-size: clamp(12px, 2.2vw, 15px);
+    color: rgba(255, 255, 255, 0.75);
+    min-width: clamp(44px, 9vw, 56px);
     font-weight: 500;
     font-variant-numeric: tabular-nums;
     flex-shrink: 0;
+    text-align: center;
+    transition: color 0.3s ease;
+}
+
+.immersive-time-current {
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.immersive-time-total {
+    color: rgba(255, 255, 255, 0.6);
 }
 
 .immersive-control-buttons {
@@ -398,103 +595,162 @@
     flex-wrap: wrap;
 }
 
-/* 通用控制按钮样式 */
+/* 控制按钮 - 现代化设计 */
 .immersive-control-btn {
-    width: clamp(40px, 8vw, 50px);
-    height: clamp(40px, 8vw, 50px);
+    width: clamp(44px, 9vw, 56px);
+    height: clamp(44px, 9vw, 56px);
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
     border-radius: 50%;
-    font-size: clamp(18px, 3.5vw, 24px);
-    background: rgba(255, 255, 255, 0.1);
-    color: #e0e0e0;
-    transition: all 0.2s;
+    font-size: clamp(20px, 4vw, 26px);
+    background: rgba(255, 255, 255, 0.12);
+    backdrop-filter: blur(8px);
+    color: rgba(255, 255, 255, 0.9);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     pointer-events: auto;
     flex-shrink: 0;
+    padding: 0;
+    margin: 0;
+    outline: none;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
 
 .immersive-control-btn:hover {
     background: rgba(255, 255, 255, 0.2);
-    transform: scale(1.1);
+    border-color: rgba(255, 255, 255, 0.3);
+    transform: scale(1.12);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+    color: #ffffff;
 }
 
+.immersive-control-btn:active {
+    transform: scale(1.05);
+}
+
+/* 播放按钮 - 特殊样式 */
 .immersive-play-button {
-    width: clamp(56px, 11vw, 72px) !important;
-    height: clamp(56px, 11vw, 72px) !important;
-    font-size: clamp(24px, 5vw, 32px) !important;
+    width: clamp(64px, 13vw, 80px) !important;
+    height: clamp(64px, 13vw, 80px) !important;
+    font-size: clamp(28px, 6vw, 36px) !important;
     background: linear-gradient(135deg, #ec4141 0%, #d63636 100%) !important;
-    color: white !important;
+    color: #ffffff !important;
+    border: 2px solid rgba(255, 255, 255, 0.2) !important;
     box-shadow: 
-        0 8px 24px rgba(236, 65, 65, 0.5),
-        0 0 20px rgba(236, 65, 65, 0.3);
+        0 8px 24px rgba(236, 65, 65, 0.6),
+        0 0 24px rgba(236, 65, 65, 0.4),
+        inset 0 2px 8px rgba(255, 255, 255, 0.1);
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
-    border: 2px solid rgba(255, 255, 255, 0.1);
 }
 
 .immersive-play-button:hover {
     background: linear-gradient(135deg, #d63636 0%, #c02e2e 100%) !important;
-    transform: scale(1.1) !important;
+    transform: scale(1.15) !important;
     box-shadow: 
-        0 12px 32px rgba(236, 65, 65, 0.7),
-        0 0 30px rgba(236, 65, 65, 0.5);
-    border-color: rgba(255, 255, 255, 0.2);
+        0 12px 36px rgba(236, 65, 65, 0.8),
+        0 0 36px rgba(236, 65, 65, 0.6),
+        inset 0 2px 12px rgba(255, 255, 255, 0.15);
+    border-color: rgba(255, 255, 255, 0.3) !important;
 }
 
 .immersive-play-button:active {
-    transform: scale(1.05) !important;
+    transform: scale(1.08) !important;
 }
 
+/* 关闭按钮 - 现代化设计 */
 .immersive-close-btn {
     position: absolute;
-    top: clamp(12px, 2vh, 20px);
-    right: clamp(12px, 2vw, 20px);
-    width: clamp(36px, 7vw, 44px);
-    height: clamp(36px, 7vw, 44px);
+    top: clamp(16px, 2.5vh, 24px);
+    right: clamp(16px, 2.5vw, 24px);
+    width: clamp(40px, 8vw, 48px);
+    height: clamp(40px, 8vw, 48px);
     display: flex;
     align-items: center;
     justify-content: center;
-    background: rgba(0, 0, 0, 0.4);
-    backdrop-filter: blur(10px);
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(12px);
     border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.15);
     cursor: pointer;
-    font-size: clamp(16px, 3vw, 20px);
-    color: #e0e0e0;
-    z-index: 10;
+    color: rgba(255, 255, 255, 0.9);
+    z-index: 100;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     pointer-events: auto;
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 0;
+    margin: 0;
+    outline: none;
+}
+
+.immersive-close-btn svg {
+    width: 20px;
+    height: 20px;
+    stroke: currentColor;
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .immersive-close-btn:hover {
-    background: rgba(236, 65, 65, 0.3);
+    background: rgba(236, 65, 65, 0.4);
+    border-color: rgba(236, 65, 65, 0.6);
     transform: scale(1.1) rotate(90deg);
-    border-color: rgba(236, 65, 65, 0.5);
+    color: #ffffff;
+    box-shadow: 0 4px 16px rgba(236, 65, 65, 0.4);
 }
 
+.immersive-close-btn:active {
+    transform: scale(0.95) rotate(90deg);
+}
+
+/* 词曲作者信息 - 现代化设计 */
 .immersive-credits {
     display: flex;
     flex-direction: column;
-    gap: clamp(6px, 1vh, 8px);
-    padding: clamp(12px, 2.5vw, 20px);
-    background: rgba(0, 0, 0, 0.2);
-    backdrop-filter: blur(10px);
-    border-radius: clamp(8px, 1.5vw, 12px);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    font-size: clamp(11px, 2vw, 13px);
-    color: rgba(255, 255, 255, 0.7);
+    gap: clamp(8px, 1.5vh, 12px);
+    padding: clamp(16px, 3vw, 24px);
+    background: rgba(0, 0, 0, 0.25);
+    backdrop-filter: blur(16px);
+    border-radius: clamp(12px, 2.5vw, 16px);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    font-size: clamp(12px, 2.2vw, 14px);
+    color: rgba(255, 255, 255, 0.75);
     pointer-events: auto;
     animation: fadeInUp 0.6s cubic-bezier(0.4, 0, 0.2, 1) 0.35s both;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     box-sizing: border-box;
     word-wrap: break-word;
     overflow-wrap: break-word;
+    box-shadow: 
+        inset 0 1px 4px rgba(0, 0, 0, 0.3),
+        0 2px 8px rgba(0, 0, 0, 0.2);
 }
 
 .immersive-credits:hover {
-    background: rgba(0, 0, 0, 0.3);
+    background: rgba(0, 0, 0, 0.35);
     border-color: rgba(255, 255, 255, 0.2);
+    transform: translateY(-2px);
+    box-shadow: 
+        inset 0 1px 4px rgba(0, 0, 0, 0.3),
+        0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.immersive-credit-item {
+    display: flex;
+    align-items: baseline;
+    gap: clamp(8px, 1.5vw, 12px);
+    line-height: 1.6;
+}
+
+.immersive-credit-label {
+    color: rgba(255, 255, 255, 0.6);
+    font-weight: 500;
+    min-width: 24px;
+}
+
+.immersive-credit-value {
+    color: rgba(255, 255, 255, 0.9);
+    font-weight: 400;
+    flex: 1;
 }
 
 /* 响应式设计 */

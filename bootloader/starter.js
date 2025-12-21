@@ -1314,8 +1314,8 @@
                     try {
                         KernelLogger.info("BootLoader", "内核加载完成，显示锁屏界面");
                         // 延迟初始化锁屏界面，确保所有依赖已加载
-                        setTimeout(() => {
-                            LockScreen.init();
+                        setTimeout(async () => {
+                            await LockScreen.init();
                         }, 300);
                     } catch (e) {
                         KernelLogger.warn("BootLoader", `锁屏界面初始化失败: ${e.message}`);

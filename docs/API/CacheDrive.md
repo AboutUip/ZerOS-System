@@ -83,8 +83,9 @@ const value = await ProcessManager.callKernelAPI(
 **示例**:
 ```javascript
 // 设置系统缓存（1小时过期）
+// 注意：系统级缓存需要使用 ProcessManager.EXPLOIT_PID (10000)
 await ProcessManager.callKernelAPI(
-    this.pid,
+    ProcessManager.EXPLOIT_PID,
     'Cache.set',
     ['system.config', { theme: 'dark' }, { ttl: 3600000 }]
 );
@@ -115,8 +116,9 @@ await ProcessManager.callKernelAPI(
 **示例**:
 ```javascript
 // 获取系统缓存
+// 注意：系统级缓存需要使用 ProcessManager.EXPLOIT_PID (10000)
 const config = await ProcessManager.callKernelAPI(
-    this.pid,
+    ProcessManager.EXPLOIT_PID,
     'Cache.get',
     ['system.config', { theme: 'light' }]  // 默认主题为 'light'
 );
@@ -144,8 +146,9 @@ const userData = await ProcessManager.callKernelAPI(
 **示例**:
 ```javascript
 // 检查系统缓存是否存在
+// 注意：系统级缓存需要使用 ProcessManager.EXPLOIT_PID (10000)
 const exists = await ProcessManager.callKernelAPI(
-    this.pid,
+    ProcessManager.EXPLOIT_PID,
     'Cache.has',
     ['system.config']
 );
@@ -153,7 +156,7 @@ const exists = await ProcessManager.callKernelAPI(
 if (exists) {
     // 缓存存在，可以直接使用
     const config = await ProcessManager.callKernelAPI(
-        this.pid,
+        ProcessManager.EXPLOIT_PID,
         'Cache.get',
         ['system.config']
     );
@@ -175,8 +178,9 @@ if (exists) {
 **示例**:
 ```javascript
 // 删除系统缓存
+// 注意：系统级缓存需要使用 ProcessManager.EXPLOIT_PID (10000)
 await ProcessManager.callKernelAPI(
-    this.pid,
+    ProcessManager.EXPLOIT_PID,
     'Cache.delete',
     ['system.config']
 );
@@ -185,7 +189,7 @@ await ProcessManager.callKernelAPI(
 await ProcessManager.callKernelAPI(
     this.pid,
     'Cache.delete',
-    ['user.data', { pid: this.pid }]
+    ['user.data']
 );
 ```
 
@@ -204,8 +208,9 @@ await ProcessManager.callKernelAPI(
 **示例**:
 ```javascript
 // 清空所有系统缓存
+// 注意：系统级缓存需要使用 ProcessManager.EXPLOIT_PID (10000)
 const count = await ProcessManager.callKernelAPI(
-    this.pid,
+    ProcessManager.EXPLOIT_PID,
     'Cache.clear',
     [{}]
 );
@@ -214,7 +219,7 @@ const count = await ProcessManager.callKernelAPI(
 const expiredCount = await ProcessManager.callKernelAPI(
     this.pid,
     'Cache.clear',
-    [{ pid: this.pid, expiredOnly: true }]
+    [{ expiredOnly: true }]
 );
 ```
 
@@ -244,8 +249,9 @@ const expiredCount = await ProcessManager.callKernelAPI(
 **示例**:
 ```javascript
 // 获取系统缓存统计
+// 注意：系统级缓存需要使用 ProcessManager.EXPLOIT_PID (10000)
 const stats = await ProcessManager.callKernelAPI(
-    this.pid,
+    ProcessManager.EXPLOIT_PID,
     'Cache.getStats',
     [{}]
 );
