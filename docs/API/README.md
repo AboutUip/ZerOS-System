@@ -40,6 +40,7 @@
 - [CacheDrive.md](./CacheDrive.md) - 缓存驱动 ✅
 - [DragDrive.md](./DragDrive.md) - 拖拽驱动 ✅
 - [GeographyDrive.md](./GeographyDrive.md) - 地理位置驱动 ✅
+- [SpeechDrive.md](./SpeechDrive.md) - 语音识别驱动 ✅
 - [CryptDrive.md](./CryptDrive.md) - 加密驱动 ✅
 
 ### PHP 服务
@@ -105,6 +106,7 @@
 - PermissionManager
 - DragDrive
 - GeographyDrive
+- SpeechDrive
 - CryptDrive
 - FSDirve (PHP 服务)
 

@@ -73,7 +73,10 @@ class PermissionManager {
         
         // 缓存权限
         CACHE_READ: 'CACHE_READ',                           // 读取缓存
-        CACHE_WRITE: 'CACHE_WRITE'                          // 写入/删除缓存
+        CACHE_WRITE: 'CACHE_WRITE',                        // 写入/删除缓存
+        
+        // 语音识别权限
+        SPEECH_RECOGNITION: 'SPEECH_RECOGNITION'           // 语音识别
     };
     
     /**
@@ -135,6 +138,9 @@ class PermissionManager {
         // 缓存权限（普通权限，自动授予）
         [PermissionManager.PERMISSION.CACHE_READ]: PermissionManager.PERMISSION_LEVEL.NORMAL,
         [PermissionManager.PERMISSION.CACHE_WRITE]: PermissionManager.PERMISSION_LEVEL.NORMAL,
+        
+        // 语音识别权限（特殊权限，需要用户确认）
+        [PermissionManager.PERMISSION.SPEECH_RECOGNITION]: PermissionManager.PERMISSION_LEVEL.SPECIAL,
         
         // 危险权限（需要明确授权）
         [PermissionManager.PERMISSION.PROCESS_MANAGE]: PermissionManager.PERMISSION_LEVEL.DANGEROUS,

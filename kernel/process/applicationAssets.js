@@ -523,6 +523,25 @@ const APPLICATION_ASSETS = {
             supportsPreview: true,
             category: "system"
         }
+    },
+    
+    // 星火AI - AI聊天程序
+    // 注意：路径是 D: 盘下的真实路径
+    "sparkai": {
+        script: "D:/application/sparkai/sparkai.js",
+        styles: ["D:/application/sparkai/sparkai.css"],
+        icon: "D:/application/sparkai/sparkai.svg",
+        metadata: {
+            autoStart: false,
+            priority: 5,
+            description: "讯飞星火AI",
+            version: "1.0.0",
+            type: "GUI",
+            alwaysShowInTaskbar: false,
+            allowMultipleInstances: true,
+            supportsPreview: true,
+            category: "utility"  // 工具类应用
+        }
     }
 };
 

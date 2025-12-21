@@ -383,13 +383,63 @@
                     
                     // 监听响应
                     xhr.addEventListener('load', function() {
+                        // 根据 responseType 选择正确的响应数据
+                        let responseBody = '';
+                        let responseSize = 0;
+                        
+                        try {
+                            // 检查 responseType
+                            const responseType = xhr.responseType || '';
+                            
+                            if (responseType === '' || responseType === 'text') {
+                                // 文本类型，使用 responseText
+                                if (xhr.responseText) {
+                                    responseBody = xhr.responseText.substring(0, 1000);
+                                    responseSize = new Blob([xhr.responseText]).size;
+                                }
+                            } else {
+                                // 二进制类型（arraybuffer, blob 等），使用 response
+                                if (xhr.response) {
+                                    if (responseType === 'arraybuffer') {
+                                        // ArrayBuffer 类型
+                                        const buffer = xhr.response;
+                                        responseSize = buffer.byteLength;
+                                        // 只记录大小，不记录内容（二进制数据不适合作为字符串）
+                                        responseBody = `[ArrayBuffer: ${responseSize} bytes]`;
+                                    } else if (responseType === 'blob') {
+                                        // Blob 类型
+                                        const blob = xhr.response;
+                                        responseSize = blob.size;
+                                        responseBody = `[Blob: ${responseSize} bytes, type: ${blob.type || 'unknown'}]`;
+                                    } else {
+                                        // 其他类型（json 等）
+                                        try {
+                                            const responseStr = JSON.stringify(xhr.response);
+                                            responseBody = responseStr.substring(0, 1000);
+                                            responseSize = new Blob([responseStr]).size;
+                                        } catch (e) {
+                                            responseBody = `[${responseType}: ${typeof xhr.response}]`;
+                                            responseSize = 0;
+                                        }
+                                    }
+                                }
+                            }
+                        } catch (e) {
+                            // 如果读取响应失败，记录错误但不影响请求
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.debug("NetworkManager", `读取响应数据失败: ${e.message}`);
+                            }
+                            responseBody = '[无法读取响应数据]';
+                            responseSize = 0;
+                        }
+                        
                         self._handleResponseReceived({
                             url: requestUrl,
                             status: xhr.status,
                             statusText: xhr.statusText,
                             headers: {},
-                            body: xhr.responseText ? xhr.responseText.substring(0, 1000) : '',
-                            size: xhr.responseText ? new Blob([xhr.responseText]).size : 0
+                            body: responseBody,
+                            size: responseSize
                         });
                     });
                     

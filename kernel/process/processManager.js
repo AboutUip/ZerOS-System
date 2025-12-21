@@ -1373,6 +1373,16 @@ class ProcessManager {
                 }
             }
             
+            // 清理程序的语音识别会话
+            if (typeof SpeechDrive !== 'undefined' && typeof SpeechDrive.cleanupProcess === 'function') {
+                try {
+                    SpeechDrive.cleanupProcess(pid);
+                    ProcessManager._log(2, `已清理程序 PID ${pid} 的语音识别会话`);
+                } catch (e) {
+                    ProcessManager._log(1, `清理程序 PID ${pid} 的语音识别会话失败: ${e.message}`);
+                }
+            }
+            
             // 在清理GUI之后，关闭关联的CLI程序（避免递归调用）
             if (cliProgramPidToKill) {
                 ProcessManager._log(2, `CLI程序专用终端退出，关闭关联CLI程序 (PID: ${cliProgramPidToKill})`);
@@ -1836,6 +1846,15 @@ class ProcessManager {
             'Cache.delete': PermissionManager.PERMISSION.CACHE_WRITE,
             'Cache.clear': PermissionManager.PERMISSION.CACHE_WRITE,
             'Cache.getStats': PermissionManager.PERMISSION.CACHE_READ,
+            
+            // 语音识别API
+            'Speech.isSupported': null,  // 检查支持性不需要权限
+            'Speech.createSession': PermissionManager.PERMISSION.SPEECH_RECOGNITION,
+            'Speech.startRecognition': PermissionManager.PERMISSION.SPEECH_RECOGNITION,
+            'Speech.stopRecognition': PermissionManager.PERMISSION.SPEECH_RECOGNITION,
+            'Speech.stopSession': PermissionManager.PERMISSION.SPEECH_RECOGNITION,
+            'Speech.getSessionStatus': PermissionManager.PERMISSION.SPEECH_RECOGNITION,
+            'Speech.getSessionResults': PermissionManager.PERMISSION.SPEECH_RECOGNITION,
         };
         
         return apiPermissionMap[apiName] || null;
@@ -3583,6 +3602,74 @@ class ProcessManager {
                     throw new Error('GeographyDrive 模块未加载');
                 }
                 return GeographyDrive.getCachedLocation();
+            },
+            
+            // 语音识别API
+            'Speech.isSupported': async () => {
+                if (typeof SpeechDrive === 'undefined') {
+                    return false;
+                }
+                return SpeechDrive.isSupported();
+            },
+            'Speech.createSession': async (options = {}) => {
+                if (typeof SpeechDrive === 'undefined') {
+                    throw new Error('SpeechDrive 模块未加载');
+                }
+                if (pid === null || pid === undefined) {
+                    throw new Error('Speech.createSession: 无法获取进程 ID');
+                }
+                if (options && typeof options !== 'object') {
+                    throw new Error('Speech.createSession: options 必须是对象');
+                }
+                return await SpeechDrive.createSession(pid, options || {});
+            },
+            'Speech.startRecognition': async () => {
+                if (typeof SpeechDrive === 'undefined') {
+                    throw new Error('SpeechDrive 模块未加载');
+                }
+                if (pid === null || pid === undefined) {
+                    throw new Error('Speech.startRecognition: 无法获取进程 ID');
+                }
+                await SpeechDrive.startRecognition(pid);
+                return true;
+            },
+            'Speech.stopRecognition': async () => {
+                if (typeof SpeechDrive === 'undefined') {
+                    throw new Error('SpeechDrive 模块未加载');
+                }
+                if (pid === null || pid === undefined) {
+                    throw new Error('Speech.stopRecognition: 无法获取进程 ID');
+                }
+                await SpeechDrive.stopRecognition(pid);
+                return true;
+            },
+            'Speech.stopSession': async () => {
+                if (typeof SpeechDrive === 'undefined') {
+                    throw new Error('SpeechDrive 模块未加载');
+                }
+                if (pid === null || pid === undefined) {
+                    throw new Error('Speech.stopSession: 无法获取进程 ID');
+                }
+                await SpeechDrive.stopSession(pid);
+                return true;
+            },
+            'Speech.getSessionStatus': async () => {
+                if (typeof SpeechDrive === 'undefined') {
+                    throw new Error('SpeechDrive 模块未加载');
+                }
+                if (pid === null || pid === undefined) {
+                    throw new Error('Speech.getSessionStatus: 无法获取进程 ID');
+                }
+                return SpeechDrive.getSessionStatus(pid);
+            },
+            'Speech.getSessionResults': async () => {
+                if (typeof SpeechDrive === 'undefined') {
+                    throw new Error('SpeechDrive 模块未加载');
+                }
+                if (pid === null || pid === undefined) {
+                    throw new Error('Speech.getSessionResults: 无法获取进程 ID');
+                }
+                return SpeechDrive.getSessionResults(pid);
             },
             
             // 缓存API

@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="sparkGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#8b5cf6;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#ec4899;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- 背景圆形 -->
+  <circle cx="32" cy="32" r="30" fill="url(#sparkGradient)" opacity="0.9"/>
+  
+  <!-- 星火图标 - 抽象的火花/星星形状 -->
+  <g transform="translate(32, 32)">
+    <!-- 中心点 -->
+    <circle cx="0" cy="0" r="3" fill="#ffffff" opacity="0.9"/>
+    
+    <!-- 火花射线 -->
+    <g opacity="0.8">
+      <line x1="0" y1="0" x2="0" y2="-18" stroke="#ffffff" stroke-width="2" stroke-linecap="round"/>
+      <line x1="0" y1="0" x2="12.7" y2="-12.7" stroke="#ffffff" stroke-width="2" stroke-linecap="round"/>
+      <line x1="0" y1="0" x2="18" y2="0" stroke="#ffffff" stroke-width="2" stroke-linecap="round"/>
+      <line x1="0" y1="0" x2="12.7" y2="12.7" stroke="#ffffff" stroke-width="2" stroke-linecap="round"/>
+      <line x1="0" y1="0" x2="0" y2="18" stroke="#ffffff" stroke-width="2" stroke-linecap="round"/>
+      <line x1="0" y1="0" x2="-12.7" y2="12.7" stroke="#ffffff" stroke-width="2" stroke-linecap="round"/>
+      <line x1="0" y1="0" x2="-18" y2="0" stroke="#ffffff" stroke-width="2" stroke-linecap="round"/>
+      <line x1="0" y1="0" x2="-12.7" y2="-12.7" stroke="#ffffff" stroke-width="2" stroke-linecap="round"/>
+    </g>
+    
+    <!-- 小火花点 -->
+    <circle cx="0" cy="-15" r="2" fill="#ffffff"/>
+    <circle cx="10.6" cy="-10.6" r="2" fill="#ffffff"/>
+    <circle cx="15" cy="0" r="2" fill="#ffffff"/>
+    <circle cx="10.6" cy="10.6" r="2" fill="#ffffff"/>
+    <circle cx="0" cy="15" r="2" fill="#ffffff"/>
+    <circle cx="-10.6" cy="10.6" r="2" fill="#ffffff"/>
+    <circle cx="-15" cy="0" r="2" fill="#ffffff"/>
+    <circle cx="-10.6" cy="-10.6" r="2" fill="#ffffff"/>
+  </g>
+</svg>
+

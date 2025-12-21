@@ -126,6 +126,11 @@
             "../kernel/drive/LStorage.js",
             "../kernel/dynamicModule/dynamicManager.js"
         ],
+        
+        // 第十二层：语音识别驱动器（依赖进程管理器，用于进程退出时清理会话）
+        "../kernel/drive/speechDrive.js": [
+            "../kernel/process/processManager.js"
+        ],
     };
     
     // 加载脚本的 Promise 缓存

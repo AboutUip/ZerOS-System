@@ -874,6 +874,254 @@ TaskbarManager._lockScreen();
 
 设置程序使用 Windows 10 风格的 UI，并自动适配主题切换。
 
+## 系统服务
+
+### 语音识别
+
+ZerOS 提供了基于 Web Speech API 的语音识别功能，支持多语言识别、持续识别和实时结果反馈。
+
+#### 权限要求
+
+使用语音识别功能需要 `SPEECH_RECOGNITION` 权限（特殊权限，需要用户确认）：
+
+```javascript
+__info__: function() {
+    return {
+        // ...
+        permissions: ['SPEECH_RECOGNITION']
+    };
+}
+```
+
+#### 基本使用
+
+```javascript
+__init__: async function(pid, initArgs) {
+    this.pid = pid;
+    
+    // 1. 检查浏览器支持
+    const supported = await Process.callKernelAPI('Speech.isSupported');
+    if (!supported) {
+        alert('浏览器不支持语音识别');
+        return;
+    }
+    
+    // 2. 创建识别会话
+    await Process.callKernelAPI('Speech.createSession', [{
+        language: 'zh-CN',  // 简体中文
+        continuous: true,   // 持续识别
+        interimResults: true,  // 返回临时结果
+        onResult: (text, isFinal) => {
+            if (isFinal) {
+                console.log('最终结果:', text);
+                this.handleFinalResult(text);
+            } else {
+                console.log('临时结果:', text);
+                this.updateTemporaryResult(text);
+            }
+        },
+        onError: (error) => {
+            console.error('识别错误:', error);
+            alert('识别出错: ' + error.message);
+        },
+        onEnd: () => {
+            console.log('识别已结束');
+        }
+    }]);
+    
+    // 3. 启动识别
+    await Process.callKernelAPI('Speech.startRecognition');
+}
+
+// 处理最终结果
+handleFinalResult: function(text) {
+    // 更新 UI 显示最终结果
+    const resultElement = document.getElementById('result');
+    if (resultElement) {
+        resultElement.textContent = text;
+    }
+}
+
+// 更新临时结果
+updateTemporaryResult: function(text) {
+    // 更新 UI 显示临时结果（灰色、斜体等）
+    const tempElement = document.getElementById('temp-result');
+    if (tempElement) {
+        tempElement.textContent = text;
+        tempElement.style.opacity = '0.6';
+        tempElement.style.fontStyle = 'italic';
+    }
+}
+
+__exit__: async function() {
+    // 停止并销毁识别会话
+    try {
+        await Process.callKernelAPI('Speech.stopSession');
+    } catch (error) {
+        console.error('停止识别失败:', error);
+    }
+}
+```
+
+#### 控制识别
+
+```javascript
+// 停止识别（但保留会话）
+await Process.callKernelAPI('Speech.stopRecognition');
+
+// 重新启动识别
+await Process.callKernelAPI('Speech.startRecognition');
+
+// 获取会话状态
+const status = await Process.callKernelAPI('Speech.getSessionStatus');
+console.log('识别状态:', status.status);
+console.log('识别语言:', status.language);
+console.log('结果数量:', status.resultsCount);
+
+// 获取所有最终结果
+const results = await Process.callKernelAPI('Speech.getSessionResults');
+console.log('所有结果:', results);
+```
+
+#### 支持的语言
+
+语音识别支持多种语言，默认使用简体中文（`zh-CN`）：
+
+- `zh-CN` - 简体中文（默认）
+- `zh-TW` - 繁体中文
+- `en-US` - 美式英语
+- `en-GB` - 英式英语
+- `ja-JP` - 日语
+- `ko-KR` - 韩语
+- `fr-FR` - 法语
+- `de-DE` - 德语
+- `es-ES` - 西班牙语
+- `ru-RU` - 俄语
+
+#### 注意事项
+
+1. **浏览器支持**: 建议使用 Chrome 或 Edge 浏览器
+2. **HTTPS 要求**: 需要 HTTPS 环境（localhost 可用）
+3. **权限要求**: 首次使用需要用户授权麦克风权限
+4. **自动清理**: 进程退出时会自动清理识别会话
+5. **持续识别**: 如果设置了 `continuous: true`，识别停止后会自动重启
+6. **临时结果**: 临时结果会实时更新，最终结果会被保存到会话中
+
+#### 完整示例
+
+```javascript
+class VoiceAssistant {
+    async __init__(pid, initArgs) {
+        this.pid = pid;
+        this.isListening = false;
+        this.results = [];
+        
+        // 检查支持
+        const supported = await Process.callKernelAPI('Speech.isSupported');
+        if (!supported) {
+            this.showError('浏览器不支持语音识别');
+            return;
+        }
+        
+        // 创建 UI
+        this.createUI();
+        
+        // 创建识别会话
+        await this.setupRecognition();
+    }
+    
+    createUI() {
+        const container = document.getElementById('gui-container');
+        this.window = document.createElement('div');
+        this.window.className = 'voice-assistant zos-gui-window';
+        this.window.innerHTML = `
+            <div class="status">未开始</div>
+            <div class="temp-result" style="opacity: 0.6; font-style: italic;"></div>
+            <div class="final-results"></div>
+            <button class="start-btn">开始识别</button>
+            <button class="stop-btn" disabled>停止识别</button>
+        `;
+        container.appendChild(this.window);
+        
+        // 绑定事件
+        this.window.querySelector('.start-btn').addEventListener('click', () => this.start());
+        this.window.querySelector('.stop-btn').addEventListener('click', () => this.stop());
+    }
+    
+    async setupRecognition() {
+        await Process.callKernelAPI('Speech.createSession', [{
+            language: 'zh-CN',
+            continuous: true,
+            interimResults: true,
+            onResult: (text, isFinal) => {
+                if (isFinal) {
+                    this.results.push(text);
+                    this.updateFinalResults();
+                } else {
+                    this.updateTemporaryResult(text);
+                }
+            },
+            onError: (error) => {
+                this.showError('识别错误: ' + error.message);
+                this.stop();
+            }
+        }]);
+    }
+    
+    async start() {
+        try {
+            await Process.callKernelAPI('Speech.startRecognition');
+            this.isListening = true;
+            this.window.querySelector('.status').textContent = '正在识别...';
+            this.window.querySelector('.start-btn').disabled = true;
+            this.window.querySelector('.stop-btn').disabled = false;
+        } catch (error) {
+            this.showError('启动识别失败: ' + error.message);
+        }
+    }
+    
+    async stop() {
+        try {
+            await Process.callKernelAPI('Speech.stopRecognition');
+            this.isListening = false;
+            this.window.querySelector('.status').textContent = '已停止';
+            this.window.querySelector('.start-btn').disabled = false;
+            this.window.querySelector('.stop-btn').disabled = true;
+        } catch (error) {
+            this.showError('停止识别失败: ' + error.message);
+        }
+    }
+    
+    updateTemporaryResult(text) {
+        const tempElement = this.window.querySelector('.temp-result');
+        tempElement.textContent = text;
+    }
+    
+    updateFinalResults() {
+        const resultsElement = this.window.querySelector('.final-results');
+        resultsElement.innerHTML = this.results.map((r, i) => 
+            `<div class="result-item">${i + 1}. ${r}</div>`
+        ).join('');
+    }
+    
+    showError(message) {
+        alert(message);
+    }
+    
+    async __exit__() {
+        if (this.isListening) {
+            await this.stop();
+        }
+        await Process.callKernelAPI('Speech.stopSession');
+        if (this.window && this.window.parentElement) {
+            this.window.parentElement.removeChild(this.window);
+        }
+    }
+}
+```
+
+更多详细信息请参考 [SpeechDrive API 文档](./API/SpeechDrive.md)。
+
 ## 主题与样式
 
 ### 使用主题变量

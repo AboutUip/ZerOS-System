@@ -1,7 +1,7 @@
 {
   "system": {
     "permissionManager.permissions": {
-      "10001": [
+      "10003": [
         "GUI_WINDOW_CREATE",
         "EVENT_LISTENER",
         "SYSTEM_NOTIFICATION"
@@ -53,6 +53,15 @@
         "description": "贪吃蛇",
         "position": null,
         "createdAt": 1765924910097
+      },
+      {
+        "id": 5,
+        "programName": "paint",
+        "name": "画板",
+        "icon": "D:/application/paint/paint.svg",
+        "description": "画板",
+        "position": null,
+        "createdAt": 1766307135134
       }
     ],
     "musicplayer.settings": {
@@ -323,7 +332,7 @@
         "lyrics": null
       }
     },
-    "system.desktopBackground": "local_D__cache_random_anime_bg_1765983395242_jpg",
+    "system.desktopBackground": "local_C___back2_png",
     "system.localDesktopBackgrounds": [
       {
         "id": "local_C___back2_png",
@@ -381,10 +390,10 @@
     "userControl.users": {
       "root": {
         "level": "DEFAULT_ADMIN",
-        "password": null,
+        "password": "61b249bf6d604d14120821f43625e84e",
         "avatar": "avatar_root_1766272534753.jpg",
         "createdAt": 1766271155991,
-        "lastLogin": 1766273596787
+        "lastLogin": 1766332601856
       },
       "TestUser": {
         "level": "USER",
@@ -394,7 +403,7 @@
         "lastLogin": 1766275335883
       }
     },
-    "userControl.currentUser": "TestUser"
+    "userControl.currentUser": "root"
   },
   "programs": {}
 }

@@ -45,6 +45,7 @@ ZerOS/
 │   │   ├── animateManager.js # 动画管理
 │   │   ├── networkManager.js # 网络管理
 │   │   ├── LStorage.js   # 本地存储
+│   │   ├── speechDrive.js # 语音识别驱动
 │   │   └── networkServiceWorker.js # 网络服务工作者
 │   ├── signal/            # 信号系统
 │   │   ├── dependencyConfig.js # 依赖管理和模块加载
@@ -400,6 +401,7 @@ ZerOS 提供了多个系统级驱动，扩展内核功能：
 - **LStorage**：本地存储管理，系统级和程序级数据持久化
 - **DragDrive**：拖拽驱动，统一的拖拽事件管理
 - **GeographyDrive**：地理位置驱动，高精度和低精度定位支持
+- **SpeechDrive**：语音识别驱动，基于 Web Speech API 的语音识别功能
 - **CryptDrive**：加密驱动，RSA 加密/解密、MD5 哈希、随机数生成
 
 详细 API 文档请参考：
@@ -408,6 +410,7 @@ ZerOS 提供了多个系统级驱动，扩展内核功能：
 - [LStorage API](API/LStorage.md)
 - [DragDrive API](API/DragDrive.md)
 - [GeographyDrive API](API/GeographyDrive.md)
+- [SpeechDrive API](API/SpeechDrive.md)
 - [CryptDrive API](API/CryptDrive.md)
 
 ### 7. 用户控制系统 (UserControl)
