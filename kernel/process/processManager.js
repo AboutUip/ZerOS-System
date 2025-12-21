@@ -800,6 +800,54 @@ class ProcessManager {
             }
         }
         
+        // 检查程序是否需要管理员权限
+        const ADMIN_ONLY_PROGRAMS = ['regedit', 'kernelchecker', 'authenticator'];
+        if (ADMIN_ONLY_PROGRAMS.includes(programName.toLowerCase())) {
+            // 检查当前用户是否为管理员
+            let isAdmin = false;
+            if (typeof UserControl !== 'undefined') {
+                try {
+                    await UserControl.ensureInitialized();
+                    isAdmin = UserControl.isAdmin();
+                } catch (e) {
+                    ProcessManager._log(1, `检查用户权限失败: ${e.message}`);
+                    KernelLogger.warn("ProcessManager", `检查用户权限失败: ${e.message}`, e);
+                    // 如果检查失败，为了安全起见，拒绝启动
+                    isAdmin = false;
+                }
+            } else {
+                // UserControl 未加载，为了安全起见，拒绝启动管理员专用程序
+                ProcessManager._log(1, `UserControl 未加载，无法验证用户权限`);
+                KernelLogger.warn("ProcessManager", `UserControl 未加载，无法验证用户权限，拒绝启动管理员专用程序: ${programName}`);
+                isAdmin = false;
+            }
+            
+            if (!isAdmin) {
+                const errorMsg = `程序 ${programName} 需要管理员权限，当前用户无权访问`;
+                ProcessManager._log(1, errorMsg);
+                KernelLogger.warn("ProcessManager", errorMsg);
+                
+                // 显示错误通知（错误通知不自动关闭，需要用户手动关闭）
+                if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                    try {
+                        const exploitPid = ProcessManager.EXPLOIT_PID;
+                        await NotificationManager.createNotification(exploitPid, {
+                            title: '权限不足',
+                            content: `程序 "${programName}" 需要管理员权限才能运行。`,
+                            type: 'snapshot',
+                            duration: 0  // 0表示不自动关闭，错误通知需要用户手动关闭
+                        });
+                    } catch (e) {
+                        ProcessManager._log(1, `创建通知失败: ${e.message}`);
+                    }
+                }
+                
+                throw new Error(errorMsg);
+            } else {
+                ProcessManager._log(2, `程序 ${programName} 管理员权限检查通过`);
+            }
+        }
+        
         // 检查程序是否支持多开
         const allowMultipleInstances = programMetadata && programMetadata.allowMultipleInstances === true;
         

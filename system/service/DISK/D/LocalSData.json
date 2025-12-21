@@ -1,7 +1,7 @@
 {
   "system": {
     "permissionManager.permissions": {
-      "10002": [
+      "10001": [
         "GUI_WINDOW_CREATE",
         "EVENT_LISTENER",
         "SYSTEM_NOTIFICATION"
@@ -391,10 +391,10 @@
         "password": "b4b14cabace7c83adf7106f283b194cb",
         "avatar": null,
         "createdAt": 1766271155991,
-        "lastLogin": 1766271677926
+        "lastLogin": 1766275335883
       }
     },
-    "userControl.currentUser": "root"
+    "userControl.currentUser": "TestUser"
   },
   "programs": {}
 }

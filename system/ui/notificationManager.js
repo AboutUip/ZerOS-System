@@ -382,7 +382,15 @@ class NotificationManager {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            gap: '12px'
+            gap: '12px',
+            // 确保标题栏不会看起来像输入框
+            border: 'none',
+            background: 'transparent',
+            outline: 'none',
+            padding: '0',
+            margin: '0',
+            width: '100%',
+            boxSizing: 'border-box'
         });
         
         if (title) {
@@ -392,9 +400,22 @@ class NotificationManager {
                 fontWeight: '600',
                 color: '#e0e0e0',
                 flex: '1',
-                minWidth: '0'
+                minWidth: '0',
+                // 确保标题元素不会看起来像输入框
+                border: 'none',
+                background: 'transparent',
+                outline: 'none',
+                padding: '0',
+                margin: '0',
+                userSelect: 'none',
+                pointerEvents: 'auto',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap'
             });
             titleElement.textContent = title;
+            // 确保标题元素不可编辑
+            titleElement.contentEditable = false;
             header.appendChild(titleElement);
         }
         
