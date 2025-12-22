@@ -878,6 +878,50 @@ class GUIManager {
             EventManager.unregisterResizer(`zos-window-resize-top-right-${windowId}`);
             EventManager.unregisterResizer(`zos-window-resize-top-left-${windowId}`);
             EventManager.unregisterResizer(`zos-window-resize-bottom-left-${windowId}`);
+            
+            // 清理触摸拖动事件处理器
+            if (windowInfo._touchDragHandlers) {
+                if (Array.isArray(windowInfo._touchDragHandlers)) {
+                    // EventManager 注册的处理器ID
+                    windowInfo._touchDragHandlers.forEach(handlerId => {
+                        if (typeof handlerId === 'number') {
+                            EventManager.unregisterEventHandler(windowInfo.pid, 'touchmove', handlerId);
+                            EventManager.unregisterEventHandler(windowInfo.pid, 'touchend', handlerId);
+                            EventManager.unregisterEventHandler(windowInfo.pid, 'touchcancel', handlerId);
+                        }
+                    });
+                } else {
+                    // 降级方案的直接事件监听器
+                    document.removeEventListener('touchmove', windowInfo._touchDragHandlers.touchmove);
+                    document.removeEventListener('touchend', windowInfo._touchDragHandlers.touchend);
+                    document.removeEventListener('touchcancel', windowInfo._touchDragHandlers.touchcancel);
+                }
+                windowInfo._touchDragHandlers = null;
+            }
+            
+            // 清理触摸拉伸事件处理器
+            if (windowInfo._touchResizeHandlers) {
+                if (Array.isArray(windowInfo._touchResizeHandlers)) {
+                    // EventManager 注册的处理器ID
+                    windowInfo._touchResizeHandlers.forEach(handlerId => {
+                        if (typeof handlerId === 'number') {
+                            EventManager.unregisterEventHandler(windowInfo.pid, 'touchmove', handlerId);
+                            EventManager.unregisterEventHandler(windowInfo.pid, 'touchend', handlerId);
+                            EventManager.unregisterEventHandler(windowInfo.pid, 'touchcancel', handlerId);
+                        }
+                    });
+                } else if (Array.isArray(windowInfo._touchResizeHandlers)) {
+                    // 降级方案的直接事件监听器数组
+                    windowInfo._touchResizeHandlers.forEach(handlers => {
+                        if (handlers && typeof handlers === 'object') {
+                            document.removeEventListener('touchmove', handlers.touchmove);
+                            document.removeEventListener('touchend', handlers.touchend);
+                            document.removeEventListener('touchcancel', handlers.touchcancel);
+                        }
+                    });
+                }
+                windowInfo._touchResizeHandlers = null;
+            }
         }
         
         // 清理标题栏保护观察器
@@ -2920,109 +2964,196 @@ class GUIManager {
         windowInfo.windowState.isMaximized = windowInfo.isMaximized;
         windowInfo.windowState.isMinimized = windowInfo.isMinimized;
         
-        // 注册拖动事件（通过标题栏拖动）
+        // 辅助函数：获取事件坐标（支持鼠标和触摸事件）
+        const getEventCoordinates = (e) => {
+            if (e.touches && e.touches.length > 0) {
+                return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+            } else if (e.changedTouches && e.changedTouches.length > 0) {
+                return { x: e.changedTouches[0].clientX, y: e.changedTouches[0].clientY };
+            } else {
+                return { x: e.clientX, y: e.clientY };
+            }
+        };
+        
+        // 拖动处理函数
+        const handleDragStart = (e) => {
+            // 只处理鼠标左键或触摸事件
+            if (e.type === 'mousedown' && e.button !== 0) {
+                return;
+            }
+            
+            // 检查是否点击在排除的元素上
+            const excludeSelectors = ['.zos-window-btn', 'button', '.zos-window-resizer', '.videoplayer-controls-bar', '.videoplayer-progress-bar', '.videoplayer-progress-container', '.videoplayer-controls', 'video'];
+            if (excludeSelectors.some(selector => e.target.closest && e.target.closest(selector))) {
+                return;
+            }
+            
+            if (windowInfo.isMaximized || windowInfo.isMinimized) {
+                e.preventDefault();
+                e.stopPropagation();
+                return;
+            }
+            
+            // 获得焦点
+            GUIManager.focusWindow(windowId);
+            
+            // 如果窗口使用了transform居中，需要先转换为固定定位
+            const rect = windowElement.getBoundingClientRect();
+            const computedStyle = window.getComputedStyle(windowElement);
+            const transform = computedStyle.transform;
+            
+            // 如果使用了transform，需要计算实际位置
+            if (transform && transform !== 'none') {
+                // 移除transform，使用固定定位
+                windowElement.style.transform = 'none';
+                windowElement.style.position = 'fixed';
+                windowElement.style.left = rect.left + 'px';
+                windowElement.style.top = rect.top + 'px';
+            }
+            
+            const coords = getEventCoordinates(e);
+            windowInfo.windowState.isDragging = true;
+            windowInfo.windowState.dragStartX = coords.x;
+            windowInfo.windowState.dragStartY = coords.y;
+            windowInfo.windowState.dragStartLeft = rect.left;
+            windowInfo.windowState.dragStartTop = rect.top;
+            
+            // 触摸事件需要阻止默认行为，防止页面滚动
+            if (e.type === 'touchstart') {
+                e.preventDefault();
+            }
+        };
+        
+        const handleDrag = (e) => {
+            if (windowInfo.isMaximized || windowInfo.isMinimized || !windowInfo.windowState.isDragging) {
+                return;
+            }
+            
+            const coords = getEventCoordinates(e);
+            const deltaX = coords.x - windowInfo.windowState.dragStartX;
+            const deltaY = coords.y - windowInfo.windowState.dragStartY;
+            
+            // 获取容器边界
+            const guiContainer = document.getElementById('gui-container');
+            const rect = windowElement.getBoundingClientRect();
+            const winWidth = rect.width || windowElement.offsetWidth;
+            const winHeight = rect.height || windowElement.offsetHeight;
+            
+            let newLeft = windowInfo.windowState.dragStartLeft + deltaX;
+            let newTop = windowInfo.windowState.dragStartTop + deltaY;
+            
+            if (guiContainer) {
+                const containerRect = guiContainer.getBoundingClientRect();
+                // 相对于容器的位置
+                const relativeLeft = newLeft - containerRect.left;
+                const relativeTop = newTop - containerRect.top;
+                
+                // 限制在容器内
+                const maxLeft = Math.max(0, containerRect.width - winWidth);
+                const maxTop = Math.max(0, containerRect.height - winHeight);
+                const finalLeft = Math.max(0, Math.min(relativeLeft, maxLeft));
+                const finalTop = Math.max(0, Math.min(relativeTop, maxTop));
+                
+                windowElement.style.left = `${finalLeft}px`;
+                windowElement.style.top = `${finalTop}px`;
+            } else {
+                // 没有容器，使用视口边界
+                const viewportWidth = window.innerWidth || document.documentElement.clientWidth;
+                const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
+                
+                // 限制在视口内
+                const maxLeft = Math.max(0, viewportWidth - winWidth);
+                const maxTop = Math.max(0, viewportHeight - winHeight);
+                const finalLeft = Math.max(0, Math.min(newLeft, maxLeft));
+                const finalTop = Math.max(0, Math.min(newTop, maxTop));
+                
+                windowElement.style.left = `${finalLeft}px`;
+                windowElement.style.top = `${finalTop}px`;
+            }
+            
+            // 触摸事件需要阻止默认行为，防止页面滚动
+            if (e.type === 'touchmove') {
+                e.preventDefault();
+            }
+        };
+        
+        const handleDragEnd = (e) => {
+            windowInfo.windowState.isDragging = false;
+            
+            // 触摸事件需要阻止默认行为
+            if (e.type === 'touchend') {
+                e.preventDefault();
+            }
+        };
+        
+        // 注册拖动事件（通过标题栏拖动）- 鼠标事件
         if (typeof EventManager !== 'undefined') {
             EventManager.registerDrag(
                 `zos-window-drag-${windowId}`,
                 titleBar,
                 windowElement,
                 windowInfo.windowState,
-                (e) => {
-                    // 拖动开始
-                    // 只处理鼠标左键
-                    if (e.button !== 0) {
-                        return;
-                    }
-                    
-                    if (windowInfo.isMaximized || windowInfo.isMinimized) {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        return;
-                    }
-                    
-                    // 获得焦点
-                    GUIManager.focusWindow(windowId);
-                    
-                    // 如果窗口使用了transform居中，需要先转换为固定定位
-                    const rect = windowElement.getBoundingClientRect();
-                    const computedStyle = window.getComputedStyle(windowElement);
-                    const transform = computedStyle.transform;
-                    
-                    // 如果使用了transform，需要计算实际位置
-                    if (transform && transform !== 'none') {
-                        // 移除transform，使用固定定位
-                        windowElement.style.transform = 'none';
-                        windowElement.style.position = 'fixed';
-                        windowElement.style.left = rect.left + 'px';
-                        windowElement.style.top = rect.top + 'px';
-                    }
-                    
-                    windowInfo.windowState.isDragging = true;
-                    windowInfo.windowState.dragStartX = e.clientX;
-                    windowInfo.windowState.dragStartY = e.clientY;
-                    windowInfo.windowState.dragStartLeft = rect.left;
-                    windowInfo.windowState.dragStartTop = rect.top;
-                },
-                (e) => {
-                    // 拖动中
-                    if (windowInfo.isMaximized || windowInfo.isMinimized || !windowInfo.windowState.isDragging) {
-                        return;
-                    }
-                    
-                    const deltaX = e.clientX - windowInfo.windowState.dragStartX;
-                    const deltaY = e.clientY - windowInfo.windowState.dragStartY;
-                    
-                    // 获取容器边界
-                    const guiContainer = document.getElementById('gui-container');
-                    const rect = windowElement.getBoundingClientRect();
-                    const winWidth = rect.width || windowElement.offsetWidth;
-                    const winHeight = rect.height || windowElement.offsetHeight;
-                    
-                    let newLeft = windowInfo.windowState.dragStartLeft + deltaX;
-                    let newTop = windowInfo.windowState.dragStartTop + deltaY;
-                    
-                    if (guiContainer) {
-                        const containerRect = guiContainer.getBoundingClientRect();
-                        // 相对于容器的位置
-                        const relativeLeft = newLeft - containerRect.left;
-                        const relativeTop = newTop - containerRect.top;
-                        
-                        // 限制在容器内
-                        const maxLeft = Math.max(0, containerRect.width - winWidth);
-                        const maxTop = Math.max(0, containerRect.height - winHeight);
-                        const finalLeft = Math.max(0, Math.min(relativeLeft, maxLeft));
-                        const finalTop = Math.max(0, Math.min(relativeTop, maxTop));
-                        
-                        windowElement.style.left = `${finalLeft}px`;
-                        windowElement.style.top = `${finalTop}px`;
-                    } else {
-                        // 没有容器，使用视口边界
-                        const viewportWidth = window.innerWidth || document.documentElement.clientWidth;
-                        const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
-                        
-                        // 限制在视口内
-                        const maxLeft = Math.max(0, viewportWidth - winWidth);
-                        const maxTop = Math.max(0, viewportHeight - winHeight);
-                        const finalLeft = Math.max(0, Math.min(newLeft, maxLeft));
-                        const finalTop = Math.max(0, Math.min(newTop, maxTop));
-                        
-                        windowElement.style.left = `${finalLeft}px`;
-                        windowElement.style.top = `${finalTop}px`;
-                    }
-                },
-                (e) => {
-                    // 拖动结束
-                    windowInfo.windowState.isDragging = false;
-                },
+                handleDragStart,
+                handleDrag,
+                handleDragEnd,
                 ['.zos-window-btn', 'button', '.zos-window-resizer', '.videoplayer-controls-bar', '.videoplayer-progress-bar', '.videoplayer-progress-container', '.videoplayer-controls', 'video']
             );
+        }
+        
+        // 注册触摸拖动事件（直接添加到标题栏）
+        let touchDragActive = false;
+        titleBar.addEventListener('touchstart', (e) => {
+            if (e.touches.length === 1) {
+                touchDragActive = true;
+                handleDragStart(e);
+            }
+        }, { passive: false });
+        
+        // 全局触摸移动和结束事件
+        const globalTouchMove = (e) => {
+            if (touchDragActive && windowInfo.windowState.isDragging) {
+                handleDrag(e);
+            }
+        };
+        
+        const globalTouchEnd = (e) => {
+            if (touchDragActive) {
+                handleDragEnd(e);
+                touchDragActive = false;
+            }
+        };
+        
+        // 使用 EventManager 注册全局触摸事件（如果可用）
+        if (typeof EventManager !== 'undefined' && windowInfo.pid) {
+            EventManager.registerEventHandler(windowInfo.pid, 'touchmove', globalTouchMove, {
+                priority: 100,
+                once: false,
+                passive: false
+            });
+            EventManager.registerEventHandler(windowInfo.pid, 'touchend', globalTouchEnd, {
+                priority: 100,
+                once: false,
+                passive: false
+            });
+        } else {
+            // 降级：直接添加全局事件监听器
+            document.addEventListener('touchmove', globalTouchMove, { passive: false });
+            document.addEventListener('touchend', globalTouchEnd, { passive: false });
+            document.addEventListener('touchcancel', globalTouchEnd, { passive: false });
+            
+            // 保存引用以便后续清理
+            windowInfo._touchDragHandlers = {
+                touchmove: globalTouchMove,
+                touchend: globalTouchEnd,
+                touchcancel: globalTouchEnd
+            };
         }
         
         // 创建拉伸器（右下角和右上角）
         GUIManager._createResizers(windowId, windowElement, windowInfo);
         
-        // 窗口点击获得焦点
-        windowElement.addEventListener('mousedown', (e) => {
+        // 窗口点击获得焦点（支持鼠标和触摸）
+        const handleWindowFocus = (e) => {
             // 如果点击的是窗口本身或窗口内的元素（但不是其他窗口的元素）
             if (e.target.closest('.zos-gui-window') === windowElement) {
                 // 排除拉伸器（使用更严格的检查）
@@ -3036,7 +3167,10 @@ class GUIManager {
                 }
                 GUIManager.focusWindow(windowId);
             }
-        });
+        };
+        
+        windowElement.addEventListener('mousedown', handleWindowFocus);
+        windowElement.addEventListener('touchstart', handleWindowFocus, { passive: true });
     }
     
     /**
@@ -3068,8 +3202,8 @@ class GUIManager {
             position: absolute;
             right: 0;
             bottom: 0;
-            width: 20px;
-            height: 20px;
+            width: 30px;
+            height: 30px;
             cursor: se-resize;
             z-index: 10001;
             background: transparent;
@@ -3078,6 +3212,7 @@ class GUIManager {
             -webkit-user-select: none;
             -moz-user-select: none;
             -ms-user-select: none;
+            touch-action: none;
         `;
         // 确保拉伸器可以接收鼠标事件
         resizerBottomRight.setAttribute('data-resizer', 'bottom-right');
@@ -3090,8 +3225,8 @@ class GUIManager {
             position: absolute;
             right: 0;
             top: 0;
-            width: 20px;
-            height: 20px;
+            width: 30px;
+            height: 30px;
             cursor: ne-resize;
             z-index: 10001;
             background: transparent;
@@ -3100,6 +3235,7 @@ class GUIManager {
             -webkit-user-select: none;
             -moz-user-select: none;
             -ms-user-select: none;
+            touch-action: none;
         `;
         // 确保拉伸器可以接收鼠标事件
         resizerTopRight.setAttribute('data-resizer', 'top-right');
@@ -3112,8 +3248,8 @@ class GUIManager {
             position: absolute;
             left: 0;
             top: 0;
-            width: 20px;
-            height: 20px;
+            width: 30px;
+            height: 30px;
             cursor: nw-resize;
             z-index: 10001;
             background: transparent;
@@ -3122,6 +3258,7 @@ class GUIManager {
             -webkit-user-select: none;
             -moz-user-select: none;
             -ms-user-select: none;
+            touch-action: none;
         `;
         // 确保拉伸器可以接收鼠标事件
         resizerTopLeft.setAttribute('data-resizer', 'top-left');
@@ -3135,8 +3272,8 @@ class GUIManager {
             position: absolute;
             left: 0;
             bottom: 0;
-            width: 20px;
-            height: 20px;
+            width: 30px;
+            height: 30px;
             cursor: sw-resize;
             z-index: 10001;
             background: transparent;
@@ -3145,11 +3282,32 @@ class GUIManager {
             -webkit-user-select: none;
             -moz-user-select: none;
             -ms-user-select: none;
+            touch-action: none;
         `;
         // 确保拉伸器可以接收鼠标事件
         resizerBottomLeft.setAttribute('data-resizer', 'bottom-left');
         // 将左下角拉伸器添加到窗口末尾，确保它在 DOM 中最后渲染（z-index 更高）
         windowElement.appendChild(resizerBottomLeft);
+        
+        // 辅助函数：获取事件坐标（支持鼠标和触摸事件）
+        const getResizeEventCoordinates = (e) => {
+            if (e.touches && e.touches.length > 0) {
+                return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+            } else if (e.changedTouches && e.changedTouches.length > 0) {
+                return { x: e.changedTouches[0].clientX, y: e.changedTouches[0].clientY };
+            } else {
+                return { x: e.clientX, y: e.clientY };
+            }
+        };
+        
+        // 创建触摸拉伸处理函数
+        // EventManager 的 registerResizer 已经通过 getResizeEventCoordinates 支持触摸事件
+        // 这里只需要确保触摸区域足够大，并且阻止默认行为
+        const createTouchResizeHandlers = (resizerElement, anchor) => {
+            // touch-action: none 已在创建拉伸器时设置，防止默认触摸行为（如滚动、缩放）
+            // 触摸事件会通过 EventManager 的全局事件处理系统自动处理
+            // registerResizer 的回调函数已经使用了 getResizeEventCoordinates 来支持触摸事件
+        };
         
         // 注册拉伸事件
         if (typeof EventManager !== 'undefined') {
@@ -3170,9 +3328,10 @@ class GUIManager {
                     GUIManager.focusWindow(windowId);
                     
                     const rect = windowElement.getBoundingClientRect();
+                    const coords = getResizeEventCoordinates(e);
                     windowInfo.windowState.isResizing = true;
-                    windowInfo.windowState.resizeStartX = e.clientX;
-                    windowInfo.windowState.resizeStartY = e.clientY;
+                    windowInfo.windowState.resizeStartX = coords.x;
+                    windowInfo.windowState.resizeStartY = coords.y;
                     windowInfo.windowState.resizeStartWidth = rect.width;
                     windowInfo.windowState.resizeStartHeight = rect.height;
                     windowInfo.windowState.resizeAnchor = 'bottom-right';
@@ -3195,8 +3354,14 @@ class GUIManager {
                         return;
                     }
                     
-                    const deltaX = e.clientX - windowInfo.windowState.resizeStartX;
-                    const deltaY = e.clientY - windowInfo.windowState.resizeStartY;
+                    const coords = getResizeEventCoordinates(e);
+                    const deltaX = coords.x - windowInfo.windowState.resizeStartX;
+                    const deltaY = coords.y - windowInfo.windowState.resizeStartY;
+                    
+                    // 触摸事件需要阻止默认行为
+                    if (e.type === 'touchmove') {
+                        e.preventDefault();
+                    }
                     
                     const minWidth = 300;
                     const minHeight = 200;
@@ -3265,9 +3430,10 @@ class GUIManager {
                     GUIManager.focusWindow(windowId);
                     
                     const rect = windowElement.getBoundingClientRect();
+                    const coords = getResizeEventCoordinates(e);
                     windowInfo.windowState.isResizing = true;
-                    windowInfo.windowState.resizeStartX = e.clientX;
-                    windowInfo.windowState.resizeStartY = e.clientY;
+                    windowInfo.windowState.resizeStartX = coords.x;
+                    windowInfo.windowState.resizeStartY = coords.y;
                     windowInfo.windowState.resizeStartWidth = rect.width;
                     windowInfo.windowState.resizeStartHeight = rect.height;
                     windowInfo.windowState.resizeStartTop = rect.top;
@@ -3292,8 +3458,14 @@ class GUIManager {
                         return;
                     }
                     
-                    const deltaX = e.clientX - windowInfo.windowState.resizeStartX;
-                    const deltaY = e.clientY - windowInfo.windowState.resizeStartY;
+                    const coords = getResizeEventCoordinates(e);
+                    const deltaX = coords.x - windowInfo.windowState.resizeStartX;
+                    const deltaY = coords.y - windowInfo.windowState.resizeStartY;
+                    
+                    // 触摸事件需要阻止默认行为
+                    if (e.type === 'touchmove') {
+                        e.preventDefault();
+                    }
                     
                     const minWidth = 300;
                     const minHeight = 200;
@@ -3357,8 +3529,16 @@ class GUIManager {
                     // 拉伸结束
                     windowInfo.windowState.isResizing = false;
                     windowInfo.windowState.resizeAnchor = null;
+                    
+                    // 触摸事件需要阻止默认行为
+                    if (e.type === 'touchend' || e.type === 'touchcancel') {
+                        e.preventDefault();
+                    }
                 }
             );
+            
+            // 为右上角拉伸器添加触摸事件支持
+            createTouchResizeHandlers(resizerTopRight, 'top-right');
             
             // 左上角拉伸
             EventManager.registerResizer(
@@ -3377,9 +3557,10 @@ class GUIManager {
                     GUIManager.focusWindow(windowId);
                     
                     const rect = windowElement.getBoundingClientRect();
+                    const coords = getResizeEventCoordinates(e);
                     windowInfo.windowState.isResizing = true;
-                    windowInfo.windowState.resizeStartX = e.clientX;
-                    windowInfo.windowState.resizeStartY = e.clientY;
+                    windowInfo.windowState.resizeStartX = coords.x;
+                    windowInfo.windowState.resizeStartY = coords.y;
                     windowInfo.windowState.resizeStartWidth = rect.width;
                     windowInfo.windowState.resizeStartHeight = rect.height;
                     windowInfo.windowState.resizeStartTop = rect.top;
@@ -3404,8 +3585,14 @@ class GUIManager {
                         return;
                     }
                     
-                    const deltaX = e.clientX - windowInfo.windowState.resizeStartX;
-                    const deltaY = e.clientY - windowInfo.windowState.resizeStartY;
+                    const coords = getResizeEventCoordinates(e);
+                    const deltaX = coords.x - windowInfo.windowState.resizeStartX;
+                    const deltaY = coords.y - windowInfo.windowState.resizeStartY;
+                    
+                    // 触摸事件需要阻止默认行为
+                    if (e.type === 'touchmove') {
+                        e.preventDefault();
+                    }
                     
                     const minWidth = 300;
                     const minHeight = 200;
@@ -3478,8 +3665,16 @@ class GUIManager {
                     // 拉伸结束
                     windowInfo.windowState.isResizing = false;
                     windowInfo.windowState.resizeAnchor = null;
+                    
+                    // 触摸事件需要阻止默认行为
+                    if (e.type === 'touchend' || e.type === 'touchcancel') {
+                        e.preventDefault();
+                    }
                 }
             );
+            
+            // 为左上角拉伸器添加触摸事件支持
+            createTouchResizeHandlers(resizerTopLeft, 'top-left');
             
             // 左下角拉伸
             EventManager.registerResizer(
@@ -3498,9 +3693,10 @@ class GUIManager {
                     GUIManager.focusWindow(windowId);
                     
                     const rect = windowElement.getBoundingClientRect();
+                    const coords = getResizeEventCoordinates(e);
                     windowInfo.windowState.isResizing = true;
-                    windowInfo.windowState.resizeStartX = e.clientX;
-                    windowInfo.windowState.resizeStartY = e.clientY;
+                    windowInfo.windowState.resizeStartX = coords.x;
+                    windowInfo.windowState.resizeStartY = coords.y;
                     windowInfo.windowState.resizeStartWidth = rect.width;
                     windowInfo.windowState.resizeStartHeight = rect.height;
                     windowInfo.windowState.resizeStartTop = rect.top;
@@ -3525,8 +3721,14 @@ class GUIManager {
                         return;
                     }
                     
-                    const deltaX = e.clientX - windowInfo.windowState.resizeStartX;
-                    const deltaY = e.clientY - windowInfo.windowState.resizeStartY;
+                    const coords = getResizeEventCoordinates(e);
+                    const deltaX = coords.x - windowInfo.windowState.resizeStartX;
+                    const deltaY = coords.y - windowInfo.windowState.resizeStartY;
+                    
+                    // 触摸事件需要阻止默认行为
+                    if (e.type === 'touchmove') {
+                        e.preventDefault();
+                    }
                     
                     const minWidth = 300;
                     const minHeight = 200;
@@ -3591,8 +3793,16 @@ class GUIManager {
                     // 拉伸结束
                     windowInfo.windowState.isResizing = false;
                     windowInfo.windowState.resizeAnchor = null;
+                    
+                    // 触摸事件需要阻止默认行为
+                    if (e.type === 'touchend' || e.type === 'touchcancel') {
+                        e.preventDefault();
+                    }
                 }
             );
+            
+            // 为左下角拉伸器添加触摸事件支持
+            createTouchResizeHandlers(resizerBottomLeft, 'bottom-left');
         }
     }
     

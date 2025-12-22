@@ -1,7 +1,7 @@
 {
   "system": {
     "permissionManager.permissions": {
-      "56692": [
+      "46799": [
         "GUI_WINDOW_CREATE",
         "KERNEL_DISK_READ",
         "KERNEL_DISK_LIST",
@@ -478,17 +478,17 @@
         "password": "61b249bf6d604d14120821f43625e84e",
         "avatar": "avatar_root_1766272534753.jpg",
         "createdAt": 1766271155991,
-        "lastLogin": 1766425016039
+        "lastLogin": 1766426453687
       },
       "TestUser": {
         "level": "USER",
         "password": null,
         "avatar": null,
         "createdAt": 1766271155991,
-        "lastLogin": 1766425085299
+        "lastLogin": 1766425092369
       }
     },
-    "userControl.currentUser": "TestUser",
+    "userControl.currentUser": "root",
     "system.lockscreenTimeComponent": true,
     "system.lockscreenBackground": "D:/cache/lockscreen/lockscreen_local_D__cache_random_anime_bg_1765983395242_jpg_random_anime_bg_1765983395242.jpg",
     "system.lockscreenRandomBg": true,
