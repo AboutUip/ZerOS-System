@@ -2007,7 +2007,14 @@
                 }
             } catch (e) {
                 if (typeof KernelLogger !== 'undefined') {
-                    KernelLogger.error('ThemeAnimator', '加载当前设置失败', e);
+                    // 确保错误信息被正确记录
+                    const errorMessage = e?.message || e?.toString() || String(e) || '未知错误';
+                    const errorStack = e?.stack || '';
+                    KernelLogger.error('ThemeAnimator', `加载当前设置失败: ${errorMessage}`, {
+                        error: errorMessage,
+                        stack: errorStack,
+                        pid: this.pid
+                    });
                 }
             }
         },
@@ -2030,7 +2037,13 @@
                 this.themeChangeUnsubscribe = ProcessManager.onThemeChange(themeChangeListener, this.pid);
             } catch (e) {
                 if (typeof KernelLogger !== 'undefined') {
-                    KernelLogger.error('ThemeAnimator', '注册主题变更监听器失败', e);
+                    const errorMessage = e?.message || e?.toString() || String(e) || '未知错误';
+                    const errorStack = e?.stack || '';
+                    KernelLogger.error('ThemeAnimator', `注册主题变更监听器失败: ${errorMessage}`, {
+                        error: errorMessage,
+                        stack: errorStack,
+                        pid: this.pid
+                    });
                 }
             }
             
@@ -2044,7 +2057,13 @@
                 this.styleChangeUnsubscribe = ProcessManager.onStyleChange(styleChangeListener, this.pid);
             } catch (e) {
                 if (typeof KernelLogger !== 'undefined') {
-                    KernelLogger.error('ThemeAnimator', '注册风格变更监听器失败', e);
+                    const errorMessage = e?.message || e?.toString() || String(e) || '未知错误';
+                    const errorStack = e?.stack || '';
+                    KernelLogger.error('ThemeAnimator', `注册风格变更监听器失败: ${errorMessage}`, {
+                        error: errorMessage,
+                        stack: errorStack,
+                        pid: this.pid
+                    });
                 }
             }
             

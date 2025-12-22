@@ -427,11 +427,31 @@ class PermissionManager {
      * @returns {boolean} 是否有权限
      */
     static hasPermission(pid, permission, context = {}) {
-        // Exploit 程序享有所有权限
+        // Exploit 程序享有所有权限，但必须验证 PID 是否为合法的 EXPLOIT_PID
         if (typeof ProcessManager !== 'undefined') {
-            const processInfo = ProcessManager.PROCESS_TABLE.get(pid);
-            if (processInfo?.isExploit) {
+            // 首先验证 PID 是否为合法的 EXPLOIT_PID
+            if (pid === ProcessManager.EXPLOIT_PID) {
+                // 只有合法的 EXPLOIT_PID 才能享有所有权限
+                // 即使其他进程修改了 isExploit 标志，也不会被授予权限
                 return true;
+            }
+            
+            // 对于非 EXPLOIT_PID，即使 isExploit 被设置为 true，也不授予权限
+            // 这防止了通过修改进程表来绕过权限检查的攻击
+            const processInfo = ProcessManager.PROCESS_TABLE.get(pid);
+            if (processInfo?.isExploit && pid !== ProcessManager.EXPLOIT_PID) {
+                // 检测到可疑的权限提升尝试
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error("PermissionManager", 
+                        `安全警告: 进程 ${pid} 的 isExploit 标志被设置为 true，但 PID 不是合法的 EXPLOIT_PID。这可能是权限提升攻击。`);
+                }
+                // 记录安全违规
+                PermissionManager._logSecurityViolation(pid, 'suspicious_isExploit_flag', {
+                    permission,
+                    isExploit: processInfo.isExploit,
+                    expectedExploitPid: ProcessManager.EXPLOIT_PID
+                });
+                // 拒绝权限，即使 isExploit 为 true
             }
         }
         
@@ -587,8 +607,20 @@ class PermissionManager {
                 : null;
             
             // Exploit 程序不受黑名单限制
-            if (processInfo?.isExploit) {
+            // 但必须验证 PID 是否为合法的 EXPLOIT_PID
+            if (processInfo?.isExploit && pid === ProcessManager.EXPLOIT_PID) {
                 return false;
+            }
+            // 如果 isExploit 为 true 但 PID 不是 EXPLOIT_PID，记录安全违规
+            if (processInfo?.isExploit && pid !== ProcessManager.EXPLOIT_PID) {
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.warn("PermissionManager", 
+                        `安全警告: 进程 ${pid} 的 isExploit 标志被设置为 true，但 PID 不是合法的 EXPLOIT_PID。在黑名单检查中忽略此标志。`);
+                }
+                PermissionManager._logSecurityViolation(pid, 'suspicious_isExploit_flag_in_blacklist', {
+                    isExploit: processInfo.isExploit,
+                    expectedExploitPid: ProcessManager.EXPLOIT_PID
+                });
             }
             
             const programName = processInfo?.programName;
@@ -1278,6 +1310,45 @@ class PermissionManager {
         KernelLogger.warn("PermissionManager", 
             `权限违规: 程序 ${programName} (PID ${pid}) 尝试访问未授权权限 ${permission}`);
     }
+    
+    /**
+     * 记录安全违规（用于权限提升攻击等严重安全问题）
+     * @private
+     */
+    static _logSecurityViolation(pid, violationType, details = {}) {
+        const processInfo = typeof ProcessManager !== 'undefined' 
+            ? ProcessManager.PROCESS_TABLE.get(pid) 
+            : null;
+        const programName = processInfo?.programName || `PID ${pid}`;
+        
+        const violationEntry = {
+            timestamp: Date.now(),
+            pid,
+            programName,
+            violationType,
+            details,
+            severity: 'critical',
+            stack: new Error().stack
+        };
+        
+        if (!PermissionManager._securityViolationLog) {
+            PermissionManager._securityViolationLog = [];
+        }
+        
+        PermissionManager._securityViolationLog.push(violationEntry);
+        
+        // 限制日志大小
+        if (PermissionManager._securityViolationLog.length > 500) {
+            PermissionManager._securityViolationLog.shift();
+        }
+        
+        // 记录错误日志
+        KernelLogger.error("PermissionManager", 
+            `安全违规: 程序 ${programName} (PID ${pid}), 类型: ${violationType}`, details);
+    }
+    
+    // 安全违规日志
+    static _securityViolationLog = [];
     
     /**
      * 更新权限统计

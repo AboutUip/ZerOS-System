@@ -183,59 +183,343 @@ class ProcessManager {
     }
     
     /**
-     * 获取进程表（兼容旧代码）
-     * @returns {Map<number, Object>} 进程表
+     * 创建受保护的进程表代理
+     * 防止外部代码直接修改进程表
+     * @param {Map} table 原始进程表
+     * @returns {Map} 受保护的进程表代理
      */
-    static get PROCESS_TABLE() {
-        // 如果已经有缓存的Map，直接返回
-        if (ProcessManager._processTableCache) {
-            return ProcessManager._processTableCache;
+    static _createProtectedProcessTable(table) {
+        // 创建只读副本，但允许通过安全方法更新
+        const protectedTable = new Map();
+        
+        // 复制所有进程信息，但创建受保护的进程信息对象
+        for (const [pid, info] of table) {
+            protectedTable.set(pid, ProcessManager._createProtectedProcessInfo(pid, info));
         }
         
-        // 从内存加载
-        const table = ProcessManager._getProcessTable();
-        ProcessManager._processTableCache = table;
-        return table;
+        // 使用 Proxy 保护 Map 操作
+        return new Proxy(protectedTable, {
+            get(target, prop) {
+                // 允许读取操作
+                if (prop === 'get' || prop === 'has' || prop === 'entries' || 
+                    prop === 'keys' || prop === 'values' || prop === 'forEach' || 
+                    prop === Symbol.iterator) {
+                    const method = target[prop];
+                    if (typeof method === 'function') {
+                        return method.bind(target);
+                    }
+                    return method;
+                }
+                
+                // size 是属性，不是方法
+                if (prop === 'size') {
+                    return target.size;
+                }
+                
+                // 禁止修改操作
+                if (prop === 'set' || prop === 'delete' || prop === 'clear') {
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.warn("ProcessManager", 
+                            `安全警告: 尝试直接修改进程表 (操作: ${prop})。请使用 ProcessManager.updateProcessInfo() 方法。`);
+                    }
+                    // 返回一个空函数，防止修改
+                    return () => {
+                        throw new Error(`安全错误: 不能直接修改进程表。请使用 ProcessManager.updateProcessInfo() 方法。`);
+                    };
+                }
+                
+                return target[prop];
+            },
+            set(target, prop, value) {
+                // 禁止设置新属性
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.warn("ProcessManager", 
+                        `安全警告: 尝试直接设置进程表属性 (属性: ${prop})。`);
+                }
+                return false;
+            }
+        });
+    }
+    
+    /**
+     * 创建受保护的进程信息对象
+     * 防止直接修改关键字段（如 isExploit）
+     * @param {number} pid 进程ID
+     * @param {Object} info 原始进程信息
+     * @returns {Object} 受保护的进程信息对象
+     */
+    static _createProtectedProcessInfo(pid, info) {
+        // 创建进程信息的浅拷贝（注意：嵌套对象不会被深拷贝）
+        // 这是为了性能考虑，因为进程信息中的 Map 和 Set 对象已经通过其他方式保护
+        const protectedInfo = { ...info };
+        
+        // 注意：嵌套对象（如 windowState）不会被深拷贝
+        // 但关键字段（如 isExploit）通过 Proxy 保护
+        // 如果进程信息包含嵌套对象，这些对象仍然可以被修改
+        // 但这不会影响 isExploit 等关键字段的保护
+        
+        // 对关键字段使用 Proxy 保护
+        return new Proxy(protectedInfo, {
+            set(target, prop, value) {
+                // 禁止修改 isExploit 字段（除非通过安全方法）
+                if (prop === 'isExploit') {
+                    // 只有 EXPLOIT_PID 可以设置 isExploit，且只能设置为 true
+                    if (pid !== ProcessManager.EXPLOIT_PID) {
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.error("ProcessManager", 
+                                `安全错误: 进程 ${pid} 尝试修改 isExploit 标志。只有 EXPLOIT_PID (${ProcessManager.EXPLOIT_PID}) 可以设置此标志。`);
+                        }
+                        // 记录安全审计
+                        ProcessManager._logSecurityViolation(pid, 'attempt_modify_isExploit', { 
+                            attemptedValue: value,
+                            currentValue: target.isExploit 
+                        });
+                        return false; // 拒绝修改
+                    }
+                    // EXPLOIT_PID 只能设置为 true
+                    if (value !== true) {
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn("ProcessManager", 
+                                `安全警告: EXPLOIT_PID 尝试将 isExploit 设置为 ${value}，已拒绝。`);
+                        }
+                        return false;
+                    }
+                }
+                
+                // 允许其他字段的修改
+                target[prop] = value;
+                return true;
+            },
+            get(target, prop) {
+                return target[prop];
+            }
+        });
+    }
+    
+    /**
+     * 记录安全违规
+     * @private
+     */
+    static _logSecurityViolation(pid, violationType, details = {}) {
+        if (typeof KernelLogger !== 'undefined') {
+            KernelLogger.error("ProcessManager", 
+                `安全违规: PID ${pid}, 类型: ${violationType}`, details);
+        }
+        
+        // 记录到安全审计日志
+        if (!ProcessManager._securityAuditLog) {
+            ProcessManager._securityAuditLog = [];
+        }
+        
+        ProcessManager._securityAuditLog.push({
+            timestamp: Date.now(),
+            pid,
+            violationType,
+            details,
+            stack: new Error().stack
+        });
+        
+        // 限制日志大小
+        if (ProcessManager._securityAuditLog.length > 1000) {
+            ProcessManager._securityAuditLog.shift();
+        }
+    }
+    
+    /**
+     * 安全地更新进程信息
+     * 这是唯一允许修改进程表的方法
+     * @param {number} pid 进程ID
+     * @param {Object} updates 要更新的字段
+     * @returns {boolean} 是否更新成功
+     */
+    static updateProcessInfo(pid, updates) {
+        // 验证 PID
+        if (typeof pid !== 'number' || pid < 0) {
+            if (typeof KernelLogger !== 'undefined') {
+                KernelLogger.warn("ProcessManager", `无效的 PID: ${pid}`);
+            }
+            return false;
+        }
+        
+        // 获取原始进程表（绕过保护）
+        const rawTable = ProcessManager._getProcessTable();
+        
+        // 检查进程是否存在
+        if (!rawTable.has(pid)) {
+            if (typeof KernelLogger !== 'undefined') {
+                KernelLogger.warn("ProcessManager", `进程不存在: PID ${pid}`);
+            }
+            return false;
+        }
+        
+        // 获取原始进程信息
+        const processInfo = rawTable.get(pid);
+        
+        // 特殊检查：禁止修改 isExploit（除非是 EXPLOIT_PID 且设置为 true）
+        if ('isExploit' in updates) {
+            if (pid !== ProcessManager.EXPLOIT_PID) {
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error("ProcessManager", 
+                        `安全错误: 进程 ${pid} 尝试通过 updateProcessInfo 修改 isExploit 标志。`);
+                }
+                ProcessManager._logSecurityViolation(pid, 'attempt_modify_isExploit_via_update', updates);
+                delete updates.isExploit; // 移除该字段
+            } else if (updates.isExploit !== true) {
+                // EXPLOIT_PID 只能设置为 true
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.warn("ProcessManager", 
+                        `安全警告: EXPLOIT_PID 尝试将 isExploit 设置为 ${updates.isExploit}，已拒绝。`);
+                }
+                delete updates.isExploit;
+            }
+        }
+        
+        // 更新进程信息
+        Object.assign(processInfo, updates);
+        rawTable.set(pid, processInfo);
+        
+        // 保存到内存
+        ProcessManager._saveProcessTable(rawTable);
+        
+        // 清空所有缓存，强制重新加载
+        ProcessManager._processTableCache = null;
+        ProcessManager._protectedProcessTableCache = null;
+        
+        // 清除已使用PID缓存（进程表已更新）
+        ProcessManager._invalidateUsedPidsCache();
+        
+        if (typeof KernelLogger !== 'undefined') {
+            KernelLogger.debug("ProcessManager", `已更新进程信息: PID ${pid}`, updates);
+        }
+        
+        return true;
+    }
+    
+    /**
+     * 获取进程表（兼容旧代码）
+     * 返回受保护的只读副本
+     * @returns {Map<number, Object>} 受保护的进程表
+     */
+    static get PROCESS_TABLE() {
+        // 如果已经有缓存的受保护表，直接返回
+        if (ProcessManager._protectedProcessTableCache) {
+            return ProcessManager._protectedProcessTableCache;
+        }
+        
+        // 从内存加载原始表
+        const rawTable = ProcessManager._getProcessTable();
+        
+        // 创建受保护的副本
+        const protectedTable = ProcessManager._createProtectedProcessTable(rawTable);
+        
+        // 缓存受保护的表
+        ProcessManager._protectedProcessTableCache = protectedTable;
+        
+        // 同时保存原始表的引用（用于内部更新）
+        ProcessManager._processTableCache = rawTable;
+        
+        return protectedTable;
     }
     
     // 进程表缓存（避免频繁从内存读取）
     static _processTableCache = null;
+    static _protectedProcessTableCache = null;
+    static _securityAuditLog = [];
     
     /**
-     * 获取下一个PID（从Exploit内存）
-     * @returns {number} 下一个PID
+     * PID分配范围配置
      */
-    static get NEXT_PID() {
-        if (typeof KernelMemory === 'undefined') {
-            // 降级：使用静态变量
-            if (ProcessManager._fallbackNextPid === undefined) {
-                // 默认从 10001 开始（Exploit 使用 10000）
-                ProcessManager._fallbackNextPid = ProcessManager.EXPLOIT_PID + 1;
+    static PID_MIN = ProcessManager.EXPLOIT_PID + 1;  // 最小PID（10001）
+    static PID_MAX = 99999;  // 最大PID
+    
+    /**
+     * 已使用的PID集合（用于避免重复分配）
+     * 注意：这个集合会从进程表中动态生成，不需要持久化
+     */
+    static _usedPids = null;
+    
+    /**
+     * 获取已使用的PID集合
+     * @returns {Set<number>} 已使用的PID集合
+     */
+    static _getUsedPids() {
+        if (ProcessManager._usedPids === null) {
+            ProcessManager._usedPids = new Set();
+            
+            // 从进程表中收集所有已使用的PID
+            const processTable = ProcessManager.PROCESS_TABLE;
+            for (const pid of processTable.keys()) {
+                ProcessManager._usedPids.add(pid);
             }
-            return ProcessManager._fallbackNextPid;
+            
+            // 始终包含EXPLOIT_PID
+            ProcessManager._usedPids.add(ProcessManager.EXPLOIT_PID);
         }
         
-        const pid = KernelMemory.loadData('NEXT_PID');
-        // 如果加载的 PID 小于等于 Exploit PID，则从 10001 开始
-        if (pid !== null && pid > ProcessManager.EXPLOIT_PID) {
-            return pid;
-        }
-        // 默认从 10001 开始（Exploit 使用 10000）
-        return ProcessManager.EXPLOIT_PID + 1;
+        return ProcessManager._usedPids;
     }
     
     /**
-     * 设置下一个PID（保存到Exploit内存）
-     * @param {number} pid 下一个PID
+     * 清除已使用PID缓存（当进程表发生变化时调用）
      */
-    static set NEXT_PID(pid) {
-        if (typeof KernelMemory === 'undefined') {
-            // 降级：使用静态变量
-            ProcessManager._fallbackNextPid = pid;
-            return;
+    static _invalidateUsedPidsCache() {
+        ProcessManager._usedPids = null;
+    }
+    
+    /**
+     * 生成加密安全的随机PID
+     * 使用crypto.getRandomValues（如果可用）或Math.random作为降级方案
+     * @returns {number} 随机PID
+     */
+    static _generateRandomPid() {
+        const min = ProcessManager.PID_MIN;
+        const max = ProcessManager.PID_MAX;
+        const range = max - min + 1;
+        
+        // 尝试使用crypto.getRandomValues（更安全）
+        if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+            try {
+                const array = new Uint32Array(1);
+                crypto.getRandomValues(array);
+                // 将随机数映射到PID范围
+                // 使用 0xFFFFFFFF + 1 (4294967296) 来归一化，确保结果在 [0, 1) 范围内
+                const randomValue = array[0] / (0xFFFFFFFF + 1);  // 归一化到[0, 1)
+                // Math.floor确保结果在 [min, max] 范围内（包含边界）
+                const pid = Math.floor(min + randomValue * range);
+                // 确保PID在有效范围内（防御性编程）
+                return Math.max(min, Math.min(max, pid));
+            } catch (e) {
+                // 如果crypto.getRandomValues失败，降级到Math.random
+                ProcessManager._log(1, `crypto.getRandomValues失败，使用Math.random: ${e.message}`);
+            }
         }
         
-        KernelMemory.saveData('NEXT_PID', pid);
+        // 降级方案：使用Math.random（虽然不够安全，但比顺序递增好）
+        return Math.floor(min + Math.random() * range);
+    }
+    
+    /**
+     * 获取下一个PID（已废弃，保留用于向后兼容）
+     * @deprecated 使用 _allocatePid() 代替
+     * @returns {number} 下一个PID
+     */
+    static get NEXT_PID() {
+        // 为了向后兼容，返回一个基于当前时间的伪随机值
+        // 但实际分配应该使用 _allocatePid()
+        const base = ProcessManager.PID_MIN;
+        const offset = Date.now() % (ProcessManager.PID_MAX - ProcessManager.PID_MIN + 1);
+        return base + offset;
+    }
+    
+    /**
+     * 设置下一个PID（已废弃，保留用于向后兼容）
+     * @deprecated PID现在是随机分配的，不再需要设置
+     * @param {number} pid 下一个PID（忽略）
+     */
+    static set NEXT_PID(pid) {
+        // 为了向后兼容，不执行任何操作
+        // PID现在是随机分配的，不需要设置
+        ProcessManager._log(3, `NEXT_PID setter被调用（已废弃），PID现在是随机分配的`);
     }
     
     // 降级方案：临时存储（仅在KernelMemory不可用时使用）
@@ -694,23 +978,57 @@ class ProcessManager {
     }
 
     /**
-     * 分配新的 PID
+     * 分配新的PID（使用加密安全的随机分配）
      * @returns {number} 新的 PID
      */
     static _allocatePid() {
-        let pid = ProcessManager.NEXT_PID;
+        const usedPids = ProcessManager._getUsedPids();
+        const maxAttempts = 1000;  // 最大尝试次数，防止无限循环
+        let attempts = 0;
+        let pid;
         
-        // 确保不会分配 Exploit 程序的 PID (10000)
-        if (pid === ProcessManager.EXPLOIT_PID) {
-            pid = ProcessManager.EXPLOIT_PID + 1;
-            ProcessManager.NEXT_PID = pid + 1;
-            ProcessManager._log(2, `跳过 Exploit PID，分配 PID: ${pid}`);
-        } else {
-            ProcessManager.NEXT_PID = pid + 1;
-            ProcessManager._log(3, `分配 PID: ${pid}`);
+        // 如果已使用的PID数量接近范围上限，需要清理或扩展范围
+        const availableRange = ProcessManager.PID_MAX - ProcessManager.PID_MIN + 1;
+        if (usedPids.size >= availableRange * 0.9) {
+            ProcessManager._log(1, `警告: 已使用的PID数量 (${usedPids.size}) 接近可用范围上限 (${availableRange})`);
         }
         
-        return pid;
+        // 生成随机PID，确保不与已使用的PID冲突
+        do {
+            pid = ProcessManager._generateRandomPid();
+            attempts++;
+            
+            // 确保不会分配 Exploit 程序的 PID
+            if (pid === ProcessManager.EXPLOIT_PID) {
+                continue;
+            }
+            
+            // 检查PID是否已被使用
+            if (!usedPids.has(pid)) {
+                // 找到未使用的PID
+                usedPids.add(pid);
+                ProcessManager._log(3, `分配随机 PID: ${pid} (尝试次数: ${attempts})`);
+                return pid;
+            }
+            
+            // 如果尝试次数过多，可能PID空间已满，记录警告
+            if (attempts >= maxAttempts) {
+                ProcessManager._log(1, `错误: 无法分配PID，已尝试 ${maxAttempts} 次。已使用PID数量: ${usedPids.size}`);
+                // 降级方案：使用顺序递增（虽然不安全，但至少能工作）
+                for (let fallbackPid = ProcessManager.PID_MIN; fallbackPid <= ProcessManager.PID_MAX; fallbackPid++) {
+                    if (fallbackPid !== ProcessManager.EXPLOIT_PID && !usedPids.has(fallbackPid)) {
+                        usedPids.add(fallbackPid);
+                        ProcessManager._log(1, `使用降级方案分配PID: ${fallbackPid}`);
+                        return fallbackPid;
+                    }
+                }
+                // 如果所有PID都被使用，抛出错误
+                throw new Error(`无法分配PID：所有可用的PID (${ProcessManager.PID_MIN}-${ProcessManager.PID_MAX}) 都已被使用`);
+            }
+        } while (attempts < maxAttempts);
+        
+        // 理论上不应该到达这里
+        throw new Error(`PID分配失败：达到最大尝试次数 ${maxAttempts}`);
     }
 
     /**
@@ -801,7 +1119,7 @@ class ProcessManager {
         }
         
         // 检查程序是否需要管理员权限
-        const ADMIN_ONLY_PROGRAMS = ['regedit', 'kernelchecker', 'authenticator'];
+        const ADMIN_ONLY_PROGRAMS = ['regedit', 'kernelchecker', 'authenticator', 'permissioncontrol'];
         if (ADMIN_ONLY_PROGRAMS.includes(programName.toLowerCase())) {
             // 检查当前用户是否为管理员
             let isAdmin = false;
@@ -937,8 +1255,20 @@ class ProcessManager {
         };
         
         const table = ProcessManager.PROCESS_TABLE;
-        table.set(pid, processInfo);
-        ProcessManager._saveProcessTable(table);
+        // 使用原始表进行更新（绕过保护）
+        const rawTable = ProcessManager._getProcessTable();
+        rawTable.set(pid, processInfo);
+        ProcessManager._saveProcessTable(rawTable);
+        
+        // 清空缓存，强制重新加载
+        ProcessManager._processTableCache = null;
+        ProcessManager._protectedProcessTableCache = null;
+        
+        // 清除已使用PID缓存（新进程已创建）
+        ProcessManager._invalidateUsedPidsCache();
+        
+        // 清除已使用PID缓存（进程表已更新）
+        ProcessManager._invalidateUsedPidsCache();
         
         // 注册程序名称到 MemoryManager
         if (typeof MemoryManager !== 'undefined') {
@@ -1141,6 +1471,9 @@ class ProcessManager {
             processInfo.status = 'starting';
             ProcessManager._saveProcessTable(ProcessManager.PROCESS_TABLE);
             
+            // 清除已使用PID缓存（进程状态已更新）
+            ProcessManager._invalidateUsedPidsCache();
+            
             // 注册程序权限（从 __info__ 中读取）
             // 必须在 __init__ 之前完成权限注册，确保程序初始化时已拥有所需权限
             if (typeof PermissionManager !== 'undefined') {
@@ -1180,6 +1513,19 @@ class ProcessManager {
                     await programClass.__init__(pid, standardizedInitArgs);
                     processInfo.status = 'running';
                     
+                    // 保存进程表（状态已更新为 running）
+                    // 使用原始表进行保存（绕过保护）
+                    const rawTable = ProcessManager._getProcessTable();
+                    rawTable.set(pid, processInfo);
+                    ProcessManager._saveProcessTable(rawTable);
+                    
+                    // 清除所有缓存，强制重新加载（确保任务栏和任务管理器能看到最新状态）
+                    ProcessManager._processTableCache = null;
+                    ProcessManager._protectedProcessTableCache = null;
+                    
+                    // 清除已使用PID缓存（进程状态已更新）
+                    ProcessManager._invalidateUsedPidsCache();
+                    
                     // 标记程序创建的元素（通过 data-pid 属性）
                     if (typeof document !== 'undefined' && document.body) {
                         ProcessManager._markProgramElements(pid, domSnapshotBefore);
@@ -1199,12 +1545,39 @@ class ProcessManager {
                 } catch (e) {
                     processInfo.status = 'exited';
                     processInfo.exitTime = Date.now();
+                    
+                    // 保存进程表（状态已更新为 exited）
+                    // 使用原始表进行保存（绕过保护）
+                    const rawTable = ProcessManager._getProcessTable();
+                    rawTable.set(pid, processInfo);
+                    ProcessManager._saveProcessTable(rawTable);
+                    
+                    // 清除所有缓存，强制重新加载
+                    ProcessManager._processTableCache = null;
+                    ProcessManager._protectedProcessTableCache = null;
+                    
+                    // 清除已使用PID缓存（进程状态已更新）
+                    ProcessManager._invalidateUsedPidsCache();
+                    
                     ProcessManager._log(1, `程序 ${programName} (PID: ${pid}) 初始化失败: ${e.message}`);
                     throw e;
                 }
             } else {
                 ProcessManager._log(1, `程序 ${programName} 没有 __init__ 方法，跳过初始化`);
                 processInfo.status = 'running';
+                
+                // 保存进程表（状态已更新为 running）
+                // 使用原始表进行保存（绕过保护）
+                const rawTable = ProcessManager._getProcessTable();
+                rawTable.set(pid, processInfo);
+                ProcessManager._saveProcessTable(rawTable);
+                
+                // 清除所有缓存，强制重新加载（确保任务栏和任务管理器能看到最新状态）
+                ProcessManager._processTableCache = null;
+                ProcessManager._protectedProcessTableCache = null;
+                
+                // 清除已使用PID缓存（进程状态已更新）
+                ProcessManager._invalidateUsedPidsCache();
                 
                 // 即使没有 __init__ 方法，也尝试标记元素
                 if (typeof document !== 'undefined' && document.body) {
@@ -1215,9 +1588,17 @@ class ProcessManager {
             return pid;
         } catch (e) {
             // 启动失败，清理进程信息
-            const table = ProcessManager.PROCESS_TABLE;
-            table.delete(pid);
-            ProcessManager._saveProcessTable(table);
+            // 使用原始表进行删除（绕过保护）
+            const rawTable = ProcessManager._getProcessTable();
+            rawTable.delete(pid);
+            ProcessManager._saveProcessTable(rawTable);
+            
+            // 清空缓存，强制重新加载
+            ProcessManager._processTableCache = null;
+            ProcessManager._protectedProcessTableCache = null;
+            
+            // 清除已使用PID缓存（进程已删除）
+            ProcessManager._invalidateUsedPidsCache();
             if (typeof MemoryManager !== 'undefined') {
                 MemoryManager.freeMemory(pid);
             }
@@ -1457,6 +1838,9 @@ class ProcessManager {
             // 保存进程表
             ProcessManager._saveProcessTable(ProcessManager.PROCESS_TABLE);
             
+            // 清除已使用PID缓存（进程状态已更新）
+            ProcessManager._invalidateUsedPidsCache();
+            
             // 通知任务栏更新（延迟更新，确保状态已保存）
             if (typeof TaskbarManager !== 'undefined' && typeof TaskbarManager.update === 'function') {
                 setTimeout(() => {
@@ -1491,6 +1875,9 @@ class ProcessManager {
                 
                 // 保存进程表
                 ProcessManager._saveProcessTable(ProcessManager.PROCESS_TABLE);
+                
+                // 清除已使用PID缓存（进程状态已更新）
+                ProcessManager._invalidateUsedPidsCache();
                 
                 // 通知任务栏更新（延迟更新，确保状态已保存）
                 if (typeof TaskbarManager !== 'undefined' && typeof TaskbarManager.update === 'function') {
@@ -4140,8 +4527,28 @@ class ProcessManager {
      * @returns {boolean}
      */
     static isExploitProcess(pid) {
+        // 严格验证：只有合法的 EXPLOIT_PID 才被认为是 Exploit 程序
+        // 即使其他进程的 isExploit 被设置为 true，也不会被认为是 Exploit 程序
+        if (pid === ProcessManager.EXPLOIT_PID) {
+            return true;
+        }
+        
+        // 对于非 EXPLOIT_PID，即使 isExploit 为 true，也不认为是 Exploit 程序
+        // 这防止了通过修改进程表来绕过检查的攻击
         const processInfo = ProcessManager.PROCESS_TABLE.get(pid);
-        return processInfo ? processInfo.isExploit : false;
+        if (processInfo?.isExploit && pid !== ProcessManager.EXPLOIT_PID) {
+            // 检测到可疑的 isExploit 标志设置
+            if (typeof KernelLogger !== 'undefined') {
+                KernelLogger.warn("ProcessManager", 
+                    `安全警告: 进程 ${pid} 的 isExploit 标志被设置为 true，但 PID 不是合法的 EXPLOIT_PID。`);
+            }
+            ProcessManager._logSecurityViolation(pid, 'suspicious_isExploit_flag_in_check', {
+                isExploit: processInfo.isExploit,
+                expectedExploitPid: ProcessManager.EXPLOIT_PID
+            });
+        }
+        
+        return false;
     }
     
     /**
@@ -4189,9 +4596,12 @@ class ProcessManager {
             // 获取进程表（如果不存在则创建新的）
             const table = ProcessManager.PROCESS_TABLE;
             
+            // 使用原始表进行更新（绕过保护）
+            const rawTable = ProcessManager._getProcessTable();
+            
             // 检查是否已存在（避免重复注册）
-            if (table.has(exploitPid)) {
-                const existingInfo = table.get(exploitPid);
+            if (rawTable.has(exploitPid)) {
+                const existingInfo = rawTable.get(exploitPid);
                 // 验证现有信息是否完整
                 if (existingInfo && existingInfo.isExploit && existingInfo.status === 'running') {
                     ProcessManager._log(2, `Exploit程序已存在 (PID: ${exploitPid})，跳过注册`);
@@ -4199,19 +4609,25 @@ class ProcessManager {
                 } else {
                     // 现有信息不完整，更新它
                     ProcessManager._log(2, `Exploit程序信息不完整，更新信息 (PID: ${exploitPid})`);
-                    table.set(exploitPid, exploitInfo);
+                    rawTable.set(exploitPid, exploitInfo);
                 }
             } else {
                 // 添加Exploit程序到进程表
-                table.set(exploitPid, exploitInfo);
+                rawTable.set(exploitPid, exploitInfo);
                 ProcessManager._log(2, `添加Exploit程序到进程表 (PID: ${exploitPid})`);
             }
             
-            // 更新缓存
-            ProcessManager._processTableCache = table;
+            // 更新缓存（使用原始表）
+            ProcessManager._processTableCache = rawTable;
             
             // 保存到内存
-            ProcessManager._saveProcessTable(table);
+            ProcessManager._saveProcessTable(rawTable);
+            
+            // 清空受保护表的缓存，强制重新加载
+            ProcessManager._protectedProcessTableCache = null;
+            
+            // 清除已使用PID缓存（Exploit进程已注册）
+            ProcessManager._invalidateUsedPidsCache();
             
             // 验证保存是否成功
             ProcessManager._processTableCache = null;  // 清空缓存以验证
@@ -4250,11 +4666,8 @@ class ProcessManager {
                 }
             }
             
-            // 确保 NEXT_PID 从 10001 开始（Exploit 使用 10000）
-            if (ProcessManager.NEXT_PID <= ProcessManager.EXPLOIT_PID) {
-                ProcessManager.NEXT_PID = ProcessManager.EXPLOIT_PID + 1;
-                ProcessManager._log(2, `设置 NEXT_PID 为 ${ProcessManager.NEXT_PID}（Exploit 使用 ${ProcessManager.EXPLOIT_PID}）`);
-            }
+            // 注意：PID现在是随机分配的，不再需要设置NEXT_PID
+            // 保留此代码仅用于向后兼容，实际不会执行任何操作
             
             ProcessManager._log(2, `Exploit程序已注册 (PID: ${exploitPid})`);
         } catch (e) {
@@ -4265,10 +4678,8 @@ class ProcessManager {
             }
             ProcessManager._fallbackProcessTable.set(exploitPid, exploitInfo);
             
-            // 确保 NEXT_PID 从 10001 开始
-            if (ProcessManager.NEXT_PID <= ProcessManager.EXPLOIT_PID) {
-                ProcessManager.NEXT_PID = ProcessManager.EXPLOIT_PID + 1;
-            }
+            // 注意：PID现在是随机分配的，不再需要设置NEXT_PID
+            // 保留此代码仅用于向后兼容，实际不会执行任何操作
             
             ProcessManager._log(2, `Exploit程序已使用降级方案注册 (PID: ${exploitPid})`);
         }
@@ -4719,10 +5130,13 @@ class ProcessManager {
         // 如果提供了 PID，验证进程是否存在
         if (pid !== null) {
             const processInfo = ProcessManager.PROCESS_TABLE.get(pid);
+            // 允许 'starting' 和 'running' 状态的进程获取主题
             if (!processInfo || (processInfo.status !== 'running' && processInfo.status !== 'starting')) {
-                throw new Error(`Process ${pid} does not exist or is not running`);
+                ProcessManager._log(1, `警告: 进程 ${pid} 不存在或状态异常 (${processInfo?.status || 'unknown'})，但仍允许获取主题`);
+                // 不抛出错误，允许继续（可能是时序问题）
+            } else {
+                ProcessManager._logProgramAction(pid, 'getCurrentTheme', {});
             }
-            ProcessManager._logProgramAction(pid, 'getCurrentTheme', {});
         }
         
         const themeManager = ProcessManager._getThemeManager();
@@ -4731,10 +5145,19 @@ class ProcessManager {
             return null;
         }
         
+        // 确保 ThemeManager 已初始化
+        if (!themeManager._initialized) {
+            ProcessManager._log(1, "ThemeManager 尚未初始化，尝试初始化");
+            // 不等待初始化完成，直接返回 null（避免阻塞）
+            // 程序可以在稍后重试
+            return null;
+        }
+        
         try {
             return themeManager.getCurrentTheme();
         } catch (e) {
-            ProcessManager._log(1, `获取当前主题失败: ${e.message}`);
+            const errorMessage = e?.message || e?.toString() || String(e) || '未知错误';
+            ProcessManager._log(1, `获取当前主题失败: ${errorMessage}`);
             return null;
         }
     }
@@ -4777,10 +5200,13 @@ class ProcessManager {
         // 如果提供了 PID，验证进程是否存在
         if (pid !== null) {
             const processInfo = ProcessManager.PROCESS_TABLE.get(pid);
+            // 允许 'starting' 和 'running' 状态的进程获取主题列表
             if (!processInfo || (processInfo.status !== 'running' && processInfo.status !== 'starting')) {
-                throw new Error(`Process ${pid} does not exist or is not running`);
+                ProcessManager._log(1, `警告: 进程 ${pid} 不存在或状态异常 (${processInfo?.status || 'unknown'})，但仍允许获取主题列表`);
+                // 不抛出错误，允许继续（可能是时序问题）
+            } else {
+                ProcessManager._logProgramAction(pid, 'getAllThemes', {});
             }
-            ProcessManager._logProgramAction(pid, 'getAllThemes', {});
         }
         
         const themeManager = ProcessManager._getThemeManager();
@@ -4896,10 +5322,13 @@ class ProcessManager {
         // 如果提供了 PID，验证进程是否存在
         if (pid !== null) {
             const processInfo = ProcessManager.PROCESS_TABLE.get(pid);
+            // 允许 'starting' 和 'running' 状态的进程注册监听器
             if (!processInfo || (processInfo.status !== 'running' && processInfo.status !== 'starting')) {
-                throw new Error(`Process ${pid} does not exist or is not running`);
+                ProcessManager._log(1, `警告: 进程 ${pid} 不存在或状态异常 (${processInfo?.status || 'unknown'})，但仍允许注册监听器`);
+                // 不抛出错误，允许注册（可能是时序问题）
+            } else {
+                ProcessManager._logProgramAction(pid, 'onThemeChange', {});
             }
-            ProcessManager._logProgramAction(pid, 'onThemeChange', {});
         }
         
         const themeManager = ProcessManager._getThemeManager();
@@ -4954,10 +5383,13 @@ class ProcessManager {
         // 如果提供了 PID，验证进程是否存在
         if (pid !== null) {
             const processInfo = ProcessManager.PROCESS_TABLE.get(pid);
+            // 允许 'starting' 和 'running' 状态的进程获取风格
             if (!processInfo || (processInfo.status !== 'running' && processInfo.status !== 'starting')) {
-                throw new Error(`Process ${pid} does not exist or is not running`);
+                ProcessManager._log(1, `警告: 进程 ${pid} 不存在或状态异常 (${processInfo?.status || 'unknown'})，但仍允许获取风格`);
+                // 不抛出错误，允许继续（可能是时序问题）
+            } else {
+                ProcessManager._logProgramAction(pid, 'getCurrentStyle', {});
             }
-            ProcessManager._logProgramAction(pid, 'getCurrentStyle', {});
         }
         
         const themeManager = ProcessManager._getThemeManager();
@@ -4966,10 +5398,19 @@ class ProcessManager {
             return null;
         }
         
+        // 确保 ThemeManager 已初始化
+        if (!themeManager._initialized) {
+            ProcessManager._log(1, "ThemeManager 尚未初始化，尝试初始化");
+            // 不等待初始化完成，直接返回 null（避免阻塞）
+            // 程序可以在稍后重试
+            return null;
+        }
+        
         try {
             return themeManager.getCurrentStyle();
         } catch (e) {
-            ProcessManager._log(1, `获取当前风格失败: ${e.message}`);
+            const errorMessage = e?.message || e?.toString() || String(e) || '未知错误';
+            ProcessManager._log(1, `获取当前风格失败: ${errorMessage}`);
             return null;
         }
     }
@@ -4983,10 +5424,13 @@ class ProcessManager {
         // 如果提供了 PID，验证进程是否存在
         if (pid !== null) {
             const processInfo = ProcessManager.PROCESS_TABLE.get(pid);
+            // 允许 'starting' 和 'running' 状态的进程获取风格列表
             if (!processInfo || (processInfo.status !== 'running' && processInfo.status !== 'starting')) {
-                throw new Error(`Process ${pid} does not exist or is not running`);
+                ProcessManager._log(1, `警告: 进程 ${pid} 不存在或状态异常 (${processInfo?.status || 'unknown'})，但仍允许获取风格列表`);
+                // 不抛出错误，允许继续（可能是时序问题）
+            } else {
+                ProcessManager._logProgramAction(pid, 'getAllStyles', {});
             }
-            ProcessManager._logProgramAction(pid, 'getAllStyles', {});
         }
         
         const themeManager = ProcessManager._getThemeManager();
@@ -5085,10 +5529,13 @@ class ProcessManager {
         // 如果提供了 PID，验证进程是否存在
         if (pid !== null) {
             const processInfo = ProcessManager.PROCESS_TABLE.get(pid);
+            // 允许 'starting' 和 'running' 状态的进程获取桌面背景
             if (!processInfo || (processInfo.status !== 'running' && processInfo.status !== 'starting')) {
-                throw new Error(`Process ${pid} does not exist or is not running`);
+                ProcessManager._log(1, `警告: 进程 ${pid} 不存在或状态异常 (${processInfo?.status || 'unknown'})，但仍允许获取桌面背景`);
+                // 不抛出错误，允许继续（可能是时序问题）
+            } else {
+                ProcessManager._logProgramAction(pid, 'getCurrentDesktopBackground', {});
             }
-            ProcessManager._logProgramAction(pid, 'getCurrentDesktopBackground', {});
         }
         
         const themeManager = ProcessManager._getThemeManager();
@@ -5114,10 +5561,13 @@ class ProcessManager {
         // 如果提供了 PID，验证进程是否存在
         if (pid !== null) {
             const processInfo = ProcessManager.PROCESS_TABLE.get(pid);
+            // 允许 'starting' 和 'running' 状态的进程获取桌面背景列表
             if (!processInfo || (processInfo.status !== 'running' && processInfo.status !== 'starting')) {
-                throw new Error(`Process ${pid} does not exist or is not running`);
+                ProcessManager._log(1, `警告: 进程 ${pid} 不存在或状态异常 (${processInfo?.status || 'unknown'})，但仍允许获取桌面背景列表`);
+                // 不抛出错误，允许继续（可能是时序问题）
+            } else {
+                ProcessManager._logProgramAction(pid, 'getAllDesktopBackgrounds', {});
             }
-            ProcessManager._logProgramAction(pid, 'getAllDesktopBackgrounds', {});
         }
         
         const themeManager = ProcessManager._getThemeManager();
@@ -5148,10 +5598,13 @@ class ProcessManager {
         // 如果提供了 PID，验证进程是否存在
         if (pid !== null) {
             const processInfo = ProcessManager.PROCESS_TABLE.get(pid);
+            // 允许 'starting' 和 'running' 状态的进程获取桌面背景
             if (!processInfo || (processInfo.status !== 'running' && processInfo.status !== 'starting')) {
-                throw new Error(`Process ${pid} does not exist or is not running`);
+                ProcessManager._log(1, `警告: 进程 ${pid} 不存在或状态异常 (${processInfo?.status || 'unknown'})，但仍允许获取桌面背景`);
+                // 不抛出错误，允许继续（可能是时序问题）
+            } else {
+                ProcessManager._logProgramAction(pid, 'getDesktopBackground', { backgroundId });
             }
-            ProcessManager._logProgramAction(pid, 'getDesktopBackground', { backgroundId });
         }
         
         const themeManager = ProcessManager._getThemeManager();
@@ -5245,10 +5698,13 @@ class ProcessManager {
         // 如果提供了 PID，验证进程是否存在
         if (pid !== null) {
             const processInfo = ProcessManager.PROCESS_TABLE.get(pid);
+            // 允许 'starting' 和 'running' 状态的进程获取动画预设列表
             if (!processInfo || (processInfo.status !== 'running' && processInfo.status !== 'starting')) {
-                throw new Error(`Process ${pid} does not exist or is not running`);
+                ProcessManager._log(1, `警告: 进程 ${pid} 不存在或状态异常 (${processInfo?.status || 'unknown'})，但仍允许获取动画预设列表`);
+                // 不抛出错误，允许继续（可能是时序问题）
+            } else {
+                ProcessManager._logProgramAction(pid, 'getAllAnimationPresets', {});
             }
-            ProcessManager._logProgramAction(pid, 'getAllAnimationPresets', {});
         }
         
         const themeManager = ProcessManager._getThemeManager();
@@ -5386,10 +5842,13 @@ class ProcessManager {
         // 如果提供了 PID，验证进程是否存在
         if (pid !== null) {
             const processInfo = ProcessManager.PROCESS_TABLE.get(pid);
+            // 允许 'starting' 和 'running' 状态的进程注册监听器
             if (!processInfo || (processInfo.status !== 'running' && processInfo.status !== 'starting')) {
-                throw new Error(`Process ${pid} does not exist or is not running`);
+                ProcessManager._log(1, `警告: 进程 ${pid} 不存在或状态异常 (${processInfo?.status || 'unknown'})，但仍允许注册监听器`);
+                // 不抛出错误，允许注册（可能是时序问题）
+            } else {
+                ProcessManager._logProgramAction(pid, 'onStyleChange', {});
             }
-            ProcessManager._logProgramAction(pid, 'onStyleChange', {});
         }
         
         const themeManager = ProcessManager._getThemeManager();

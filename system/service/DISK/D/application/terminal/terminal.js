@@ -1677,7 +1677,7 @@ function escapeHtml(s){
             // 推荐使用事件监听：Terminal.on('command', handler)
             this.commandHandler = this._defaultHandler.bind(this);
             // 用于 Tab 补全的已知命令列表（可由外部修改）
-            this._completionCommands = ['clear','pwd','whoami','echo','demo','toggleview','cd','markdir','markfile','ls','tree','cat','write','rm','ps','kill','help','check','diskmanger','eval','vim','rename','mv','copy','paste','power','exit','login','su','users'];
+            this._completionCommands = ['clear','pwd','whoami','echo','demo','toggleview','cd','markdir','markfile','ls','tree','cat','write','rm','ps','kill','help','check','diskmanger','vim','rename','mv','copy','paste','power','exit','login','su','users'];
             
             // CLI程序补全缓存（从ApplicationAssetManager获取）
             this._cliProgramsCache = null;
@@ -4554,8 +4554,65 @@ function escapeHtml(s){
         terminalInstance._commandHandlerRegistered = true;
         
         // 创建命令处理器函数并保存引用，以便后续可以移除
+        // 命令权限检查函数
+        const checkCommandPermission = (cmd, payload) => {
+            // 需要管理员权限的命令列表
+            const adminOnlyCommands = [
+                'power',      // 电源管理（重启/关机）
+                'kill',       // 终止进程
+                'rm',         // 删除文件/目录
+                'mv',         // 移动文件/目录（可能覆盖系统文件）
+                'write',      // 写入文件（可能修改系统文件）
+                'markdir',    // 创建目录（可能在系统盘创建）
+                'markfile',   // 创建文件（可能在系统盘创建）
+                'users',      // 查看用户列表（敏感信息）
+                'login',      // 切换用户（可能提权）
+                'su'          // 切换用户（可能提权）
+            ];
+            
+            // 检查命令是否需要管理员权限
+            if (adminOnlyCommands.includes(cmd)) {
+                if (typeof UserControl === 'undefined') {
+                    payload.write(`${cmd}: 权限检查失败: UserControl 未加载`);
+                    return false;
+                }
+                
+                if (!UserControl.isAdmin()) {
+                    payload.write(`${cmd}: 权限不足: 此命令需要管理员权限`);
+                    return false;
+                }
+            }
+            
+            return true;
+        };
+        
+        // 检查系统盘D:访问权限
+        const checkSystemDiskAccess = (path, payload) => {
+            // 检查路径是否在系统盘D:
+            const normalizedPath = path.replace(/\\/g, '/');
+            if (normalizedPath.startsWith('D:') || normalizedPath.startsWith('D:/')) {
+                if (typeof UserControl === 'undefined') {
+                    payload.write('权限检查失败: UserControl 未加载');
+                    return false;
+                }
+                
+                if (!UserControl.isAdmin()) {
+                    payload.write('权限不足: 非管理员用户无法访问系统盘 D:');
+                    return false;
+                }
+            }
+            
+            return true;
+        };
+        
         const commandHandler = (payload) => {
         const cmd = payload.args[0];
+        
+        // 首先检查命令权限
+        if (!checkCommandPermission(cmd, payload)) {
+            return;
+        }
+        
         switch(cmd){
             case 'exit':
                 // exit 命令：关闭当前终端程序进程
@@ -4803,6 +4860,12 @@ function escapeHtml(s){
                                 const parts = payload.env.cwd.split('/');
                                 parts.pop();
                                 const parentPath = parts.join('/');
+                                
+                                // 检查系统盘D:访问权限
+                                if (!checkSystemDiskAccess(parentPath, payload)) {
+                                    return;
+                                }
+                                
                                 payload.env.cwd = parentPath;
                                 terminalInstance.env.cwd = payload.env.cwd;
                                 terminalInstance._saveEnvToMemory(); // 保存到内存
@@ -4812,6 +4875,11 @@ function escapeHtml(s){
                             }
                             
                             const resolved = resolvePath(payload.env.cwd, newPath);
+                            
+                            // 检查系统盘D:访问权限
+                            if (!checkSystemDiskAccess(resolved, payload)) {
+                                return;
+                            }
                             
                             // 确保路径格式正确：如果是 D: 或 C:，转换为 D:/ 或 C:/
                             let phpPath = resolved;
@@ -4856,6 +4924,11 @@ function escapeHtml(s){
                 // 支持传入相对或多级路径，例如: markdir subdir 或 markdir foo/bar
                 const dirArg = payload.args[1];
                 const fullDirPath = resolvePath(payload.env.cwd, dirArg);
+                
+                // 检查系统盘D:访问权限
+                if (!checkSystemDiskAccess(fullDirPath, payload)) {
+                    return;
+                }
                 const partsDir = fullDirPath.split('/');
                 const newName = partsDir.pop();
                 const parentPath = partsDir.join('/') || partsDir[0];
@@ -4883,6 +4956,11 @@ function escapeHtml(s){
                 // 支持 markfile <name> 或 markfile path/to/name
                 const fArg = payload.args[1];
                 const fullFilePath = resolvePath(payload.env.cwd, fArg);
+                
+                // 检查系统盘D:访问权限
+                if (!checkSystemDiskAccess(fullFilePath, payload)) {
+                    return;
+                }
                 const parts = fullFilePath.split('/');
                 const fname = parts.pop();
                 const parent = parts.join('/') || parts[0];
@@ -4966,6 +5044,11 @@ function escapeHtml(s){
                             let targetPath = payload.env.cwd;
                             if(targetArg){
                                 targetPath = resolvePath(payload.env.cwd, targetArg);
+                            }
+                            
+                            // 检查系统盘D:访问权限
+                            if (!checkSystemDiskAccess(targetPath, payload)) {
+                                return;
                             }
 
                             // 从 PHP 服务获取目录列表
@@ -5124,6 +5207,11 @@ function escapeHtml(s){
                         }
                         
                         const full = resolvePath(payload.env.cwd, fArg);
+                        
+                        // 检查系统盘D:访问权限
+                        if (!checkSystemDiskAccess(full, payload)) {
+                            return;
+                        }
                         const parts = full.split('/');
                         const fname = parts.pop();
                         const parent = parts.join('/') || parts[0];
@@ -5190,6 +5278,12 @@ function escapeHtml(s){
                     }
 
                     const fullPath = resolvePath(payload.env.cwd, fileArg);
+                    
+                    // 检查系统盘D:访问权限
+                    if (!checkSystemDiskAccess(fullPath, payload)) {
+                        return;
+                    }
+                    
                     const partsF = fullPath.split('/');
                     const fname = partsF.pop();
                     const parent = partsF.join('/') || partsF[0];
@@ -5264,6 +5358,12 @@ function escapeHtml(s){
                 {
                     const targ = payload.args[1];
                     const full = resolvePath(payload.env.cwd, targ);
+                    
+                    // 检查系统盘D:访问权限
+                    if (!checkSystemDiskAccess(full, payload)) {
+                        return;
+                    }
+                    
                     const root = full.split('/')[0];
                     const COLLR = safePoolGet('KERNEL_GLOBAL_POOL', root);
                     try {
@@ -5350,6 +5450,15 @@ function escapeHtml(s){
                     const dest = payload.args[2];
                     const fullSource = resolvePath(payload.env.cwd, source);
                     const fullDest = resolvePath(payload.env.cwd, dest);
+                    
+                    // 检查系统盘D:访问权限（源和目标）
+                    if (!checkSystemDiskAccess(fullSource, payload)) {
+                        return;
+                    }
+                    if (!checkSystemDiskAccess(fullDest, payload)) {
+                        return;
+                    }
+                    
                     const root = fullSource.split('/')[0];
                     const COLLR = safePoolGet('KERNEL_GLOBAL_POOL', root);
                     
@@ -6757,7 +6866,6 @@ function escapeHtml(s){
                 payload.write(' - diskmanger [-l] [disk] : 显示磁盘分区信息。可选 -l 显示详细文件和目录占用，可选指定磁盘');
                 payload.write(' - echo [-n] [text...]    : 输出文本。可选 -n 参数不换行输出');
                 payload.write(' - clear                  : 清除屏幕');
-                payload.write(' - eval                   : 运行JavaScript表达式');
                 payload.write(' - vim [file]             : Vim文本编辑器（支持Normal/Insert/Command模式，支持鼠标滚轮滚动）');
                 payload.write(' - pwd, whoami            : 显示当前路径或当前用户');
                 payload.write(' - login <username>       : 切换用户登录');
@@ -7067,18 +7175,6 @@ function escapeHtml(s){
                             payload.write(`错误: 无法获取磁盘详细信息: ${e.message}`);
                         }
                     })();
-                }
-                break;
-            case 'eval':
-                if(!payload.args >= 2){
-                    payload.write("eval: 命令不可用");
-                    break;
-                }
-                try{
-                    payload.args.shift();
-                    payload.write(eval(payload.args.join(" ")));
-                }catch(e){
-                    payload.write(`eval: ${e.toString()}`);
                 }
                 break;
             case 'power':

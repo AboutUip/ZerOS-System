@@ -1,11 +1,11 @@
 {
   "system": {
     "system.dailyQuote": {
-      "value": "这世界太美好，有阳光空气，有善良正义，有你。",
+      "value": "做一个开心的人，开心到别人见到你也会觉得开心。",
       "expiresAt": 0,
-      "createdAt": 1766340257774,
-      "updatedAt": 1766340257774,
-      "size": 68
+      "createdAt": 1766425024625,
+      "updatedAt": 1766425024625,
+      "size": 71
     }
   },
   "programs": {
@@ -54,103 +54,97 @@
           "msg": "请求成功",
           "data": {
             "city": "晋城市",
-            "ip": "219.147.46.237",
-            "tips": "天气干冷，穿厚一点吧！",
-            "low_temperature": -3,
+            "ip": "219.147.46.234",
+            "tips": "天气阴冷，穿暖和点吧！",
+            "low_temperature": 0,
             "moji_city_id": 1945,
-            "night_condition": "多云",
+            "night_condition": "雪",
             "quality_level": "良",
-            "tomorrow_aqi": 121,
-            "tomorrow_condition": "多云转小雨",
-            "tomorrow_high_temperature": 4,
-            "tomorrow_low_temperature": 0,
-            "tomorrow_quality_level": "轻度",
+            "tomorrow_aqi": 86,
+            "tomorrow_condition": "多云转晴",
+            "tomorrow_high_temperature": 7,
+            "tomorrow_low_temperature": -4,
+            "tomorrow_quality_level": "良",
             "tomorrow_weather_icon_id": "1",
-            "update_time": "2025-12-21 16:45:57",
+            "update_time": "2025-12-22 22:56:48",
             "today": {
-              "current_temp": "3℃",
-              "current_cond": "雨夹雪",
-              "night_condition": "多云",
-              "tomorrow_condition": "多云转小雨",
-              "low": "-3℃",
+              "current_temp": "0℃",
+              "current_cond": "小雨",
+              "night_condition": "雪",
+              "tomorrow_condition": "多云转晴",
+              "low": "0℃",
               "quality": "良",
               "alert": "暂无预警信息",
-              "update_time": "2025-12-21 15:57:03"
+              "update_time": "2025-12-22 21:45:02"
             },
             "seven_day": [
-              {
-                "date": "2025-12-20",
-                "cond": "多云转晴",
-                "high": "8℃",
-                "low": "-3℃"
-              },
               {
                 "date": "2025-12-21",
                 "cond": "多云",
                 "high": "4℃",
-                "low": "-3℃"
+                "low": "0℃"
               },
               {
                 "date": "2025-12-22",
-                "cond": "多云转小雨",
-                "high": "4℃",
+                "cond": "雨夹雪转雪",
+                "high": "3℃",
                 "low": "0℃"
               },
               {
                 "date": "2025-12-23",
-                "cond": "晴",
-                "high": "8℃",
-                "low": "-2℃"
+                "cond": "多云转晴",
+                "high": "7℃",
+                "low": "-4℃"
               },
               {
                 "date": "2025-12-24",
                 "cond": "晴",
-                "high": "7℃",
-                "low": "-2℃"
+                "high": "8℃",
+                "low": "-5℃"
               },
               {
                 "date": "2025-12-25",
                 "cond": "晴",
-                "high": "8℃",
-                "low": "-1℃"
+                "high": "4℃",
+                "low": "-5℃"
               },
               {
                 "date": "2025-12-26",
                 "cond": "晴",
-                "high": "5℃",
-                "low": "-2℃"
+                "high": "3℃",
+                "low": "-6℃"
               },
               {
                 "date": "2025-12-27",
                 "cond": "晴",
-                "high": "10℃",
-                "low": "-2℃"
+                "high": "8℃",
+                "low": "-6℃"
               },
               {
                 "date": "2025-12-28",
+                "cond": "晴",
+                "high": "12℃",
+                "low": "-5℃"
+              },
+              {
+                "date": "2025-12-29",
+                "cond": "多云转阴",
+                "high": "7℃",
+                "low": "-4℃"
+              },
+              {
+                "date": "2025-12-30",
+                "cond": "阴转多云",
+                "high": "8℃",
+                "low": "-3℃"
+              },
+              {
+                "date": "2025-12-31",
                 "cond": "阴",
                 "high": "8℃",
                 "low": "-3℃"
               },
               {
-                "date": "2025-12-29",
-                "cond": "晴转多云",
-                "high": "10℃",
-                "low": "-2℃"
-              },
-              {
-                "date": "2025-12-30",
-                "cond": "多云转晴",
-                "high": "7℃",
-                "low": "-5℃"
-              },
-              {
-                "date": "2025-12-31",
-                "cond": "多云",
-                "high": "5℃",
-                "low": "-6℃"
-              },
-              {
                 "date": "2026-01-01",
                 "cond": "多云",
                 "high": "6℃",
@@ -173,185 +167,20 @@
                 "cond": "多云",
                 "high": "5℃",
                 "low": "-5℃"
-              }
-            ]
-          }
-        },
-        "expiresAt": 1766349838189,
-        "createdAt": 1766306638189,
-        "updatedAt": 1766306638189,
-        "size": 1734
-      },
-      "weather:北京市": {
-        "value": {
-          "code": 200,
-          "msg": "请求成功",
-          "data": {
-            "city": "北京市",
-            "ip": "219.147.46.231",
-            "tips": "天气干冷，穿厚一点吧！",
-            "low_temperature": -5,
-            "moji_city_id": 2,
-            "night_condition": "小雪",
-            "quality_level": "良",
-            "tomorrow_aqi": 60,
-            "tomorrow_condition": "多云转晴",
-            "tomorrow_high_temperature": 4,
-            "tomorrow_low_temperature": -5,
-            "tomorrow_quality_level": "良",
-            "tomorrow_weather_icon_id": "1",
-            "update_time": "2025-12-22 00:42:48",
-            "today": {
-              "current_temp": "-1℃",
-              "current_cond": "晴",
-              "night_condition": "小雪",
-              "tomorrow_condition": "多云转晴",
-              "low": "-5℃",
-              "quality": "良",
-              "alert": "暂无预警信息",
-              "update_time": "2025-12-22 00:05:03"
-            },
-            "seven_day": [
-              {
-                "date": "2025-12-21",
-                "cond": "晴转多云",
-                "high": "3℃",
-                "low": "-5℃"
-              },
-              {
-                "date": "2025-12-22",
-                "cond": "多云转小雪",
-                "high": "3℃",
-                "low": "-5℃"
-              },
-              {
-                "date": "2025-12-23",
-                "cond": "多云转晴",
-                "high": "4℃",
-                "low": "-5℃"
-              },
-              {
-                "date": "2025-12-24",
-                "cond": "晴",
-                "high": "4℃",
-                "low": "-6℃"
-              },
-              {
-                "date": "2025-12-25",
-                "cond": "晴",
-                "high": "2℃",
-                "low": "-8℃"
-              },
-              {
-                "date": "2025-12-26",
-                "cond": "多云",
-                "high": "0℃",
-                "low": "-7℃"
-              },
-              {
-                "date": "2025-12-27",
-                "cond": "晴",
-                "high": "3℃",
-                "low": "-6℃"
-              },
-              {
-                "date": "2025-12-28",
-                "cond": "晴转多云",
-                "high": "3℃",
-                "low": "-5℃"
-              },
-              {
-                "date": "2025-12-29",
-                "cond": "多云转晴",
-                "high": "6℃",
-                "low": "-3℃"
-              },
-              {
-                "date": "2025-12-30",
-                "cond": "晴转多云",
-                "high": "5℃",
-                "low": "-4℃"
-              },
-              {
-                "date": "2025-12-31",
-                "cond": "多云",
-                "high": "3℃",
-                "low": "-8℃"
-              },
-              {
-                "date": "2026-01-01",
-                "cond": "多云",
-                "high": "3℃",
-                "low": "-8℃"
-              },
-              {
-                "date": "2026-01-02",
-                "cond": "多云",
-                "high": "2℃",
-                "low": "-8℃"
-              },
-              {
-                "date": "2026-01-03",
-                "cond": "多云",
-                "high": "3℃",
-                "low": "-8℃"
-              },
-              {
-                "date": "2026-01-04",
-                "cond": "多云",
-                "high": "2℃",
-                "low": "-8℃"
               },
               {
                 "date": "2026-01-05",
-                "cond": "晴",
-                "high": "0.88℃",
-                "low": "-9.56℃"
+                "cond": "多云",
+                "high": "5℃",
+                "low": "-6℃"
               }
             ]
           }
         },
-        "expiresAt": 1766378448469,
-        "createdAt": 1766335248469,
-        "updatedAt": 1766335248469,
-        "size": 1740
-      },
-      "weather:晋城": {
-        "value": {
-          "code": 200,
-          "msg": "请求成功",
-          "data": {
-            "city": null,
-            "ip": "219.147.46.231",
-            "tips": null,
-            "low_temperature": null,
-            "moji_city_id": null,
-            "night_condition": null,
-            "quality_level": null,
-            "tomorrow_aqi": null,
-            "tomorrow_condition": null,
-            "tomorrow_high_temperature": null,
-            "tomorrow_low_temperature": null,
-            "tomorrow_quality_level": null,
-            "tomorrow_weather_icon_id": null,
-            "update_time": "2025-12-22 00:54:26",
-            "today": {
-              "current_temp": "℃",
-              "current_cond": null,
-              "night_condition": null,
-              "tomorrow_condition": null,
-              "low": "℃",
-              "quality": null,
-              "alert": "暂无预警信息",
-              "update_time": null
-            },
-            "seven_day": []
-          }
-        },
-        "expiresAt": 1766379145839,
-        "createdAt": 1766335945839,
-        "updatedAt": 1766335945839,
-        "size": 574
+        "expiresAt": 1766458483927,
+        "createdAt": 1766415283927,
+        "updatedAt": 1766415283927,
+        "size": 1712
       }
     }
   }

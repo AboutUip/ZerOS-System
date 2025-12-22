@@ -1,10 +1,11 @@
 {
   "system": {
     "permissionManager.permissions": {
-      "10003": [
+      "56692": [
         "GUI_WINDOW_CREATE",
-        "EVENT_LISTENER",
-        "SYSTEM_NOTIFICATION"
+        "KERNEL_DISK_READ",
+        "KERNEL_DISK_LIST",
+        "EVENT_LISTENER"
       ]
     },
     "system.style": "macos",
@@ -477,17 +478,17 @@
         "password": "61b249bf6d604d14120821f43625e84e",
         "avatar": "avatar_root_1766272534753.jpg",
         "createdAt": 1766271155991,
-        "lastLogin": 1766340442060
+        "lastLogin": 1766425016039
       },
       "TestUser": {
         "level": "USER",
         "password": null,
         "avatar": null,
         "createdAt": 1766271155991,
-        "lastLogin": 1766275335883
+        "lastLogin": 1766425085299
       }
     },
-    "userControl.currentUser": "root",
+    "userControl.currentUser": "TestUser",
     "system.lockscreenTimeComponent": true,
     "system.lockscreenBackground": "D:/cache/lockscreen/lockscreen_local_D__cache_random_anime_bg_1765983395242_jpg_random_anime_bg_1765983395242.jpg",
     "system.lockscreenRandomBg": true,

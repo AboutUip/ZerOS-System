@@ -34,15 +34,186 @@ class UserControl {
     // ==================== 内部状态 ====================
     
     /**
-     * 当前登录用户
+     * 当前登录用户（受保护）
      */
     static _currentUser = null;
     
     /**
-     * 用户数据库
+     * 用户数据库（受保护）
      * Map<username, {level, password?, createdAt, lastLogin}>
      */
     static _users = new Map();
+    
+    /**
+     * 初始化受保护的用户系统
+     * 使用 Proxy 保护内部状态
+     */
+    static _initializeProtectedState() {
+        // 保护 _currentUser - 使用内部变量存储实际值
+        let _protectedCurrentUser = UserControl._currentUser;
+        
+        // 标记是否已初始化保护
+        UserControl._protectionInitialized = true;
+        
+        // 重定义 _currentUser 属性
+        Object.defineProperty(UserControl, '_currentUser', {
+            get() {
+                return _protectedCurrentUser;
+            },
+            set(value) {
+                // 检查调用栈，只允许来自 UserControl 内部的方法
+                const stack = new Error().stack || '';
+                const callerLines = stack.split('\n').slice(1, 8) || []; // 增加检查范围
+                const callerString = callerLines.join('\n');
+                
+                // 允许来自 UserControl 内部方法的调用
+                // 注意：需要检查多种可能的调用方式（压缩后的代码可能方法名不同）
+                const allowedCallers = [
+                    'UserControl.login',
+                    'UserControl.logout',
+                    'UserControl.init',
+                    'UserControl._loadUsers',
+                    'UserControl.renameUser',
+                    'UserControl._updateCurrentUserLevel',
+                    'login',  // 可能的方法名（压缩后）
+                    'logout', // 可能的方法名（压缩后）
+                    'init'    // 可能的方法名（压缩后）
+                ];
+                
+                // 检查是否来自 UserControl 类的方法
+                const isFromUserControl = callerString.includes('UserControl') || 
+                                        callerString.includes('userControl') ||
+                                        callerString.includes('usercontrol');
+                
+                // 检查是否匹配允许的调用者
+                const isAllowed = isFromUserControl && allowedCallers.some(caller => 
+                    callerString.includes(caller) || 
+                    callerString.includes(caller.toLowerCase())
+                );
+                
+                if (!isAllowed) {
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.error("UserControl", 
+                            `安全错误: 尝试直接修改 _currentUser。请使用 UserControl.login() 或 UserControl.logout() 方法。`);
+                    }
+                    // 记录安全违规
+                    UserControl._logSecurityViolation('attempt_direct_modify_currentUser', {
+                        attemptedValue: value,
+                        currentValue: _protectedCurrentUser,
+                        stack: stack
+                    });
+                    return; // 拒绝修改
+                }
+                _protectedCurrentUser = value;
+            },
+            configurable: true,
+            enumerable: false
+        });
+        
+        // 保护 _users Map
+        const originalUsers = UserControl._users;
+        UserControl._users = new Proxy(originalUsers, {
+            set(target, prop, value) {
+                // 禁止直接设置属性
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error("UserControl", 
+                        `安全错误: 尝试直接修改 _users Map。请使用 UserControl 的公共方法。`);
+                }
+                UserControl._logSecurityViolation('attempt_direct_modify_users', {
+                    property: prop,
+                    value: value
+                });
+                return false;
+            },
+            get(target, prop) {
+                // 允许读取操作
+                if (prop === 'get' || prop === 'has' || prop === 'entries' || 
+                    prop === 'keys' || prop === 'values' || prop === 'forEach' || 
+                    prop === Symbol.iterator) {
+                    const method = target[prop];
+                    if (typeof method === 'function') {
+                        return method.bind(target);
+                    }
+                    return method;
+                }
+                
+                // size 是属性，不是方法
+                if (prop === 'size') {
+                    return target.size;
+                }
+                
+                // 对于修改操作，检查调用栈，只允许来自 UserControl 内部的方法
+                if (prop === 'set' || prop === 'delete' || prop === 'clear') {
+                    return (...args) => {
+                        const stack = new Error().stack || '';
+                        const callerLines = stack.split('\n').slice(1, 6) || [];
+                        const callerString = callerLines.join('\n');
+                        
+                        // 允许来自 UserControl 内部方法的调用
+                        const allowedCallers = [
+                            'UserControl._loadUsers',
+                            'UserControl._createDefaultUsers',
+                            'UserControl.createUser',
+                            'UserControl.deleteUser',
+                            'UserControl.renameUser',
+                            'UserControl.setPassword',
+                            'UserControl.setAvatar'
+                        ];
+                        
+                        const isAllowed = allowedCallers.some(caller => callerString.includes(caller));
+                        
+                        if (!isAllowed) {
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.error("UserControl", 
+                                    `安全错误: 不能直接修改 _users Map。请使用 UserControl 的公共方法。`);
+                            }
+                            UserControl._logSecurityViolation('attempt_direct_modify_users', {
+                                operation: prop,
+                                args: args,
+                                stack: stack
+                            });
+                            throw new Error(`安全错误: 不能直接修改 _users Map。请使用 UserControl 的公共方法。`);
+                        }
+                        
+                        // 允许操作
+                        return target[prop](...args);
+                    };
+                }
+                
+                return target[prop];
+            }
+        });
+    }
+    
+    /**
+     * 记录安全违规
+     * @private
+     */
+    static _logSecurityViolation(violationType, details = {}) {
+        if (typeof KernelLogger !== 'undefined') {
+            KernelLogger.error("UserControl", 
+                `安全违规: 类型: ${violationType}`, details);
+        }
+        
+        if (!UserControl._securityViolationLog) {
+            UserControl._securityViolationLog = [];
+        }
+        
+        UserControl._securityViolationLog.push({
+            timestamp: Date.now(),
+            violationType,
+            details,
+            stack: new Error().stack
+        });
+        
+        // 限制日志大小
+        if (UserControl._securityViolationLog.length > 500) {
+            UserControl._securityViolationLog.shift();
+        }
+    }
+    
+    // 安全违规日志
+    static _securityViolationLog = [];
     
     /**
      * 是否已初始化
@@ -92,6 +263,9 @@ class UserControl {
                 } else {
                     KernelLogger.warn("UserControl", "LStorage 未定义，无法加载用户数据");
                 }
+                
+                // 初始化受保护的状态
+                UserControl._initializeProtectedState();
                 
                 // 加载用户数据（等待完成）
                 await UserControl._loadUsers();

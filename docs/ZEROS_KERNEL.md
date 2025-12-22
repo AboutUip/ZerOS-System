@@ -338,7 +338,7 @@ Bash 风格的命令行终端界面，提供完整的命令处理能力和窗口
 - 目录操作：`markdir`, `markfile`
 - 系统管理：`ps`, `kill`, `diskmanger`, `power`, `check`
 - 编辑器：`vim`
-- 工具：`clear`, `help`, `eval`, `pwd`, `whoami`
+- 工具：`clear`, `help`, `pwd`, `whoami`
 
 ### 9. GUI 管理系统
 
