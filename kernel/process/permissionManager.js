@@ -34,10 +34,14 @@ class PermissionManager {
         GUI_WINDOW_MANAGE: 'GUI_WINDOW_MANAGE',         // 管理窗口
         
         // 系统存储权限
-        SYSTEM_STORAGE_READ: 'SYSTEM_STORAGE_READ',     // 读取系统存储
+        SYSTEM_STORAGE_READ: 'SYSTEM_STORAGE_READ',     // 读取系统存储（基础权限，仅可读取非敏感键）
         SYSTEM_STORAGE_WRITE: 'SYSTEM_STORAGE_WRITE',   // 写入系统存储（基础权限，仅可写入非敏感键）
         
-        // 系统存储细粒度权限（危险权限，仅管理员可授予）
+        // 系统存储细粒度读取权限（危险权限，仅管理员可授予）
+        SYSTEM_STORAGE_READ_USER_CONTROL: 'SYSTEM_STORAGE_READ_USER_CONTROL',           // 读取用户控制相关存储（userControl.*）
+        SYSTEM_STORAGE_READ_PERMISSION_CONTROL: 'SYSTEM_STORAGE_READ_PERMISSION_CONTROL', // 读取权限控制相关存储（permissionControl.*, permissionManager.*）
+        
+        // 系统存储细粒度写入权限（危险权限，仅管理员可授予）
         SYSTEM_STORAGE_WRITE_USER_CONTROL: 'SYSTEM_STORAGE_WRITE_USER_CONTROL',           // 写入用户控制相关存储（userControl.*）
         SYSTEM_STORAGE_WRITE_PERMISSION_CONTROL: 'SYSTEM_STORAGE_WRITE_PERMISSION_CONTROL', // 写入权限控制相关存储（permissionControl.*, permissionManager.*）
         SYSTEM_STORAGE_WRITE_DESKTOP: 'SYSTEM_STORAGE_WRITE_DESKTOP',                     // 写入桌面相关存储（desktop.*）
@@ -113,8 +117,14 @@ class PermissionManager {
         [PermissionManager.PERMISSION.KERNEL_MEMORY_WRITE]: PermissionManager.PERMISSION_LEVEL.SPECIAL,
         [PermissionManager.PERMISSION.NETWORK_ACCESS]: PermissionManager.PERMISSION_LEVEL.SPECIAL,
         [PermissionManager.PERMISSION.GUI_WINDOW_MANAGE]: PermissionManager.PERMISSION_LEVEL.SPECIAL,
-        [PermissionManager.PERMISSION.SYSTEM_STORAGE_READ]: PermissionManager.PERMISSION_LEVEL.SPECIAL,
+        [PermissionManager.PERMISSION.SYSTEM_STORAGE_READ]: PermissionManager.PERMISSION_LEVEL.NORMAL, // 基础权限，自动授予，但仅可读取非敏感键
         [PermissionManager.PERMISSION.SYSTEM_STORAGE_WRITE]: PermissionManager.PERMISSION_LEVEL.NORMAL, // 基础权限，自动授予，但仅可写入非敏感键
+        
+        // 系统存储细粒度读取权限（危险权限，仅管理员可授予）
+        [PermissionManager.PERMISSION.SYSTEM_STORAGE_READ_USER_CONTROL]: PermissionManager.PERMISSION_LEVEL.DANGEROUS,
+        [PermissionManager.PERMISSION.SYSTEM_STORAGE_READ_PERMISSION_CONTROL]: PermissionManager.PERMISSION_LEVEL.DANGEROUS,
+        
+        // 系统存储细粒度写入权限（危险权限，仅管理员可授予）
         [PermissionManager.PERMISSION.THEME_WRITE]: PermissionManager.PERMISSION_LEVEL.SPECIAL,
         [PermissionManager.PERMISSION.DESKTOP_MANAGE]: PermissionManager.PERMISSION_LEVEL.SPECIAL,
         [PermissionManager.PERMISSION.MULTITHREADING_CREATE]: PermissionManager.PERMISSION_LEVEL.SPECIAL,
@@ -380,7 +390,7 @@ class PermissionManager {
      * @param {number} pid 进程ID
      * @param {Object|Array} programInfoOrPermissions 程序信息（从 __info__ 获取）或权限数组（向后兼容）
      */
-    static async registerProgramPermissions(pid, programInfoOrPermissions) {
+    static async registerProgramPermissions(pid, programInfoOrPermissions, options = {}) {
         // 确保已初始化
         await PermissionManager._ensureInitialized();
         
@@ -398,8 +408,12 @@ class PermissionManager {
             return;
         }
         
+        // 检查是否为管理员专用程序（通过 options.isAdminProgram 标志）
+        const isAdminProgram = options.isAdminProgram === true;
+        
         const permissionSet = PermissionManager._permissions.get(pid) || new Set();
         let grantedCount = 0;
+        let dangerousGrantedCount = 0;
         
         for (const perm of permissions) {
             // 验证权限是否有效
@@ -415,16 +429,26 @@ class PermissionManager {
                 permissionSet.add(perm);
                 grantedCount++;
                 KernelLogger.debug("PermissionManager", `程序 ${pid} 自动获得普通权限: ${perm}`);
+            } else if (level === PermissionManager.PERMISSION_LEVEL.DANGEROUS && isAdminProgram) {
+                // 危险权限：如果是管理员专用程序，自动授予（因为管理员已经授权了程序的启动）
+                permissionSet.add(perm);
+                grantedCount++;
+                dangerousGrantedCount++;
+                KernelLogger.info("PermissionManager", `程序 ${pid}（管理员专用程序）自动获得危险权限: ${perm}`);
             } else {
-                // 特殊权限：仅记录，等待使用时申请
-                KernelLogger.debug("PermissionManager", `程序 ${pid} 声明了特殊权限: ${perm}（待申请）`);
+                // 特殊权限或非管理员程序的危险权限：仅记录，等待使用时申请
+                KernelLogger.debug("PermissionManager", `程序 ${pid} 声明了${level === PermissionManager.PERMISSION_LEVEL.DANGEROUS ? '危险' : '特殊'}权限: ${perm}（待申请）`);
             }
         }
         
         if (permissionSet.size > 0) {
             PermissionManager._permissions.set(pid, permissionSet);
             PermissionManager._savePermissions();
-            KernelLogger.info("PermissionManager", `程序 ${pid} 已注册 ${grantedCount} 个普通权限`);
+            if (dangerousGrantedCount > 0) {
+                KernelLogger.info("PermissionManager", `程序 ${pid} 已注册 ${grantedCount} 个权限（包括 ${dangerousGrantedCount} 个危险权限）`);
+            } else {
+                KernelLogger.info("PermissionManager", `程序 ${pid} 已注册 ${grantedCount} 个普通权限`);
+            }
         }
     }
     

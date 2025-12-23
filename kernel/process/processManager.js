@@ -657,10 +657,21 @@ class ProcessManager {
     
     /**
      * 启动需要自动启动的程序
-     * 在内核加载完成后调用
+     * 必须在系统加载完成且用户登录后才调用
      */
     static async startAutoStartPrograms() {
         ProcessManager._log(2, "检查需要自动启动的程序");
+        
+        // 检查系统加载标志位是否已删除（确保系统加载完成且用户已登录）
+        if (typeof POOL !== 'undefined' && typeof POOL.__IS_SYSTEM_LOADING__ === 'function') {
+            if (POOL.__IS_SYSTEM_LOADING__()) {
+                ProcessManager._log(1, "系统仍在加载中，拒绝启动自动启动程序（必须在系统加载完成且用户登录后启动）");
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.warn("ProcessManager", "系统仍在加载中，拒绝启动自动启动程序（必须在系统加载完成且用户登录后启动）");
+                }
+                return;
+            }
+        }
         
         // 从POOL获取应用程序资源映射
         let applicationAssets = null;
@@ -1120,7 +1131,9 @@ class ProcessManager {
         
         // 检查程序是否需要管理员权限
         const ADMIN_ONLY_PROGRAMS = ['regedit', 'kernelchecker', 'authenticator', 'permissioncontrol'];
+        let isAdminProgram = false;
         if (ADMIN_ONLY_PROGRAMS.includes(programName.toLowerCase())) {
+            isAdminProgram = true;
             // 检查当前用户是否为管理员
             let isAdmin = false;
             if (typeof UserControl !== 'undefined') {
@@ -1484,8 +1497,11 @@ class ProcessManager {
                     }
                     if (programInfo) {
                         // 等待权限注册完成，确保程序初始化时已拥有所需权限
-                        await PermissionManager.registerProgramPermissions(pid, programInfo);
-                        ProcessManager._log(2, `程序 ${programName} (PID: ${pid}) 权限注册完成`);
+                        // 如果是管理员专用程序，传递 isAdminProgram 标志，自动授予危险权限
+                        await PermissionManager.registerProgramPermissions(pid, programInfo, {
+                            isAdminProgram: isAdminProgram
+                        });
+                        ProcessManager._log(2, `程序 ${programName} (PID: ${pid}) 权限注册完成${isAdminProgram ? '（管理员专用程序，已自动授予危险权限）' : ''}`);
                     }
                 } catch (e) {
                     ProcessManager._log(1, `注册程序权限失败: ${e.message}`);

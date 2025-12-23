@@ -5,6 +5,11 @@ const POOL = {
     __IS_INITED__: false,
     // 私有池：Map<normalizedKey, Object>
     __KEY_POOL__: new Map(),
+    // 系统加载标志位：标识系统是否正在加载中
+    // 一旦系统加载完成，此标志位将被删除，且拒绝后续添加（不进行持久化保存）
+    __SYSTEM_LOADING_FLAG__: 'SYSTEM_LOADING',
+    // 系统加载标志位是否已被删除（一旦删除，永久拒绝添加）
+    __SYSTEM_LOADING_REMOVED__: false,
 
     /**
      * 将任意 type 规范化为字符串键，保证一致性。
@@ -95,6 +100,7 @@ const POOL = {
     /**
      * 添加或覆盖某个类别下的命名元素
      * 若 name 为空将打印警告并忽略。
+     * 特殊处理：系统加载标志位一旦被删除，永久拒绝添加（不进行持久化保存）。
      * @param {*} type
      * @param {string} name
      * @param {*} elem
@@ -120,6 +126,18 @@ const POOL = {
             // 为避免混淆，保留 name 作为元素名（这里认为调用者传入的是 enumObject + memberName 的简写用法）
         }
         const key = this.__normalizeKey__(realType);
+        
+        // 检查是否尝试添加系统加载标志位
+        // 如果标志位已被删除，永久拒绝添加（安全策略）
+        if (name === this.__SYSTEM_LOADING_FLAG__ && this.__SYSTEM_LOADING_REMOVED__) {
+            if (typeof KernelLogger !== 'undefined') {
+                KernelLogger.warn("POOL", `拒绝添加系统加载标志位 ${name}：系统加载已完成，标志位已被永久删除（安全策略）`);
+            } else {
+                console.warn(`[内核][POOL] 拒绝添加系统加载标志位 ${name}：系统加载已完成，标志位已被永久删除（安全策略）`);
+            }
+            return; // 拒绝添加
+        }
+        
         if (!this.__KEY_POOL__.has(key)) this.__UPDATE__(realType);
         const obj = this.__KEY_POOL__.get(key);
         obj[name] = elem;
@@ -180,6 +198,7 @@ const POOL = {
      * 删除类别或类别下的某个名称
      * - __REMOVE__(type) => 删除整个类别（从 Map 中删除）
      * - __REMOVE__(type, name) => 删除该类别下的单项
+     * 特殊处理：删除系统加载标志位时，标记为永久删除，拒绝后续添加。
      * @param {*} type
      * @param {string} [name]
      */
@@ -203,8 +222,31 @@ const POOL = {
         }
         const obj = this.__KEY_POOL__.get(key);
         if (Object.prototype.hasOwnProperty.call(obj, name)) {
+            // 特殊处理：如果删除的是系统加载标志位，标记为永久删除
+            if (name === this.__SYSTEM_LOADING_FLAG__) {
+                this.__SYSTEM_LOADING_REMOVED__ = true;
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.info("POOL", `系统加载标志位已删除，系统加载完成。此后永久拒绝添加该标志位（安全策略）`);
+                } else {
+                    console.log("[内核][POOL] 系统加载标志位已删除，系统加载完成。此后永久拒绝添加该标志位（安全策略）");
+                }
+            }
             delete obj[name];
         }
+    },
+    
+    /**
+     * 检查系统是否正在加载中
+     * @returns {boolean} 如果系统正在加载中返回 true，否则返回 false
+     */
+    __IS_SYSTEM_LOADING__() {
+        // 如果标志位已被删除，直接返回 false
+        if (this.__SYSTEM_LOADING_REMOVED__) {
+            return false;
+        }
+        // 检查标志位是否存在
+        const flag = this.__GET__("KERNEL_GLOBAL_POOL", this.__SYSTEM_LOADING_FLAG__);
+        return flag === true;
     },
 
     /**
@@ -244,7 +286,7 @@ const POOL = {
 
     /**
      * 清空整个池或指定类别的内容
-     * - __CLEAR__() => 清空整个 Map 并将 __IS_INITED__ 设为 false
+     * - __CLEAR__() => 清空整个 Map 并将 __IS_INITED__ 设为 false，同时重置系统加载标志位状态
      * - __CLEAR__(type) => 删除指定类别
      * @param {*} [type]
      */
@@ -253,6 +295,8 @@ const POOL = {
         if (typeof type === "undefined") {
             this.__KEY_POOL__.clear();
             this.__IS_INITED__ = false;
+            // 重置系统加载标志位状态（系统完全重置时，允许重新设置标志位）
+            this.__SYSTEM_LOADING_REMOVED__ = false;
             return;
         }
         const key = this.__normalizeKey__(type);

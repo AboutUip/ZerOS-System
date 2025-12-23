@@ -2189,8 +2189,12 @@
                     PermissionManager.PERMISSION.GUI_WINDOW_CREATE,
                     PermissionManager.PERMISSION.CACHE_READ,
                     PermissionManager.PERMISSION.CACHE_WRITE,
-                    PermissionManager.PERMISSION.SYSTEM_STORAGE_READ,
-                    PermissionManager.PERMISSION.SYSTEM_STORAGE_WRITE,
+                    PermissionManager.PERMISSION.SYSTEM_STORAGE_READ,   // 读取系统存储（基础权限，仅可读取非敏感键）
+                    PermissionManager.PERMISSION.SYSTEM_STORAGE_READ_USER_CONTROL,      // 读取用户控制相关存储（userControl.*）- 需要管理员授权
+                    PermissionManager.PERMISSION.SYSTEM_STORAGE_READ_PERMISSION_CONTROL, // 读取权限控制相关存储（permissionControl.*, permissionManager.*）- 需要管理员授权
+                    PermissionManager.PERMISSION.SYSTEM_STORAGE_WRITE,  // 写入系统存储（基础权限，仅可写入非敏感键）
+                    PermissionManager.PERMISSION.SYSTEM_STORAGE_WRITE_USER_CONTROL,      // 写入用户控制相关存储（userControl.*）- 需要管理员授权
+                    PermissionManager.PERMISSION.SYSTEM_STORAGE_WRITE_PERMISSION_CONTROL, // 写入权限控制相关存储（permissionControl.*, permissionManager.*）- 需要管理员授权
                     PermissionManager.PERMISSION.KERNEL_DISK_READ,
                     PermissionManager.PERMISSION.KERNEL_DISK_WRITE,
                     PermissionManager.PERMISSION.KERNEL_DISK_LIST

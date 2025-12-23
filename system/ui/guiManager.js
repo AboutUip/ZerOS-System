@@ -1095,6 +1095,8 @@ class GUIManager {
             gap: 8px;
             align-items: center;
             flex-shrink: 0;
+            position: relative;
+            z-index: 10002;
         `;
         
         // 最小化按钮
@@ -1120,6 +1122,8 @@ class GUIManager {
             font-size: 18px;
             line-height: 1;
             transition: all 0.15s;
+            position: relative;
+            z-index: 10003;
         `;
         minimizeBtn.addEventListener('mouseenter', () => {
             minimizeBtn.style.background = 'rgba(255, 255, 255, 0.08)';
@@ -1155,6 +1159,8 @@ class GUIManager {
             justify-content: center;
             font-size: 16px;
             transition: all 0.15s;
+            position: relative;
+            z-index: 10003;
         `;
         maximizeBtn.addEventListener('mouseenter', () => {
             maximizeBtn.style.background = 'rgba(255, 255, 255, 0.08)';
@@ -1190,6 +1196,8 @@ class GUIManager {
             justify-content: center;
             font-size: 20px;
             transition: all 0.15s;
+            position: relative;
+            z-index: 10003;
         `;
         closeBtn.addEventListener('mouseenter', () => {
             closeBtn.style.background = 'rgba(255, 95, 87, 0.15)';
@@ -3195,17 +3203,17 @@ class GUIManager {
             }
         }
         
-        // 右下角拉伸器（提高 z-index 确保不被其他元素遮挡）
+        // 右下角拉伸器（减小尺寸避免误触）
         const resizerBottomRight = document.createElement('div');
         resizerBottomRight.className = 'zos-window-resizer zos-window-resizer-bottom-right';
         resizerBottomRight.style.cssText = `
             position: absolute;
             right: 0;
             bottom: 0;
-            width: 30px;
-            height: 30px;
+            width: 15px;
+            height: 15px;
             cursor: se-resize;
-            z-index: 10001;
+            z-index: 9999;
             background: transparent;
             pointer-events: auto;
             user-select: none;
@@ -3218,17 +3226,17 @@ class GUIManager {
         resizerBottomRight.setAttribute('data-resizer', 'bottom-right');
         windowElement.appendChild(resizerBottomRight);
         
-        // 右上角拉伸器（提高 z-index 确保在标题栏之上）
+        // 右上角拉伸器（减小尺寸避免覆盖关闭按钮）
         const resizerTopRight = document.createElement('div');
         resizerTopRight.className = 'zos-window-resizer zos-window-resizer-top-right';
         resizerTopRight.style.cssText = `
             position: absolute;
             right: 0;
             top: 0;
-            width: 30px;
-            height: 30px;
+            width: 15px;
+            height: 15px;
             cursor: ne-resize;
-            z-index: 10001;
+            z-index: 9999;
             background: transparent;
             pointer-events: auto;
             user-select: none;
@@ -3241,17 +3249,17 @@ class GUIManager {
         resizerTopRight.setAttribute('data-resizer', 'top-right');
         windowElement.appendChild(resizerTopRight);
         
-        // 左上角拉伸器（提高 z-index 确保在标题栏之上）
+        // 左上角拉伸器（减小尺寸避免覆盖标题栏）
         const resizerTopLeft = document.createElement('div');
         resizerTopLeft.className = 'zos-window-resizer zos-window-resizer-top-left';
         resizerTopLeft.style.cssText = `
             position: absolute;
             left: 0;
             top: 0;
-            width: 30px;
-            height: 30px;
+            width: 15px;
+            height: 15px;
             cursor: nw-resize;
-            z-index: 10001;
+            z-index: 9999;
             background: transparent;
             pointer-events: auto;
             user-select: none;
@@ -3265,17 +3273,17 @@ class GUIManager {
         // 将左上角拉伸器添加到窗口末尾，确保它在 DOM 中最后渲染（z-index 更高）
         windowElement.appendChild(resizerTopLeft);
         
-        // 左下角拉伸器（提高 z-index 确保不被其他元素遮挡）
+        // 左下角拉伸器（减小尺寸避免误触）
         const resizerBottomLeft = document.createElement('div');
         resizerBottomLeft.className = 'zos-window-resizer zos-window-resizer-bottom-left';
         resizerBottomLeft.style.cssText = `
             position: absolute;
             left: 0;
             bottom: 0;
-            width: 30px;
-            height: 30px;
+            width: 15px;
+            height: 15px;
             cursor: sw-resize;
-            z-index: 10001;
+            z-index: 9999;
             background: transparent;
             pointer-events: auto;
             user-select: none;

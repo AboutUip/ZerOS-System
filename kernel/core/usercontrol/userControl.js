@@ -134,6 +134,85 @@ class UserControl {
                     prop === Symbol.iterator) {
                     const method = target[prop];
                     if (typeof method === 'function') {
+                        // 对于 get 方法，返回一个包装函数，保护返回的对象
+                        if (prop === 'get') {
+                            return (key) => {
+                                const value = target.get(key);
+                                if (value && typeof value === 'object') {
+                                    // 返回一个受保护的 Proxy 对象，防止直接修改
+                                    return new Proxy(value, {
+                                        set(obj, propName, propValue) {
+                                            // 检查调用栈，只允许来自 UserControl 内部的方法修改
+                                            const stack = new Error().stack || '';
+                                            const callerLines = stack.split('\n').slice(1, 10) || [];
+                                            const callerString = callerLines.join('\n');
+                                            
+                                            // 允许来自 UserControl 内部方法的调用
+                                            const allowedCallers = [
+                                                'UserControl._loadUsers',
+                                                'UserControl._createDefaultUsers',
+                                                'UserControl.createUser',
+                                                'UserControl.deleteUser',
+                                                'UserControl.renameUser',
+                                                'UserControl.setPassword',
+                                                'UserControl.setAvatar',
+                                                'UserControl.login',
+                                                'UserControl.logout',
+                                                'UserControl._saveUsers',
+                                                'UserControl._updateCurrentUserLevel'
+                                            ];
+                                            
+                                            // 严格检查：只允许来自 UserControl 内部方法的调用
+                                            // 必须精确匹配 allowedCallers 中的方法名
+                                            let isAllowed = allowedCallers.some(caller => 
+                                                callerString.includes(caller)
+                                            );
+                                            
+                                            // 额外检查：确保调用栈中包含 kernel/core/usercontrol/ 路径
+                                            // 这样可以防止用户程序通过伪造调用栈绕过检查
+                                            if (isAllowed) {
+                                                const isKernelModule = /kernel[\/\\]core[\/\\]usercontrol[\/\\]/i.test(callerString);
+                                                if (!isKernelModule) {
+                                                    // 如果匹配了 allowedCallers 但不在内核模块路径中，拒绝
+                                                    isAllowed = false;
+                                                }
+                                            }
+                                            
+                                            if (!isAllowed) {
+                                                if (typeof KernelLogger !== 'undefined') {
+                                                    KernelLogger.error("UserControl", 
+                                                        `安全错误: 尝试直接修改用户数据对象。请使用 UserControl 的公共方法。`);
+                                                }
+                                                UserControl._logSecurityViolation('attempt_direct_modify_user_data', {
+                                                    username: key,
+                                                    property: propName,
+                                                    value: propValue,
+                                                    stack: stack
+                                                });
+                                                throw new Error(`安全错误: 不能直接修改用户数据对象。请使用 UserControl 的公共方法。`);
+                                            }
+                                            
+                                            // 允许修改
+                                            obj[propName] = propValue;
+                                            return true;
+                                        },
+                                        deleteProperty(obj, propName) {
+                                            // 禁止删除属性
+                                            if (typeof KernelLogger !== 'undefined') {
+                                                KernelLogger.error("UserControl", 
+                                                    `安全错误: 尝试删除用户数据属性。`);
+                                            }
+                                            UserControl._logSecurityViolation('attempt_delete_user_data_property', {
+                                                username: key,
+                                                property: propName
+                                            });
+                                            throw new Error(`安全错误: 不能删除用户数据属性。`);
+                                        }
+                                    });
+                                }
+                                return value;
+                            };
+                        }
                         return method.bind(target);
                     }
                     return method;

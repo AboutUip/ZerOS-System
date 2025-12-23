@@ -1073,6 +1073,13 @@
             if (!POOL.__HAS__ || !POOL.__HAS__("KERNEL_GLOBAL_POOL")) {
                 POOL.__INIT__("KERNEL_GLOBAL_POOL");
             }
+            
+            // 设置系统加载标志位（允许内核模块在系统加载期间访问敏感键）
+            if (typeof POOL.__IS_SYSTEM_LOADING__ === 'function' && !POOL.__IS_SYSTEM_LOADING__()) {
+                POOL.__ADD__("KERNEL_GLOBAL_POOL", POOL.__SYSTEM_LOADING_FLAG__, true);
+                KernelLogger.info("BootLoader", "系统加载标志位已设置，允许内核模块在系统加载期间访问敏感键");
+            }
+            
             // 确保 Dependency 和 WORK_SPACE 已添加（如果还未添加）
             if (!POOL.__GET__("KERNEL_GLOBAL_POOL", "Dependency")) {
                 POOL.__ADD__("KERNEL_GLOBAL_POOL", "Dependency", Dependency);
@@ -1144,14 +1151,9 @@
                     }
                 }
                 
-                // 启动需要自动启动的程序（可选，如果没有程序需要自动启动则跳过）
-                try {
-                    await ProcessManager.startAutoStartPrograms();
-                    KernelLogger.info("BootLoader", "自动启动程序检查完成");
-                } catch (e) {
-                    KernelLogger.warn("BootLoader", `自动启动程序检查失败: ${e.message}`);
-                    // 不阻塞内核启动
-                }
+                // 注意：自动启动程序将在用户登录成功后启动（在LockScreen中处理）
+                // 这样可以确保系统加载完成且用户已登录后才启动自动启动程序
+                KernelLogger.info("BootLoader", "自动启动程序将在用户登录后启动");
             } else {
                 KernelLogger.error("BootLoader", "ProcessManager 未加载");
             }

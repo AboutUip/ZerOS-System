@@ -909,11 +909,336 @@ class LStorage {
             await LStorage.init();
         }
         
+        // 检查是否为内核模块调用
+        const isKernelModuleCall = LStorage._isKernelModuleCall();
+        
+        // 获取调用栈（用于系统加载期间的检查）
+        let fullCallStack = '';
         try {
-            return LStorage._storageData.system[key] ?? null;
+            const stackError = new Error();
+            fullCallStack = stackError.stack || '';
+        } catch (e) {
+            // 忽略错误
+        }
+        
+        // 获取当前进程PID（通过调用栈分析）
+        // 注意：对于内核模块调用，PID 可能为 null，这是正常的
+        const currentPid = LStorage._getCurrentPid();
+        
+        // 调试日志：记录调用信息（对敏感键或无法获取PID的情况）
+        const isSensitiveKeyCheck = key.startsWith('userControl.') || key.startsWith('permissionControl.') || key === 'permissionManager.permissions';
+        if (isSensitiveKeyCheck || !isKernelModuleCall || !currentPid) {
+            KernelLogger.debug("LStorage", `调用检测 - 键: ${key}, 内核模块: ${isKernelModuleCall}, PID: ${currentPid || 'null'}`);
+        }
+        
+        // 定义敏感存储键及其所需权限（需要危险权限，仅管理员可授予）
+        const SENSITIVE_KEY_PERMISSIONS = {};
+        if (typeof PermissionManager !== 'undefined' && PermissionManager.PERMISSION) {
+            // 用户控制相关键（危险权限，仅管理员可授予）
+            SENSITIVE_KEY_PERMISSIONS['userControl.users'] = PermissionManager.PERMISSION.SYSTEM_STORAGE_READ_USER_CONTROL;
+            SENSITIVE_KEY_PERMISSIONS['userControl.settings'] = PermissionManager.PERMISSION.SYSTEM_STORAGE_READ_USER_CONTROL;
+            SENSITIVE_KEY_PERMISSIONS['userControl.currentUser'] = PermissionManager.PERMISSION.SYSTEM_STORAGE_READ_USER_CONTROL;
+            
+            // 权限控制相关键（危险权限，仅管理员可授予）
+            SENSITIVE_KEY_PERMISSIONS['permissionControl.blacklist'] = PermissionManager.PERMISSION.SYSTEM_STORAGE_READ_PERMISSION_CONTROL;
+            SENSITIVE_KEY_PERMISSIONS['permissionControl.whitelist'] = PermissionManager.PERMISSION.SYSTEM_STORAGE_READ_PERMISSION_CONTROL;
+            SENSITIVE_KEY_PERMISSIONS['permissionControl.settings'] = PermissionManager.PERMISSION.SYSTEM_STORAGE_READ_PERMISSION_CONTROL;
+            SENSITIVE_KEY_PERMISSIONS['permissionManager.permissions'] = PermissionManager.PERMISSION.SYSTEM_STORAGE_READ_PERMISSION_CONTROL;
+        }
+        
+        // 检查是否为敏感键
+        const isSensitiveKey = key in SENSITIVE_KEY_PERMISSIONS;
+        const requiredPermission = SENSITIVE_KEY_PERMISSIONS[key];
+        
+        // 检查系统是否正在加载中（通过POOL标志位）
+        let isSystemLoading = false;
+        if (typeof POOL !== 'undefined' && typeof POOL.__IS_SYSTEM_LOADING__ === 'function') {
+            isSystemLoading = POOL.__IS_SYSTEM_LOADING__();
+            KernelLogger.debug("LStorage", `检查系统加载状态 - 键: ${key}, isSystemLoading: ${isSystemLoading}, isSensitiveKey: ${isSensitiveKey}`);
+        } else {
+            KernelLogger.debug("LStorage", `POOL 或 __IS_SYSTEM_LOADING__ 不可用 - 键: ${key}`);
+        }
+        
+        if (isSensitiveKey) {
+            // 对于敏感键，即使是内核模块调用，也要进行严格验证
+            const isUserControlKey = key.startsWith('userControl.');
+            const isPermissionControlKey = key.startsWith('permissionControl.') || key === 'permissionManager.permissions';
+            
+            KernelLogger.debug("LStorage", `敏感键检查 - 键: ${key}, isUserControlKey: ${isUserControlKey}, isPermissionControlKey: ${isPermissionControlKey}, isSystemLoading: ${isSystemLoading}`);
+            
+            // 如果系统正在加载中（依赖POOL标志位），允许内核模块访问敏感键
+            // 只需要检查调用栈中是否包含相应的内核模块标识即可
+            if (isSystemLoading) {
+                KernelLogger.debug("LStorage", `系统加载中（POOL标志位），检查敏感键 ${key}，isUserControlKey: ${isUserControlKey}, isPermissionControlKey: ${isPermissionControlKey}`);
+                let allowedInSystemLoading = false;
+                
+                // 检查 UserControl 模块
+                if (isUserControlKey) {
+                    const hasUserControlPath = /kernel[\/\\]core[\/\\]usercontrol[\/\\]/i.test(fullCallStack);
+                    const hasUserControlName = /userControl/i.test(fullCallStack);
+                    if (hasUserControlPath || hasUserControlName) {
+                        allowedInSystemLoading = true;
+                        KernelLogger.debug("LStorage", `系统加载中（POOL标志位），检测到 UserControl 调用，允许读取 ${key}`);
+                    } else {
+                        KernelLogger.debug("LStorage", `系统加载中（POOL标志位），UserControl 调用栈检查失败，调用栈片段: ${fullCallStack.substring(0, 500)}`);
+                    }
+                }
+                // 检查 PermissionManager 模块（独立检查，不依赖 allowedInSystemLoading）
+                if (isPermissionControlKey) {
+                    // 更宽松的匹配：检查调用栈中是否包含 permissionManager 相关的标识
+                    // 包括：permissionManager.js, permissionManager, _loadPermissions 等
+                    const hasPermissionManagerPath = /kernel[\/\\]process[\/\\].*permissionManager/i.test(fullCallStack);
+                    const hasPermissionManagerName = /permissionManager/i.test(fullCallStack);
+                    const hasLoadPermissions = /_loadPermissions/i.test(fullCallStack);
+                    const hasPermissionManagerFile = /permissionManager\.js/i.test(fullCallStack);
+                    
+                    KernelLogger.debug("LStorage", `系统加载中（POOL标志位），PermissionManager 检查 - hasPath: ${hasPermissionManagerPath}, hasName: ${hasPermissionManagerName}, hasLoadPermissions: ${hasLoadPermissions}, hasFile: ${hasPermissionManagerFile}`);
+                    
+                    // 在系统加载期间，如果键是 permissionManager.permissions，且调用栈检查失败
+                    // 我们仍然允许访问（因为这是系统初始化必需的，调用栈可能被截断）
+                    if (key === 'permissionManager.permissions') {
+                        if (hasPermissionManagerPath || hasPermissionManagerName || hasLoadPermissions || hasPermissionManagerFile) {
+                            allowedInSystemLoading = true;
+                            KernelLogger.debug("LStorage", `系统加载中（POOL标志位），检测到 PermissionManager 调用，允许读取 ${key}`);
+                        } else {
+                            // 系统加载期间，permissionManager.permissions 应该允许访问（系统初始化需要）
+                            // 即使调用栈检查失败，也允许（因为调用栈可能被截断）
+                            allowedInSystemLoading = true;
+                            KernelLogger.warn("LStorage", `系统加载中（POOL标志位），PermissionManager 调用栈检查未完全匹配，但系统加载期间允许访问 ${key}（系统初始化需要）`);
+                            KernelLogger.debug("LStorage", `调用栈片段: ${fullCallStack.substring(0, 500)}`);
+                        }
+                    } else {
+                        // 其他 permissionControl 键，需要严格匹配
+                        if (hasPermissionManagerPath || hasPermissionManagerName || hasLoadPermissions || hasPermissionManagerFile) {
+                            allowedInSystemLoading = true;
+                            KernelLogger.debug("LStorage", `系统加载中（POOL标志位），检测到 PermissionManager 调用，允许读取 ${key}`);
+                        } else {
+                            KernelLogger.warn("LStorage", `系统加载中（POOL标志位），PermissionManager 调用栈检查失败，键: ${key}`);
+                            KernelLogger.debug("LStorage", `调用栈片段: ${fullCallStack.substring(0, 500)}`);
+                        }
+                    }
+                }
+                
+                if (allowedInSystemLoading) {
+                    // 系统加载中，允许访问敏感键
+                    KernelLogger.debug("LStorage", `系统加载中（POOL标志位），允许内核模块读取敏感键 ${key}`);
+                    try {
+                        const value = LStorage._storageData.system[key] ?? null;
+                        if (value) {
+                            KernelLogger.warn("LStorage", `敏感系统存储键 ${key} 被读取 - PID: unknown, 调用者: 内核模块（系统加载中）`);
+                        }
+                        return value;
+                    } catch (error) {
+                        KernelLogger.error("LStorage", `读取系统存储失败: ${error.message}`, error);
+                        throw error;
+                    }
+                } else {
+                    KernelLogger.debug("LStorage", `系统加载中（POOL标志位），但调用栈检查未通过，继续后续验证流程`);
+                }
+            }
+            
+            // 如果 _isKernelModuleCall() 返回 false，但调用栈中包含内核模块标识，可能是异步调用导致的调用栈格式问题
+            // 在这种情况下，我们需要重新检查调用栈
+            if (!isKernelModuleCall) {
+                // 获取完整的调用栈进行二次检查
+                try {
+                    const fullStack = new Error().stack || '';
+                    // 检查调用栈中是否包含内核模块标识
+                    if (/kernel[\/\\]process[\/\\].*permissionManager/i.test(fullStack) || 
+                        /permissionManager/i.test(fullStack)) {
+                        // 如果调用栈中包含 permissionManager，且是敏感键 permissionManager.permissions，允许通过
+                        if (isPermissionControlKey && key === 'permissionManager.permissions') {
+                            KernelLogger.debug("LStorage", `检测到 PermissionManager 调用（二次检查），允许读取 ${key}`);
+                            isKernelModuleCall = true; // 标记为内核模块调用，继续后续验证
+                        }
+                    }
+                } catch (e) {
+                    KernelLogger.debug("LStorage", `二次检查调用栈失败: ${e.message}`);
+                }
+            }
+            
+            if (isKernelModuleCall) {
+                // 内核模块调用：需要验证是否为允许的内核模块
+                let allowed = false;
+                try {
+                    const stack = new Error().stack;
+                    if (stack) {
+                        // 对于 userControl.* 键，只允许 UserControl 模块读取
+                        if (isUserControlKey) {
+                            if (/kernel[\/\\]core[\/\\]usercontrol[\/\\]/i.test(stack)) {
+                                allowed = true;
+                                KernelLogger.debug("LStorage", `UserControl 模块调用，允许读取 ${key}`);
+                            } else {
+                                KernelLogger.error("LStorage", `安全警告：检测到疑似伪造的内核模块调用，拒绝读取 ${key}`);
+                                throw new Error(`安全验证失败：只有 UserControl 模块可以读取 ${key} 键`);
+                            }
+                        }
+                        // 对于 permissionControl.* 和 permissionManager.permissions 键，只允许 PermissionManager 模块读取
+                        else if (isPermissionControlKey) {
+                            // 匹配多种可能的路径格式：
+                            // - kernel/process/permissionManager.js
+                            // - kernel/process/permissionmanager.js
+                            // - 包含 permissionManager 或 permissionmanager 的路径
+                            // - 调用栈中包含 permissionManager 或 permissionmanager 字符串
+                            const permissionManagerPatterns = [
+                                /kernel[\/\\]process[\/\\].*permissionManager/i,
+                                /kernel[\/\\]process[\/\\].*permissionmanager/i,
+                                /permissionManager\.js/i,
+                                /permissionmanager\.js/i,
+                                /permissionManager/i,  // 更宽松的匹配
+                                /permissionmanager/i   // 更宽松的匹配
+                            ];
+                            
+                            let matched = false;
+                            for (const pattern of permissionManagerPatterns) {
+                                if (pattern.test(stack)) {
+                                    matched = true;
+                                    KernelLogger.debug("LStorage", `PermissionManager 模式匹配成功: ${pattern}`);
+                                    break;
+                                }
+                            }
+                            
+                            if (matched) {
+                                allowed = true;
+                                KernelLogger.debug("LStorage", `PermissionManager 模块调用，允许读取 ${key}`);
+                            } else {
+                                // 如果无法匹配，记录详细调用栈用于调试
+                                KernelLogger.debug("LStorage", `PermissionManager 调用栈验证失败，调用栈: ${stack.substring(0, 800)}`);
+                                KernelLogger.error("LStorage", `安全警告：检测到疑似伪造的内核模块调用，拒绝读取 ${key}`);
+                                throw new Error(`安全验证失败：只有 PermissionManager 模块可以读取 ${key} 键`);
+                            }
+                        }
+                    } else {
+                        KernelLogger.error("LStorage", `无法获取调用栈，拒绝读取敏感系统存储键 ${key}`);
+                        throw new Error(`安全验证失败：无法获取调用栈`);
+                    }
+                } catch (e) {
+                    KernelLogger.error("LStorage", `验证敏感键读取来源时出错: ${e.message}`);
+                    throw new Error(`安全验证失败：${e.message}`);
+                }
+                
+                if (!allowed) {
+                    KernelLogger.error("LStorage", `内核模块调用验证失败，拒绝读取 ${key}`);
+                    throw new Error(`安全验证失败：不允许的内核模块调用`);
+                }
+                // 继续执行读取操作
+            } else {
+                // 用户程序调用：需要危险权限（仅管理员可授予）
+                // 但是，如果是 permissionManager.permissions 键，且调用栈中包含 permissionManager，
+                // 可能是系统初始化时的调用，应该允许通过
+                if (isPermissionControlKey && key === 'permissionManager.permissions') {
+                    try {
+                        const fullStack = new Error().stack || '';
+                        // 检查调用栈中是否包含 permissionManager 标识
+                        if (/permissionManager/i.test(fullStack) || 
+                            /kernel[\/\\]process[\/\\].*permissionManager/i.test(fullStack)) {
+                            // 如果调用栈中包含 permissionManager，且是系统初始化阶段，允许通过
+                            KernelLogger.debug("LStorage", `检测到 PermissionManager 调用（用户程序分支二次检查），允许读取 ${key}`);
+                            // 直接允许，跳过权限检查（因为这是系统初始化时的调用）
+                            try {
+                                const value = LStorage._storageData.system[key] ?? null;
+                                if (value) {
+                                    KernelLogger.warn("LStorage", `敏感系统存储键 ${key} 被读取 - PID: unknown, 调用者: PermissionManager（系统初始化）`);
+                                }
+                                return value;
+                            } catch (error) {
+                                KernelLogger.error("LStorage", `读取系统存储失败: ${error.message}`, error);
+                                throw error;
+                            }
+                        }
+                    } catch (e) {
+                        KernelLogger.debug("LStorage", `二次检查调用栈失败: ${e.message}`);
+                    }
+                }
+                
+                if (typeof PermissionManager === 'undefined') {
+                    // 降级方案：检查用户权限
+                    if (typeof UserControl !== 'undefined') {
+                        if (!UserControl.isAdmin()) {
+                            KernelLogger.error("LStorage", `读取敏感系统存储键 ${key} 需要管理员权限`);
+                            throw new Error(`读取系统存储键 ${key} 需要管理员权限`);
+                        }
+                    } else {
+                        KernelLogger.error("LStorage", `UserControl 不可用，无法验证管理员权限`);
+                        throw new Error(`无法验证权限：UserControl 不可用`);
+                    }
+                } else {
+                    // 检查进程是否有对应的危险权限（仅管理员可授予）
+                    if (!requiredPermission) {
+                        // requiredPermission 未定义，说明权限配置有问题，拒绝读取
+                        KernelLogger.error("LStorage", `读取敏感系统存储键 ${key} 缺少权限配置，拒绝读取`);
+                        throw new Error(`无法验证权限：权限配置缺失`);
+                    }
+                    
+                    if (!currentPid) {
+                        // 无法获取 PID，无法验证调用来源，拒绝读取（安全策略：宁可拒绝也不允许）
+                        KernelLogger.error("LStorage", `无法获取进程PID，拒绝读取敏感系统存储键 ${key}（安全策略）`);
+                        throw new Error(`无法验证权限：无法获取进程PID`);
+                    }
+                    
+                    // 对于危险权限，必须先检查是否已有权限，不能通过请求获得
+                    // 危险权限只能由管理员在程序启动时授予，不能通过运行时请求获得
+                    const hasPermission = PermissionManager.hasPermission(currentPid, requiredPermission);
+                    if (!hasPermission) {
+                        // 检查当前用户是否为管理员（如果是管理员，可以授权）
+                        if (typeof UserControl !== 'undefined') {
+                            const currentUser = UserControl.getCurrentUser();
+                            const isAdmin = UserControl.isAdmin();
+                            
+                            if (!isAdmin) {
+                                // 普通用户无法授权危险权限，直接拒绝
+                                KernelLogger.error("LStorage", `进程 ${currentPid} 尝试读取敏感系统存储键 ${key}，但缺少所需权限 ${requiredPermission}，且当前用户 ${currentUser || '未知'} 不是管理员，无法授权`);
+                                throw new Error(`缺少权限：${requiredPermission}（需要管理员授权，当前用户无法授权此权限）`);
+                            } else {
+                                // 管理员可以授权，但危险权限不应该通过运行时请求获得
+                                // 为了安全，即使管理员也不允许运行时授权危险权限
+                                KernelLogger.error("LStorage", `进程 ${currentPid} 尝试读取敏感系统存储键 ${key}，但缺少所需权限 ${requiredPermission}。危险权限必须在程序启动时授予，不允许运行时授权`);
+                                throw new Error(`缺少权限：${requiredPermission}（危险权限必须在程序启动时授予）`);
+                            }
+                        } else {
+                            KernelLogger.error("LStorage", `UserControl 不可用，无法验证管理员权限`);
+                            throw new Error(`无法验证权限：UserControl 不可用`);
+                        }
+                    }
+                    
+                    // 权限检查通过，记录日志
+                    KernelLogger.debug("LStorage", `进程 ${currentPid} 已获得权限 ${requiredPermission}，允许读取敏感系统存储键 ${key}`);
+                }
+            }
+        } else {
+            // 非敏感键
+            if (isKernelModuleCall) {
+                // 内核模块调用：直接允许，不需要 PID 检查
+                KernelLogger.debug("LStorage", `内核模块调用，允许读取非敏感系统存储键 ${key}`);
+            } else {
+                // 用户程序调用：需要基础权限（SYSTEM_STORAGE_READ，普通权限，自动授予）
+                if (typeof PermissionManager !== 'undefined' && currentPid) {
+                    const hasBasePermission = PermissionManager.hasPermission(currentPid, PermissionManager.PERMISSION.SYSTEM_STORAGE_READ);
+                    if (!hasBasePermission) {
+                        // 基础权限可以请求（特殊权限，需要用户确认）
+                        const granted = await PermissionManager.checkAndRequestPermission(currentPid, PermissionManager.PERMISSION.SYSTEM_STORAGE_READ);
+                        if (!granted) {
+                            KernelLogger.error("LStorage", `进程 ${currentPid} 尝试读取系统存储键 ${key}，但缺少基础权限 SYSTEM_STORAGE_READ`);
+                            throw new Error(`缺少权限：SYSTEM_STORAGE_READ`);
+                        }
+                    }
+                } else if (!currentPid) {
+                    // 无法获取 PID，无法验证调用来源，拒绝读取（安全策略）
+                    KernelLogger.error("LStorage", `无法获取进程PID，拒绝读取系统存储键 ${key}（安全策略）`);
+                    throw new Error(`无法验证权限：无法获取进程PID`);
+                }
+            }
+        }
+        
+        try {
+            const value = LStorage._storageData.system[key] ?? null;
+            if (isSensitiveKey && value) {
+                KernelLogger.warn("LStorage", `敏感系统存储键 ${key} 被读取 - PID: ${currentPid || 'unknown'}, 调用者: ${isKernelModuleCall ? '内核模块' : '用户程序'}`);
+            }
+            return value;
         } catch (error) {
             KernelLogger.error("LStorage", `读取系统存储失败: ${error.message}`, error);
-            return null;
+            throw error;
         }
     }
     
@@ -925,12 +1250,55 @@ class LStorage {
     static _isKernelModuleCall() {
         try {
             const stack = new Error().stack;
-            if (!stack) return false;
+            if (!stack) {
+                KernelLogger.debug("LStorage", `无法获取调用栈，返回 false`);
+                return false;
+            }
             
-            // 检查调用栈中是否包含内核模块路径
-            // 内核模块路径示例：kernel/core/usercontrol/, kernel/process/, kernel/drive/ 等
-            const kernelModulePattern = /kernel[\/\\](core|process|drive|filesystem|dynamicModule)[\/\\]/;
-            return kernelModulePattern.test(stack);
+            // 将调用栈按行分割
+            const stackLines = stack.split('\n');
+            
+            // 跳过第一行（Error 消息）和第二行（LStorage.js 本身）
+            // 从第三行开始检查，找到第一个不是 LStorage.js 的调用者
+            for (let i = 2; i < Math.min(stackLines.length, 15); i++) {
+                const line = stackLines[i];
+                
+                // 跳过 LStorage.js 本身的调用栈行
+                if (line.includes('LStorage.js') || line.includes('lStorage.js')) {
+                    continue;
+                }
+                
+                // 检查是否包含内核模块路径
+                // 内核模块路径包括：
+                // - kernel/core/, kernel/process/, kernel/filesystem/, kernel/dynamicModule/
+                // - kernel/drive/ (驱动模块，如 cryptDrive.js, LStorage.js 等)
+                // - system/ui/ (系统UI模块，如 themeManager.js, desktop.js, taskbarManager.js 等)
+                // 但排除 kernel/drive/LStorage.js 本身的调用栈行（已在上面跳过）
+                const kernelModulePatterns = [
+                    /kernel[\/\\](core|process|filesystem|dynamicModule)[\/\\]/,  // 核心模块
+                    /kernel[\/\\]drive[\/\\]/,                                    // 驱动模块（排除 LStorage.js 本身）
+                    /system[\/\\]ui[\/\\]/                                        // 系统UI模块
+                ];
+                
+                for (const pattern of kernelModulePatterns) {
+                    if (pattern.test(line)) {
+                        // 找到内核模块调用，记录详细信息用于调试
+                        KernelLogger.debug("LStorage", `检测到内核模块调用，调用栈行: ${line.substring(0, 100)}`);
+                        return true;
+                    }
+                }
+                
+                // 如果找到用户程序路径（application/），说明是用户程序调用
+                if (/service[\/\\]DISK[\/\\][CD][\/\\]application[\/\\]/.test(line)) {
+                    KernelLogger.debug("LStorage", `检测到用户程序调用，调用栈行: ${line.substring(0, 100)}`);
+                    return false;
+                }
+            }
+            
+            // 如果没有找到明确的调用者，记录完整调用栈用于调试
+            KernelLogger.debug("LStorage", `无法确定调用来源，完整调用栈: ${stackLines.slice(0, 20).join('\n')}`);
+            KernelLogger.debug("LStorage", `无法确定调用来源，默认拒绝（安全策略）`);
+            return false;
         } catch (e) {
             KernelLogger.debug("LStorage", `检查内核模块调用失败: ${e.message}`);
             return false;
@@ -1031,27 +1399,56 @@ class LStorage {
         const requiredPermission = DANGEROUS_KEY_PERMISSIONS[key] || SPECIAL_KEY_PERMISSIONS[key];
         
         if (isDangerousKey) {
-            // 对于危险键，即使是内核模块调用，也要记录日志
+            // 对于危险键，即使是内核模块调用，也要进行严格验证
             // 对于 userControl.users 键，需要更严格的验证
             const isUserControlUsersKey = (key === 'userControl.users');
+            const isPermissionControlKey = key.startsWith('permissionControl.') || key === 'permissionManager.permissions';
             
             if (isKernelModuleCall) {
-                // 内核模块调用：允许写入（内核模块是可信的）
-                // 但对于 userControl.users 键，需要额外验证是否为 UserControl 模块
-                if (isUserControlUsersKey) {
-                    // 验证调用栈中确实包含 UserControl 模块
-                    try {
-                        const stack = new Error().stack;
-                        if (!stack || !/kernel[\/\\]core[\/\\]usercontrol[\/\\]/i.test(stack)) {
-                            KernelLogger.error("LStorage", `安全警告：检测到疑似伪造的内核模块调用，拒绝写入 ${key}`);
-                            throw new Error(`安全验证失败：无法确认调用来源`);
+                // 内核模块调用：需要验证是否为允许的内核模块
+                let allowed = false;
+                try {
+                    const stack = new Error().stack;
+                    if (stack) {
+                        // 对于 userControl.users 键，只允许 UserControl 模块写入
+                        if (isUserControlUsersKey) {
+                            if (/kernel[\/\\]core[\/\\]usercontrol[\/\\]/i.test(stack)) {
+                                allowed = true;
+                                KernelLogger.debug("LStorage", `UserControl 模块调用，允许写入 ${key}`);
+                            } else {
+                                KernelLogger.error("LStorage", `安全警告：检测到疑似伪造的内核模块调用，拒绝写入 ${key}`);
+                                throw new Error(`安全验证失败：只有 UserControl 模块可以写入 userControl.users 键`);
+                            }
                         }
-                    } catch (e) {
-                        KernelLogger.error("LStorage", `验证 userControl.users 写入来源时出错: ${e.message}`);
-                        throw new Error(`安全验证失败：${e.message}`);
+                        // 对于 permissionControl.* 和 permissionManager.permissions 键，只允许 PermissionManager 模块写入
+                        else if (isPermissionControlKey) {
+                            if (/kernel[\/\\]process[\/\\]permissionManager\.js/i.test(stack) || 
+                                /kernel[\/\\]process[\/\\]permissionmanager\.js/i.test(stack)) {
+                                allowed = true;
+                                KernelLogger.debug("LStorage", `PermissionManager 模块调用，允许写入 ${key}`);
+                            } else {
+                                KernelLogger.error("LStorage", `安全警告：检测到疑似伪造的内核模块调用，拒绝写入 ${key}`);
+                                throw new Error(`安全验证失败：只有 PermissionManager 模块可以写入 ${key} 键`);
+                            }
+                        }
+                        // 对于其他危险键，允许所有内核模块写入（但记录日志）
+                        else {
+                            allowed = true;
+                            KernelLogger.debug("LStorage", `内核模块调用，允许写入危险系统存储键 ${key}`);
+                        }
+                    } else {
+                        KernelLogger.error("LStorage", `无法获取调用栈，拒绝写入危险系统存储键 ${key}`);
+                        throw new Error(`安全验证失败：无法获取调用栈`);
                     }
+                } catch (e) {
+                    KernelLogger.error("LStorage", `验证危险键写入来源时出错: ${e.message}`);
+                    throw new Error(`安全验证失败：${e.message}`);
                 }
-                KernelLogger.debug("LStorage", `内核模块调用，允许写入危险系统存储键 ${key}`);
+                
+                if (!allowed) {
+                    KernelLogger.error("LStorage", `内核模块调用验证失败，拒绝写入 ${key}`);
+                    throw new Error(`安全验证失败：不允许的内核模块调用`);
+                }
                 // 继续执行写入操作
             } else {
                 // 用户程序调用：需要危险权限（仅管理员可授予）
@@ -1086,11 +1483,32 @@ class LStorage {
                         throw new Error(`无法验证权限：无法获取进程PID`);
                     }
                     
-                    // 检查进程是否有对应的危险权限（仅管理员可授予）
-                    const hasPermission = await PermissionManager.checkAndRequestPermission(currentPid, requiredPermission);
+                    // 对于危险权限，必须先检查是否已有权限，不能通过请求获得
+                    // 危险权限只能由管理员在程序启动时授予，不能通过运行时请求获得
+                    const hasPermission = PermissionManager.hasPermission(currentPid, requiredPermission);
                     if (!hasPermission) {
-                        KernelLogger.error("LStorage", `进程 ${currentPid} 尝试写入危险系统存储键 ${key}，但缺少所需权限 ${requiredPermission}`);
-                        throw new Error(`缺少权限：${requiredPermission}（需要管理员授权）`);
+                        // 检查当前用户是否为管理员（如果是管理员，可以授权）
+                        if (typeof UserControl !== 'undefined') {
+                            const currentUser = UserControl.getCurrentUser();
+                            const isAdmin = UserControl.isAdmin();
+                            
+                            if (!isAdmin) {
+                                // 普通用户无法授权危险权限，直接拒绝
+                                KernelLogger.error("LStorage", `进程 ${currentPid} 尝试写入危险系统存储键 ${key}，但缺少所需权限 ${requiredPermission}，且当前用户 ${currentUser || '未知'} 不是管理员，无法授权`);
+                                throw new Error(`缺少权限：${requiredPermission}（需要管理员授权，当前用户无法授权此权限）`);
+                            }
+                            
+                            // 管理员可以授权，但需要通过权限请求对话框
+                            const granted = await PermissionManager.checkAndRequestPermission(currentPid, requiredPermission);
+                            if (!granted) {
+                                KernelLogger.error("LStorage", `进程 ${currentPid} 尝试写入危险系统存储键 ${key}，但权限请求被拒绝`);
+                                throw new Error(`缺少权限：${requiredPermission}（权限请求被拒绝）`);
+                            }
+                        } else {
+                            // UserControl 不可用，拒绝写入（安全策略）
+                            KernelLogger.error("LStorage", `UserControl 不可用，无法验证用户权限，拒绝写入危险系统存储键 ${key}`);
+                            throw new Error(`无法验证权限：UserControl 不可用`);
+                        }
                     }
                 }
             }
@@ -1349,11 +1767,27 @@ class LStorage {
      * 获取所有系统存储数据（用于调试）
      * @returns {Object} 所有系统存储数据
      */
+    /**
+     * 获取所有系统存储数据（仅内核模块可用）
+     * @returns {Object} 系统存储数据对象
+     */
     static getAllSystemStorage() {
         if (!LStorage._initialized) {
             return {};
         }
         
+        // 检查是否为内核模块调用
+        const isKernelModuleCall = LStorage._isKernelModuleCall();
+        
+        if (!isKernelModuleCall) {
+            // 用户程序调用：拒绝访问（安全策略）
+            const currentPid = LStorage._getCurrentPid();
+            KernelLogger.error("LStorage", `安全拒绝：用户程序尝试枚举所有系统存储键（PID: ${currentPid || 'unknown'}）`);
+            throw new Error(`安全策略：不允许用户程序枚举所有系统存储键`);
+        }
+        
+        // 内核模块调用：允许访问
+        KernelLogger.debug("LStorage", `内核模块调用，允许获取所有系统存储数据`);
         return LStorage._storageData.system || {};
     }
     

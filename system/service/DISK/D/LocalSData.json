@@ -471,17 +471,17 @@
         "password": "61b249bf6d604d14120821f43625e84e",
         "avatar": "avatar_root_1766272534753.jpg",
         "createdAt": 1766271155991,
-        "lastLogin": 1766507740426
+        "lastLogin": 1766513636703
       },
       "TestUser": {
         "level": "USER",
         "password": null,
         "avatar": null,
         "createdAt": 1766271155991,
-        "lastLogin": 1766507727327
+        "lastLogin": 1766513648506
       }
     },
-    "userControl.currentUser": "root",
+    "userControl.currentUser": "TestUser",
     "system.lockscreenTimeComponent": true,
     "system.lockscreenBackground": "D:/cache/lockscreen/lockscreen_local_D__cache_random_anime_bg_1765983395242_jpg_random_anime_bg_1765983395242.jpg",
     "system.lockscreenRandomBg": true,
@@ -494,7 +494,19 @@
         "source": "desktop_background",
         "originalBackgroundId": "local_D__cache_random_anime_bg_1765983395242_jpg"
       }
-    ]
+    ],
+    "permissionControl.settings": {
+      "test": "escalate_attempt",
+      "timestamp": 1766509735075
+    },
+    "permissionControl.blacklist": {
+      "test": "escalate_attempt",
+      "timestamp": 1766509735075
+    },
+    "permissionControl.whitelist": {
+      "test": "escalate_attempt",
+      "timestamp": 1766509735075
+    }
   },
   "programs": {}
 }

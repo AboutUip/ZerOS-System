@@ -1239,6 +1239,14 @@ KernelLogger.info("LockScreen", "模块初始化");
                     // 延迟一下再隐藏锁屏界面，让用户看到成功消息
                     await new Promise(resolve => setTimeout(resolve, 500));
                     
+                    // 删除系统加载标志位（系统加载完成，用户已登录）
+                    if (typeof POOL !== 'undefined' && typeof POOL.__IS_SYSTEM_LOADING__ === 'function' && POOL.__IS_SYSTEM_LOADING__()) {
+                        POOL.__REMOVE__("KERNEL_GLOBAL_POOL", POOL.__SYSTEM_LOADING_FLAG__);
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.info('LockScreen', '系统加载完成，用户已登录，系统加载标志位已删除');
+                        }
+                    }
+                    
                     // 更新开始菜单的用户信息
                     if (typeof TaskbarManager !== 'undefined' && typeof TaskbarManager._updateStartMenuUserInfo === 'function') {
                         TaskbarManager._updateStartMenuUserInfo().catch(err => {
@@ -1246,6 +1254,21 @@ KernelLogger.info("LockScreen", "模块初始化");
                                 KernelLogger.warn('LockScreen', `更新开始菜单用户信息失败: ${err.message}`);
                             }
                         });
+                    }
+                    
+                    // 启动需要自动启动的程序（系统加载完成且用户已登录）
+                    if (typeof ProcessManager !== 'undefined' && typeof ProcessManager.startAutoStartPrograms === 'function') {
+                        try {
+                            await ProcessManager.startAutoStartPrograms();
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.info('LockScreen', '自动启动程序检查完成');
+                            }
+                        } catch (e) {
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.warn('LockScreen', `自动启动程序检查失败: ${e.message}`);
+                            }
+                            // 不阻塞登录流程
+                        }
                     }
                     
                     LockScreen._hideLoadingOverlay();

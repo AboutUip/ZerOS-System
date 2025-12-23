@@ -154,8 +154,9 @@
                 permissions: typeof PermissionManager !== 'undefined' ? [
                     PermissionManager.PERMISSION.GUI_WINDOW_CREATE,      // 创建GUI窗口
                     PermissionManager.PERMISSION.EVENT_LISTENER,          // 注册事件监听器
-                    PermissionManager.PERMISSION.SYSTEM_STORAGE_READ,   // 读取系统存储（读取黑名单、白名单）
-                    PermissionManager.PERMISSION.SYSTEM_STORAGE_WRITE,  // 写入系统存储（基础权限）
+                    PermissionManager.PERMISSION.SYSTEM_STORAGE_READ,   // 读取系统存储（基础权限，仅可读取非敏感键）
+                    PermissionManager.PERMISSION.SYSTEM_STORAGE_READ_PERMISSION_CONTROL, // 读取权限控制存储（读取黑名单、白名单、设置）- 需要管理员授权
+                    PermissionManager.PERMISSION.SYSTEM_STORAGE_WRITE,  // 写入系统存储（基础权限，仅可写入非敏感键）
                     PermissionManager.PERMISSION.SYSTEM_STORAGE_WRITE_PERMISSION_CONTROL, // 写入权限控制存储（保存黑名单、白名单、设置）- 需要管理员授权
                     PermissionManager.PERMISSION.PROCESS_MANAGE          // 管理进程（需要查看和管理其他程序的权限）
                 ] : [],
