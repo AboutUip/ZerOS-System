@@ -63,9 +63,38 @@ console.log(`当前主题: ${theme}`);
 
 **返回值**: `Promise<boolean>` - 是否成功
 
+**权限检查**:
+写入系统存储时会根据存储键的重要程度进行权限检查：
+
+1. **危险键（DANGEROUS）** - 需要管理员授权的高风险权限：
+   - `userControl.users` - **仅允许内核模块写入**，用户程序绝对禁止写入
+   - `userControl.settings` - 需要 `SYSTEM_STORAGE_WRITE_USER_CONTROL` 权限（危险权限）
+   - `permissionControl.*` - 需要 `SYSTEM_STORAGE_WRITE_PERMISSION_CONTROL` 权限（危险权限）
+   - `permissionManager.permissions` - 需要 `SYSTEM_STORAGE_WRITE_PERMISSION_CONTROL` 权限（危险权限）
+
+2. **特殊键（SPECIAL）** - 需要用户确认的特殊权限：
+   - `desktop.icons` - 需要 `SYSTEM_STORAGE_WRITE_DESKTOP` 权限（特殊权限）
+   - `desktop.background` - 需要 `SYSTEM_STORAGE_WRITE_DESKTOP` 权限（特殊权限）
+   - `desktop.settings` - 需要 `SYSTEM_STORAGE_WRITE_DESKTOP` 权限（特殊权限）
+
+3. **普通键** - 需要基础权限：
+   - 其他系统存储键 - 需要 `SYSTEM_STORAGE_WRITE` 权限（普通权限，自动授予）
+
+**安全策略**:
+- `userControl.users` 键只能由 `UserControl` 内核模块写入，任何用户程序都无法直接修改，即使获得相关权限也不行
+- 危险权限（如 `SYSTEM_STORAGE_WRITE_USER_CONTROL`）只能由管理员用户授权，普通用户无法授权
+- 如果无法获取调用程序的 PID，对于危险键会直接拒绝写入
+
 **示例**:
 ```javascript
+// 写入普通系统存储键（需要 SYSTEM_STORAGE_WRITE 权限）
 await LStorage.setSystemStorage('system.theme', 'dark');
+
+// 写入桌面图标（需要 SYSTEM_STORAGE_WRITE_DESKTOP 权限）
+await LStorage.setSystemStorage('desktop.icons', iconsArray);
+
+// ⚠️ 警告：用户程序无法直接写入 userControl.users 键
+// 该键只能由 UserControl 内核模块操作
 ```
 
 #### `deleteSystemStorage(key)`
@@ -247,6 +276,49 @@ class MyApp {
 - **格式**: JSON
 - **自动保存**: 每次写入操作后自动保存到文件
 
+## 权限与安全
+
+### 系统存储权限分级
+
+系统存储键根据其重要性分为三个级别：
+
+1. **危险键（DANGEROUS）** - 影响系统核心功能，需要管理员授权：
+   - `userControl.users` - 用户账户数据（**仅内核模块可写入**）
+   - `userControl.settings` - 用户控制设置
+   - `permissionControl.*` - 权限控制相关
+   - `permissionManager.permissions` - 权限管理器数据
+
+2. **特殊键（SPECIAL）** - 需要用户确认，普通用户可以授权：
+   - `desktop.icons` - 桌面图标配置
+   - `desktop.background` - 桌面背景配置
+   - `desktop.settings` - 桌面设置
+
+3. **普通键** - 基础权限即可操作，自动授予
+
+### 细粒度权限
+
+系统提供了细粒度的权限控制：
+
+- `SYSTEM_STORAGE_WRITE` - 基础写入权限（普通权限，自动授予）
+- `SYSTEM_STORAGE_WRITE_USER_CONTROL` - 写入用户控制相关存储（危险权限，仅管理员可授予）
+- `SYSTEM_STORAGE_WRITE_PERMISSION_CONTROL` - 写入权限控制相关存储（危险权限，仅管理员可授予）
+- `SYSTEM_STORAGE_WRITE_DESKTOP` - 写入桌面相关存储（特殊权限，普通用户可授权）
+
+### 安全策略
+
+1. **`userControl.users` 键的特殊保护**：
+   - 该键绝对不允许用户程序直接写入，即使获得 `SYSTEM_STORAGE_WRITE_USER_CONTROL` 权限也不行
+   - 只有 `UserControl` 内核模块可以写入此键
+   - 这防止了权限提升攻击
+
+2. **权限授权限制**：
+   - 危险权限只能由管理员用户授权，普通用户无法授权
+   - 普通用户只能授权普通权限和特殊权限
+
+3. **调用来源验证**：
+   - 系统会通过调用栈分析验证调用来源
+   - 无法验证调用来源时，对于危险键会直接拒绝
+
 ## 注意事项
 
 1. **初始化**: 存储管理器在系统启动时自动初始化，通常不需要手动调用 `init()`
@@ -255,10 +327,14 @@ class MyApp {
 4. **延迟保存**: 如果 D: 分区尚未初始化，数据会先保存在内存中，待分区可用后自动保存
 5. **错误处理**: 如果保存失败（如磁盘空间不足），操作会返回 `false`，但数据仍在内存中
 6. **程序退出**: 程序退出时可以选择保留或删除其存储数据
+7. **权限检查**: 写入系统存储时会自动进行权限检查，缺少权限时会抛出错误
+8. **安全限制**: 某些敏感键（如 `userControl.users`）对用户程序完全禁止写入，只能由内核模块操作
 
 ## 相关文档
 
 - [ZEROS_KERNEL.md](../ZEROS_KERNEL.md) - 内核概述
 - [DEVELOPER_GUIDE.md](../DEVELOPER_GUIDE.md) - 开发者指南
 - [Disk.md](./Disk.md) - 虚拟磁盘管理 API
+- [PermissionManager.md](./PermissionManager.md) - 权限管理 API（了解权限系统）
+- [UserControl.md](./UserControl.md) - 用户控制 API（了解用户级别和权限授权）
 

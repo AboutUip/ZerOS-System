@@ -918,6 +918,62 @@ class LStorage {
     }
     
     /**
+     * 检查调用栈是否来自内核模块
+     * @returns {boolean} 是否来自内核模块
+     * @private
+     */
+    static _isKernelModuleCall() {
+        try {
+            const stack = new Error().stack;
+            if (!stack) return false;
+            
+            // 检查调用栈中是否包含内核模块路径
+            // 内核模块路径示例：kernel/core/usercontrol/, kernel/process/, kernel/drive/ 等
+            const kernelModulePattern = /kernel[\/\\](core|process|drive|filesystem|dynamicModule)[\/\\]/;
+            return kernelModulePattern.test(stack);
+        } catch (e) {
+            KernelLogger.debug("LStorage", `检查内核模块调用失败: ${e.message}`);
+            return false;
+        }
+    }
+    
+    /**
+     * 获取当前进程PID（通过调用栈分析）
+     * @returns {number|null} 进程PID，如果无法获取则返回null
+     * @private
+     */
+    static _getCurrentPid() {
+        try {
+            if (typeof ProcessManager === 'undefined') {
+                return null;
+            }
+            
+            // 尝试从调用栈中获取程序路径，然后查找对应的 PID
+            const stack = new Error().stack;
+            if (!stack) return null;
+            
+            // 查找程序路径（匹配 application/ 目录下的程序）
+            const programPathMatch = stack.match(/service[\/\\]DISK[\/\\][CD][\/\\]application[\/\\]([^\/\\\s]+)/);
+            if (programPathMatch) {
+                const programName = programPathMatch[1].toLowerCase();
+                // 查找对应的 PID（取第一个匹配的）
+                if (ProcessManager.PROCESS_TABLE) {
+                    for (const [pid, info] of ProcessManager.PROCESS_TABLE) {
+                        if (info.programName && info.programName.toLowerCase() === programName) {
+                            return pid;
+                        }
+                    }
+                }
+            }
+            
+            return null;
+        } catch (e) {
+            KernelLogger.debug("LStorage", `获取当前PID失败: ${e.message}`);
+            return null;
+        }
+    }
+    
+    /**
      * 写入系统本地存储数据
      * @param {string} key 存储键
      * @param {any} value 存储的值
@@ -926,6 +982,157 @@ class LStorage {
     static async setSystemStorage(key, value) {
         if (!LStorage._initialized) {
             await LStorage.init();
+        }
+        
+        // 获取当前进程PID
+        const currentPid = LStorage._getCurrentPid();
+        
+        // 检查是否来自内核模块（内核模块是可信的，可以写入敏感键）
+        const isKernelModuleCall = LStorage._isKernelModuleCall();
+        
+        // 定义危险存储键及其所需权限（需要危险权限，仅管理员可授予）
+        const DANGEROUS_KEY_PERMISSIONS = {};
+        const SPECIAL_KEY_PERMISSIONS = {};
+        if (typeof PermissionManager !== 'undefined' && PermissionManager.PERMISSION) {
+            // 危险权限（仅管理员可授予）
+            DANGEROUS_KEY_PERMISSIONS['userControl.users'] = PermissionManager.PERMISSION.SYSTEM_STORAGE_WRITE_USER_CONTROL;
+            DANGEROUS_KEY_PERMISSIONS['userControl.settings'] = PermissionManager.PERMISSION.SYSTEM_STORAGE_WRITE_USER_CONTROL;
+            DANGEROUS_KEY_PERMISSIONS['permissionControl.blacklist'] = PermissionManager.PERMISSION.SYSTEM_STORAGE_WRITE_PERMISSION_CONTROL;
+            DANGEROUS_KEY_PERMISSIONS['permissionControl.whitelist'] = PermissionManager.PERMISSION.SYSTEM_STORAGE_WRITE_PERMISSION_CONTROL;
+            DANGEROUS_KEY_PERMISSIONS['permissionControl.settings'] = PermissionManager.PERMISSION.SYSTEM_STORAGE_WRITE_PERMISSION_CONTROL;
+            DANGEROUS_KEY_PERMISSIONS['permissionManager.permissions'] = PermissionManager.PERMISSION.SYSTEM_STORAGE_WRITE_PERMISSION_CONTROL;
+            
+            // 特殊权限（需要用户确认，但普通用户可以授予）
+            SPECIAL_KEY_PERMISSIONS['desktop.icons'] = PermissionManager.PERMISSION.SYSTEM_STORAGE_WRITE_DESKTOP;
+            SPECIAL_KEY_PERMISSIONS['desktop.background'] = PermissionManager.PERMISSION.SYSTEM_STORAGE_WRITE_DESKTOP;
+            SPECIAL_KEY_PERMISSIONS['desktop.settings'] = PermissionManager.PERMISSION.SYSTEM_STORAGE_WRITE_DESKTOP;
+        }
+        
+        // 定义危险键列表（用于权限检查，即使 PermissionManager 未定义也需要检查）
+        const DANGEROUS_KEYS = {
+            'userControl.users': true,
+            'userControl.settings': true,
+            'permissionControl.blacklist': true,
+            'permissionControl.whitelist': true,
+            'permissionControl.settings': true,
+            'permissionManager.permissions': true,
+        };
+        
+        // 定义特殊键列表（需要特殊权限，但普通用户可以授予）
+        const SPECIAL_KEYS = {
+            'desktop.icons': true,
+            'desktop.background': true,
+            'desktop.settings': true,
+        };
+        
+        // 检查是否为危险键（需要危险权限，仅管理员可授予）或特殊键（需要特殊权限）
+        const isDangerousKey = DANGEROUS_KEYS[key];
+        const isSpecialKey = SPECIAL_KEYS[key];
+        const requiredPermission = DANGEROUS_KEY_PERMISSIONS[key] || SPECIAL_KEY_PERMISSIONS[key];
+        
+        if (isDangerousKey) {
+            // 对于危险键，即使是内核模块调用，也要记录日志
+            // 对于 userControl.users 键，需要更严格的验证
+            const isUserControlUsersKey = (key === 'userControl.users');
+            
+            if (isKernelModuleCall) {
+                // 内核模块调用：允许写入（内核模块是可信的）
+                // 但对于 userControl.users 键，需要额外验证是否为 UserControl 模块
+                if (isUserControlUsersKey) {
+                    // 验证调用栈中确实包含 UserControl 模块
+                    try {
+                        const stack = new Error().stack;
+                        if (!stack || !/kernel[\/\\]core[\/\\]usercontrol[\/\\]/i.test(stack)) {
+                            KernelLogger.error("LStorage", `安全警告：检测到疑似伪造的内核模块调用，拒绝写入 ${key}`);
+                            throw new Error(`安全验证失败：无法确认调用来源`);
+                        }
+                    } catch (e) {
+                        KernelLogger.error("LStorage", `验证 userControl.users 写入来源时出错: ${e.message}`);
+                        throw new Error(`安全验证失败：${e.message}`);
+                    }
+                }
+                KernelLogger.debug("LStorage", `内核模块调用，允许写入危险系统存储键 ${key}`);
+                // 继续执行写入操作
+            } else {
+                // 用户程序调用：需要危险权限（仅管理员可授予）
+                // 对于 userControl.users 键，绝对不允许用户程序直接写入
+                if (isUserControlUsersKey) {
+                    KernelLogger.error("LStorage", `安全拒绝：用户程序尝试直接写入 userControl.users 键（PID: ${currentPid || 'unknown'}）`);
+                    throw new Error(`安全策略：不允许用户程序直接写入 userControl.users 键`);
+                }
+                
+                if (typeof PermissionManager === 'undefined') {
+                    // 降级方案：检查用户权限
+                    if (typeof UserControl !== 'undefined') {
+                        if (!UserControl.isAdmin()) {
+                            KernelLogger.error("LStorage", `写入危险系统存储键 ${key} 需要管理员权限`);
+                            throw new Error(`写入系统存储键 ${key} 需要管理员权限`);
+                        }
+                    } else {
+                        KernelLogger.error("LStorage", `UserControl 不可用，无法验证管理员权限`);
+                        throw new Error(`无法验证权限：UserControl 不可用`);
+                    }
+                } else {
+                    // 检查进程是否有对应的危险权限（仅管理员可授予）
+                    if (!requiredPermission) {
+                        // requiredPermission 未定义，说明权限配置有问题，拒绝写入
+                        KernelLogger.error("LStorage", `写入危险系统存储键 ${key} 缺少权限配置，拒绝写入`);
+                        throw new Error(`无法验证权限：权限配置缺失`);
+                    }
+                    
+                    if (!currentPid) {
+                        // 无法获取 PID，无法验证调用来源，拒绝写入（安全策略：宁可拒绝也不允许）
+                        KernelLogger.error("LStorage", `无法获取进程PID，拒绝写入危险系统存储键 ${key}（安全策略）`);
+                        throw new Error(`无法验证权限：无法获取进程PID`);
+                    }
+                    
+                    // 检查进程是否有对应的危险权限（仅管理员可授予）
+                    const hasPermission = await PermissionManager.checkAndRequestPermission(currentPid, requiredPermission);
+                    if (!hasPermission) {
+                        KernelLogger.error("LStorage", `进程 ${currentPid} 尝试写入危险系统存储键 ${key}，但缺少所需权限 ${requiredPermission}`);
+                        throw new Error(`缺少权限：${requiredPermission}（需要管理员授权）`);
+                    }
+                }
+            }
+        } else if (isSpecialKey) {
+            // 需要特殊权限（用户确认，普通用户可以授予）
+            if (typeof PermissionManager === 'undefined') {
+                // 降级方案：允许写入（特殊权限默认允许）
+                KernelLogger.debug("LStorage", `PermissionManager 不可用，允许写入特殊键 ${key}`);
+            } else {
+                if (currentPid && requiredPermission) {
+                    const hasPermission = await PermissionManager.checkAndRequestPermission(currentPid, requiredPermission);
+                    if (!hasPermission) {
+                        KernelLogger.warn("LStorage", `进程 ${currentPid} 尝试写入特殊系统存储键 ${key}，但缺少所需权限 ${requiredPermission}`);
+                        throw new Error(`缺少权限：${requiredPermission}`);
+                    }
+                } else {
+                    // 无法获取 PID 或 requiredPermission 未定义，允许写入（降级方案，特殊键相对安全）
+                    KernelLogger.debug("LStorage", `无法获取当前PID或权限定义，允许写入特殊键 ${key}`);
+                }
+            }
+        } else {
+            // 非敏感键，检查基础权限（SYSTEM_STORAGE_WRITE）
+            // 注意：由于 setSystemStorage 没有 pid 参数，我们只能通过调用栈获取
+            // 如果无法获取 PID，对于非敏感键，我们仍然允许写入（降级方案）
+            if (currentPid && typeof PermissionManager !== 'undefined') {
+                // 检查基础权限（普通权限，自动授予）
+                const hasBasePermission = PermissionManager.hasPermission(currentPid, PermissionManager.PERMISSION.SYSTEM_STORAGE_WRITE);
+                if (!hasBasePermission) {
+                    // 请求基础权限（如果需要）
+                    const granted = await PermissionManager.checkAndRequestPermission(currentPid, PermissionManager.PERMISSION.SYSTEM_STORAGE_WRITE);
+                    if (!granted) {
+                        KernelLogger.warn("LStorage", `进程 ${currentPid} 尝试写入系统存储键 ${key}，但缺少基础权限 SYSTEM_STORAGE_WRITE`);
+                        throw new Error(`缺少权限：SYSTEM_STORAGE_WRITE`);
+                    }
+                }
+            } else if (currentPid) {
+                // 无法获取 PermissionManager，但获取到了 PID，记录警告
+                KernelLogger.debug("LStorage", `PermissionManager 不可用，允许写入非敏感键 ${key} (PID: ${currentPid})`);
+            } else {
+                // 无法获取 PID，对于非敏感键，允许写入（降级方案）
+                KernelLogger.debug("LStorage", `无法获取当前PID，允许写入非敏感键 ${key}`);
+            }
         }
         
         KernelLogger.info("LStorage", `写入系统存储: Key=${key}, Value类型=${typeof value}, 是否为数组=${Array.isArray(value)}`);
@@ -999,18 +1206,12 @@ class LStorage {
                         const savedKeys = Object.keys(savedValue);
                         KernelLogger.debug("LStorage", `对象验证: Key=${key}, 保存时键数=${valueKeys.length}, 当前内存键数=${savedKeys.length}`);
                         
-                        // 如果键数量不匹配，检查是否是数据被修改了（允许这种情况，只记录警告）
+                        // 如果键数量不匹配，检查是否是数据被修改了
+                        // 注意：在多进程环境中，保存后数据可能被其他操作修改（如并发写入），这是正常的
                         if (valueKeys.length !== savedKeys.length) {
-                            // 检查是否是数据被修改了（例如，程序被终止，权限被清除）
-                            const isDataModified = savedKeys.length < valueKeys.length;
-                            if (isDataModified) {
-                                // 数据可能被修改了（例如权限被清除），这是正常的，只记录调试信息
-                                KernelLogger.debug("LStorage", `对象键数量变化: Key=${key}, 保存时=${valueKeys.length}, 当前=${savedKeys.length} (可能是数据被修改)`);
-                            } else {
-                                // 键数量增加了，这不应该发生，记录警告
-                                KernelLogger.warn("LStorage", `保存后验证失败: Key=${key} 对象键数量不匹配 (期望: ${valueKeys.length}, 实际: ${savedKeys.length})`);
-                                return false;
-                            }
+                            // 键数量变化（增加或减少）都可能是正常的（并发写入、权限清除等）
+                            // 只记录调试信息，不返回失败，因为数据已经成功保存
+                            KernelLogger.debug("LStorage", `对象键数量变化: Key=${key}, 保存时=${valueKeys.length}, 当前=${savedKeys.length} (可能是并发写入或数据修改)`);
                         }
                     } else if (savedValue === undefined || savedValue === null) {
                         // 对于非对象类型，检查是否存在

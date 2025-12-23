@@ -1149,7 +1149,9 @@
                 copyright: '© 2025 ZerOS',
                 permissions: typeof PermissionManager !== 'undefined' ? [
                     PermissionManager.PERMISSION.GUI_WINDOW_CREATE,
-                    PermissionManager.PERMISSION.EVENT_LISTENER
+                    PermissionManager.PERMISSION.EVENT_LISTENER,
+                    PermissionManager.PERMISSION.SYSTEM_STORAGE_READ,   // 读取最高分记录
+                    PermissionManager.PERMISSION.SYSTEM_STORAGE_WRITE  // 保存最高分记录
                 ] : []
             };
         }

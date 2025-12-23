@@ -66,9 +66,10 @@
                     title: '设置',
                     icon: icon,
                     onClose: () => {
-                        if (typeof ProcessManager !== 'undefined') {
-                            ProcessManager.killProgram(pid);
-                        }
+                        // onClose 回调只做清理工作，不调用 _closeWindow 或 unregisterWindow
+                        // 窗口关闭由 GUIManager._closeWindow 统一处理
+                        // _closeWindow 会在窗口关闭后检查该 PID 是否还有其他窗口，如果没有，会 kill 进程
+                        // 这样可以确保程序多实例（不同 PID）互不影响
                     }
                 });
                 
@@ -130,7 +131,9 @@
             
             // 注销窗口
             if (typeof GUIManager !== 'undefined' && this.windowId) {
-                GUIManager.unregisterWindow(this.pid, this.windowId);
+                GUIManager.unregisterWindow(this.windowId);
+            } else if (this.pid && typeof GUIManager !== 'undefined') {
+                GUIManager.unregisterWindow(this.pid);
             } else if (this.window && this.window.parentElement) {
                 this.window.parentElement.removeChild(this.window);
             }

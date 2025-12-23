@@ -28,7 +28,9 @@ class UserControl {
         'CRYPT_DELETE_KEY',       // 删除密钥
         'CRYPT_ENCRYPT',          // 加密数据
         'CRYPT_DECRYPT',          // 解密数据
-        'PROCESS_MANAGE'          // 管理进程（危险权限）
+        'PROCESS_MANAGE',         // 管理进程（危险权限）
+        'SYSTEM_STORAGE_WRITE_USER_CONTROL',           // 写入用户控制存储（危险权限）
+        'SYSTEM_STORAGE_WRITE_PERMISSION_CONTROL'      // 写入权限控制存储（危险权限）
     ];
     
     // ==================== 内部状态 ====================

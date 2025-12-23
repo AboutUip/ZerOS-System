@@ -19,7 +19,7 @@
 
 ## 高风险权限
 
-普通用户无法授权以下高风险权限：
+普通用户无法授权以下高风险权限（只有管理员用户才能授权）：
 
 - `CRYPT_GENERATE_KEY` - 生成密钥对
 - `CRYPT_IMPORT_KEY` - 导入密钥对
@@ -27,6 +27,8 @@
 - `CRYPT_ENCRYPT` - 加密数据
 - `CRYPT_DECRYPT` - 解密数据
 - `PROCESS_MANAGE` - 管理进程
+- `SYSTEM_STORAGE_WRITE_USER_CONTROL` - 写入用户控制相关存储（**注意：`userControl.users` 键只能由内核模块写入，用户程序即使获得此权限也无法写入该键**）
+- `SYSTEM_STORAGE_WRITE_PERMISSION_CONTROL` - 写入权限控制相关存储
 
 ## 初始化
 
@@ -425,6 +427,7 @@ if (!canGrant) {
 4. **头像存储**: 用户头像文件存储在 `D:/cache/` 目录，文件名格式为 `avatar_{username}_{timestamp}.{ext}`
 5. **权限限制**: 普通用户无法授权高风险权限，只有管理员可以授权所有权限
 6. **初始化顺序**: 用户控制系统依赖 `LStorage`，确保 `LStorage` 已初始化后再使用
+7. **`userControl.users` 键保护**: `userControl.users` 键只能由 `UserControl` 内核模块写入，用户程序无法直接修改，即使获得相关权限也不行。这是为了防止权限提升攻击
 
 ## 相关文档
 

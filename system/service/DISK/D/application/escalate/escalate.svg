@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="escalateGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ff5f57"/>
+      <stop offset="100%" stop-color="#ff8c42"/>
+    </linearGradient>
+    <filter id="escalateGlow">
+      <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  
+  <!-- 背景 -->
+  <rect x="0" y="0" width="64" height="64" rx="8" fill="#1a1a1a"/>
+  
+  <!-- 盾牌图标 -->
+  <path d="M 32 8 L 20 14 L 20 28 C 20 36 26 42 32 46 C 38 42 44 36 44 28 L 44 14 Z" 
+        fill="url(#escalateGrad)" stroke="#ffffff" stroke-width="1.5" filter="url(#escalateGlow)"/>
+  
+  <!-- 向上箭头 -->
+  <path d="M 32 22 L 28 26 L 32 30 L 36 26 Z" fill="#ffffff"/>
+  <rect x="30" y="26" width="4" height="8" fill="#ffffff"/>
+  
+  <!-- 文字 -->
+  <text x="32" y="56" font-family="monospace" font-size="10" fill="#ff5f57" font-weight="bold" text-anchor="middle">ESC</text>
+</svg>
+

@@ -823,7 +823,9 @@
                 permissions: typeof PermissionManager !== 'undefined' ? [
                     PermissionManager.PERMISSION.GUI_WINDOW_CREATE,
                     PermissionManager.PERMISSION.NETWORK_ACCESS,
-                    PermissionManager.PERMISSION.EVENT_LISTENER
+                    PermissionManager.PERMISSION.EVENT_LISTENER,
+                    PermissionManager.PERMISSION.SYSTEM_STORAGE_READ,   // 读取书签
+                    PermissionManager.PERMISSION.SYSTEM_STORAGE_WRITE  // 保存书签
                 ] : []
             };
         }

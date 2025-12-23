@@ -5241,7 +5241,9 @@
                     PermissionManager.PERMISSION.GUI_WINDOW_CREATE,
                     PermissionManager.PERMISSION.SYSTEM_NOTIFICATION,
                     PermissionManager.PERMISSION.NETWORK_ACCESS,
-                    PermissionManager.PERMISSION.EVENT_LISTENER
+                    PermissionManager.PERMISSION.EVENT_LISTENER,
+                    PermissionManager.PERMISSION.SYSTEM_STORAGE_READ,   // 读取程序设置和缓存
+                    PermissionManager.PERMISSION.SYSTEM_STORAGE_WRITE  // 保存程序设置和缓存
                 ] : []
             };
         },

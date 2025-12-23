@@ -118,7 +118,11 @@ system/service/DISK/D/application/
                     title: '我的应用',
                     icon: 'application/myapp/myapp.svg',
                     onClose: () => {
-                        ProcessManager.killProgram(pid);
+                        // onClose 回调只用于执行清理工作，不应调用 unregisterWindow 或 _closeWindow
+                        // 窗口关闭流程由 GUIManager 统一管理
+                        // GUIManager 会在窗口关闭后自动检查该 PID 是否还有其他窗口
+                        // 如果没有且不是 Exploit 程序（PID 10000），会自动 kill 进程
+                        // 这样可以确保程序多实例（不同 PID）互不影响
                     }
                 });
             }
@@ -129,7 +133,11 @@ system/service/DISK/D/application/
         
         __exit__: async function() {
             if (typeof GUIManager !== 'undefined') {
-                GUIManager.unregisterWindow(this.pid);
+                if (this.windowId) {
+                    GUIManager.unregisterWindow(this.windowId);
+                } else if (this.pid) {
+                    GUIManager.unregisterWindow(this.pid);
+                }
             } else if (this.window && this.window.parentElement) {
                 this.window.parentElement.removeChild(this.window);
             }
@@ -268,13 +276,16 @@ GUIManager.registerWindow(this.pid, this.window, {
     title: '我的应用',
     icon: 'application/myapp/myapp.svg',
     onClose: () => {
-        ProcessManager.killProgram(this.pid);
+        // onClose 回调只用于执行清理工作，不应调用 unregisterWindow 或 _closeWindow
+        // 窗口关闭流程由 GUIManager 统一管理
+        // GUIManager 会在窗口关闭后自动检查该 PID 是否还有其他窗口
+        // 如果没有且不是 Exploit 程序（PID 10000），会自动 kill 进程
     },
     onMinimize: () => {
         // 窗口最小化回调
     },
-    onMaximize: () => {
-        // 窗口最大化回调
+    onMaximize: (isMaximized) => {
+        // 窗口最大化回调，isMaximized 为 true 表示最大化，false 表示还原
     }
 });
 
@@ -291,6 +302,14 @@ this.window.style.top = '100px';
 - ✅ **标题栏保护**：自动保护窗口标题栏，防止被意外删除
 - ✅ **z-index 管理**：自动管理窗口层级，确保正确的显示顺序
 - ✅ **窗口状态同步**：自动同步窗口状态（最大化、最小化等）
+- ✅ **自动进程管理**：窗口关闭后自动检查并 kill 进程（如果不是 Exploit 程序且没有其他窗口）
+
+**窗口关闭回调注意事项**：
+- `onClose` 回调只用于执行清理工作，不应调用 `unregisterWindow` 或 `_closeWindow`
+- 窗口关闭流程由 GUIManager 统一管理，确保资源正确清理
+- GUIManager 会在窗口关闭后自动检查该 PID 是否还有其他窗口
+- 如果没有其他窗口且不是 Exploit 程序（PID 10000），会自动 kill 进程
+- 这样可以确保程序多实例（不同 PID）互不影响
 
 **详细说明**：请参考 [GUIManager API 文档](API/GUIManager.md)
 
@@ -628,7 +647,10 @@ __init__: async function(pid, initArgs) {
             title: '我的应用',
             icon: 'application/myapp/myapp.svg',
             onClose: () => {
-                ProcessManager.killProgram(pid);
+                // onClose 回调只用于执行清理工作，不应调用 unregisterWindow 或 _closeWindow
+                // 窗口关闭流程由 GUIManager 统一管理
+                // GUIManager 会在窗口关闭后自动检查该 PID 是否还有其他窗口
+                // 如果没有且不是 Exploit 程序（PID 10000），会自动 kill 进程
             }
         });
     }
@@ -1355,7 +1377,11 @@ __exit__: async function() {
     
     // 注销窗口
     if (typeof GUIManager !== 'undefined') {
-        GUIManager.unregisterWindow(this.pid);
+        if (this.windowId) {
+            GUIManager.unregisterWindow(this.windowId);
+        } else if (this.pid) {
+            GUIManager.unregisterWindow(this.pid);
+        }
     }
 }
 ```
@@ -1453,7 +1479,11 @@ const data = sharedSpace.getData('myKey');
                         title: '我的应用',
                         icon: 'application/myapp/myapp.svg',
                         onClose: () => {
-                            ProcessManager.killProgram(pid);
+                            // onClose 回调只用于执行清理工作，不应调用 unregisterWindow 或 _closeWindow
+                            // 窗口关闭流程由 GUIManager 统一管理
+                            // GUIManager 会在窗口关闭后自动检查该 PID 是否还有其他窗口
+                            // 如果没有且不是 Exploit 程序（PID 10000），会自动 kill 进程
+                            // 这样可以确保程序多实例（不同 PID）互不影响
                         }
                     });
                 }
@@ -1507,7 +1537,11 @@ const data = sharedSpace.getData('myKey');
             try {
                 // 1. 注销窗口（优先处理，确保窗口正确关闭）
                 if (typeof GUIManager !== 'undefined') {
-                    await GUIManager.unregisterWindow(this.pid);
+                    if (this.windowId) {
+                        await GUIManager.unregisterWindow(this.windowId);
+                    } else if (this.pid) {
+                        await GUIManager.unregisterWindow(this.pid);
+                    }
                 } else if (this.window && this.window.parentElement) {
                     this.window.parentElement.removeChild(this.window);
                 }

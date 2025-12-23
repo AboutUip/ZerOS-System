@@ -125,7 +125,9 @@
 
             // 取消注册 GUI 窗口
             if (typeof GUIManager !== 'undefined' && this.windowId) {
-                GUIManager.unregisterWindow(this.pid, this.windowId);
+                GUIManager.unregisterWindow(this.windowId);
+            } else if (this.pid && typeof GUIManager !== 'undefined') {
+                GUIManager.unregisterWindow(this.pid);
             } else if (this.window && this.window.parentElement) {
                 this.window.parentElement.removeChild(this.window);
             }

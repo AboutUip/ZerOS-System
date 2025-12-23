@@ -32,9 +32,9 @@ GUIManager.init();
 - `options` (Object): 选项对象
   - `title` (string): 窗口标题
   - `icon` (string): 窗口图标路径（可选）
-  - `onClose` (Function): 关闭回调 `() => {}`
+  - `onClose` (Function): 关闭回调 `() => {}`。**重要**：此回调在窗口关闭时被调用，用于执行清理工作。回调不应调用 `GUIManager.unregisterWindow()` 或 `GUIManager._closeWindow()`，因为窗口关闭流程由 GUIManager 统一管理。如果回调中已经关闭了窗口（通过 `unregisterWindow`），GUIManager 会检测到并跳过后续关闭流程。GUIManager 会在窗口关闭后自动检查该 PID 是否还有其他窗口，如果没有且不是 Exploit 程序（PID 10000），会自动 kill 进程。
   - `onMinimize` (Function): 最小化回调（可选）`() => {}`
-  - `onMaximize` (Function): 最大化回调（可选）`() => {}`
+  - `onMaximize` (Function): 最大化回调（可选）`(isMaximized: boolean) => {}`。参数 `isMaximized` 表示窗口是否最大化（`true` 为最大化，`false` 为还原）
   - `windowId` (string): 窗口 ID（可选，如果不提供则自动生成）
 
 **返回值**: `Object|null` - 窗口信息对象
@@ -60,13 +60,16 @@ GUIManager.registerWindow(pid, windowElement, {
     title: '我的应用',
     icon: 'application/myapp/myapp.svg',
     onClose: () => {
-        ProcessManager.killProgram(pid);
+        // onClose 回调只用于执行清理工作，不应调用 unregisterWindow 或 _closeWindow
+        // 窗口关闭流程由 GUIManager 统一管理
+        // GUIManager 会在窗口关闭后自动检查该 PID 是否还有其他窗口
+        // 如果没有且不是 Exploit 程序（PID 10000），会自动 kill 进程
     },
     onMinimize: () => {
         console.log('窗口已最小化');
     },
-    onMaximize: () => {
-        console.log('窗口已最大化');
+    onMaximize: (isMaximized) => {
+        console.log('窗口已最大化:', isMaximized);
     }
 });
 ```
@@ -273,7 +276,10 @@ __init__: async function(pid, initArgs) {
         title: '我的应用',
         icon: 'application/myapp/myapp.svg',
         onClose: () => {
-            ProcessManager.killProgram(pid);
+            // onClose 回调只用于执行清理工作，不应调用 unregisterWindow 或 _closeWindow
+            // 窗口关闭流程由 GUIManager 统一管理
+            // GUIManager 会在窗口关闭后自动检查该 PID 是否还有其他窗口
+            // 如果没有且不是 Exploit 程序（PID 10000），会自动 kill 进程
         }
     });
     
@@ -345,6 +351,34 @@ GUIManager 自动为每个窗口创建统一的控制按钮：
 
 按钮图标会根据当前主题样式自动更新。
 
+## 窗口关闭流程
+
+当窗口关闭时（用户点击关闭按钮或调用 `unregisterWindow`），GUIManager 会执行以下流程：
+
+1. **调用 `onClose` 回调**（如果存在）：
+   - 回调在窗口关闭动画之前执行
+   - GUIManager 会在调用前清除 `onClose` 引用，避免递归调用
+   - 如果回调中已经调用了 `unregisterWindow`，GUIManager 会检测到并跳过后续关闭流程
+
+2. **执行关闭动画**：
+   - 使用 AnimateManager 添加关闭动画
+   - 等待动画完成后移除窗口元素
+
+3. **注销窗口**：
+   - 从窗口注册表中移除窗口信息
+   - 清理事件监听器（拖动、拉伸等）
+   - 更新任务栏可见性
+
+4. **检查进程终止**：
+   - 如果该 PID 没有其他窗口了，且不是 Exploit 程序（PID 10000），会自动调用 `ProcessManager.killProgram(pid)` 终止进程
+   - 这样可以确保程序多实例（不同 PID）互不影响
+
+**重要提示**：
+- `onClose` 回调只用于执行清理工作，不应调用 `unregisterWindow` 或 `_closeWindow`
+- 窗口关闭流程由 GUIManager 统一管理，确保资源正确清理
+- 程序多窗口（同一 PID 的多个窗口）应该由程序自己管理
+- 程序多实例（不同 PID）应该独立管理，互不影响
+
 ## 注意事项
 
 1. **窗口元素**: 窗口元素必须具有 `position: fixed` 或 `position: absolute`
@@ -352,6 +386,7 @@ GUIManager 自动为每个窗口创建统一的控制按钮：
 3. **多窗口**: 一个进程可以注册多个窗口，第一个窗口会被标记为主窗口
 4. **模态对话框**: 模态对话框会阻止用户与其他窗口交互，直到对话框关闭
 5. **窗口清理**: 程序退出时，GUIManager 会自动清理所有窗口
+6. **关闭回调**: `onClose` 回调不应调用 `unregisterWindow` 或 `_closeWindow`，窗口关闭由 GUIManager 统一管理
 
 ## 相关文档
 

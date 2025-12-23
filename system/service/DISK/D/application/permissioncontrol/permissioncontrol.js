@@ -133,7 +133,9 @@
 
             // 注销窗口
             if (typeof GUIManager !== 'undefined' && this.windowId) {
-                GUIManager.unregisterWindow(this.pid, this.windowId);
+                GUIManager.unregisterWindow(this.windowId);
+            } else if (this.pid && typeof GUIManager !== 'undefined') {
+                GUIManager.unregisterWindow(this.pid);
             }
 
             // 清理引用
@@ -153,7 +155,8 @@
                     PermissionManager.PERMISSION.GUI_WINDOW_CREATE,      // 创建GUI窗口
                     PermissionManager.PERMISSION.EVENT_LISTENER,          // 注册事件监听器
                     PermissionManager.PERMISSION.SYSTEM_STORAGE_READ,   // 读取系统存储（读取黑名单、白名单）
-                    PermissionManager.PERMISSION.SYSTEM_STORAGE_WRITE,  // 写入系统存储（保存黑名单、白名单）
+                    PermissionManager.PERMISSION.SYSTEM_STORAGE_WRITE,  // 写入系统存储（基础权限）
+                    PermissionManager.PERMISSION.SYSTEM_STORAGE_WRITE_PERMISSION_CONTROL, // 写入权限控制存储（保存黑名单、白名单、设置）- 需要管理员授权
                     PermissionManager.PERMISSION.PROCESS_MANAGE          // 管理进程（需要查看和管理其他程序的权限）
                 ] : [],
                 metadata: {

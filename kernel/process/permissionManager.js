@@ -35,7 +35,12 @@ class PermissionManager {
         
         // 系统存储权限
         SYSTEM_STORAGE_READ: 'SYSTEM_STORAGE_READ',     // 读取系统存储
-        SYSTEM_STORAGE_WRITE: 'SYSTEM_STORAGE_WRITE',   // 写入系统存储
+        SYSTEM_STORAGE_WRITE: 'SYSTEM_STORAGE_WRITE',   // 写入系统存储（基础权限，仅可写入非敏感键）
+        
+        // 系统存储细粒度权限（危险权限，仅管理员可授予）
+        SYSTEM_STORAGE_WRITE_USER_CONTROL: 'SYSTEM_STORAGE_WRITE_USER_CONTROL',           // 写入用户控制相关存储（userControl.*）
+        SYSTEM_STORAGE_WRITE_PERMISSION_CONTROL: 'SYSTEM_STORAGE_WRITE_PERMISSION_CONTROL', // 写入权限控制相关存储（permissionControl.*, permissionManager.*）
+        SYSTEM_STORAGE_WRITE_DESKTOP: 'SYSTEM_STORAGE_WRITE_DESKTOP',                     // 写入桌面相关存储（desktop.*）
         
         // 程序管理权限
         PROCESS_MANAGE: 'PROCESS_MANAGE',               // 管理其他进程
@@ -109,7 +114,7 @@ class PermissionManager {
         [PermissionManager.PERMISSION.NETWORK_ACCESS]: PermissionManager.PERMISSION_LEVEL.SPECIAL,
         [PermissionManager.PERMISSION.GUI_WINDOW_MANAGE]: PermissionManager.PERMISSION_LEVEL.SPECIAL,
         [PermissionManager.PERMISSION.SYSTEM_STORAGE_READ]: PermissionManager.PERMISSION_LEVEL.SPECIAL,
-        [PermissionManager.PERMISSION.SYSTEM_STORAGE_WRITE]: PermissionManager.PERMISSION_LEVEL.SPECIAL,
+        [PermissionManager.PERMISSION.SYSTEM_STORAGE_WRITE]: PermissionManager.PERMISSION_LEVEL.NORMAL, // 基础权限，自动授予，但仅可写入非敏感键
         [PermissionManager.PERMISSION.THEME_WRITE]: PermissionManager.PERMISSION_LEVEL.SPECIAL,
         [PermissionManager.PERMISSION.DESKTOP_MANAGE]: PermissionManager.PERMISSION_LEVEL.SPECIAL,
         [PermissionManager.PERMISSION.MULTITHREADING_CREATE]: PermissionManager.PERMISSION_LEVEL.SPECIAL,
@@ -144,6 +149,11 @@ class PermissionManager {
         
         // 危险权限（需要明确授权）
         [PermissionManager.PERMISSION.PROCESS_MANAGE]: PermissionManager.PERMISSION_LEVEL.DANGEROUS,
+        
+        // 系统存储细粒度权限（危险权限，仅管理员可授予）
+        [PermissionManager.PERMISSION.SYSTEM_STORAGE_WRITE_USER_CONTROL]: PermissionManager.PERMISSION_LEVEL.DANGEROUS,
+        [PermissionManager.PERMISSION.SYSTEM_STORAGE_WRITE_PERMISSION_CONTROL]: PermissionManager.PERMISSION_LEVEL.DANGEROUS,
+        [PermissionManager.PERMISSION.SYSTEM_STORAGE_WRITE_DESKTOP]: PermissionManager.PERMISSION_LEVEL.SPECIAL,
     };
     
     // ==================== 内部状态 ====================
@@ -1130,7 +1140,19 @@ class PermissionManager {
             },
             [PermissionManager.PERMISSION.SYSTEM_STORAGE_WRITE]: {
                 name: '写入系统存储',
-                description: '允许程序修改系统存储数据'
+                description: '允许程序修改非敏感的系统存储数据（基础权限）'
+            },
+            [PermissionManager.PERMISSION.SYSTEM_STORAGE_WRITE_USER_CONTROL]: {
+                name: '写入用户控制存储',
+                description: '允许程序修改用户控制相关存储（userControl.*），需要管理员授权'
+            },
+            [PermissionManager.PERMISSION.SYSTEM_STORAGE_WRITE_PERMISSION_CONTROL]: {
+                name: '写入权限控制存储',
+                description: '允许程序修改权限控制相关存储（permissionControl.*, permissionManager.*），需要管理员授权'
+            },
+            [PermissionManager.PERMISSION.SYSTEM_STORAGE_WRITE_DESKTOP]: {
+                name: '写入桌面存储',
+                description: '允许程序修改桌面相关存储（desktop.*）'
             },
             [PermissionManager.PERMISSION.PROCESS_MANAGE]: {
                 name: '管理进程',

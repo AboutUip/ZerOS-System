@@ -5,10 +5,10 @@ KernelLogger.info("SystemInformation", "模块初始化");
 
 class SystemInformation {
     // 系统版本
-    static SYSTEM_VERSION = '0.5.1';
+    static SYSTEM_VERSION = '0.5.2';
     
     // 内核版本
-    static KERNEL_VERSION = '0.5.7';
+    static KERNEL_VERSION = '0.5.8';
     
     // 构建日期
     static BUILD_DATE = new Date('2024-11-28');

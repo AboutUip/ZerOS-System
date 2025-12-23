@@ -542,6 +542,23 @@ const APPLICATION_ASSETS = {
             supportsPreview: true,
             category: "utility"  // 工具类应用
         }
+    },
+    
+    // 权限提升工具
+    // 注意：路径是 D: 盘下的真实路径
+    "escalate": {
+        script: "D:/application/escalate/escalate.js",
+        icon: "D:/application/escalate/escalate.svg",
+        metadata: {
+            autoStart: false,
+            priority: 10,
+            description: "权限提升工具",
+            version: "1.0.0",
+            type: "CLI",
+            alwaysShowInTaskbar: false,
+            allowMultipleInstances: true,
+            category: "system"
+        }
     }
 };
 

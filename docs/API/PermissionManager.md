@@ -25,7 +25,15 @@
 ```javascript
 PermissionManager.PERMISSION.SYSTEM_NOTIFICATION      // 发送系统通知
 PermissionManager.PERMISSION.SYSTEM_STORAGE_READ      // 读取系统级本地存储
-PermissionManager.PERMISSION.SYSTEM_STORAGE_WRITE     // 写入系统级本地存储
+PermissionManager.PERMISSION.SYSTEM_STORAGE_WRITE     // 写入系统级本地存储（基础权限，仅可写入非敏感键）
+
+// 系统存储细粒度权限（危险权限，仅管理员可授予）
+PermissionManager.PERMISSION.SYSTEM_STORAGE_WRITE_USER_CONTROL         // 写入用户控制相关存储（userControl.*）
+PermissionManager.PERMISSION.SYSTEM_STORAGE_WRITE_PERMISSION_CONTROL   // 写入权限控制相关存储（permissionControl.*, permissionManager.*）
+
+// 系统存储细粒度权限（特殊权限，普通用户可以授予）
+PermissionManager.PERMISSION.SYSTEM_STORAGE_WRITE_DESKTOP              // 写入桌面相关存储（desktop.*）
+
 PermissionManager.PERMISSION.PROCESS_MANAGE           // 管理其他进程（启动/终止）
 PermissionManager.PERMISSION.THEME_READ               // 读取系统主题配置
 PermissionManager.PERMISSION.THEME_WRITE              // 更改系统主题配置
@@ -376,7 +384,8 @@ PermissionManager.clearAuditLog(true);
 - `NETWORK_ACCESS` - 网络访问
 - `GUI_WINDOW_MANAGE` - 管理窗口
 - `SYSTEM_STORAGE_READ` - 读取系统存储
-- `SYSTEM_STORAGE_WRITE` - 写入系统存储
+- `SYSTEM_STORAGE_WRITE` - 写入系统存储（基础权限，仅可写入非敏感键）
+- `SYSTEM_STORAGE_WRITE_DESKTOP` - 写入桌面相关存储（`desktop.*` 键）
 - `THEME_WRITE` - 修改主题
 - `DESKTOP_MANAGE` - 管理桌面
 - `MULTITHREADING_CREATE` - 创建线程
@@ -388,11 +397,13 @@ PermissionManager.clearAuditLog(true);
 - `CRYPT_ENCRYPT` - 加密数据
 - `CRYPT_DECRYPT` - 解密数据
 
-### 危险权限（需要明确授权）
+### 危险权限（需要明确授权，仅管理员可授予）
 
-危险权限每次使用时都可能需要用户确认，需要用户明确授权。
+危险权限每次使用时都可能需要用户确认，需要用户明确授权。**只有管理员用户才能授权危险权限给程序，普通用户无法授权。**
 
 - `PROCESS_MANAGE` - 管理进程（启动/终止其他程序）
+- `SYSTEM_STORAGE_WRITE_USER_CONTROL` - 写入用户控制相关存储（`userControl.*` 键，**注意：`userControl.users` 键只能由内核模块写入，用户程序即使获得此权限也无法写入该键**）
+- `SYSTEM_STORAGE_WRITE_PERMISSION_CONTROL` - 写入权限控制相关存储（`permissionControl.*`、`permissionManager.permissions` 键）
 
 ## 使用示例
 
@@ -536,6 +547,9 @@ try {
 8. **违规记录时机**：只有在权限被明确拒绝后，程序再次尝试访问时才会记录违规。在权限请求流程中不会记录违规
 9. **黑名单优先级最高**：黑名单检查在权限检查前进行，黑名单中的程序会被直接拒绝
 10. **权限请求流程**：在权限请求流程中，系统使用 `isRequesting` 标志避免误记录违规
+11. **系统存储细粒度权限**：系统存储写入权限分为多个级别，危险键需要危险权限（仅管理员可授予），特殊键需要特殊权限（普通用户可以授予）
+12. **`userControl.users` 键特殊保护**：`userControl.users` 键只能由 `UserControl` 内核模块写入，用户程序即使获得 `SYSTEM_STORAGE_WRITE_USER_CONTROL` 权限也无法写入该键，这是为了防止权限提升攻击
+13. **危险权限授权限制**：危险权限只能由管理员用户授权，普通用户无法授权危险权限给程序
 
 ## 相关文档
 
