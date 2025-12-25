@@ -1,11 +1,11 @@
 {
   "system": {
     "system.dailyQuote": {
-      "value": "现在老了，开始注意身体了，可岁数不饶人，晚喽！",
+      "value": "别总给自己，沮丧的暗示。",
       "expiresAt": 0,
-      "createdAt": 1766513646129,
-      "updatedAt": 1766513646129,
-      "size": 71
+      "createdAt": 1766684364516,
+      "updatedAt": 1766684364516,
+      "size": 38
     }
   },
   "programs": {
@@ -54,59 +54,41 @@
           "msg": "请求成功",
           "data": {
             "city": "晋城市",
-            "ip": "219.147.46.231",
-            "tips": "天气干冷，穿厚一点吧！",
-            "low_temperature": -2,
+            "ip": "219.147.46.235",
+            "tips": "天气阴冷，穿暖和点吧！",
+            "low_temperature": -5,
             "moji_city_id": 1945,
             "night_condition": "晴",
-            "quality_level": "轻度",
-            "tomorrow_aqi": 102,
+            "quality_level": "良",
+            "tomorrow_aqi": 90,
             "tomorrow_condition": "晴",
-            "tomorrow_high_temperature": 7,
+            "tomorrow_high_temperature": 9,
             "tomorrow_low_temperature": -5,
-            "tomorrow_quality_level": "轻度",
+            "tomorrow_quality_level": "良",
             "tomorrow_weather_icon_id": "0",
-            "update_time": "2025-12-23 22:52:57",
+            "update_time": "2025-12-26 01:41:46",
             "today": {
-              "current_temp": "0℃",
-              "current_cond": "阴",
+              "current_temp": "-4℃",
+              "current_cond": "多云",
               "night_condition": "晴",
               "tomorrow_condition": "晴",
-              "low": "-2℃",
-              "quality": "轻度",
-              "alert": "山西省气象台2025年12月23日08时06分发布大风蓝色预警，预警区域：大同市、朔州市、忻州市、太原市、吕梁市、晋中市、阳泉市、临汾市、运城市、长治市、晋城市。预计未来24小时预警区域可能受大风影响，平均风力可达6级以上，或者阵风7级以上。请有关单位和人员做好防范准备。防御指南：1.政府及相关部门按照职责做好防大风工作；2.关好门窗，加固围板、棚架、广告牌等易被风吹动的搭建物，妥善安置易受大风影响的室外物品，遮盖建筑物资；3.行人注意尽量少骑自行车，刮风时不要在广告牌、临时搭建物等下面逗留；4.有关部门和单位注意森林、草原等防火。（预警信息来源：国家预警信息发布中心）",
-              "update_time": "2025-12-23 22:05:03"
+              "low": "-5℃",
+              "quality": "良",
+              "alert": "暂无预警信息",
+              "update_time": "2025-12-26 01:05:04"
             },
             "seven_day": [
-              {
-                "date": "2025-12-22",
-                "cond": "雨夹雪",
-                "high": "3℃",
-                "low": "0℃"
-              },
-              {
-                "date": "2025-12-23",
-                "cond": "多云转晴",
-                "high": "8℃",
-                "low": "-2℃"
-              },
-              {
-                "date": "2025-12-24",
-                "cond": "晴",
-                "high": "7℃",
-                "low": "-5℃"
-              },
               {
                 "date": "2025-12-25",
                 "cond": "晴",
                 "high": "4℃",
-                "low": "-5℃"
+                "low": "-6℃"
               },
               {
                 "date": "2025-12-26",
                 "cond": "晴",
-                "high": "4℃",
-                "low": "-6℃"
+                "high": "5℃",
+                "low": "-5℃"
               },
               {
                 "date": "2025-12-27",
@@ -122,39 +104,39 @@
               },
               {
                 "date": "2025-12-29",
-                "cond": "多云转晴",
-                "high": "10℃",
+                "cond": "晴",
+                "high": "7℃",
                 "low": "-3℃"
               },
               {
                 "date": "2025-12-30",
-                "cond": "多云转阴",
-                "high": "6℃",
-                "low": "-3℃"
+                "cond": "多云",
+                "high": "9℃",
+                "low": "-5℃"
               },
               {
                 "date": "2025-12-31",
-                "cond": "阴",
-                "high": "6℃",
-                "low": "-3℃"
+                "cond": "多云转雨夹雪",
+                "high": "7℃",
+                "low": "-4℃"
               },
               {
                 "date": "2026-01-01",
-                "cond": "阴转多云",
-                "high": "3℃",
-                "low": "-6℃"
+                "cond": "多云转雪",
+                "high": "5℃",
+                "low": "-4℃"
               },
               {
                 "date": "2026-01-02",
-                "cond": "多云",
+                "cond": "雨转阴",
                 "high": "5℃",
                 "low": "-6℃"
               },
               {
                 "date": "2026-01-03",
-                "cond": "多云",
-                "high": "5℃",
-                "low": "-5℃"
+                "cond": "阴转多云",
+                "high": "2℃",
+                "low": "-7℃"
               },
               {
                 "date": "2026-01-04",
@@ -173,14 +155,32 @@
                 "cond": "多云",
                 "high": "4℃",
                 "low": "-6℃"
+              },
+              {
+                "date": "2026-01-07",
+                "cond": "多云",
+                "high": "4℃",
+                "low": "-7℃"
+              },
+              {
+                "date": "2026-01-08",
+                "cond": "多云",
+                "high": "4℃",
+                "low": "-7℃"
+              },
+              {
+                "date": "2026-01-09",
+                "cond": "晴",
+                "high": "4.07℃",
+                "low": "-5.93℃"
               }
             ]
           }
         },
-        "expiresAt": 1766544649635,
-        "createdAt": 1766501449635,
-        "updatedAt": 1766501449635,
-        "size": 2503
+        "expiresAt": 1766727573070,
+        "createdAt": 1766684373070,
+        "updatedAt": 1766684373070,
+        "size": 1705
       }
     }
   }

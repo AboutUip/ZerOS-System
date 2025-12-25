@@ -1,7 +1,7 @@
 {
   "system": {
     "permissionManager.permissions": {
-      "30305": [
+      "10889": [
         "GUI_WINDOW_CREATE",
         "EVENT_LISTENER",
         "SYSTEM_STORAGE_READ",
@@ -36,6 +36,16 @@
         "createdAt": 1765485244257
       },
       {
+        "id": 6,
+        "type": "file",
+        "targetPath": "C://back2.png",
+        "name": "back2.png",
+        "icon": "D:/application/filemanager/assets/file-image.svg",
+        "description": "back2.png",
+        "position": null,
+        "createdAt": 1766580114576
+      },
+      {
         "id": 3,
         "programName": "musicplayer",
         "name": "音乐Music",
@@ -67,7 +77,7 @@
       }
     ],
     "musicplayer.settings": {
-      "useNotification": true,
+      "useNotification": false,
       "favorites": [
         "3208050",
         "5245130",
@@ -472,14 +482,14 @@
       "keys": {},
       "defaultKeyId": null
     },
-    "snake.highScore": 20,
+    "snake.highScore": 180,
     "userControl.users": {
       "root": {
         "level": "DEFAULT_ADMIN",
         "password": "61b249bf6d604d14120821f43625e84e",
         "avatar": "avatar_root_1766272534753.jpg",
         "createdAt": 1766271155991,
-        "lastLogin": 1766513636703
+        "lastLogin": 1766684370494
       },
       "TestUser": {
         "level": "USER",
@@ -489,7 +499,7 @@
         "lastLogin": 1766513648506
       }
     },
-    "userControl.currentUser": "TestUser",
+    "userControl.currentUser": "root",
     "system.lockscreenTimeComponent": true,
     "system.lockscreenBackground": "D:/cache/lockscreen/lockscreen_local_D__cache_random_anime_bg_1765983395242_jpg_random_anime_bg_1765983395242.jpg",
     "system.lockscreenRandomBg": true,
