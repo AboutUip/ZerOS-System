@@ -657,6 +657,11 @@ class TaskbarManager {
                     hintText.style.display = 'block';
                 }
                 
+                // 重新设置键盘监听器（如果之前被移除了）
+                if (typeof LockScreen._setupKeyboardListeners === 'function') {
+                    LockScreen._setupKeyboardListeners();
+                }
+                
                 KernelLogger.info("TaskbarManager", "屏幕已锁定");
             } else {
                 // 锁屏未初始化或容器已被删除，重新初始化

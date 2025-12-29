@@ -1543,16 +1543,30 @@ KernelLogger.info("LockScreen", "模块初始化");
          * 设置键盘监听（全面优化，支持更多快捷键）
          */
         static _setupKeyboardListeners() {
+            // 如果已经设置了键盘监听器，先移除旧的
+            if (LockScreen._keydownHandler) {
+                document.removeEventListener('keydown', LockScreen._keydownHandler);
+                LockScreen._keydownHandler = null;
+            }
+            
             let keyPressed = false;
             
             // 检查锁屏是否可见，如果不可见则不处理事件
             const handleKeydown = (e) => {
-                // 如果锁屏容器不存在或不可见，不处理事件（允许其他程序正常输入）
-                if (!LockScreen.container || 
-                    !LockScreen.container.parentElement || 
-                    LockScreen.container.style.display === 'none' ||
-                    getComputedStyle(LockScreen.container).display === 'none' ||
-                    LockScreen.container.offsetParent === null) {
+                // 如果锁屏容器不存在或未添加到DOM，不处理事件（允许其他程序正常输入）
+                if (!LockScreen.container || !LockScreen.container.parentElement) {
+                    return; // 锁屏容器不存在或未添加到DOM，不拦截事件
+                }
+                
+                // 检查锁屏是否真的可见（通过样式和类名）
+                const computedStyle = getComputedStyle(LockScreen.container);
+                const isDisplayNone = computedStyle.display === 'none';
+                const isVisibilityHidden = computedStyle.visibility === 'hidden';
+                const hasFadeOutClass = LockScreen.container.classList.contains('lockscreen-fade-out');
+                const opacity = parseFloat(computedStyle.opacity) || 1;
+                
+                // 如果锁屏被隐藏或正在淡出，不处理事件
+                if (isDisplayNone || isVisibilityHidden || (hasFadeOutClass && opacity < 0.1)) {
                     return; // 锁屏不可见，不拦截事件
                 }
                 // 如果用户列表显示，优先处理用户列表导航
