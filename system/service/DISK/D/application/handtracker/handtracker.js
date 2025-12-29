@@ -144,7 +144,9 @@
                 await this._startCamera();
                 
             } catch (error) {
-                console.error('[HandTracker] 初始化失败:', error);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('HANDTRACKER', '初始化失败', error);
+                }
                 this._showError('初始化失败: ' + error.message);
             }
         },
@@ -222,7 +224,9 @@
                 circleModeBtn.style.color = '#8b5cf6';
                 cubeModeBtn.style.color = '#fff';
                 this._clearTrackingCircles();
-                console.log('[HandTracker] 切换到方块模式');
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.debug('HANDTRACKER', '切换到方块模式');
+                }
             };
             
             const circleModeBtn = document.createElement('button');
@@ -244,7 +248,9 @@
                 cubeModeBtn.style.color = '#8b5cf6';
                 circleModeBtn.style.color = '#fff';
                 this._removeTrackingCube();
-                console.log('[HandTracker] 切换到圆形跟随模式');
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.debug('HANDTRACKER', '切换到圆形跟随模式');
+                }
             };
             
             modeButtonContainer.appendChild(cubeModeBtn);
@@ -431,12 +437,16 @@
                 if (typeof DynamicManager !== 'undefined') {
                     this._updateStatus('正在加载 MediaPipe...');
                     this.vision = await DynamicManager.loadModule('mediapipe');
-                    console.log('[HandTracker] MediaPipe 加载成功');
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.info('HANDTRACKER', 'MediaPipe 加载成功');
+                    }
                 } else {
                     throw new Error('DynamicManager 不可用');
                 }
             } catch (error) {
-                console.error('[HandTracker] 加载依赖失败:', error);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('HANDTRACKER', '加载依赖失败', error);
+                }
                 throw new Error('加载依赖库失败: ' + error.message);
             }
         },
@@ -561,10 +571,14 @@
                     minTrackingConfidence: 0.5
                 });
                 
-                console.log('[HandTracker] MediaPipe 初始化成功（手部检测 + 手势识别 + 面部识别）');
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.info('HANDTRACKER', 'MediaPipe 初始化成功（手部检测 + 手势识别 + 面部识别）');
+                }
                 this._updateStatus('MediaPipe 初始化完成');
             } catch (error) {
-                console.error('[HandTracker] MediaPipe 初始化失败:', error);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('HANDTRACKER', 'MediaPipe 初始化失败', error);
+                }
                 throw new Error('MediaPipe 初始化失败: ' + error.message);
             }
         },
@@ -572,18 +586,141 @@
         /**
          * 启动摄像头
          */
+        /**
+         * 诊断摄像头状态
+         * @returns {Promise<Object>} 诊断信息
+         */
+        _diagnoseCamera: async function() {
+            const diagnosis = {
+                browserSupport: false,
+                mediaDevicesSupport: false,
+                devicesAvailable: false,
+                permissionStatus: 'unknown',
+                deviceCount: 0,
+                deviceList: [],
+                currentStreamActive: false,
+                currentStreamTracks: 0,
+                errors: []
+            };
+            
+            try {
+                // 检查浏览器支持
+                diagnosis.browserSupport = !!(navigator && navigator.mediaDevices);
+                diagnosis.mediaDevicesSupport = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+                
+                if (!diagnosis.mediaDevicesSupport) {
+                    diagnosis.errors.push('浏览器不支持 MediaDevices API');
+                    return diagnosis;
+                }
+                
+                // 检查当前是否有活动的摄像头流
+                if (this.stream) {
+                    diagnosis.currentStreamActive = true;
+                    diagnosis.currentStreamTracks = this.stream.getVideoTracks().length;
+                }
+                
+                // 尝试检测是否有其他标签页在使用摄像头
+                // 注意：由于浏览器安全限制，无法直接检测其他标签页，但可以尝试获取所有设备
+                // 如果设备存在但无法访问，可能是被占用
+                diagnosis.possibleConflict = false;
+                if (diagnosis.deviceCount > 0 && diagnosis.permissionStatus === 'granted') {
+                    // 尝试快速测试摄像头是否可用（不实际启动流）
+                    try {
+                        // 创建一个临时的测试约束
+                        const testConstraints = { video: { facingMode: 'user' } };
+                        // 注意：这里不实际调用 getUserMedia，只是检查约束是否有效
+                        diagnosis.possibleConflict = false; // 无法直接检测，标记为未知
+                    } catch (e) {
+                        diagnosis.errors.push(`摄像头可用性测试失败: ${e.message}`);
+                    }
+                }
+                
+                // 检查权限状态
+                try {
+                    if (navigator.permissions && navigator.permissions.query) {
+                        const permissionResult = await navigator.permissions.query({ name: 'camera' });
+                        diagnosis.permissionStatus = permissionResult.state; // 'granted', 'denied', 'prompt'
+                    }
+                } catch (e) {
+                    diagnosis.errors.push(`无法检查权限状态: ${e.message}`);
+                }
+                
+                // 枚举可用设备（这会列出系统中所有可用的视频输入设备，不仅仅是当前程序使用的）
+                // 包括物理摄像头（如笔记本前置/后置摄像头、USB摄像头）和虚拟摄像头（如OBS虚拟摄像头等）
+                try {
+                    const devices = await navigator.mediaDevices.enumerateDevices();
+                    const videoDevices = devices.filter(device => device.kind === 'videoinput');
+                    diagnosis.deviceCount = videoDevices.length;
+                    diagnosis.devicesAvailable = videoDevices.length > 0;
+                    diagnosis.deviceList = videoDevices.map(device => ({
+                        deviceId: device.deviceId,
+                        label: device.label || '未命名摄像头',
+                        groupId: device.groupId
+                    }));
+                    
+                    if (videoDevices.length === 0) {
+                        diagnosis.errors.push('未检测到任何摄像头设备');
+                    }
+                } catch (e) {
+                    diagnosis.errors.push(`无法枚举设备: ${e.message}`);
+                }
+                
+            } catch (error) {
+                diagnosis.errors.push(`诊断过程出错: ${error.message}`);
+            }
+            
+            return diagnosis;
+        },
+        
         _startCamera: async function() {
             try {
+                // 先检查 ZerOS 权限系统
+                if (typeof PermissionManager !== 'undefined' && this.pid) {
+                    this._updateStatus('正在检查权限...');
+                    const hasPermission = await PermissionManager.checkAndRequestPermission(
+                        this.pid,
+                        PermissionManager.PERMISSION.MEDIA_ACCESS
+                    );
+                    
+                    if (!hasPermission) {
+                        throw new Error('用户拒绝了摄像头访问权限');
+                    }
+                }
+                
                 this._updateStatus('正在请求摄像头权限...');
                 
-                // 请求摄像头权限
-                this.stream = await navigator.mediaDevices.getUserMedia({
+                // 检查浏览器是否支持 getUserMedia
+                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                    throw new Error('浏览器不支持摄像头访问，请使用现代浏览器（Chrome、Firefox、Edge 等）');
+                }
+                
+                // 请求摄像头权限（先尝试高质量配置）
+                let constraints = {
                     video: {
                         width: { ideal: 1280 },
                         height: { ideal: 720 },
                         facingMode: 'user'
                     }
-                });
+                };
+                
+                try {
+                    this.stream = await navigator.mediaDevices.getUserMedia(constraints);
+                } catch (constraintError) {
+                    // 如果配置错误，尝试使用默认配置
+                    if (constraintError.name === 'OverconstrainedError' || constraintError.name === 'ConstraintNotSatisfiedError') {
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('HANDTRACKER', '高质量配置失败，尝试使用默认配置', constraintError);
+                        }
+                        constraints = {
+                            video: {
+                                facingMode: 'user'
+                            }
+                        };
+                        this.stream = await navigator.mediaDevices.getUserMedia(constraints);
+                    } else {
+                        throw constraintError; // 重新抛出其他错误
+                    }
+                }
                 
                 // 设置video源
                 this.video.srcObject = this.stream;
@@ -606,9 +743,14 @@
                             reject(new Error('视频尺寸无效'));
                         }
                     };
-                    this.video.onerror = (error) => {
+                    this.video.onerror = (event) => {
                         clearTimeout(timeout);
-                        reject(error);
+                        // video 元素的错误事件可能不包含标准的 Error 对象
+                        const videoError = new Error('视频元素加载失败');
+                        videoError.name = 'VideoLoadError';
+                        videoError.originalEvent = event;
+                        videoError.videoError = this.video.error;
+                        reject(videoError);
                     };
                     
                     // 如果视频已经加载，立即检查
@@ -617,12 +759,136 @@
                     }
                 });
                 
-                console.log('[HandTracker] 摄像头启动成功');
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.info('HANDTRACKER', '摄像头启动成功');
+                }
                 this._updateStatus('摄像头已就绪，点击"开始跟踪"开始');
                 
             } catch (error) {
-                console.error('[HandTracker] 摄像头启动失败:', error);
-                this._showError('无法访问摄像头: ' + error.message);
+                // 记录详细的错误信息
+                if (typeof KernelLogger !== 'undefined') {
+                    // 构建详细的错误信息对象
+                    const errorDetails = {};
+                    
+                    // 尝试提取所有可能的错误属性
+                    if (error) {
+                        if (error.name) errorDetails.name = error.name;
+                        if (error.message) errorDetails.message = error.message;
+                        if (error.stack) errorDetails.stack = error.stack;
+                        if (error.constraint) errorDetails.constraint = error.constraint;
+                        if (error.constraintName) errorDetails.constraintName = error.constraintName;
+                        if (error.videoError) errorDetails.videoError = error.videoError;
+                        if (error.originalEvent) errorDetails.originalEvent = 'Video element error event';
+                        
+                        // 如果错误对象有可枚举属性，也包含它们
+                        try {
+                            for (const key in error) {
+                                if (!errorDetails[key] && typeof error[key] !== 'function') {
+                                    try {
+                                        errorDetails[key] = String(error[key]);
+                                    } catch (e) {
+                                        errorDetails[key] = '[无法序列化]';
+                                    }
+                                }
+                            }
+                        } catch (e) {
+                            // 忽略枚举错误
+                        }
+                    }
+                    
+                    // 确保至少有一些信息
+                    if (Object.keys(errorDetails).length === 0) {
+                        errorDetails.rawError = String(error || '未知错误');
+                        errorDetails.errorType = typeof error;
+                    }
+                    
+                    // 构建错误消息
+                    const errorName = errorDetails.name || error?.name || 'UnknownError';
+                    const errorMessage = errorDetails.message || error?.message || String(error) || '未知错误';
+                    
+                    KernelLogger.error('HANDTRACKER', `摄像头启动失败: ${errorName} - ${errorMessage}`, errorDetails);
+                }
+                
+                // 提供更友好的错误信息
+                let errorMessage = '无法访问摄像头';
+                let showRetry = false; // 是否显示重试按钮
+                
+                // 确保 error 对象有基本属性
+                if (!error || typeof error !== 'object') {
+                    error = { name: 'UnknownError', message: String(error || '未知错误') };
+                }
+                
+                if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
+                    errorMessage = '摄像头权限被拒绝，请在浏览器设置中允许摄像头访问';
+                    showRetry = true; // 用户可能已经允许权限，可以重试
+                } else if (error.name === 'NotFoundError' || error.name === 'DevicesNotFoundError') {
+                    errorMessage = '未检测到摄像头设备，请检查摄像头是否已连接';
+                    showRetry = true; // 用户可能已经连接摄像头，可以重试
+                } else if (error.name === 'NotReadableError' || error.name === 'TrackStartError') {
+                    // 执行诊断以获取更详细的信息
+                    this._updateStatus('正在诊断摄像头问题...');
+                    const diagnosis = await this._diagnoseCamera();
+                    
+                    let detailedMessage = '摄像头被其他程序占用';
+                    if (diagnosis.deviceCount === 0) {
+                        detailedMessage = '未检测到摄像头设备';
+                    } else if (diagnosis.permissionStatus === 'denied') {
+                        detailedMessage = '摄像头权限被拒绝，请在浏览器设置中允许';
+                    } else if (diagnosis.permissionStatus === 'prompt') {
+                        detailedMessage = '需要授权摄像头访问权限';
+                    } else {
+                        // 提供更详细的解决建议
+                        detailedMessage = '摄像头无法启动，可能原因：\n';
+                        detailedMessage += '1. 其他浏览器标签页正在使用摄像头\n';
+                        detailedMessage += '2. 其他应用程序（如视频会议软件）占用摄像头\n';
+                        detailedMessage += '3. 摄像头硬件或驱动程序问题\n';
+                        detailedMessage += '\n建议：\n';
+                        detailedMessage += '- 关闭其他使用摄像头的浏览器标签页\n';
+                        detailedMessage += '- 关闭其他使用摄像头的应用程序\n';
+                        detailedMessage += '- 检查摄像头是否正常工作\n';
+                        detailedMessage += '- 尝试刷新页面后重试';
+                    }
+                    
+                    errorMessage = detailedMessage;
+                    showRetry = true; // 用户可能已经关闭其他程序，可以重试
+                    
+                    // 输出详细诊断信息到日志
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.debug('HANDTRACKER', `摄像头诊断 - 权限状态: ${diagnosis.permissionStatus}, 检测到的摄像头数量: ${diagnosis.deviceCount}`);
+                        if (diagnosis.deviceList.length > 0) {
+                            KernelLogger.debug('HANDTRACKER', `可用摄像头: ${JSON.stringify(diagnosis.deviceList)}`);
+                        }
+                        if (diagnosis.errors.length > 0) {
+                            KernelLogger.warn('HANDTRACKER', `诊断错误: ${diagnosis.errors.join(', ')}`);
+                        }
+                    }
+                    
+                    // 显示诊断按钮，让用户可以查看详细信息
+                    this._showError(errorMessage, showRetry, true);
+                    return; // 提前返回，避免重复显示错误
+                } else if (error.name === 'OverconstrainedError' || error.name === 'ConstraintNotSatisfiedError') {
+                    errorMessage = '摄像头不支持请求的配置，尝试使用默认设置';
+                    showRetry = true; // 可以尝试使用默认配置重试
+                } else {
+                    // 对于其他未知错误，显示错误消息
+                    errorMessage = error.message || error.toString() || '未知错误，请查看控制台获取详细信息';
+                    showRetry = true; // 提供重试选项
+                    
+                    // 记录未知错误类型
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.warn('HANDTRACKER', `未知的摄像头错误类型: ${error.name || 'Unknown'}`, {
+                            error: error.message || String(error),
+                            name: error.name,
+                            stack: error.stack,
+                            fullError: error
+                        });
+                    }
+                }
+                
+                // 对于 NotReadableError，已经在上面处理并返回了
+                if (error.name !== 'NotReadableError' && error.name !== 'TrackStartError') {
+                    this._showError(errorMessage, showRetry);
+                }
             }
         },
         
@@ -744,7 +1010,9 @@
                         } catch (detectError) {
                             // 如果检测失败，记录错误但不中断流程
                             if (detectError.message && !detectError.message.includes('ROI width and height must be > 0')) {
-                                console.warn('[HandTracker] 手部检测失败:', detectError);
+                                if (typeof KernelLogger !== 'undefined') {
+                                    KernelLogger.warn('HANDTRACKER', '手部检测失败', detectError);
+                                }
                             }
                             results = null;
                         }
@@ -769,7 +1037,9 @@
                             } catch (error) {
                                 // 忽略 ROI 错误，这是 MediaPipe 的内部错误
                                 if (error.message && !error.message.includes('ROI width and height must be > 0')) {
-                                    console.warn('[HandTracker] 手势识别失败:', error);
+                                    if (typeof KernelLogger !== 'undefined') {
+                                        KernelLogger.warn('HANDTRACKER', '手势识别失败', error);
+                                    }
                                 }
                             }
                         }
@@ -787,7 +1057,9 @@
                         } catch (error) {
                             // 忽略 ROI 错误
                             if (error.message && !error.message.includes('ROI width and height must be > 0')) {
-                                console.warn('[HandTracker] 面部识别失败:', error);
+                                if (typeof KernelLogger !== 'undefined') {
+                                    KernelLogger.warn('HANDTRACKER', '面部识别失败', error);
+                                }
                             }
                         }
                     } else {
@@ -826,7 +1098,9 @@
                 this.lastFaceResults = faceResults;
                 
             } catch (error) {
-                console.error('[HandTracker] 处理帧失败:', error);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('HANDTRACKER', '处理帧失败', error);
+                }
             }
             
             // 性能优化：动态调整帧率
@@ -1179,12 +1453,143 @@
         
         /**
          * 显示错误信息
+         * @param {string} message 错误消息
+         * @param {boolean} showRetry 是否显示重试按钮（对于可恢复的错误）
+         * @param {boolean} showDiagnose 是否显示诊断按钮
          */
-        _showError: function(message) {
+        _showError: function(message, showRetry = false, showDiagnose = false) {
             if (this.statusDisplay) {
+                // 清除之前可能存在的按钮
+                const toolbar = this.statusDisplay.parentElement;
+                if (toolbar) {
+                    const existingRetryBtn = toolbar.querySelector('.handtracker-retry-btn');
+                    if (existingRetryBtn) {
+                        existingRetryBtn.remove();
+                    }
+                    const existingDiagnoseBtn = toolbar.querySelector('.handtracker-diagnose-btn');
+                    if (existingDiagnoseBtn) {
+                        existingDiagnoseBtn.remove();
+                    }
+                }
+                
                 this.statusDisplay.textContent = '错误: ' + message;
-                // 使用 CSS 类而不是内联样式
                 this.statusDisplay.classList.add('error');
+                
+                // 如果需要显示重试按钮
+                if (showRetry && toolbar) {
+                    const retryBtn = document.createElement('button');
+                    retryBtn.className = 'handtracker-retry-btn handtracker-btn';
+                    retryBtn.textContent = '重试';
+                    retryBtn.style.marginLeft = '10px';
+                    retryBtn.style.padding = '4px 12px';
+                    retryBtn.style.fontSize = '12px';
+                    retryBtn.onclick = () => this._retryCamera();
+                    toolbar.appendChild(retryBtn);
+                }
+                
+                // 如果需要显示诊断按钮
+                if (showDiagnose && toolbar) {
+                    const diagnoseBtn = document.createElement('button');
+                    diagnoseBtn.className = 'handtracker-diagnose-btn handtracker-btn';
+                    diagnoseBtn.textContent = '诊断';
+                    diagnoseBtn.style.marginLeft = '10px';
+                    diagnoseBtn.style.padding = '4px 12px';
+                    diagnoseBtn.style.fontSize = '12px';
+                    diagnoseBtn.onclick = async () => {
+                        this._updateStatus('正在诊断...');
+                        const diagnosis = await this._diagnoseCamera();
+                        this._showDiagnosisResult(diagnosis);
+                    };
+                    toolbar.appendChild(diagnoseBtn);
+                }
+            }
+        },
+        
+        /**
+         * 显示诊断结果
+         * @param {Object} diagnosis 诊断信息
+         */
+        _showDiagnosisResult: function(diagnosis) {
+            let message = '诊断结果:\n';
+            message += `- 浏览器支持: ${diagnosis.browserSupport ? '是' : '否'}\n`;
+            message += `- MediaDevices API: ${diagnosis.mediaDevicesSupport ? '支持' : '不支持'}\n`;
+            message += `- 权限状态: ${diagnosis.permissionStatus}\n`;
+            message += `- 系统可用摄像头设备: ${diagnosis.deviceCount} 个（包括物理和虚拟设备）\n`;
+            message += `- 当前程序摄像头流: ${diagnosis.currentStreamActive ? `活动 (${diagnosis.currentStreamTracks} 个轨道)` : '未活动'}\n`;
+            
+            if (diagnosis.deviceList.length > 0) {
+                message += '\n系统检测到的所有可用摄像头设备:\n';
+                message += '（注意：这包括所有物理摄像头和虚拟摄像头，不仅仅是当前程序使用的）\n';
+                diagnosis.deviceList.forEach((device, index) => {
+                    message += `  ${index + 1}. ${device.label}\n`;
+                });
+            }
+            
+            if (diagnosis.errors.length > 0) {
+                message += '\n错误信息:\n';
+                diagnosis.errors.forEach(error => {
+                    message += `  - ${error}\n`;
+                });
+            }
+            
+            // 输出诊断结果到日志
+            if (typeof KernelLogger !== 'undefined') {
+                KernelLogger.info('HANDTRACKER', '摄像头诊断结果', { 
+                    deviceCount: diagnosis.deviceCount,
+                    currentStreamActive: diagnosis.currentStreamActive,
+                    permissionStatus: diagnosis.permissionStatus,
+                    deviceList: diagnosis.deviceList
+                });
+            }
+            
+            // 显示在状态栏（说明这是系统检测到的所有可用设备）
+            let statusText = '';
+            if (diagnosis.deviceCount > 0) {
+                statusText = `诊断完成: 系统检测到 ${diagnosis.deviceCount} 个可用摄像头设备`;
+                if (diagnosis.currentStreamActive) {
+                    statusText += `, 当前程序正在使用 ${diagnosis.currentStreamTracks} 个摄像头`;
+                } else {
+                    statusText += `, 但无法启动（可能被占用）`;
+                }
+                statusText += `, 权限: ${diagnosis.permissionStatus}`;
+            } else {
+                statusText = `诊断完成: 未检测到摄像头设备, 权限: ${diagnosis.permissionStatus}`;
+            }
+            this._updateStatus(statusText);
+            
+            // 如果检测到问题，提供建议
+            if (diagnosis.deviceCount === 0) {
+                this._showError('未检测到摄像头设备，请检查硬件连接', true, false);
+            } else if (diagnosis.permissionStatus === 'denied') {
+                this._showError('摄像头权限被拒绝，请在浏览器设置中允许', true, false);
+            } else if (diagnosis.errors.length > 0) {
+                this._showError('检测到问题，请查看控制台获取详细信息', true, false);
+            }
+        },
+        
+        /**
+         * 重试启动摄像头
+         */
+        _retryCamera: async function() {
+            // 清理之前的流（如果存在）
+            if (this.stream) {
+                this.stream.getTracks().forEach(track => track.stop());
+                this.stream = null;
+            }
+            
+            // 重置视频元素
+            if (this.video) {
+                this.video.srcObject = null;
+            }
+            
+            // 重新启动摄像头
+            try {
+                await this._startCamera();
+            } catch (error) {
+                // 错误已经在 _startCamera 中处理
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('HANDTRACKER', '重试启动摄像头失败', error);
+                }
             }
         },
         
@@ -1227,7 +1632,9 @@
                     if (this._originalConsoleWarn) {
                         this._originalConsoleWarn('[HandTracker] 清理MediaPipe资源失败:', e);
                     } else {
-                        console.warn('[HandTracker] 清理MediaPipe资源失败:', e);
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('HANDTRACKER', '清理MediaPipe资源失败', e);
+                        }
                     }
                 }
                 this.handLandmarker = null;
@@ -1240,7 +1647,9 @@
                     if (this._originalConsoleWarn) {
                         this._originalConsoleWarn('[HandTracker] 清理MediaPipe资源失败:', e);
                     } else {
-                        console.warn('[HandTracker] 清理MediaPipe资源失败:', e);
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('HANDTRACKER', '清理MediaPipe资源失败', e);
+                        }
                     }
                 }
                 this.gestureRecognizer = null;
@@ -1253,7 +1662,9 @@
                     if (this._originalConsoleWarn) {
                         this._originalConsoleWarn('[HandTracker] 清理MediaPipe资源失败:', e);
                     } else {
-                        console.warn('[HandTracker] 清理MediaPipe资源失败:', e);
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('HANDTRACKER', '清理MediaPipe资源失败', e);
+                        }
                     }
                 }
                 this.faceLandmarker = null;
@@ -1272,7 +1683,9 @@
                     }
                     this.threeRenderer.dispose();
                 } catch (e) {
-                    console.warn('[HandTracker] 清理Three.js资源失败:', e);
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.warn('HANDTRACKER', '清理Three.js资源失败', e);
+                    }
                 }
                 this.threeRenderer = null;
             }
@@ -1290,7 +1703,9 @@
                         this.particles.material.dispose();
                     }
                 } catch (e) {
-                    console.warn('[HandTracker] 清理粒子系统失败:', e);
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.warn('HANDTRACKER', '清理粒子系统失败', e);
+                    }
                 }
                 this.particles = null;
             }
@@ -1430,9 +1845,8 @@
                         const handOffsetX = gData.handOffsetX || 0;
                         
                         // 调试日志（仅在非默认状态时输出）
-                        if (mode !== 'SCATTER' && mode !== 'NONE') {
-                            console.log('[Worker] 接收手势:', mode, '握拳:', fistDegree.toFixed(2), '目标点:', targetPoint ? '有' : '无');
-                        }
+                        // 注意：Worker 代码中不能使用 KernelLogger，因为这是字符串代码
+                        // 如果需要调试，可以通过 postMessage 发送消息到主线程
                         
                         const { positions, velocities, baseState, count, colors } = group;
                         
@@ -1735,16 +2149,22 @@
                         this.threeRenderer = new this.THREE.WebGPURenderer({ antialias: true });
                         // WebGPURenderer 需要异步初始化
                         await this.threeRenderer.init();
-                        console.log('[HandTracker] 使用 WebGPURenderer');
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.info('HANDTRACKER', '使用 WebGPURenderer');
+                        }
                     } catch (e) {
-                        console.warn('[HandTracker] WebGPURenderer 初始化失败，回退到 WebGLRenderer:', e);
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('HANDTRACKER', 'WebGPURenderer 初始化失败，回退到 WebGLRenderer', e);
+                        }
                         this.threeRenderer = null;
                     }
                 }
                 
                 if (!this.threeRenderer) {
                     this.threeRenderer = new this.THREE.WebGLRenderer({ antialias: true });
-                    console.log('[HandTracker] 使用 WebGLRenderer');
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.info('HANDTRACKER', '使用 WebGLRenderer');
+                    }
                 }
                 
                 this.threeRenderer.setSize(width, height);
@@ -1775,7 +2195,9 @@
                 this._threeAnimationFrameId = null;
                 this._animateThreeJS();
                 
-                console.log('[HandTracker] Three.js 初始化完成，粒子组数量:', this._particleGroups.length);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.info('HANDTRACKER', `Three.js 初始化完成，粒子组数量: ${this._particleGroups.length}`);
+                }
                 
                 // 监听窗口大小变化（使用 EventManager）
                 this._resizeHandler = () => this._onThreeJSResize();
@@ -1790,7 +2212,9 @@
                 }
                 
             } catch (error) {
-                console.error('[HandTracker] Three.js 初始化失败:', error);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('HANDTRACKER', 'Three.js 初始化失败', error);
+                }
             }
         },
         
@@ -2061,17 +2485,23 @@
             
             // 始终只维护一个粒子组
             if (this._particleGroups.length === 0) {
-                console.log('[HandTracker] 检测到手部但粒子组不存在，正在创建...');
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.debug('HANDTRACKER', '检测到手部但粒子组不存在，正在创建...');
+                }
                 const createdGroup = this._createParticleGroup(0, null, null, 1);
                 if (!createdGroup) {
-                    console.warn('[HandTracker] 粒子组创建失败');
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.warn('HANDTRACKER', '粒子组创建失败');
+                    }
                     return;
                 }
             }
             
             const group = this._particleGroups[0];
             if (!group) {
-                console.warn('[HandTracker] 粒子组不存在，无法处理手势');
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.warn('HANDTRACKER', '粒子组不存在，无法处理手势');
+                }
                 return;
             }
             
@@ -2143,7 +2573,9 @@
             
             // 调试日志（仅在开发时启用）
             if (combinedHandState.type !== 'SCATTER' && combinedHandState.type !== 'NONE') {
-                console.log('[HandTracker] 手势状态:', combinedHandState.type, '强度:', combinedHandState.strength.toFixed(2), '握拳:', group.fistClosureDegree.toFixed(2), '目标点:', combinedHandState.targetPoint ? '有' : '无');
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.debug('HANDTRACKER', `手势状态: ${combinedHandState.type}, 强度: ${combinedHandState.strength.toFixed(2)}, 握拳: ${group.fistClosureDegree.toFixed(2)}, 目标点: ${combinedHandState.targetPoint ? '有' : '无'}`);
+                }
             }
             
             // 即使没有检测到手部，也确保粒子组存在并保持状态
@@ -2214,13 +2646,17 @@
         _createParticleGroup: function(handIndex, landmarks, gestureResults, totalHands) {
             // 严格检查 Three.js 是否已完全初始化
             if (!this.threeScene || !this.THREE || !this.threeRenderer) {
-                console.warn('[HandTracker] Three.js 未初始化，无法创建粒子组');
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.warn('HANDTRACKER', 'Three.js 未初始化，无法创建粒子组');
+                }
                 return null;
             }
             
             // 检查是否已存在粒子组（避免重复创建）
             if (this._particleGroups.length > 0) {
-                console.log('[HandTracker] 粒子组已存在，跳过创建');
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.debug('HANDTRACKER', '粒子组已存在，跳过创建');
+                }
                 return this._particleGroups[0];
             }
             
@@ -2321,7 +2757,9 @@
                 });
             }
             
-            console.log('[HandTracker] 粒子组已创建，ID:', groupId, '粒子数:', this.particleCount);
+            if (typeof KernelLogger !== 'undefined') {
+                KernelLogger.info('HANDTRACKER', `粒子组已创建，ID: ${groupId}, 粒子数: ${this.particleCount}`);
+            }
             return group;
         },
         
@@ -2848,10 +3286,14 @@
                     window.addEventListener('resize', resizeHandler);
                 }
                 
-                console.log('[HandTracker] 跟踪页面Three.js初始化完成');
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.info('HANDTRACKER', '跟踪页面Three.js初始化完成');
+                }
                 
             } catch (error) {
-                console.error('[HandTracker] 跟踪页面Three.js初始化失败:', error);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('HANDTRACKER', '跟踪页面Three.js初始化失败', error);
+                }
             }
         },
         
@@ -2952,7 +3394,9 @@
                     this._lastVictoryGestureTime = currentTime;
                     // 删除立方体
                     this._removeTrackingCube();
-                    console.log('[HandTracker] 检测到比耶手势，删除立方体');
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.debug('HANDTRACKER', '检测到比耶手势，删除立方体');
+                    }
                     // 清空历史记录，避免重复触发
                     this._victoryGestureHistory = [];
                 }
@@ -2982,7 +3426,9 @@
                     if (this._checkCubeClick(landmarks[8])) {  // 使用食指尖位置
                         this._lastSingleFingerClickTime = currentTime;
                         this._cubeRotationEnabled = !this._cubeRotationEnabled;
-                        console.log('[HandTracker] 立方体旋转', this._cubeRotationEnabled ? '启用' : '禁用');
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.debug('HANDTRACKER', `立方体旋转 ${this._cubeRotationEnabled ? '启用' : '禁用'}`);
+                        }
                     }
                 }
                 return;
@@ -3019,7 +3465,9 @@
                             this._isTwoHandActive = false;
                             this._lastTwoHandDistance = null;
                             this._lastTwoHandCenter = null;
-                            console.log('[HandTracker] 两只手松开，停止操作');
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.debug('HANDTRACKER', '两只手松开，停止操作');
+                            }
                         }
                     }
                 }
@@ -3055,7 +3503,9 @@
                             this._lastTwoFingerCenter3D = null;
                             this._twoFingerVelocity = { x: 0, y: 0, z: 0 };
                             this._twoFingerMoveHistory = [];
-                            console.log('[HandTracker] 两指松开，停止移动');
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.debug('HANDTRACKER', '两指松开，停止移动');
+                            }
                         }
                     } else {
                         // 如果没有检测到两指手势且不在移动状态，重置状态
@@ -3073,7 +3523,9 @@
                 this._lastTwoFingerCenter3D = null;
                 this._twoFingerVelocity = { x: 0, y: 0, z: 0 };
                 this._twoFingerMoveHistory = [];
-                console.log('[HandTracker] 两指手势消失，停止移动');
+                if (typeof KernelLogger !== 'undefined') {
+                KernelLogger.debug('HANDTRACKER', '两指手势消失，停止移动');
+            }
             }
         },
         
@@ -3479,7 +3931,9 @@
             // 保持兼容性：_trackingCube指向太阳系
             this._trackingCube = this._solarSystem;
             
-            console.log('[HandTracker] 太阳系已创建');
+            if (typeof KernelLogger !== 'undefined') {
+                KernelLogger.info('HANDTRACKER', '太阳系已创建');
+            }
         },
         
         /**
@@ -3616,7 +4070,9 @@
             this._lastTwoFingerDistance = null;
             this._lastTwoFingerCenter = null;
             
-            console.log('[HandTracker] 太阳系已删除');
+            if (typeof KernelLogger !== 'undefined') {
+                KernelLogger.info('HANDTRACKER', '太阳系已删除');
+            }
         },
         
         /**
@@ -4081,7 +4537,9 @@
                 copyright: '© 2025 ZerOS',
                 permissions: [
                     'MULTITHREADING_CREATE',
-                    'MULTITHREADING_EXECUTE'
+                    'MULTITHREADING_EXECUTE',
+                    'EVENT_LISTENER',  // GUI 窗口需要事件监听权限
+                    'MEDIA_ACCESS'     // 摄像头访问权限
                 ],
                 metadata: {
                     allowMultipleInstances: false  // 不支持多开

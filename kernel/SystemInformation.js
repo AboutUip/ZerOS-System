@@ -5,13 +5,13 @@ KernelLogger.info("SystemInformation", "模块初始化");
 
 class SystemInformation {
     // 系统版本
-    static SYSTEM_VERSION = '0.5.2';
+    static SYSTEM_VERSION = '0.5.3';
     
     // 内核版本
-    static KERNEL_VERSION = '0.5.8';
+    static KERNEL_VERSION = '0.5.9';
     
     // 构建日期
-    static BUILD_DATE = new Date('2024-11-28');
+    static BUILD_DATE = new Date('2025-11-28');
     
     // 系统名称
     static SYSTEM_NAME = 'ZerOS';
@@ -33,7 +33,7 @@ class SystemInformation {
         },
         {
             organization: 'AI模型',
-            role: 'AI',
+            role: 'Google',
             name: 'Gemini 3 Pro'
         }
     ];

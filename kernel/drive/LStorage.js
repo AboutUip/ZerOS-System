@@ -1004,7 +1004,8 @@ class LStorage {
                             // 系统加载期间，permissionManager.permissions 应该允许访问（系统初始化需要）
                             // 即使调用栈检查失败，也允许（因为调用栈可能被截断）
                             allowedInSystemLoading = true;
-                            KernelLogger.warn("LStorage", `系统加载中（POOL标志位），PermissionManager 调用栈检查未完全匹配，但系统加载期间允许访问 ${key}（系统初始化需要）`);
+                            // 这是系统初始化时的正常情况，使用 debug 级别而不是 warn
+                            KernelLogger.debug("LStorage", `系统加载中（POOL标志位），PermissionManager 调用栈检查未完全匹配，但系统加载期间允许访问 ${key}（系统初始化需要）`);
                             KernelLogger.debug("LStorage", `调用栈片段: ${fullCallStack.substring(0, 500)}`);
                         }
                     } else {
@@ -1025,7 +1026,13 @@ class LStorage {
                     try {
                         const value = LStorage._storageData.system[key] ?? null;
                         if (value) {
-                            KernelLogger.warn("LStorage", `敏感系统存储键 ${key} 被读取 - PID: unknown, 调用者: 内核模块（系统加载中）`);
+                            // 记录到权限管理器审计日志，而不是输出警告日志
+                            if (typeof PermissionManager !== 'undefined' && typeof PermissionManager.recordStorageAccessAudit === 'function') {
+                                PermissionManager.recordStorageAccessAudit(key, null, '内核模块（系统加载中）', {
+                                    systemLoading: true,
+                                    poolFlag: true
+                                });
+                            }
                         }
                         return value;
                     } catch (error) {
@@ -1138,7 +1145,13 @@ class LStorage {
                             try {
                                 const value = LStorage._storageData.system[key] ?? null;
                                 if (value) {
-                                    KernelLogger.warn("LStorage", `敏感系统存储键 ${key} 被读取 - PID: unknown, 调用者: PermissionManager（系统初始化）`);
+                                    // 记录到权限管理器审计日志，而不是输出警告日志
+                                    if (typeof PermissionManager !== 'undefined' && typeof PermissionManager.recordStorageAccessAudit === 'function') {
+                                        PermissionManager.recordStorageAccessAudit(key, null, 'PermissionManager（系统初始化）', {
+                                            systemInitialization: true,
+                                            stackCheck: 'secondary'
+                                        });
+                                    }
                                 }
                                 return value;
                             } catch (error) {
@@ -1233,7 +1246,18 @@ class LStorage {
         try {
             const value = LStorage._storageData.system[key] ?? null;
             if (isSensitiveKey && value) {
-                KernelLogger.warn("LStorage", `敏感系统存储键 ${key} 被读取 - PID: ${currentPid || 'unknown'}, 调用者: ${isKernelModuleCall ? '内核模块' : '用户程序'}`);
+                // 记录到权限管理器审计日志，而不是输出警告日志
+                if (typeof PermissionManager !== 'undefined' && typeof PermissionManager.recordStorageAccessAudit === 'function') {
+                    PermissionManager.recordStorageAccessAudit(
+                        key, 
+                        currentPid || null, 
+                        isKernelModuleCall ? '内核模块' : '用户程序',
+                        {
+                            hasPermission: true,
+                            requiredPermission: requiredPermission || null
+                        }
+                    );
+                }
             }
             return value;
         } catch (error) {

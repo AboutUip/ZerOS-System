@@ -739,25 +739,44 @@ __init__: async function(pid, initArgs) {
 
 ```javascript
 // 获取终端 API
-const terminalAPI = POOL.__GET__("APPLICATION_SHARED_POOL", "TerminalAPI");
+const TerminalAPI = POOL.__GET__("APPLICATION_SHARED_POOL", "TerminalAPI");
 
-if (terminalAPI) {
+if (TerminalAPI) {
     // 写入输出
-    terminalAPI.write('Hello\n');
+    TerminalAPI.write('Hello\n');
+    
+    // 写入带样式的文本
+    TerminalAPI.write({
+        text: 'Error: File not found\n',
+        color: 'red',
+        bold: true
+    });
     
     // 清空输出
-    terminalAPI.clear();
+    TerminalAPI.clear();
     
     // 设置工作目录
-    terminalAPI.setCwd('C:/Users');
+    TerminalAPI.setCwd('C:/Users');
     
     // 获取环境变量
-    const env = terminalAPI.getEnv();
+    const env = TerminalAPI.getEnv();
     
     // 设置环境变量
-    terminalAPI.setEnv({ KEY: 'value' });
+    TerminalAPI.setEnv({ KEY: 'value' });
+    
+    // 创建标签页
+    const tabId = TerminalAPI.createTab('My Tab');
+    
+    // 注册命令处理器
+    TerminalAPI.onCommand((command) => {
+        if (command === 'hello') {
+            TerminalAPI.write('Hello from my CLI program!\n');
+        }
+    });
 }
 ```
+
+详细 API 文档请参考 [TerminalAPI 文档](API/TerminalAPI.md)
 
 ### 命令行参数解析
 

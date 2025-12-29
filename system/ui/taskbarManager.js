@@ -48,6 +48,10 @@ class TaskbarManager {
     // 正在进行的天气数据加载请求（用于防止并发重复请求）
     static _pendingWeatherRequest = null;
     
+    // 自定义任务栏图标管理
+    static _customIcons = new Map(); // Map<iconId, CustomIconData>
+    static _customIconIdCounter = 0; // 自定义图标ID计数器
+    
     /**
      * 初始化任务栏
      */
@@ -90,6 +94,11 @@ class TaskbarManager {
         
         // 立即尝试同步加载任务栏位置（如果 LStorage 已初始化）
         TaskbarManager._tryLoadTaskbarPositionSync();
+        
+        // 加载自定义图标
+        TaskbarManager._loadCustomIcons().catch(e => {
+            KernelLogger.warn("TaskbarManager", `加载自定义图标失败: ${e.message}`);
+        });
         
         // 立即应用任务栏位置（使用已加载的位置或默认位置）
         TaskbarManager._applyTaskbarPosition(taskbar);
@@ -988,6 +997,12 @@ class TaskbarManager {
         for (const [programName, programData] of programMap) {
             const iconElement = TaskbarManager._createTaskbarIcon(programName, programData);
             leftContainer.appendChild(iconElement);
+        }
+        
+        // 渲染自定义图标
+        for (const [iconId, iconData] of TaskbarManager._customIcons.entries()) {
+            const customIconElement = TaskbarManager._createCustomTaskbarIcon(iconData);
+            leftContainer.appendChild(customIconElement);
         }
         
         taskbar.appendChild(leftContainer);
@@ -11338,6 +11353,387 @@ class TaskbarManager {
             KernelLogger.error("TaskbarManager", `设置固定程序列表失败: ${error.message}`, error);
             throw error;
         }
+    }
+    
+    // ========== 自定义图标管理 API ==========
+    
+    /**
+     * 添加自定义图标到任务栏
+     * @param {Object} options 图标配置
+     * @param {string} options.iconId 图标唯一标识符（如果未提供，将自动生成）
+     * @param {string} options.icon 图标路径或URL
+     * @param {string} options.title 图标标题/工具提示
+     * @param {Function} options.onClick 点击事件处理函数
+     * @param {number} options.pid 关联的进程ID（用于权限检查和自动清理）
+     * @param {Object} options.metadata 元数据（可选）
+     * @returns {Promise<string>} 返回图标ID
+     */
+    static async addCustomIcon(options) {
+        if (!options || typeof options !== 'object') {
+            throw new Error('图标配置必须是对象');
+        }
+        
+        const { iconId, icon, title, onClick, pid, metadata = {} } = options;
+        
+        // 验证必需参数
+        if (!icon || typeof icon !== 'string') {
+            throw new Error('图标路径或URL是必需的');
+        }
+        
+        if (!title || typeof title !== 'string') {
+            throw new Error('图标标题是必需的');
+        }
+        
+        if (onClick && typeof onClick !== 'function') {
+            throw new Error('点击事件处理函数必须是函数');
+        }
+        
+        // 生成图标ID（如果未提供）
+        const finalIconId = iconId || `custom-icon-${TaskbarManager._customIconIdCounter++}`;
+        
+        // 检查图标ID是否已存在
+        if (TaskbarManager._customIcons.has(finalIconId)) {
+            throw new Error(`图标ID已存在: ${finalIconId}`);
+        }
+        
+        // 创建图标数据
+        const iconData = {
+            iconId: finalIconId,
+            icon: icon,
+            title: title,
+            onClick: onClick || null,
+            pid: pid || null,
+            metadata: metadata,
+            createdAt: Date.now()
+        };
+        
+        // 保存到内存
+        TaskbarManager._customIcons.set(finalIconId, iconData);
+        
+        // 保存到存储（持久化）
+        try {
+            await TaskbarManager._saveCustomIcons();
+        } catch (e) {
+            KernelLogger.warn("TaskbarManager", `保存自定义图标失败: ${e.message}`);
+        }
+        
+        // 重新渲染任务栏
+        const taskbar = document.getElementById('taskbar');
+        if (taskbar) {
+            await TaskbarManager._renderTaskbar(taskbar);
+        }
+        
+        KernelLogger.info("TaskbarManager", `已添加自定义图标到任务栏: ${finalIconId} (${title})`);
+        
+        return finalIconId;
+    }
+    
+    /**
+     * 移除自定义图标
+     * @param {string} iconId 图标ID
+     * @returns {Promise<boolean>} 是否成功
+     */
+    static async removeCustomIcon(iconId) {
+        if (!iconId || typeof iconId !== 'string') {
+            throw new Error('图标ID必须是字符串');
+        }
+        
+        if (!TaskbarManager._customIcons.has(iconId)) {
+            KernelLogger.debug("TaskbarManager", `图标不存在: ${iconId}`);
+            return false;
+        }
+        
+        // 从内存中移除
+        TaskbarManager._customIcons.delete(iconId);
+        
+        // 保存到存储
+        try {
+            await TaskbarManager._saveCustomIcons();
+        } catch (e) {
+            KernelLogger.warn("TaskbarManager", `保存自定义图标失败: ${e.message}`);
+        }
+        
+        // 重新渲染任务栏
+        const taskbar = document.getElementById('taskbar');
+        if (taskbar) {
+            await TaskbarManager._renderTaskbar(taskbar);
+        }
+        
+        KernelLogger.info("TaskbarManager", `已移除自定义图标: ${iconId}`);
+        
+        return true;
+    }
+    
+    /**
+     * 更新自定义图标
+     * @param {string} iconId 图标ID
+     * @param {Object} updates 更新内容
+     * @returns {Promise<boolean>} 是否成功
+     */
+    static async updateCustomIcon(iconId, updates) {
+        if (!iconId || typeof iconId !== 'string') {
+            throw new Error('图标ID必须是字符串');
+        }
+        
+        if (!updates || typeof updates !== 'object') {
+            throw new Error('更新内容必须是对象');
+        }
+        
+        const iconData = TaskbarManager._customIcons.get(iconId);
+        if (!iconData) {
+            throw new Error(`图标不存在: ${iconId}`);
+        }
+        
+        // 更新图标数据
+        if (updates.icon !== undefined) {
+            if (typeof updates.icon !== 'string') {
+                throw new Error('图标路径必须是字符串');
+            }
+            iconData.icon = updates.icon;
+        }
+        
+        if (updates.title !== undefined) {
+            if (typeof updates.title !== 'string') {
+                throw new Error('图标标题必须是字符串');
+            }
+            iconData.title = updates.title;
+        }
+        
+        if (updates.onClick !== undefined) {
+            if (updates.onClick !== null && typeof updates.onClick !== 'function') {
+                throw new Error('点击事件处理函数必须是函数或null');
+            }
+            iconData.onClick = updates.onClick;
+        }
+        
+        if (updates.metadata !== undefined) {
+            if (typeof updates.metadata !== 'object') {
+                throw new Error('元数据必须是对象');
+            }
+            iconData.metadata = { ...iconData.metadata, ...updates.metadata };
+        }
+        
+        // 保存到存储
+        try {
+            await TaskbarManager._saveCustomIcons();
+        } catch (e) {
+            KernelLogger.warn("TaskbarManager", `保存自定义图标失败: ${e.message}`);
+        }
+        
+        // 重新渲染任务栏
+        const taskbar = document.getElementById('taskbar');
+        if (taskbar) {
+            await TaskbarManager._renderTaskbar(taskbar);
+        }
+        
+        KernelLogger.info("TaskbarManager", `已更新自定义图标: ${iconId}`);
+        
+        return true;
+    }
+    
+    /**
+     * 获取自定义图标列表
+     * @returns {Promise<Array<Object>>} 自定义图标列表
+     */
+    static async getCustomIcons() {
+        return Array.from(TaskbarManager._customIcons.values()).map(iconData => ({
+            iconId: iconData.iconId,
+            icon: iconData.icon,
+            title: iconData.title,
+            pid: iconData.pid,
+            metadata: iconData.metadata,
+            createdAt: iconData.createdAt
+        }));
+    }
+    
+    /**
+     * 根据PID获取自定义图标列表
+     * @param {number} pid 进程ID
+     * @returns {Promise<Array<Object>>} 自定义图标列表
+     */
+    static async getCustomIconsByPid(pid) {
+        if (typeof pid !== 'number') {
+            throw new Error('进程ID必须是数字');
+        }
+        
+        return Array.from(TaskbarManager._customIcons.values())
+            .filter(iconData => iconData.pid === pid)
+            .map(iconData => ({
+                iconId: iconData.iconId,
+                icon: iconData.icon,
+                title: iconData.title,
+                pid: iconData.pid,
+                metadata: iconData.metadata,
+                createdAt: iconData.createdAt
+            }));
+    }
+    
+    /**
+     * 清理指定PID的所有自定义图标（进程退出时调用）
+     * @param {number} pid 进程ID
+     * @returns {Promise<number>} 清理的图标数量
+     */
+    static async cleanupCustomIconsByPid(pid) {
+        if (typeof pid !== 'number') {
+            return 0;
+        }
+        
+        let cleanedCount = 0;
+        const iconsToRemove = [];
+        
+        for (const [iconId, iconData] of TaskbarManager._customIcons.entries()) {
+            if (iconData.pid === pid) {
+                iconsToRemove.push(iconId);
+            }
+        }
+        
+        for (const iconId of iconsToRemove) {
+            TaskbarManager._customIcons.delete(iconId);
+            cleanedCount++;
+        }
+        
+        if (cleanedCount > 0) {
+            // 保存到存储
+            try {
+                await TaskbarManager._saveCustomIcons();
+            } catch (e) {
+                KernelLogger.warn("TaskbarManager", `保存自定义图标失败: ${e.message}`);
+            }
+            
+            // 重新渲染任务栏
+            const taskbar = document.getElementById('taskbar');
+            if (taskbar) {
+                await TaskbarManager._renderTaskbar(taskbar);
+            }
+            
+            KernelLogger.info("TaskbarManager", `已清理进程 ${pid} 的 ${cleanedCount} 个自定义图标`);
+        }
+        
+        return cleanedCount;
+    }
+    
+    /**
+     * 保存自定义图标到存储
+     * @private
+     */
+    static async _saveCustomIcons() {
+        if (typeof LStorage === 'undefined' || typeof LStorage.setSystemStorage !== 'function') {
+            return;
+        }
+        
+        // 转换为可序列化的格式（移除函数）
+        const serializableIcons = Array.from(TaskbarManager._customIcons.values()).map(iconData => ({
+            iconId: iconData.iconId,
+            icon: iconData.icon,
+            title: iconData.title,
+            pid: iconData.pid,
+            metadata: iconData.metadata,
+            createdAt: iconData.createdAt
+            // 注意：onClick 函数不会被保存，需要在加载时重新注册
+        }));
+        
+        await LStorage.setSystemStorage('taskbar.customIcons', serializableIcons);
+    }
+    
+    /**
+     * 从存储加载自定义图标
+     * @private
+     */
+    static async _loadCustomIcons() {
+        if (typeof LStorage === 'undefined' || typeof LStorage.getSystemStorage !== 'function') {
+            return;
+        }
+        
+        try {
+            const savedIcons = await LStorage.getSystemStorage('taskbar.customIcons');
+            if (!Array.isArray(savedIcons)) {
+                return;
+            }
+            
+            for (const savedIcon of savedIcons) {
+                // 验证数据格式
+                if (!savedIcon.iconId || !savedIcon.icon || !savedIcon.title) {
+                    KernelLogger.warn("TaskbarManager", `跳过无效的自定义图标数据: ${JSON.stringify(savedIcon)}`);
+                    continue;
+                }
+                
+                // 恢复图标数据（onClick 需要在程序重新注册）
+                TaskbarManager._customIcons.set(savedIcon.iconId, {
+                    iconId: savedIcon.iconId,
+                    icon: savedIcon.icon,
+                    title: savedIcon.title,
+                    onClick: null, // 函数无法序列化，需要程序重新注册
+                    pid: savedIcon.pid || null,
+                    metadata: savedIcon.metadata || {},
+                    createdAt: savedIcon.createdAt || Date.now()
+                });
+            }
+            
+            KernelLogger.debug("TaskbarManager", `已加载 ${TaskbarManager._customIcons.size} 个自定义图标`);
+        } catch (e) {
+            KernelLogger.warn("TaskbarManager", `加载自定义图标失败: ${e.message}`);
+        }
+    }
+    
+    /**
+     * 创建自定义任务栏图标元素
+     * @param {Object} iconData 图标数据
+     * @returns {HTMLElement} 图标元素
+     * @private
+     */
+    static _createCustomTaskbarIcon(iconData) {
+        const iconContainer = document.createElement('div');
+        iconContainer.className = 'taskbar-icon taskbar-custom-icon';
+        iconContainer.dataset.iconId = iconData.iconId;
+        if (iconData.pid) {
+            iconContainer.dataset.pid = iconData.pid.toString();
+        }
+        
+        // 创建图标
+        const icon = document.createElement('img');
+        // 转换虚拟路径为实际 URL
+        const iconUrl = typeof ProcessManager !== 'undefined' && typeof ProcessManager.convertVirtualPathToUrl === 'function'
+            ? ProcessManager.convertVirtualPathToUrl(iconData.icon)
+            : iconData.icon;
+        icon.src = iconUrl;
+        icon.alt = iconData.title;
+        icon.className = 'taskbar-icon-image';
+        icon.onerror = () => {
+            // 图标加载失败，使用默认图标
+            icon.style.display = 'none';
+            const defaultIconContainer = document.createElement('div');
+            defaultIconContainer.className = 'taskbar-icon-image';
+            defaultIconContainer.style.cssText = 'width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;';
+            TaskbarManager._loadSystemIconWithRetry('app-default', defaultIconContainer).catch(e => {
+                KernelLogger.warn("TaskbarManager", `加载默认图标失败: ${e.message}，使用文字图标`);
+                const textIcon = document.createElement('div');
+                textIcon.className = 'taskbar-icon-text';
+                textIcon.textContent = iconData.title.charAt(0).toUpperCase();
+                iconContainer.appendChild(textIcon);
+            });
+            iconContainer.appendChild(defaultIconContainer);
+        };
+        iconContainer.appendChild(icon);
+        
+        // 添加工具提示
+        const tooltip = document.createElement('div');
+        tooltip.className = 'taskbar-icon-tooltip';
+        tooltip.textContent = iconData.title;
+        iconContainer.appendChild(tooltip);
+        
+        // 点击事件
+        if (iconData.onClick && typeof iconData.onClick === 'function') {
+            iconContainer.addEventListener('click', (e) => {
+                e.stopPropagation();
+                try {
+                    iconData.onClick(e, iconData);
+                } catch (error) {
+                    KernelLogger.error("TaskbarManager", `自定义图标点击事件处理失败: ${error.message}`, error);
+                }
+            });
+        }
+        
+        return iconContainer;
     }
 }
 

@@ -27,6 +27,7 @@
 - [ContextMenuManager.md](./ContextMenuManager.md) - 上下文菜单管理 ✅
 - [DesktopManager.md](./DesktopManager.md) - 桌面管理 ✅
 - [LockScreen.md](./LockScreen.md) - 锁屏界面 ✅
+- [TerminalAPI.md](./TerminalAPI.md) - 终端 API（CLI 程序使用） ✅
 
 ### 文件系统
 - [Disk.md](./Disk.md) - 虚拟磁盘管理 ✅
@@ -90,6 +91,7 @@
 - ContextMenuManager
 - DesktopManager
 - LockScreen
+- TerminalAPI
 
 **用户控制**
 - UserControl

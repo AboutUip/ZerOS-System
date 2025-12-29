@@ -28,16 +28,6 @@
         "createdAt": 1765485244257
       },
       {
-        "id": 6,
-        "type": "file",
-        "targetPath": "C://back2.png",
-        "name": "back2.png",
-        "icon": "D:/application/filemanager/assets/file-image.svg",
-        "description": "back2.png",
-        "position": null,
-        "createdAt": 1766580114576
-      },
-      {
         "id": 3,
         "programName": "musicplayer",
         "name": "音乐Music",
@@ -66,6 +56,15 @@
         "description": "画板",
         "position": null,
         "createdAt": 1766307135134
+      },
+      {
+        "id": 14,
+        "programName": "sparkai",
+        "name": "讯飞星火AI",
+        "icon": "D:/application/sparkai/sparkai.svg",
+        "description": "讯飞星火AI",
+        "position": null,
+        "createdAt": 1767018018812
       }
     ],
     "musicplayer.settings": {
@@ -471,7 +470,16 @@
     ],
     "system.randomAnimeBgStatus": "success",
     "cryptDrive.keys": {
-      "keys": {},
+      "keys": {
+        "key_1767013186476_qph4g5nlu": {
+          "publicKey": "-----BEGIN PUBLIC KEY-----\nMIGeMA0GCSqGSIb3DQEBAQUAA4GMADCBiAKBgFvacXhs5f0n2MzKXL3HUHUb6YPz\n3EQUq1UmbMuX+271B8fynLvSHGVTYk0kNRmtVJgUtT4c/9WL2dA3wajWyCggh8KU\nPpP8PgCmQZlaQn1rLnEu0N9+WfLK9MLRsQb5rb5yI8fDZhEAgacwYRm528DI67B8\nn9XyrKscboZNetRPAgMBAAE=\n-----END PUBLIC KEY-----",
+          "privateKey": "-----BEGIN RSA PRIVATE KEY-----\nMIICWgIBAAKBgFvacXhs5f0n2MzKXL3HUHUb6YPz3EQUq1UmbMuX+271B8fynLvS\nHGVTYk0kNRmtVJgUtT4c/9WL2dA3wajWyCggh8KUPpP8PgCmQZlaQn1rLnEu0N9+\nWfLK9MLRsQb5rb5yI8fDZhEAgacwYRm528DI67B8n9XyrKscboZNetRPAgMBAAEC\ngYArA9Jtxfmyo015Ii9qRIPeQ/MIc1Qsoc1WtAbxFTyPSrqZHXnez1ey7+iyHYms\ne6qJCfGSo/v/Il4fj2zmx6a17E6vRu5P+YMKqU8Hr1ZFBwf1WeKWXW56tZPPvxTS\n8/CjlLS16ATshPR5Qo9pu7/FwOpkXxdOFQLfQMWnSscziQJBAJ3b28/wapRLt9WJ\noDv+OWAXnZts91IySb84CABYPE1X+IJeLMHNtAnyRkrY1BAN1HHoymW09NmczlxR\ni0XNRJ0CQQCU9WyfEtcBNSeKEBb1wxuE68QWYY+a+j3E5Bj5ZYUkkZEkaSvlL7n+\nXhSGNBCv2xtA4YGsjZkedYf06fCxDwrbAkBvDFZCnnbrYaSuBEYDTiDgl1xZFTua\nyCOW7/y4+Vlac3Mvir5ji6iGgreuOYBc1s3HYCLZj4Xbe/KzgO2/qdoFAkAZ/r6H\nADWvS0RsLqSjHPp3duGQelQiWpte+eN12oaivBiVPxle9LZDss1oIjvrRJR7/R6x\nK0DWdPJWBmFvtM1TAkBLJfEqp8BUcSzEZqw2O1Zukv4FFagt7h9wVxdcwtZCwl8L\nsQ9tyJxZ9WoBCcZHV6ik6E9hlsmvrDpjKTjd8o07\n-----END RSA PRIVATE KEY-----",
+          "createdAt": 1767013186476,
+          "expiresAt": null,
+          "description": "test",
+          "tags": []
+        }
+      },
       "defaultKeyId": null
     },
     "snake.highScore": 180,
@@ -481,7 +489,7 @@
         "password": "61b249bf6d604d14120821f43625e84e",
         "avatar": "avatar_root_1766272534753.jpg",
         "createdAt": 1766271155991,
-        "lastLogin": 1766684370494
+        "lastLogin": 1767022961115
       },
       "TestUser": {
         "level": "USER",
@@ -493,7 +501,7 @@
     },
     "userControl.currentUser": "root",
     "system.lockscreenTimeComponent": true,
-    "system.lockscreenBackground": "D:/cache/lockscreen/lockscreen_local_D__cache_random_anime_bg_1765983395242_jpg_random_anime_bg_1765983395242.jpg",
+    "system.lockscreenBackground": "/system/assets/start/bg3.jpg",
     "system.lockscreenRandomBg": true,
     "system.lockscreenBackgrounds": [
       {

@@ -85,7 +85,10 @@ class PermissionManager {
         CACHE_WRITE: 'CACHE_WRITE',                        // 写入/删除缓存
         
         // 语音识别权限
-        SPEECH_RECOGNITION: 'SPEECH_RECOGNITION'           // 语音识别
+        SPEECH_RECOGNITION: 'SPEECH_RECOGNITION',          // 语音识别
+        
+        // 媒体访问权限
+        MEDIA_ACCESS: 'MEDIA_ACCESS'                        // 访问摄像头和麦克风
     };
     
     /**
@@ -156,6 +159,9 @@ class PermissionManager {
         
         // 语音识别权限（特殊权限，需要用户确认）
         [PermissionManager.PERMISSION.SPEECH_RECOGNITION]: PermissionManager.PERMISSION_LEVEL.SPECIAL,
+        
+        // 媒体访问权限（特殊权限，需要用户确认）
+        [PermissionManager.PERMISSION.MEDIA_ACCESS]: PermissionManager.PERMISSION_LEVEL.SPECIAL,
         
         // 危险权限（需要明确授权）
         [PermissionManager.PERMISSION.PROCESS_MANAGE]: PermissionManager.PERMISSION_LEVEL.DANGEROUS,
@@ -1506,6 +1512,43 @@ class PermissionManager {
             PermissionManager._violationLog = [];
         }
         KernelLogger.info("PermissionManager", "审计日志已清除");
+    }
+    
+    /**
+     * 记录敏感系统存储访问审计日志
+     * 用于 LStorage 模块记录敏感存储键的访问
+     * @param {string} storageKey 存储键名
+     * @param {number|null} pid 进程ID（null 表示未知或内核模块）
+     * @param {string} caller 调用者描述（如 '内核模块（系统加载中）'、'PermissionManager（系统初始化）'、'用户程序'）
+     * @param {Object} context 附加上下文信息
+     */
+    static recordStorageAccessAudit(storageKey, pid, caller, context = {}) {
+        // 如果 PermissionManager 未初始化，静默跳过（避免循环依赖）
+        if (!PermissionManager._initialized) {
+            return;
+        }
+        
+        // 确定权限名称（基于存储键）
+        let permission = null;
+        if (storageKey.startsWith('userControl.')) {
+            permission = PermissionManager.PERMISSION.SYSTEM_STORAGE_READ_USER_CONTROL;
+        } else if (storageKey.startsWith('permissionControl.') || storageKey === 'permissionManager.permissions') {
+            permission = PermissionManager.PERMISSION.SYSTEM_STORAGE_READ_PERMISSION_CONTROL;
+        }
+        
+        // 记录审计日志
+        PermissionManager._logAudit(
+            pid || 0, // 使用 0 表示未知 PID
+            permission || 'STORAGE_ACCESS', // 如果没有对应权限，使用通用标识
+            'storage_access', // 操作类型
+            true, // 访问成功
+            permission ? PermissionManager.PERMISSION_LEVEL_MAP[permission] || PermissionManager.PERMISSION_LEVEL.DANGEROUS : PermissionManager.PERMISSION_LEVEL.DANGEROUS,
+            {
+                storageKey: storageKey,
+                caller: caller,
+                ...context
+            }
+        );
     }
 }
 

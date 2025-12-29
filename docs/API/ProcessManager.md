@@ -428,6 +428,15 @@ const allProcesses = ProcessManager.getProcessInfo();
 - `Theme.read` - 读取主题（需要 `THEME_READ` 权限）
 - `Theme.write` - 修改主题（需要 `THEME_WRITE` 权限）
 - `Desktop.manage` - 管理桌面（需要 `DESKTOP_MANAGE` 权限）
+- `Desktop.addShortcut` - 添加桌面快捷方式（需要 `DESKTOP_MANAGE` 权限）
+- `Desktop.addFileOrFolderIcon` - 添加文件/文件夹图标到桌面（需要 `DESKTOP_MANAGE` 权限）
+- `Desktop.removeShortcut` - 移除桌面快捷方式（需要 `DESKTOP_MANAGE` 权限）
+- `Desktop.getIcons` - 获取桌面图标列表（无需权限）
+- `Desktop.getConfig` - 获取桌面配置（无需权限）
+- `Desktop.setArrangementMode` - 设置排列模式（需要 `DESKTOP_MANAGE` 权限）
+- `Desktop.setIconSize` - 设置图标大小（需要 `DESKTOP_MANAGE` 权限）
+- `Desktop.setAutoArrange` - 设置自动排列（需要 `DESKTOP_MANAGE` 权限）
+- `Desktop.refresh` - 刷新桌面（需要 `DESKTOP_MANAGE` 权限）
 - `Process.manage` - 管理进程（需要 `PROCESS_MANAGE` 权限）
 - `Drag.createSession` - 创建拖拽会话（需要 `DRAG_ELEMENT` 权限）
 - `Drag.enable` - 启用拖拽（需要 `DRAG_ELEMENT` 权限）
@@ -441,7 +450,7 @@ const allProcesses = ProcessManager.getProcessInfo();
 - `Drag.getProcessDrags` - 获取进程拖拽会话（需要 `DRAG_ELEMENT` 权限）
 - `Geography.getCurrentPosition` - 获取当前位置（需要 `GEOGRAPHY_LOCATION` 权限）
 - `Geography.clearCache` - 清除位置缓存（需要 `GEOGRAPHY_LOCATION` 权限）
-- `Geography.isSupported` - 检查是否支持地理位置（需要 `GEOGRAPHY_LOCATION` 权限）
+- `Geography.isSupported` - 检查是否支持地理位置（无需权限）
 - `Geography.getCachedLocation` - 获取缓存的位置（需要 `GEOGRAPHY_LOCATION` 权限）
 - `Crypt.generateKeyPair` - 生成密钥对（需要 `CRYPT_GENERATE_KEY` 权限）
 - `Crypt.importKeyPair` - 导入密钥对（需要 `CRYPT_IMPORT_KEY` 权限）
@@ -464,6 +473,23 @@ const allProcesses = ProcessManager.getProcessInfo();
 - `Cache.delete` - 删除缓存（需要 `CACHE_WRITE` 权限）
 - `Cache.clear` - 清空缓存（需要 `CACHE_WRITE` 权限）
 - `Cache.getStats` - 获取缓存统计（需要 `CACHE_READ` 权限）
+- `Taskbar.pinProgram` - 固定程序到任务栏（需要 `DESKTOP_MANAGE` 权限）
+- `Taskbar.unpinProgram` - 从任务栏取消固定程序（需要 `DESKTOP_MANAGE` 权限）
+- `Taskbar.getPinnedPrograms` - 获取固定程序列表（无需权限）
+- `Taskbar.isPinned` - 检查程序是否固定（无需权限）
+- `Taskbar.setPinnedPrograms` - 批量设置固定程序（需要 `DESKTOP_MANAGE` 权限）
+- `Taskbar.addIcon` - 添加自定义图标到任务栏（需要 `DESKTOP_MANAGE` 权限）
+- `Taskbar.removeIcon` - 移除任务栏自定义图标（需要 `DESKTOP_MANAGE` 权限，且只能删除自己创建的图标）
+- `Taskbar.updateIcon` - 更新任务栏自定义图标（需要 `DESKTOP_MANAGE` 权限，且只能更新自己创建的图标）
+- `Taskbar.getCustomIcons` - 获取所有自定义图标（无需权限）
+- `Taskbar.getCustomIconsByPid` - 根据 PID 获取自定义图标（无需权限）
+- `Speech.isSupported` - 检查是否支持语音识别（无需权限）
+- `Speech.createSession` - 创建语音识别会话（需要 `SPEECH_RECOGNITION` 权限）
+- `Speech.startRecognition` - 开始语音识别（需要 `SPEECH_RECOGNITION` 权限）
+- `Speech.stopRecognition` - 停止语音识别（需要 `SPEECH_RECOGNITION` 权限）
+- `Speech.stopSession` - 停止语音识别会话（需要 `SPEECH_RECOGNITION` 权限）
+- `Speech.getSessionStatus` - 获取会话状态（需要 `SPEECH_RECOGNITION` 权限）
+- `Speech.getSessionResults` - 获取识别结果（需要 `SPEECH_RECOGNITION` 权限）
 
 **示例**:
 ```javascript

@@ -42,6 +42,7 @@ await DesktopManager.init();
 
 **示例**:
 ```javascript
+// 直接调用
 const iconId = DesktopManager.addShortcut({
     programName: 'filemanager',
     name: '文件管理器',
@@ -49,7 +50,18 @@ const iconId = DesktopManager.addShortcut({
     description: '管理文件和文件夹',
     position: { x: 100, y: 100 }
 });
+
+// 通过 ProcessManager 调用（推荐）
+const iconId = await ProcessManager.callKernelAPI(pid, 'Desktop.addShortcut', [{
+    programName: 'filemanager',
+    name: '文件管理器',
+    icon: 'application/filemanager/filemanager.svg',
+    description: '管理文件和文件夹',
+    position: { x: 100, y: 100 }
+}]);
 ```
+
+**权限要求**: 需要 `DESKTOP_MANAGE` 权限
 
 #### `removeShortcut(iconId)`
 
@@ -60,8 +72,50 @@ const iconId = DesktopManager.addShortcut({
 
 **示例**:
 ```javascript
+// 直接调用
 DesktopManager.removeShortcut(iconId);
+
+// 通过 ProcessManager 调用（推荐）
+await ProcessManager.callKernelAPI(pid, 'Desktop.removeShortcut', [iconId]);
 ```
+
+**权限要求**: 需要 `DESKTOP_MANAGE` 权限
+
+#### `addFileOrFolderIcon(options)`
+
+添加文件/文件夹图标到桌面。
+
+**参数**:
+- `options` (Object): 选项对象
+  - `type` (string): 类型，必须是 `'file'` 或 `'directory'`（必需）
+  - `targetPath` (string): 目标路径（文件或文件夹的完整路径）（必需）
+  - `name` (string): 显示名称（可选，默认使用文件名）
+  - `icon` (string): 图标路径（可选）
+  - `description` (string): 描述（可选）
+  - `position` (Object): 位置 `{x, y}`（可选，默认自动排列）
+
+**返回值**: `number` - 图标 ID
+
+**示例**:
+```javascript
+// 直接调用
+const iconId = DesktopManager.addFileOrFolderIcon({
+    type: 'file',
+    targetPath: 'C:/Documents/example.txt',
+    name: '示例文件',
+    description: '这是一个示例文件'
+});
+
+// 通过 ProcessManager 调用（推荐）
+const iconId = await ProcessManager.callKernelAPI(pid, 'Desktop.addFileOrFolderIcon', [{
+    type: 'directory',
+    targetPath: 'C:/Users/Documents',
+    name: '我的文档',
+    description: '文档文件夹'
+}]);
+```
+
+**权限要求**: 需要 `DESKTOP_MANAGE` 权限
 
 #### `getIcons()`
 
@@ -73,7 +127,9 @@ DesktopManager.removeShortcut(iconId);
 ```javascript
 {
     id: number,
-    programName: string,
+    programName: string,  // 程序快捷方式才有此字段
+    type: string,         // 文件/文件夹图标才有此字段：'file' 或 'directory'
+    targetPath: string,   // 文件/文件夹图标才有此字段
     name: string,
     icon: string|null,
     description: string,
@@ -84,11 +140,21 @@ DesktopManager.removeShortcut(iconId);
 
 **示例**:
 ```javascript
+// 直接调用
 const icons = DesktopManager.getIcons();
 icons.forEach(icon => {
-    console.log(`${icon.name}: ${icon.programName}`);
+    if (icon.programName) {
+        console.log(`程序快捷方式: ${icon.name} -> ${icon.programName}`);
+    } else if (icon.type) {
+        console.log(`${icon.type === 'file' ? '文件' : '文件夹'}: ${icon.name} -> ${icon.targetPath}`);
+    }
 });
+
+// 通过 ProcessManager 调用（推荐）
+const icons = await ProcessManager.callKernelAPI(pid, 'Desktop.getIcons', []);
 ```
+
+**权限要求**: 不需要权限（读取操作）
 
 ### 桌面配置管理
 
@@ -108,10 +174,16 @@ icons.forEach(icon => {
 
 **示例**:
 ```javascript
+// 直接调用
 const config = DesktopManager.getConfig();
 console.log(`排列模式: ${config.arrangementMode}`);
 console.log(`图标大小: ${config.iconSize}`);
+
+// 通过 ProcessManager 调用（推荐）
+const config = await ProcessManager.callKernelAPI(pid, 'Desktop.getConfig', []);
 ```
+
+**权限要求**: 不需要权限（读取操作）
 
 #### `setArrangementMode(mode)`
 
@@ -122,8 +194,14 @@ console.log(`图标大小: ${config.iconSize}`);
 
 **示例**:
 ```javascript
+// 直接调用
 DesktopManager.setArrangementMode('grid');
+
+// 通过 ProcessManager 调用（推荐）
+await ProcessManager.callKernelAPI(pid, 'Desktop.setArrangementMode', ['grid']);
 ```
+
+**权限要求**: 需要 `DESKTOP_MANAGE` 权限
 
 #### `setIconSize(size)`
 
@@ -134,8 +212,14 @@ DesktopManager.setArrangementMode('grid');
 
 **示例**:
 ```javascript
+// 直接调用
 DesktopManager.setIconSize('large');
+
+// 通过 ProcessManager 调用（推荐）
+await ProcessManager.callKernelAPI(pid, 'Desktop.setIconSize', ['large']);
 ```
+
+**权限要求**: 需要 `DESKTOP_MANAGE` 权限
 
 #### `setAutoArrange(autoArrange)`
 
@@ -146,8 +230,14 @@ DesktopManager.setIconSize('large');
 
 **示例**:
 ```javascript
+// 直接调用
 DesktopManager.setAutoArrange(true);
+
+// 通过 ProcessManager 调用（推荐）
+await ProcessManager.callKernelAPI(pid, 'Desktop.setAutoArrange', [true]);
 ```
+
+**权限要求**: 需要 `DESKTOP_MANAGE` 权限
 
 ### 桌面组件管理
 
@@ -262,8 +352,64 @@ DesktopManager.updateComponentStyle(componentId, {
 
 **示例**:
 ```javascript
+// 直接调用
 DesktopManager.refresh();
+
+// 通过 ProcessManager 调用（推荐）
+await ProcessManager.callKernelAPI(pid, 'Desktop.refresh', []);
 ```
+
+**权限要求**: 需要 `DESKTOP_MANAGE` 权限
+
+## 通过 ProcessManager 调用
+
+所有桌面管理 API 都可以通过 `ProcessManager.callKernelAPI` 调用，并自动进行权限检查：
+
+```javascript
+// 添加桌面快捷方式
+const iconId = await ProcessManager.callKernelAPI(pid, 'Desktop.addShortcut', [{
+    programName: 'filemanager',
+    name: '文件管理器',
+    icon: 'application/filemanager/filemanager.svg',
+    description: '管理文件和文件夹'
+}]);
+
+// 添加文件图标
+const fileIconId = await ProcessManager.callKernelAPI(pid, 'Desktop.addFileOrFolderIcon', [{
+    type: 'file',
+    targetPath: 'C:/Documents/example.txt',
+    name: '示例文件'
+}]);
+
+// 移除快捷方式
+await ProcessManager.callKernelAPI(pid, 'Desktop.removeShortcut', [iconId]);
+
+// 获取桌面图标列表
+const icons = await ProcessManager.callKernelAPI(pid, 'Desktop.getIcons', []);
+
+// 设置排列模式
+await ProcessManager.callKernelAPI(pid, 'Desktop.setArrangementMode', ['grid']);
+
+// 设置图标大小
+await ProcessManager.callKernelAPI(pid, 'Desktop.setIconSize', ['large']);
+
+// 设置自动排列
+await ProcessManager.callKernelAPI(pid, 'Desktop.setAutoArrange', [true]);
+
+// 刷新桌面
+await ProcessManager.callKernelAPI(pid, 'Desktop.refresh', []);
+```
+
+**权限要求**:
+- `Desktop.addShortcut`: 需要 `DESKTOP_MANAGE` 权限
+- `Desktop.addFileOrFolderIcon`: 需要 `DESKTOP_MANAGE` 权限
+- `Desktop.removeShortcut`: 需要 `DESKTOP_MANAGE` 权限
+- `Desktop.getIcons`: 不需要权限（读取操作）
+- `Desktop.getConfig`: 不需要权限（读取操作）
+- `Desktop.setArrangementMode`: 需要 `DESKTOP_MANAGE` 权限
+- `Desktop.setIconSize`: 需要 `DESKTOP_MANAGE` 权限
+- `Desktop.setAutoArrange`: 需要 `DESKTOP_MANAGE` 权限
+- `Desktop.refresh`: 需要 `DESKTOP_MANAGE` 权限
 
 ## 使用示例
 

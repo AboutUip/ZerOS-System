@@ -1749,6 +1749,18 @@ class ProcessManager {
                 }
             }
             
+            // 清理程序创建的任务栏自定义图标
+            if (typeof TaskbarManager !== 'undefined' && typeof TaskbarManager.cleanupCustomIconsByPid === 'function') {
+                try {
+                    const cleanedCount = await TaskbarManager.cleanupCustomIconsByPid(pid);
+                    if (cleanedCount > 0) {
+                        ProcessManager._log(2, `已清理程序 PID ${pid} 的 ${cleanedCount} 个任务栏自定义图标`);
+                    }
+                } catch (e) {
+                    ProcessManager._log(1, `清理程序 PID ${pid} 的任务栏自定义图标失败: ${e.message}`);
+                }
+            }
+            
             // 清理程序创建的拖拽会话
             if (typeof DragDrive !== 'undefined' && typeof DragDrive.cleanupProcessDrags === 'function') {
                 try {
@@ -2217,17 +2229,31 @@ class ProcessManager {
             
             // 桌面API
             'Desktop.manage': PermissionManager.PERMISSION.DESKTOP_MANAGE,
+            'Desktop.addShortcut': PermissionManager.PERMISSION.DESKTOP_MANAGE, // 添加桌面快捷方式需要桌面管理权限
+            'Desktop.removeShortcut': PermissionManager.PERMISSION.DESKTOP_MANAGE, // 移除桌面快捷方式需要桌面管理权限
+            'Desktop.getIcons': null, // 读取操作不需要权限
+            'Desktop.getConfig': null, // 读取操作不需要权限
+            'Desktop.setArrangementMode': PermissionManager.PERMISSION.DESKTOP_MANAGE, // 设置排列模式需要桌面管理权限
+            'Desktop.setIconSize': PermissionManager.PERMISSION.DESKTOP_MANAGE, // 设置图标大小需要桌面管理权限
+            'Desktop.setAutoArrange': PermissionManager.PERMISSION.DESKTOP_MANAGE, // 设置自动排列需要桌面管理权限
+            'Desktop.refresh': PermissionManager.PERMISSION.DESKTOP_MANAGE, // 刷新桌面需要桌面管理权限
+            'Desktop.addFileOrFolderIcon': PermissionManager.PERMISSION.DESKTOP_MANAGE, // 添加文件/文件夹图标需要桌面管理权限
             
             // 任务栏API
             'Taskbar.pinProgram': PermissionManager.PERMISSION.DESKTOP_MANAGE,
-            
-            // 事件API
-            'Event.register': PermissionManager.PERMISSION.EVENT_LISTENER,
-            'Event.unregister': PermissionManager.PERMISSION.EVENT_LISTENER, // 使用桌面管理权限
             'Taskbar.unpinProgram': PermissionManager.PERMISSION.DESKTOP_MANAGE,
             'Taskbar.getPinnedPrograms': null, // 读取操作不需要权限
             'Taskbar.isPinned': null, // 读取操作不需要权限
             'Taskbar.setPinnedPrograms': PermissionManager.PERMISSION.DESKTOP_MANAGE,
+            'Taskbar.addIcon': PermissionManager.PERMISSION.DESKTOP_MANAGE, // 添加自定义图标需要桌面管理权限
+            'Taskbar.removeIcon': PermissionManager.PERMISSION.DESKTOP_MANAGE, // 移除自定义图标需要桌面管理权限
+            'Taskbar.updateIcon': PermissionManager.PERMISSION.DESKTOP_MANAGE, // 更新自定义图标需要桌面管理权限
+            'Taskbar.getCustomIcons': null, // 读取操作不需要权限
+            'Taskbar.getCustomIconsByPid': null, // 读取操作不需要权限
+            
+            // 事件API
+            'Event.register': PermissionManager.PERMISSION.EVENT_LISTENER,
+            'Event.unregister': PermissionManager.PERMISSION.EVENT_LISTENER,
             
             // 进程管理API
             'Process.manage': PermissionManager.PERMISSION.PROCESS_MANAGE,
@@ -3738,11 +3764,38 @@ class ProcessManager {
                 if (typeof DesktopManager === 'undefined') {
                     throw new Error('DesktopManager 未加载');
                 }
+                if (!options || typeof options !== 'object') {
+                    throw new Error('Desktop.addShortcut: 选项必须是对象');
+                }
+                if (!options.programName || typeof options.programName !== 'string') {
+                    throw new Error('Desktop.addShortcut: programName 是必需的且必须是字符串');
+                }
                 return DesktopManager.addShortcut(options);
+            },
+            'Desktop.addFileOrFolderIcon': async (options) => {
+                if (typeof DesktopManager === 'undefined') {
+                    throw new Error('DesktopManager 未加载');
+                }
+                if (!options || typeof options !== 'object') {
+                    throw new Error('Desktop.addFileOrFolderIcon: 选项必须是对象');
+                }
+                if (!options.type || typeof options.type !== 'string') {
+                    throw new Error('Desktop.addFileOrFolderIcon: type 是必需的且必须是字符串');
+                }
+                if (!options.targetPath || typeof options.targetPath !== 'string') {
+                    throw new Error('Desktop.addFileOrFolderIcon: targetPath 是必需的且必须是字符串');
+                }
+                if (options.type !== 'file' && options.type !== 'directory') {
+                    throw new Error('Desktop.addFileOrFolderIcon: type 必须是 "file" 或 "directory"');
+                }
+                return DesktopManager.addFileOrFolderIcon(options);
             },
             'Desktop.removeShortcut': async (iconId) => {
                 if (typeof DesktopManager === 'undefined') {
                     throw new Error('DesktopManager 未加载');
+                }
+                if (typeof iconId !== 'number') {
+                    throw new Error('Desktop.removeShortcut: iconId 必须是数字');
                 }
                 DesktopManager.removeShortcut(iconId);
                 return true;
@@ -3763,6 +3816,9 @@ class ProcessManager {
                 if (typeof DesktopManager === 'undefined') {
                     throw new Error('DesktopManager 未加载');
                 }
+                if (!mode || typeof mode !== 'string' || !['grid', 'list', 'auto'].includes(mode)) {
+                    throw new Error('Desktop.setArrangementMode: mode 必须是 "grid", "list" 或 "auto"');
+                }
                 DesktopManager.setArrangementMode(mode);
                 return true;
             },
@@ -3770,12 +3826,18 @@ class ProcessManager {
                 if (typeof DesktopManager === 'undefined') {
                     throw new Error('DesktopManager 未加载');
                 }
+                if (!size || typeof size !== 'string' || !['small', 'medium', 'large'].includes(size)) {
+                    throw new Error('Desktop.setIconSize: size 必须是 "small", "medium" 或 "large"');
+                }
                 DesktopManager.setIconSize(size);
                 return true;
             },
             'Desktop.setAutoArrange': async (autoArrange) => {
                 if (typeof DesktopManager === 'undefined') {
                     throw new Error('DesktopManager 未加载');
+                }
+                if (typeof autoArrange !== 'boolean') {
+                    throw new Error('Desktop.setAutoArrange: autoArrange 必须是布尔值');
                 }
                 DesktopManager.setAutoArrange(autoArrange);
                 return true;
@@ -3830,6 +3892,71 @@ class ProcessManager {
                     throw new Error('Taskbar.setPinnedPrograms: 程序名称列表必须是数组');
                 }
                 return await TaskbarManager.setPinnedPrograms(programNames);
+            },
+            'Taskbar.addIcon': async (options, pid) => {
+                if (typeof TaskbarManager === 'undefined') {
+                    throw new Error('TaskbarManager 未加载');
+                }
+                if (!options || typeof options !== 'object') {
+                    throw new Error('Taskbar.addIcon: 图标配置必须是对象');
+                }
+                // 自动关联PID（如果未提供）
+                if (!options.pid && pid) {
+                    options.pid = pid;
+                }
+                return await TaskbarManager.addCustomIcon(options);
+            },
+            'Taskbar.removeIcon': async (iconId, pid) => {
+                if (typeof TaskbarManager === 'undefined') {
+                    throw new Error('TaskbarManager 未加载');
+                }
+                if (!iconId || typeof iconId !== 'string') {
+                    throw new Error('Taskbar.removeIcon: 图标ID必须是字符串');
+                }
+                // 权限检查：只能删除自己创建的图标
+                if (pid) {
+                    const iconData = await TaskbarManager.getCustomIcons();
+                    const targetIcon = iconData.find(icon => icon.iconId === iconId);
+                    if (targetIcon && targetIcon.pid !== pid) {
+                        throw new Error(`Taskbar.removeIcon: 无权删除其他进程创建的图标 (PID: ${targetIcon.pid})`);
+                    }
+                }
+                return await TaskbarManager.removeCustomIcon(iconId);
+            },
+            'Taskbar.updateIcon': async (iconId, updates, pid) => {
+                if (typeof TaskbarManager === 'undefined') {
+                    throw new Error('TaskbarManager 未加载');
+                }
+                if (!iconId || typeof iconId !== 'string') {
+                    throw new Error('Taskbar.updateIcon: 图标ID必须是字符串');
+                }
+                if (!updates || typeof updates !== 'object') {
+                    throw new Error('Taskbar.updateIcon: 更新内容必须是对象');
+                }
+                // 权限检查：只能更新自己创建的图标
+                if (pid) {
+                    const iconData = await TaskbarManager.getCustomIcons();
+                    const targetIcon = iconData.find(icon => icon.iconId === iconId);
+                    if (targetIcon && targetIcon.pid !== pid) {
+                        throw new Error(`Taskbar.updateIcon: 无权更新其他进程创建的图标 (PID: ${targetIcon.pid})`);
+                    }
+                }
+                return await TaskbarManager.updateCustomIcon(iconId, updates);
+            },
+            'Taskbar.getCustomIcons': async () => {
+                if (typeof TaskbarManager === 'undefined') {
+                    throw new Error('TaskbarManager 未加载');
+                }
+                return await TaskbarManager.getCustomIcons();
+            },
+            'Taskbar.getCustomIconsByPid': async (pid) => {
+                if (typeof TaskbarManager === 'undefined') {
+                    throw new Error('TaskbarManager 未加载');
+                }
+                if (typeof pid !== 'number') {
+                    throw new Error('Taskbar.getCustomIconsByPid: 进程ID必须是数字');
+                }
+                return await TaskbarManager.getCustomIconsByPid(pid);
             },
             
             // 多线程API

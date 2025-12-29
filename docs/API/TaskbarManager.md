@@ -226,6 +226,181 @@ await ProcessManager.callKernelAPI(pid, 'Taskbar.setPinnedPrograms', [['filemana
 - `Taskbar.isPinned`: 不需要权限（读取操作）
 - `Taskbar.setPinnedPrograms`: 需要 `DESKTOP_MANAGE` 权限
 
+### 自定义图标管理
+
+#### `addCustomIcon(options)`
+
+添加自定义图标到任务栏。
+
+**参数**:
+- `options` (Object): 图标配置对象
+  - `iconId` (string, 可选): 图标唯一标识符（如果未提供，将自动生成）
+  - `icon` (string, 必需): 图标路径或URL
+  - `title` (string, 必需): 图标标题/工具提示
+  - `onClick` (Function, 可选): 点击事件处理函数
+  - `pid` (number, 可选): 关联的进程ID（用于权限检查和自动清理）
+  - `metadata` (Object, 可选): 元数据
+
+**返回值**: `Promise<string>` - 图标ID
+
+**示例**:
+```javascript
+// 直接调用
+const iconId = await TaskbarManager.addCustomIcon({
+    icon: 'D:/application/myapp/icon.png',
+    title: '我的应用',
+    onClick: (e, iconData) => {
+        console.log('图标被点击', iconData);
+    },
+    metadata: {
+        // 自定义元数据
+    }
+});
+
+// 通过 ProcessManager 调用
+const iconId = await ProcessManager.callKernelAPI(pid, 'Taskbar.addIcon', [{
+    icon: 'D:/application/myapp/icon.png',
+    title: '我的应用',
+    onClick: (e, iconData) => {
+        console.log('图标被点击', iconData);
+    }
+}]);
+```
+
+#### `removeCustomIcon(iconId)`
+
+移除自定义图标。
+
+**参数**:
+- `iconId` (string): 图标ID
+
+**返回值**: `Promise<boolean>` - 是否成功
+
+**示例**:
+```javascript
+// 直接调用
+await TaskbarManager.removeCustomIcon(iconId);
+
+// 通过 ProcessManager 调用
+await ProcessManager.callKernelAPI(pid, 'Taskbar.removeIcon', [iconId]);
+```
+
+**权限要求**: 需要 `DESKTOP_MANAGE` 权限，且只能删除自己创建的图标（通过 PID 验证）
+
+#### `updateCustomIcon(iconId, updates)`
+
+更新自定义图标。
+
+**参数**:
+- `iconId` (string): 图标ID
+- `updates` (Object): 更新内容
+  - `icon` (string, 可选): 新的图标路径
+  - `title` (string, 可选): 新的标题
+  - `onClick` (Function|null, 可选): 新的点击事件处理函数
+  - `metadata` (Object, 可选): 新的元数据（会合并到现有元数据）
+
+**返回值**: `Promise<boolean>` - 是否成功
+
+**示例**:
+```javascript
+// 直接调用
+await TaskbarManager.updateCustomIcon(iconId, {
+    title: '新标题',
+    icon: 'D:/application/myapp/new-icon.png'
+});
+
+// 通过 ProcessManager 调用
+await ProcessManager.callKernelAPI(pid, 'Taskbar.updateIcon', [iconId, {
+    title: '新标题',
+    icon: 'D:/application/myapp/new-icon.png'
+}]);
+```
+
+**权限要求**: 需要 `DESKTOP_MANAGE` 权限，且只能更新自己创建的图标（通过 PID 验证）
+
+#### `getCustomIcons()`
+
+获取所有自定义图标列表。
+
+**返回值**: `Promise<Array<Object>>` - 自定义图标列表，每个对象包含：
+- `iconId` (string): 图标ID
+- `icon` (string): 图标路径
+- `title` (string): 图标标题
+- `pid` (number|null): 关联的进程ID
+- `metadata` (Object): 元数据
+- `createdAt` (number): 创建时间戳
+
+**示例**:
+```javascript
+// 直接调用
+const icons = await TaskbarManager.getCustomIcons();
+
+// 通过 ProcessManager 调用
+const icons = await ProcessManager.callKernelAPI(pid, 'Taskbar.getCustomIcons', []);
+```
+
+**权限要求**: 不需要权限（读取操作）
+
+#### `getCustomIconsByPid(pid)`
+
+根据 PID 获取自定义图标列表。
+
+**参数**:
+- `pid` (number): 进程ID
+
+**返回值**: `Promise<Array<Object>>` - 自定义图标列表
+
+**示例**:
+```javascript
+// 直接调用
+const icons = await TaskbarManager.getCustomIconsByPid(pid);
+
+// 通过 ProcessManager 调用
+const icons = await ProcessManager.callKernelAPI(pid, 'Taskbar.getCustomIconsByPid', [pid]);
+```
+
+**权限要求**: 不需要权限（读取操作）
+
+**通过 ProcessManager 调用自定义图标 API**:
+
+```javascript
+// 添加自定义图标
+const iconId = await ProcessManager.callKernelAPI(pid, 'Taskbar.addIcon', [{
+    icon: 'D:/application/myapp/icon.png',
+    title: '我的应用',
+    onClick: (e, iconData) => {
+        console.log('图标被点击', iconData);
+    }
+}]);
+
+// 更新自定义图标
+await ProcessManager.callKernelAPI(pid, 'Taskbar.updateIcon', [iconId, {
+    title: '新标题'
+}]);
+
+// 移除自定义图标
+await ProcessManager.callKernelAPI(pid, 'Taskbar.removeIcon', [iconId]);
+
+// 获取所有自定义图标
+const icons = await ProcessManager.callKernelAPI(pid, 'Taskbar.getCustomIcons', []);
+
+// 根据 PID 获取自定义图标
+const myIcons = await ProcessManager.callKernelAPI(pid, 'Taskbar.getCustomIconsByPid', [pid]);
+```
+
+**权限要求**:
+- `Taskbar.addIcon`: 需要 `DESKTOP_MANAGE` 权限
+- `Taskbar.removeIcon`: 需要 `DESKTOP_MANAGE` 权限，且只能删除自己创建的图标
+- `Taskbar.updateIcon`: 需要 `DESKTOP_MANAGE` 权限，且只能更新自己创建的图标
+- `Taskbar.getCustomIcons`: 不需要权限（读取操作）
+- `Taskbar.getCustomIconsByPid`: 不需要权限（读取操作）
+
+**注意事项**:
+- 自定义图标会自动关联到创建它的进程 PID
+- 进程退出时，该进程创建的所有自定义图标会自动清理
+- `onClick` 函数无法序列化，系统重启后需要程序重新注册
+- 自定义图标会与固定程序和运行中的程序一起显示在任务栏左侧
+
 ## 任务栏结构
 
 任务栏包含以下部分：

@@ -3132,7 +3132,22 @@ class GUIManager {
         };
         
         // 使用 EventManager 注册全局触摸事件（如果可用）
-        if (typeof EventManager !== 'undefined' && windowInfo.pid) {
+        // 先检查程序是否有 EVENT_LISTENER 权限，避免输出警告
+        let hasEventListenerPermission = false;
+        if (typeof PermissionManager !== 'undefined' && windowInfo.pid) {
+            const exploitPid = typeof ProcessManager !== 'undefined' ? ProcessManager.EXPLOIT_PID : 10000;
+            // EXPLOIT_PID 是系统级 PID，自动拥有所有权限
+            if (windowInfo.pid === exploitPid) {
+                hasEventListenerPermission = true;
+            } else {
+                hasEventListenerPermission = PermissionManager.hasPermission(
+                    windowInfo.pid, 
+                    PermissionManager.PERMISSION.EVENT_LISTENER
+                );
+            }
+        }
+        
+        if (typeof EventManager !== 'undefined' && windowInfo.pid && hasEventListenerPermission) {
             EventManager.registerEventHandler(windowInfo.pid, 'touchmove', globalTouchMove, {
                 priority: 100,
                 once: false,
@@ -3144,7 +3159,7 @@ class GUIManager {
                 passive: false
             });
         } else {
-            // 降级：直接添加全局事件监听器
+            // 降级：直接添加全局事件监听器（程序没有权限或 EventManager 不可用）
             document.addEventListener('touchmove', globalTouchMove, { passive: false });
             document.addEventListener('touchend', globalTouchEnd, { passive: false });
             document.addEventListener('touchcancel', globalTouchEnd, { passive: false });

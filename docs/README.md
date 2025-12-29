@@ -94,8 +94,9 @@
 | API | 描述 | 状态 |
 |-----|------|------|
 | [DesktopManager](./API/DesktopManager.md) | 桌面图标、组件、背景管理 | ✅ |
-| [TaskbarManager](./API/TaskbarManager.md) | 任务栏管理、程序固定、多任务切换 | ✅ |
+| [TaskbarManager](./API/TaskbarManager.md) | 任务栏管理、程序固定、多任务切换、自定义图标 | ✅ |
 | [ContextMenuManager](./API/ContextMenuManager.md) | 右键菜单管理 | ✅ |
+| [TerminalAPI](./API/TerminalAPI.md) | 终端 API（CLI 程序使用） | ✅ |
 | [NotificationManager](./API/NotificationManager.md) | 系统通知管理 | ✅ |
 | [ThemeManager](./API/ThemeManager.md) | 主题和风格系统 | ✅ |
 | [LockScreen](./API/LockScreen.md) | 锁屏界面（Windows 11 风格登录界面） | ✅ |

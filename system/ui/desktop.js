@@ -204,8 +204,23 @@ class DesktopManager {
         DesktopManager._iconsContainer.style.display = 'block';
         DesktopManager._iconsContainer.style.visibility = 'visible';
         
+        // 强制浏览器重新计算布局（确保 clientWidth/clientHeight 更新）
+        void DesktopManager._iconsContainer.offsetWidth;
+        
+        // 调试日志：输出容器尺寸信息
+        const actualWidth = DesktopManager._iconsContainer.clientWidth || DesktopManager._iconsContainer.offsetWidth || 0;
+        const actualHeight = DesktopManager._iconsContainer.clientHeight || DesktopManager._iconsContainer.offsetHeight || 0;
+        KernelLogger.debug("DesktopManager", `图标容器布局更新: 桌面容器 ${containerWidth}x${containerHeight}, 设置尺寸 ${width}x${height}, 实际可用 ${actualWidth}x${actualHeight}, 任务栏位置 ${taskbarPosition}, 任务栏尺寸 ${taskbarWidth}x${taskbarHeight}`);
+        
         // 重新应用排列模式（确保排列样式正确）
         DesktopManager._applyArrangementMode();
+        
+        // 延迟重新排列图标，确保布局已完全更新
+        requestAnimationFrame(() => {
+            if (DesktopManager._autoArrange) {
+                DesktopManager._arrangeIcons();
+            }
+        });
         
     }
     
@@ -340,11 +355,11 @@ class DesktopManager {
             container.style.justifyItems = 'start';
             container.style.flexDirection = '';
         } else if (DesktopManager._arrangementMode === 'list') {
-            // 列表排列（垂直）
-            container.style.display = 'flex';
-            container.style.flexDirection = 'column';
-            container.style.alignItems = 'flex-start';
-            container.style.gap = `${DesktopManager._iconSpacing}px`;
+            // 列表排列（垂直）- 使用 block 布局，图标使用绝对定位
+            container.style.display = 'block';
+            container.style.flexDirection = '';
+            container.style.alignItems = '';
+            container.style.gap = '';
             container.style.gridTemplateColumns = '';
             container.style.gridAutoRows = '';
             container.style.alignContent = '';
@@ -390,10 +405,13 @@ class DesktopManager {
             return;
         }
         
-        if (DesktopManager._autoArrange && DesktopManager._arrangementMode === 'grid') {
+        // 如果排列模式是 'auto'，默认使用网格模式
+        const effectiveMode = DesktopManager._arrangementMode === 'auto' ? 'grid' : DesktopManager._arrangementMode;
+        
+        if (DesktopManager._autoArrange && effectiveMode === 'grid') {
             // 网格自动排列
             DesktopManager._arrangeIconsGrid();
-        } else if (DesktopManager._autoArrange && DesktopManager._arrangementMode === 'list') {
+        } else if (DesktopManager._autoArrange && effectiveMode === 'list') {
             // 列表自动排列
             DesktopManager._arrangeIconsList();
         } else {
@@ -414,20 +432,75 @@ class DesktopManager {
             return;
         }
         
+        // 强制浏览器重新计算布局（确保获取最新的尺寸）
+        void container.offsetWidth;
+        
         // 使用 clientWidth/clientHeight 获取实际可用空间（不包括 padding）
-        const containerWidth = container.clientWidth || container.offsetWidth || 0;
-        const containerHeight = container.clientHeight || container.offsetHeight || 0;
+        // 注意：clientWidth 已经减去了 padding，所以这就是实际可用宽度
+        let containerWidth = container.clientWidth || 0;
+        let containerHeight = container.clientHeight || 0;
+        
+        // 如果 clientWidth/clientHeight 为 0，尝试使用其他方法获取尺寸
+        if (containerWidth === 0 || containerHeight === 0) {
+            // 方法1：使用 getBoundingClientRect 获取实际尺寸（包括 padding）
+            const rect = container.getBoundingClientRect();
+            if (rect.width > 0 && rect.height > 0) {
+                // 使用 box-sizing: border-box，所以 rect.width/height 已经包含了 padding
+                // 但我们需要的是内容区域，所以需要减去 padding
+                const spacing = DesktopManager._iconSpacing;
+                containerWidth = Math.max(0, rect.width - spacing * 2);
+                containerHeight = Math.max(0, rect.height - spacing * 2);
+            } else {
+                // 方法2：使用 offsetWidth/offsetHeight（但需要确保足够大）
+                const spacing = DesktopManager._iconSpacing;
+                const offsetW = container.offsetWidth || 0;
+                const offsetH = container.offsetHeight || 0;
+                
+                // 只有当 offsetWidth/offsetHeight 大于 padding * 2 时才使用
+                if (offsetW > spacing * 2 && offsetH > spacing * 2) {
+                    containerWidth = offsetW - spacing * 2;
+                    containerHeight = offsetH - spacing * 2;
+                } else {
+                    // 容器还未完全布局，延迟排列
+                    KernelLogger.debug("DesktopManager", `容器尺寸未就绪: offsetWidth=${offsetW}, offsetHeight=${offsetH}, 延迟排列`);
+                    setTimeout(() => {
+                        if (DesktopManager._autoArrange) {
+                            DesktopManager._arrangeIcons();
+                        }
+                    }, 100);
+                    return;
+                }
+            }
+        }
+        
         const iconWidth = DesktopManager._getIconWidth();
         const iconHeight = DesktopManager._getIconHeight();
         const spacing = DesktopManager._iconSpacing;
         
-        // 计算每行可容纳的图标数（考虑 padding）
-        const availableWidth = containerWidth - spacing * 2; // 左右各留一个 spacing
-        const iconsPerRow = Math.max(1, Math.floor(availableWidth / (iconWidth + spacing)));
+        // 确保容器尺寸有效
+        if (containerWidth <= 0 || containerHeight <= 0) {
+            KernelLogger.debug("DesktopManager", `容器尺寸无效: ${containerWidth}x${containerHeight}，延迟重试`);
+            // 延迟重试，等待容器布局完成
+            setTimeout(() => {
+                if (DesktopManager._autoArrange) {
+                    DesktopManager._arrangeIcons();
+                }
+            }, 100);
+            return;
+        }
         
-        // 计算每列可容纳的图标数（考虑 padding）
-        const availableHeight = containerHeight - spacing * 2; // 上下各留一个 spacing
-        const iconsPerCol = Math.max(1, Math.floor(availableHeight / (iconHeight + spacing)));
+        // 容器已经有 padding = spacing，所以 clientWidth 已经是可用宽度
+        // 计算每行可容纳的图标数：可用宽度 / (图标宽度 + 间距)
+        // 注意：不需要再减去 spacing，因为 padding 已经处理了边距
+        const iconsPerRow = Math.max(1, Math.floor(containerWidth / (iconWidth + spacing)));
+        
+        // 计算每列可容纳的图标数
+        const iconsPerCol = Math.max(1, Math.floor(containerHeight / (iconHeight + spacing)));
+        
+        // 调试日志
+        if (icons.length > 0) {
+            KernelLogger.debug("DesktopManager", `网格排列: 容器 ${containerWidth}x${containerHeight}, 图标 ${iconWidth}x${iconHeight}, 间距 ${spacing}, 每行 ${iconsPerRow} 个, 每列 ${iconsPerCol} 个, 共 ${icons.length} 个图标`);
+        }
         
         icons.forEach((iconData, index) => {
             const iconElement = document.getElementById(`desktop-icon-${iconData.id}`);
@@ -435,29 +508,21 @@ class DesktopManager {
                 return;
             }
             
+            // 计算行列位置
             const row = Math.floor(index / iconsPerRow);
             const col = index % iconsPerRow;
             
-            // 计算位置（考虑 padding）
-            let x = col * (iconWidth + spacing) + spacing;
-            let y = row * (iconHeight + spacing) + spacing;
+            // 计算位置
+            // 容器已经有 padding = spacing，所以第一个图标的位置就是 spacing
+            // 后续图标位置：spacing + col * (iconWidth + spacing)
+            let x = spacing + col * (iconWidth + spacing);
+            let y = spacing + row * (iconHeight + spacing);
             
-            // 边界检查：确保图标不会超出容器
-            const maxX = containerWidth - iconWidth - spacing;
-            const maxY = containerHeight - iconHeight - spacing;
+            // 边界检查：确保图标不会超出容器（考虑 padding）
+            const maxX = containerWidth - iconWidth; // containerWidth 已经是 clientWidth（已减去 padding）
+            const maxY = containerHeight - iconHeight; // containerHeight 已经是 clientHeight（已减去 padding）
             x = Math.max(spacing, Math.min(x, maxX));
             y = Math.max(spacing, Math.min(y, maxY));
-            
-            // 如果图标会超出容器底部，尝试换行或调整位置
-            if (y + iconHeight > containerHeight - spacing) {
-                // 如果还有空间，尝试放在下一行
-                if (row < iconsPerCol - 1) {
-                    y = Math.min(y, containerHeight - iconHeight - spacing);
-                } else {
-                    // 没有更多行，放在最后一行
-                    y = containerHeight - iconHeight - spacing;
-                }
-            }
             
             iconElement.style.position = 'absolute';
             iconElement.style.left = `${x}px`;
@@ -467,7 +532,8 @@ class DesktopManager {
     }
     
     /**
-     * 列表排列图标
+     * 列表排列图标（支持多列垂直排列）
+     * 列表模式：优先垂直排列，当一列排满后自动换到下一列
      */
     static _arrangeIconsList() {
         const icons = Array.from(DesktopManager._icons.values());
@@ -478,11 +544,66 @@ class DesktopManager {
             return;
         }
         
+        // 强制浏览器重新计算布局（确保获取最新的尺寸）
+        void container.offsetWidth;
+        
         // 使用 clientWidth/clientHeight 获取实际可用空间（不包括 padding）
-        const containerWidth = container.clientWidth || container.offsetWidth || 0;
-        const containerHeight = container.clientHeight || container.offsetHeight || 0;
-        const spacing = DesktopManager._iconSpacing;
+        // 注意：clientWidth/clientHeight 已经减去了 padding，所以这就是实际可用尺寸
+        let containerWidth = container.clientWidth || 0;
+        let containerHeight = container.clientHeight || 0;
+        
+        // 如果 clientWidth/clientHeight 为 0，尝试使用其他方法获取尺寸
+        if (containerWidth === 0 || containerHeight === 0) {
+            // 使用 getBoundingClientRect 获取实际尺寸（包括 padding）
+            const rect = container.getBoundingClientRect();
+            if (rect.width > 0 && rect.height > 0) {
+                const spacing = DesktopManager._iconSpacing;
+                containerWidth = Math.max(0, rect.width - spacing * 2);
+                containerHeight = Math.max(0, rect.height - spacing * 2);
+            } else {
+                // 容器还未完全布局，延迟排列
+                KernelLogger.debug("DesktopManager", `列表排列: 容器尺寸未就绪，延迟排列`);
+                setTimeout(() => {
+                    if (DesktopManager._autoArrange) {
+                        DesktopManager._arrangeIcons();
+                    }
+                }, 100);
+                return;
+            }
+        }
+        
+        const iconWidth = DesktopManager._getIconWidth();
         const iconHeight = DesktopManager._getIconHeight();
+        const spacing = DesktopManager._iconSpacing;
+        
+        // 确保容器尺寸有效
+        if (containerWidth <= 0 || containerHeight <= 0) {
+            KernelLogger.debug("DesktopManager", `列表排列: 容器尺寸无效: ${containerWidth}x${containerHeight}，延迟重试`);
+            setTimeout(() => {
+                if (DesktopManager._autoArrange) {
+                    DesktopManager._arrangeIcons();
+                }
+            }, 100);
+            return;
+        }
+        
+        // 计算每列可容纳的图标数（垂直方向）
+        // 容器已经有 padding，所以可用高度就是 containerHeight
+        const iconsPerCol = Math.max(1, Math.floor(containerHeight / (iconHeight + spacing)));
+        
+        // 计算每行可容纳的列数（水平方向）
+        // 容器已经有 padding，所以可用宽度就是 containerWidth
+        const colsPerRow = Math.max(1, Math.floor(containerWidth / (iconWidth + spacing)));
+        
+        // 计算总列数（根据图标总数和每列图标数）
+        const totalCols = Math.ceil(icons.length / iconsPerCol);
+        // 实际使用的列数（不超过容器宽度限制）
+        const actualCols = Math.min(totalCols, colsPerRow);
+        
+        // 调试日志
+        if (icons.length > 0) {
+            KernelLogger.debug("DesktopManager", `列表排列: 容器 ${containerWidth}x${containerHeight}, 图标 ${iconWidth}x${iconHeight}, 间距 ${spacing}, 每列 ${iconsPerCol} 个, 每行 ${colsPerRow} 列, 总列数 ${totalCols}, 实际列数 ${actualCols}, 共 ${icons.length} 个图标`);
+        }
         
         icons.forEach((iconData, index) => {
             const iconElement = document.getElementById(`desktop-icon-${iconData.id}`);
@@ -490,18 +611,28 @@ class DesktopManager {
                 return;
             }
             
-            let y = index * (iconHeight + spacing) + spacing;
+            // 计算列索引（第几列）
+            const col = Math.floor(index / iconsPerCol);
+            // 计算行索引（在当前列中的位置）
+            const row = index % iconsPerCol;
             
-            // 边界检查：确保图标不会超出容器底部
-            const maxY = containerHeight - iconHeight - spacing;
-            if (y > maxY) {
-                // 如果超出容器，放在最后一行
-                y = Math.max(spacing, maxY);
-            }
+            // 计算位置
+            // 容器已经有 padding = spacing，所以第一列第一个图标的位置是 spacing
+            // 水平位置：spacing + col * (iconWidth + spacing)
+            // 垂直位置：spacing + row * (iconHeight + spacing)
+            let x = spacing + col * (iconWidth + spacing);
+            let y = spacing + row * (iconHeight + spacing);
+            
+            // 边界检查：确保图标不会超出容器
+            const maxX = containerWidth - iconWidth; // containerWidth 已经是 clientWidth（已减去 padding）
+            const maxY = containerHeight - iconHeight; // containerHeight 已经是 clientHeight（已减去 padding）
+            x = Math.max(spacing, Math.min(x, maxX));
+            y = Math.max(spacing, Math.min(y, maxY));
             
             iconElement.style.position = 'absolute';
-            iconElement.style.left = `${spacing}px`;
+            iconElement.style.left = `${x}px`;
             iconElement.style.top = `${y}px`;
+            iconElement.style.display = 'flex'; // 确保显示
         });
     }
     
@@ -556,13 +687,14 @@ class DesktopManager {
                 } else {
                     // 如果没有保存的位置，使用默认位置（左上角开始，按顺序排列）
                     const index = Array.from(DesktopManager._icons.keys()).indexOf(iconData.id);
-                    const availableWidth = containerWidth - spacing * 2;
-                    const iconsPerRow = Math.max(1, Math.floor(availableWidth / (iconWidth + spacing)));
+                    // 容器已经有 padding，clientWidth 已经是可用宽度
+                    const iconsPerRow = Math.max(1, Math.floor(containerWidth / (iconWidth + spacing)));
                     const row = Math.floor(index / iconsPerRow);
                     const col = index % iconsPerRow;
                     
-                    let x = col * (iconWidth + spacing) + spacing;
-                    let y = row * (iconHeight + spacing) + spacing;
+                    // 容器已经有 padding，第一个图标位置是 spacing
+                    let x = spacing + col * (iconWidth + spacing);
+                    let y = spacing + row * (iconHeight + spacing);
                     
                     // 边界检查
                     const maxX = containerWidth - iconWidth - spacing;
@@ -619,6 +751,11 @@ class DesktopManager {
             const arrangement = await LStorage.getSystemStorage(DesktopManager.STORAGE_KEY_ARRANGEMENT);
             if (arrangement && ['grid', 'list', 'auto'].includes(arrangement)) {
                 DesktopManager._arrangementMode = arrangement;
+                KernelLogger.debug("DesktopManager", `从存储加载排列模式: ${arrangement}`);
+            } else {
+                // 如果没有保存的配置或配置无效，使用默认的网格模式
+                DesktopManager._arrangementMode = 'grid';
+                KernelLogger.debug("DesktopManager", `使用默认排列模式: grid`);
             }
             
             // 加载图标大小
@@ -1277,8 +1414,8 @@ class DesktopManager {
         if (DesktopManager._arrangementMode === 'grid') {
             // 网格模式：根据鼠标位置计算目标行列
             const containerWidth = container.clientWidth || container.offsetWidth || 0;
-            const availableWidth = containerWidth - spacing * 2;
-            const iconsPerRow = Math.max(1, Math.floor(availableWidth / (iconWidth + spacing)));
+            // 容器已经有 padding，clientWidth 已经是可用宽度
+            const iconsPerRow = Math.max(1, Math.floor(containerWidth / (iconWidth + spacing)));
             
             const targetCol = Math.floor((mouseX - spacing) / (iconWidth + spacing));
             const targetRow = Math.floor((mouseY - spacing) / (iconHeight + spacing));
@@ -1286,8 +1423,16 @@ class DesktopManager {
             
             return Math.max(0, Math.min(targetIndex, icons.length - 1));
         } else if (DesktopManager._arrangementMode === 'list') {
-            // 列表模式：根据鼠标Y坐标计算目标索引
-            const targetIndex = Math.floor((mouseY - spacing) / (iconHeight + spacing));
+            // 列表模式：根据鼠标位置计算目标索引（支持多列）
+            // 首先计算列索引
+            const targetCol = Math.floor((mouseX - spacing) / (iconWidth + spacing));
+            // 然后计算行索引（在当前列中的位置）
+            const targetRow = Math.floor((mouseY - spacing) / (iconHeight + spacing));
+            // 计算每列可容纳的图标数
+            const containerHeight = container.clientHeight || container.offsetHeight || 0;
+            const iconsPerCol = Math.max(1, Math.floor(containerHeight / (iconHeight + spacing)));
+            // 计算目标索引
+            const targetIndex = targetCol * iconsPerCol + targetRow;
             return Math.max(0, Math.min(targetIndex, icons.length - 1));
         }
         
@@ -1314,8 +1459,8 @@ class DesktopManager {
         
         if (DesktopManager._arrangementMode === 'grid') {
             const containerWidth = container.clientWidth || container.offsetWidth || 0;
-            const availableWidth = containerWidth - spacing * 2;
-            const iconsPerRow = Math.max(1, Math.floor(availableWidth / (iconWidth + spacing)));
+            // 容器已经有 padding，clientWidth 已经是可用宽度
+            const iconsPerRow = Math.max(1, Math.floor(containerWidth / (iconWidth + spacing)));
             
             icons.forEach((iconData, index) => {
                 if (iconData.id === draggedIconId) return; // 跳过被拖动的图标
@@ -1331,8 +1476,9 @@ class DesktopManager {
                 
                 const row = Math.floor(displayIndex / iconsPerRow);
                 const col = displayIndex % iconsPerRow;
-                const x = col * (iconWidth + spacing) + spacing;
-                const y = row * (iconHeight + spacing) + spacing;
+                // 容器已经有 padding，第一个图标位置是 spacing
+                const x = spacing + col * (iconWidth + spacing);
+                const y = spacing + row * (iconHeight + spacing);
                 
                 const iconElement = document.getElementById(`desktop-icon-${iconData.id}`);
                 if (iconElement && !iconElement.dataset.dragging) {
@@ -1343,6 +1489,10 @@ class DesktopManager {
                 }
             });
         } else if (DesktopManager._arrangementMode === 'list') {
+            // 列表模式：支持多列垂直排列
+            const containerHeight = container.clientHeight || container.offsetHeight || 0;
+            const iconsPerCol = Math.max(1, Math.floor(containerHeight / (iconHeight + spacing)));
+            
             icons.forEach((iconData, index) => {
                 if (iconData.id === draggedIconId) return; // 跳过被拖动的图标
                 
@@ -1355,13 +1505,19 @@ class DesktopManager {
                     displayIndex = index + 1;
                 }
                 
-                const y = displayIndex * (iconHeight + spacing) + spacing;
+                // 计算列索引和行索引
+                const col = Math.floor(displayIndex / iconsPerCol);
+                const row = displayIndex % iconsPerCol;
+                
+                // 计算位置
+                const x = spacing + col * (iconWidth + spacing);
+                const y = spacing + row * (iconHeight + spacing);
                 
                 const iconElement = document.getElementById(`desktop-icon-${iconData.id}`);
                 if (iconElement && !iconElement.dataset.dragging) {
                     // 拖动时使用平滑过渡，但不要影响被拖动的图标
                     iconElement.style.transition = 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)';
-                    iconElement.style.left = `${spacing}px`;
+                    iconElement.style.left = `${x}px`;
                     iconElement.style.top = `${y}px`;
                 }
             });
@@ -2461,8 +2617,15 @@ class DesktopManager {
             throw new Error(`DesktopManager.setArrangementMode: 无效的模式: ${mode}`);
         }
         
+        // 列表模式已支持多列垂直排列，无需警告
+        
         DesktopManager._arrangementMode = mode;
         DesktopManager._applyArrangementMode();
+        
+        // 重新排列图标
+        if (DesktopManager._autoArrange) {
+            DesktopManager._arrangeIcons();
+        }
         
         // 根据模式启用/禁用拖拽功能
         DesktopManager._updateIconDragState();

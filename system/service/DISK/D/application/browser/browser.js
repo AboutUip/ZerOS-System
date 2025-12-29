@@ -571,10 +571,15 @@
             iframe.allow = 'fullscreen';
             // 使用 sandbox 属性限制导航，但允许必要的功能
             // allow-scripts: 允许脚本执行
-            // allow-same-origin: 允许同源访问（用于注入脚本拦截链接）
+            // allow-same-origin: 允许同源访问（必需，否则网站无法使用 cookie 和 localStorage）
+            //   注意：虽然 allow-same-origin + allow-scripts 理论上允许沙箱逃逸，
+            //   但我们通过以下方式增强安全性：
+            //   1. 不设置 allow-top-navigation（禁止顶级导航，防止跳出）
+            //   2. 注入脚本拦截 window.top 访问
+            //   3. 拦截危险的导航操作
             // allow-forms: 允许表单提交
             // allow-popups: 允许弹窗（但我们会拦截）
-            // allow-top-navigation: 禁止顶级导航（防止跳出）
+            // 注意：不设置 allow-top-navigation，防止 iframe 内容导航到父窗口
             iframe.sandbox = 'allow-scripts allow-same-origin allow-forms allow-popups';
             iframe.referrerPolicy = 'no-referrer-when-downgrade';
             iframe.style.cssText = `
@@ -601,7 +606,8 @@
         },
         
         /**
-         * 注入脚本拦截链接和导航（仅对同源页面有效）
+         * 注入脚本拦截链接和导航，并增强安全性
+         * 注意：此方法仅对同源页面有效（跨域页面无法访问）
          */
         _injectNavigationInterceptor: function() {
             if (!this.iframe || !this.iframe.contentWindow) {
@@ -617,8 +623,40 @@
                     // 尝试访问 iframe 的 location，如果跨域会抛出异常
                     const test = iframeWindow.location.href;
                 } catch (e) {
-                    // 跨域，无法注入脚本
+                    // 跨域，无法注入脚本（这是正常的，跨域页面无法访问）
                     return;
+                }
+                
+                // 安全增强：拦截 window.top 访问，防止沙箱逃逸
+                try {
+                    // 重定义 window.top，防止页面访问父窗口
+                    Object.defineProperty(iframeWindow, 'top', {
+                        get: function() {
+                            // 返回自身，而不是父窗口
+                            return iframeWindow;
+                        },
+                        configurable: false
+                    });
+                    
+                    // 重定义 window.parent，防止页面访问父窗口
+                    Object.defineProperty(iframeWindow, 'parent', {
+                        get: function() {
+                            // 返回自身，而不是父窗口
+                            return iframeWindow;
+                        },
+                        configurable: false
+                    });
+                    
+                    // 拦截 window.frameElement，防止页面检测到自己在 iframe 中
+                    Object.defineProperty(iframeWindow, 'frameElement', {
+                        get: function() {
+                            return null; // 返回 null，让页面认为不在 iframe 中
+                        },
+                        configurable: false
+                    });
+                } catch (e) {
+                    // 如果无法重定义（某些浏览器可能不允许），记录警告但继续
+                    console.warn('[Browser] 无法增强安全性（拦截 window.top）:', e);
                 }
                 
                 // 同源，可以注入脚本

@@ -88,6 +88,39 @@ PermissionManager.PERMISSION.CRYPT_RANDOM             // 随机数生成
 PermissionManager.PERMISSION.GEOGRAPHY_LOCATION       // 获取地理位置信息
 ```
 
+### 拖拽权限
+
+```javascript
+PermissionManager.PERMISSION.DRAG_ELEMENT            // 元素拖拽
+PermissionManager.PERMISSION.DRAG_FILE                // 文件拖拽
+PermissionManager.PERMISSION.DRAG_WINDOW              // 窗口拖拽
+```
+
+### 事件权限
+
+```javascript
+PermissionManager.PERMISSION.EVENT_LISTENER           // 注册事件监听器
+```
+
+### 缓存权限
+
+```javascript
+PermissionManager.PERMISSION.CACHE_READ               // 读取缓存
+PermissionManager.PERMISSION.CACHE_WRITE              // 写入/删除缓存
+```
+
+### 语音识别权限
+
+```javascript
+PermissionManager.PERMISSION.SPEECH_RECOGNITION       // 语音识别
+```
+
+### 媒体访问权限
+
+```javascript
+PermissionManager.PERMISSION.MEDIA_ACCESS            // 访问摄像头和麦克风
+```
+
 ## 初始化
 
 权限管理器在系统启动时自动初始化，无需手动调用。

@@ -22,6 +22,8 @@ KernelLogger.info("LockScreen", "模块初始化");
         static _userSwitchButton = null;
         static _userListContainer = null;
         static _showUserList = false;
+        static _selectedUserIndex = -1; // 用户列表中选中的用户索引（用于键盘导航）
+        static _passwordInputVisible = false; // 密码输入框是否可见
         
         /**
          * 初始化锁屏界面
@@ -541,8 +543,22 @@ KernelLogger.info("LockScreen", "模块初始化");
             passwordInput.type = 'password';
             passwordInput.className = 'lockscreen-password-input';
             passwordInput.id = 'lockscreen-password-input';
-            passwordInput.placeholder = '输入密码';
+            passwordInput.placeholder = '输入密码（按 Enter 登录，Esc 取消）';
             passwordInput.autocomplete = 'off';
+            passwordInput.setAttribute('aria-label', '密码输入框');
+            // 添加额外的键盘事件处理（用于更好的用户体验）
+            passwordInput.addEventListener('keydown', (e) => {
+                // 允许标准文本编辑快捷键
+                if (e.ctrlKey || e.metaKey) {
+                    // Ctrl+A, Ctrl+C, Ctrl+V, Ctrl+X 等由浏览器默认处理
+                    return;
+                }
+                
+                // Backspace 和 Delete 由浏览器默认处理
+                if (e.key === 'Backspace' || e.key === 'Delete') {
+                    return;
+                }
+            });
             LockScreen.passwordInput = passwordInput;
             
             const loginButton = document.createElement('button');
@@ -561,12 +577,86 @@ KernelLogger.info("LockScreen", "模块初始化");
             
             LockScreen.container.appendChild(loginContainer);
             
-            // 提示文字（初始显示）
+            // 提示文字容器（初始显示）
+            const hintContainer = document.createElement('div');
+            hintContainer.style.cssText = `
+                position: absolute;
+                bottom: 40px;
+                left: 50%;
+                transform: translateX(-50%);
+                text-align: center;
+                color: rgba(255, 255, 255, 0.7);
+                font-size: 12px;
+                display: flex;
+                flex-direction: column;
+                gap: 8px;
+                z-index: 10;
+            `;
+            
             const hintText = document.createElement('div');
             hintText.className = 'lockscreen-hint';
             hintText.id = 'lockscreen-hint';
             hintText.textContent = '按任意键继续';
-            LockScreen.container.appendChild(hintText);
+            hintContainer.appendChild(hintText);
+            
+            // 快捷键提示（动态更新）
+            const shortcutHint = document.createElement('div');
+            shortcutHint.className = 'lockscreen-shortcut-hint';
+            shortcutHint.id = 'lockscreen-shortcut-hint';
+            shortcutHint.style.cssText = `
+                font-size: 11px;
+                opacity: 0.6;
+            `;
+            hintContainer.appendChild(shortcutHint);
+            
+            LockScreen.container.appendChild(hintContainer);
+            
+            // 初始化快捷键提示
+            setTimeout(() => {
+                LockScreen._updateShortcutHint();
+            }, 100);
+        }
+        
+        /**
+         * 更新快捷键提示
+         */
+        static _updateShortcutHint() {
+            const shortcutHint = document.getElementById('lockscreen-shortcut-hint');
+            if (!shortcutHint) {
+                return;
+            }
+            
+            const hints = [];
+            
+            // 如果有多个用户，显示切换用户提示
+            if (LockScreen._userList.length > 1) {
+                hints.push('Tab 切换用户');
+                hints.push('Ctrl+U 显示用户列表');
+            }
+            
+            // 如果密码输入框可见
+            if (LockScreen._passwordInputVisible) {
+                if (LockScreen.isPasswordMode) {
+                    hints.push('Enter 登录');
+                    hints.push('Esc 取消');
+                } else {
+                    hints.push('Enter 或任意键登录');
+                }
+            }
+            
+            // 如果用户列表显示
+            if (LockScreen._showUserList) {
+                hints.push('↑↓ 导航');
+                hints.push('Enter 确认');
+                hints.push('Esc 关闭');
+            }
+            
+            if (hints.length > 0) {
+                shortcutHint.textContent = hints.join(' • ');
+                shortcutHint.style.display = 'block';
+            } else {
+                shortcutHint.style.display = 'none';
+            }
         }
         
         /**
@@ -672,6 +762,9 @@ KernelLogger.info("LockScreen", "模块初始化");
                 
                 // 更新用户列表
                 LockScreen._renderUserList();
+                
+                // 更新快捷键提示
+                LockScreen._updateShortcutHint();
                 
             } catch (e) {
                 KernelLogger.error('LockScreen', `更新用户信息失败: ${e.message}`, e);
@@ -785,7 +878,11 @@ KernelLogger.info("LockScreen", "模块初始化");
                     gap: 12px;
                     transition: all 0.2s ease;
                     background: ${index === LockScreen._currentUserIndex ? 'rgba(255, 255, 255, 0.15)' : 'transparent'};
+                    outline: none;
                 `;
+                
+                // 添加 tabindex 以支持键盘导航
+                userItem.setAttribute('tabindex', '0');
                 
                 // 用户头像（小）
                 const avatar = document.createElement('div');
@@ -911,16 +1008,44 @@ KernelLogger.info("LockScreen", "模块初始化");
                     LockScreen._switchUser(index);
                 });
                 
+                // 键盘事件：Enter 或 Space 确认选择
+                userItem.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        LockScreen._switchUser(index);
+                    }
+                });
+                
                 // 悬停效果
                 userItem.addEventListener('mouseenter', () => {
-                    if (index !== LockScreen._currentUserIndex) {
+                    if (index !== LockScreen._currentUserIndex && index !== LockScreen._selectedUserIndex) {
                         userItem.style.background = 'rgba(255, 255, 255, 0.1)';
                     }
                 });
                 userItem.addEventListener('mouseleave', () => {
-                    if (index !== LockScreen._currentUserIndex) {
+                    if (index !== LockScreen._currentUserIndex && index !== LockScreen._selectedUserIndex) {
                         userItem.style.background = 'transparent';
                     }
+                });
+                
+                // 鼠标进入时更新选中索引（用于键盘导航的视觉反馈）
+                userItem.addEventListener('mouseenter', () => {
+                    LockScreen._selectedUserIndex = index;
+                    // 更新所有项的样式
+                    const allItems = LockScreen._userListContainer.querySelectorAll('.lockscreen-user-item');
+                    allItems.forEach((item, idx) => {
+                        if (idx === index) {
+                            item.style.background = 'rgba(255, 255, 255, 0.25)';
+                            item.style.transform = 'scale(1.02)';
+                        } else if (idx === LockScreen._currentUserIndex) {
+                            item.style.background = 'rgba(255, 255, 255, 0.15)';
+                            item.style.transform = 'scale(1)';
+                        } else {
+                            item.style.background = 'transparent';
+                            item.style.transform = 'scale(1)';
+                        }
+                    });
                 });
                 
                 LockScreen._userListContainer.appendChild(userItem);
@@ -984,11 +1109,16 @@ KernelLogger.info("LockScreen", "模块初始化");
             if (passwordContainer) {
                 passwordContainer.style.display = 'none';
             }
+            LockScreen._passwordInputVisible = false;
             
             // 清空密码输入
             if (LockScreen.passwordInput) {
                 LockScreen.passwordInput.value = '';
+                LockScreen.passwordInput.blur();
             }
+            
+            // 重置选中索引
+            LockScreen._selectedUserIndex = -1;
             
             // 显示提示文字
             const hintText = document.getElementById('lockscreen-hint');
@@ -997,11 +1127,17 @@ KernelLogger.info("LockScreen", "模块初始化");
                 hintText.style.display = 'block';
             }
             
+            // 更新快捷键提示
+            LockScreen._updateShortcutHint();
+            
             // 更新用户列表高亮
             LockScreen._renderUserList();
             
             // 隐藏用户列表
             LockScreen._hideUserList();
+            
+            // 更新快捷键提示
+            LockScreen._updateShortcutHint();
         }
         
         /**
@@ -1024,7 +1160,11 @@ KernelLogger.info("LockScreen", "模块初始化");
             }
             
             LockScreen._showUserList = true;
+            LockScreen._selectedUserIndex = LockScreen._currentUserIndex; // 初始化选中索引
             LockScreen._userListContainer.style.display = 'flex';
+            
+            // 更新快捷键提示
+            LockScreen._updateShortcutHint();
             
             // 添加动画
             requestAnimationFrame(() => {
@@ -1035,6 +1175,18 @@ KernelLogger.info("LockScreen", "模块初始化");
                 requestAnimationFrame(() => {
                     LockScreen._userListContainer.style.opacity = '1';
                     LockScreen._userListContainer.style.transform = 'translateX(-50%) translateY(0)';
+                    
+                    // 更新视觉反馈
+                    const userItems = LockScreen._userListContainer.querySelectorAll('.lockscreen-user-item');
+                    userItems.forEach((item, index) => {
+                        if (index === LockScreen._selectedUserIndex) {
+                            item.style.background = 'rgba(255, 255, 255, 0.25)';
+                            item.style.transform = 'scale(1.02)';
+                        } else if (index === LockScreen._currentUserIndex) {
+                            item.style.background = 'rgba(255, 255, 255, 0.15)';
+                            item.style.transform = 'scale(1)';
+                        }
+                    });
                 });
             });
         }
@@ -1048,11 +1200,26 @@ KernelLogger.info("LockScreen", "模块初始化");
             }
             
             LockScreen._showUserList = false;
+            LockScreen._selectedUserIndex = -1; // 重置选中索引
+            
+            // 更新快捷键提示
+            LockScreen._updateShortcutHint();
             
             // 添加淡出动画
             LockScreen._userListContainer.style.opacity = '0';
             LockScreen._userListContainer.style.transform = 'translateX(-50%) translateY(-10px)';
             LockScreen._userListContainer.style.transition = 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
+            
+            // 重置所有用户项的样式
+            const userItems = LockScreen._userListContainer.querySelectorAll('.lockscreen-user-item');
+            userItems.forEach((item, index) => {
+                if (index === LockScreen._currentUserIndex) {
+                    item.style.background = 'rgba(255, 255, 255, 0.15)';
+                } else {
+                    item.style.background = 'transparent';
+                }
+                item.style.transform = 'scale(1)';
+            });
             
             setTimeout(() => {
                 if (LockScreen._userListContainer) {
@@ -1098,6 +1265,7 @@ KernelLogger.info("LockScreen", "模块初始化");
                 if (LockScreen.isPasswordMode) {
                     // 有密码，显示密码输入框
                     passwordContainer.style.display = 'flex';
+                    LockScreen._passwordInputVisible = true;
                     if (LockScreen.passwordInput) {
                         LockScreen.passwordInput.style.display = 'block';
                     }
@@ -1107,6 +1275,8 @@ KernelLogger.info("LockScreen", "模块初始化");
                     setTimeout(() => {
                         if (LockScreen.passwordInput) {
                             LockScreen.passwordInput.focus();
+                            // 选中所有文本（如果有）
+                            LockScreen.passwordInput.select();
                         }
                         // 隐藏加载蒙版
                         LockScreen._hideLoadingOverlay();
@@ -1117,6 +1287,7 @@ KernelLogger.info("LockScreen", "模块初始化");
                 } else {
                     // 无密码，显示登录按钮
                     passwordContainer.style.display = 'flex';
+                    LockScreen._passwordInputVisible = true;
                     if (LockScreen.loginButton) {
                         LockScreen.loginButton.style.display = 'flex';
                     }
@@ -1124,13 +1295,16 @@ KernelLogger.info("LockScreen", "模块初始化");
                         LockScreen.passwordInput.style.display = 'none';
                     }
                     if (hintText) {
-                        hintText.textContent = '按回车键登录';
+                        hintText.textContent = '按回车键或任意键登录';
                     }
                     // 隐藏加载蒙版
                     setTimeout(() => {
                         LockScreen._hideLoadingOverlay();
                     }, 200);
                 }
+                
+                // 更新快捷键提示
+                LockScreen._updateShortcutHint();
             }, 300);
         }
         
@@ -1359,36 +1533,221 @@ KernelLogger.info("LockScreen", "模块初始化");
         }
         
         /**
-         * 设置键盘监听
+         * 设置键盘监听（全面优化，支持更多快捷键）
          */
         static _setupKeyboardListeners() {
             let keyPressed = false;
             
             document.addEventListener('keydown', (e) => {
-                // 如果已经在密码模式，处理密码输入
-                if (LockScreen.isPasswordMode && LockScreen.passwordInput && LockScreen.passwordInput.style.display !== 'none') {
+                // 如果用户列表显示，优先处理用户列表导航
+                if (LockScreen._showUserList && LockScreen._userListContainer) {
+                    // 方向键导航用户列表
+                    if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        
+                        const userItems = LockScreen._userListContainer.querySelectorAll('.lockscreen-user-item');
+                        if (userItems.length === 0) {
+                            return;
+                        }
+                        
+                        // 初始化选中索引
+                        if (LockScreen._selectedUserIndex < 0) {
+                            LockScreen._selectedUserIndex = LockScreen._currentUserIndex;
+                        }
+                        
+                        // 更新选中索引
+                        if (e.key === 'ArrowUp') {
+                            LockScreen._selectedUserIndex = (LockScreen._selectedUserIndex - 1 + userItems.length) % userItems.length;
+                        } else {
+                            LockScreen._selectedUserIndex = (LockScreen._selectedUserIndex + 1) % userItems.length;
+                        }
+                        
+                        // 更新视觉反馈
+                        userItems.forEach((item, index) => {
+                            if (index === LockScreen._selectedUserIndex) {
+                                item.style.background = 'rgba(255, 255, 255, 0.25)';
+                                item.style.transform = 'scale(1.02)';
+                            } else if (index === LockScreen._currentUserIndex) {
+                                item.style.background = 'rgba(255, 255, 255, 0.15)';
+                                item.style.transform = 'scale(1)';
+                            } else {
+                                item.style.background = 'transparent';
+                                item.style.transform = 'scale(1)';
+                            }
+                        });
+                        
+                        // 滚动到可见区域
+                        const selectedItem = userItems[LockScreen._selectedUserIndex];
+                        if (selectedItem) {
+                            selectedItem.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                        }
+                        return;
+                    }
+                    
+                    // Enter 确认选择用户
                     if (e.key === 'Enter') {
                         e.preventDefault();
+                        e.stopPropagation();
+                        
+                        if (LockScreen._selectedUserIndex >= 0 && LockScreen._selectedUserIndex < LockScreen._userList.length) {
+                            LockScreen._switchUser(LockScreen._selectedUserIndex);
+                            LockScreen._selectedUserIndex = -1;
+                        }
+                        return;
+                    }
+                    
+                    // Esc 关闭用户列表
+                    if (e.key === 'Escape') {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        LockScreen._hideUserList();
+                        LockScreen._selectedUserIndex = -1;
+                        return;
+                    }
+                }
+                
+                // 如果密码输入框可见且获得焦点，处理密码输入相关快捷键
+                if (LockScreen._passwordInputVisible && 
+                    LockScreen.passwordInput && 
+                    LockScreen.passwordInput.style.display !== 'none' &&
+                    document.activeElement === LockScreen.passwordInput) {
+                    
+                    // Enter 提交登录
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        e.stopPropagation();
                         const password = LockScreen.passwordInput.value;
                         LockScreen._handleLogin(password);
+                        return;
                     }
+                    
+                    // Esc 清空密码并取消焦点（如果无密码模式则隐藏输入框）
+                    if (e.key === 'Escape') {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (LockScreen.passwordInput) {
+                            LockScreen.passwordInput.value = '';
+                            if (!LockScreen.isPasswordMode) {
+                                // 无密码模式，隐藏输入框
+                                const passwordContainer = document.getElementById('lockscreen-password-container');
+                                if (passwordContainer) {
+                                    passwordContainer.style.display = 'none';
+                                }
+                                LockScreen._passwordInputVisible = false;
+                                const hintText = document.getElementById('lockscreen-hint');
+                                if (hintText) {
+                                    hintText.style.display = 'block';
+                                    hintText.textContent = '按任意键继续';
+                                }
+                            } else {
+                                // 有密码模式，保持输入框显示但清空内容
+                                LockScreen.passwordInput.blur();
+                            }
+                        }
+                        return;
+                    }
+                    
+                    // Tab 键：如果有多个用户，切换用户
+                    if (e.key === 'Tab' && !e.shiftKey && LockScreen._userList.length > 1) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        const nextIndex = (LockScreen._currentUserIndex + 1) % LockScreen._userList.length;
+                        LockScreen._switchUser(nextIndex);
+                        // 重新显示密码输入
+                        setTimeout(() => {
+                            LockScreen._showPasswordInput();
+                        }, 100);
+                        return;
+                    }
+                    
+                    // Shift+Tab：反向切换用户
+                    if (e.key === 'Tab' && e.shiftKey && LockScreen._userList.length > 1) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        const prevIndex = (LockScreen._currentUserIndex - 1 + LockScreen._userList.length) % LockScreen._userList.length;
+                        LockScreen._switchUser(prevIndex);
+                        // 重新显示密码输入
+                        setTimeout(() => {
+                            LockScreen._showPasswordInput();
+                        }, 100);
+                        return;
+                    }
+                    
+                    // 其他标准文本编辑快捷键（Ctrl+A全选、Ctrl+C复制等）由浏览器默认处理
+                    // 不阻止这些快捷键
                     return;
                 }
                 
-                // 如果无密码模式，按回车登录
-                if (!LockScreen.isPasswordMode && e.key === 'Enter') {
+                // 如果密码输入框可见但未获得焦点，按任意键聚焦
+                if (LockScreen._passwordInputVisible && 
+                    LockScreen.passwordInput && 
+                    LockScreen.passwordInput.style.display !== 'none' &&
+                    document.activeElement !== LockScreen.passwordInput) {
+                    
+                    // 如果是可打印字符或特殊键，聚焦到密码输入框
+                    if (e.key.length === 1 || 
+                        e.key === 'Backspace' || 
+                        e.key === 'Delete' || 
+                        e.key === 'ArrowLeft' || 
+                        e.key === 'ArrowRight' ||
+                        e.key === 'Home' ||
+                        e.key === 'End') {
+                        e.preventDefault();
+                        if (LockScreen.passwordInput) {
+                            LockScreen.passwordInput.focus();
+                            // 如果是可打印字符，添加到输入框
+                            if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+                                LockScreen.passwordInput.value += e.key;
+                            }
+                        }
+                        return;
+                    }
+                }
+                
+                // 如果无密码模式且输入框可见，按回车登录
+                if (!LockScreen.isPasswordMode && LockScreen._passwordInputVisible && e.key === 'Enter') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    LockScreen._handleLogin();
+                    return;
+                }
+                
+                // 如果无密码模式且输入框可见，按任意键登录（除了特殊键）
+                if (!LockScreen.isPasswordMode && LockScreen._passwordInputVisible && 
+                    e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
                     e.preventDefault();
                     LockScreen._handleLogin();
                     return;
                 }
                 
                 // 首次按键，显示登录界面
-                if (!keyPressed && !LockScreen.isPasswordMode) {
+                if (!keyPressed) {
+                    // 忽略功能键和修饰键
+                    if (e.key === 'Shift' || e.key === 'Control' || e.key === 'Alt' || 
+                        e.key === 'Meta' || e.key === 'Tab' || e.key === 'CapsLock' ||
+                        e.key.startsWith('F') && e.key.length <= 3) {
+                        return;
+                    }
+                    
                     keyPressed = true;
                     LockScreen._showPasswordInput();
-                } else if (!keyPressed && LockScreen.isPasswordMode) {
-                    keyPressed = true;
-                    LockScreen._showPasswordInput();
+                    
+                    // 如果是可打印字符且是密码模式，直接输入
+                    if (LockScreen.isPasswordMode && 
+                        LockScreen.passwordInput && 
+                        e.key.length === 1 && 
+                        !e.ctrlKey && 
+                        !e.metaKey && 
+                        !e.altKey) {
+                        e.preventDefault();
+                        setTimeout(() => {
+                            if (LockScreen.passwordInput) {
+                                LockScreen.passwordInput.value = e.key;
+                                LockScreen.passwordInput.focus();
+                            }
+                        }, 100);
+                    }
                 }
             }, { once: false });
             
@@ -1404,11 +1763,15 @@ KernelLogger.info("LockScreen", "模块初始化");
                 // 点击其他地方时隐藏用户列表
                 if (LockScreen._showUserList) {
                     LockScreen._hideUserList();
+                    LockScreen._selectedUserIndex = -1;
                 }
                 
                 if (!keyPressed) {
                     keyPressed = true;
                     LockScreen._showPasswordInput();
+                } else if (LockScreen.passwordInput && LockScreen.passwordInput.style.display !== 'none') {
+                    // 如果密码输入框已显示，点击时聚焦
+                    LockScreen.passwordInput.focus();
                 }
             }, { once: false });
             
@@ -1423,6 +1786,19 @@ KernelLogger.info("LockScreen", "模块初始化");
                     }
                 });
             }
+            
+            // 用户切换按钮快捷键（Ctrl+U 或 Alt+U）
+            document.addEventListener('keydown', (e) => {
+                if ((e.ctrlKey || e.altKey) && (e.key === 'u' || e.key === 'U') && 
+                    LockScreen._userList.length > 1 && 
+                    !LockScreen._showUserList) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    LockScreen._displayUserList();
+                    // 初始化选中索引
+                    LockScreen._selectedUserIndex = LockScreen._currentUserIndex;
+                }
+            }, { once: false });
         }
         
         /**
