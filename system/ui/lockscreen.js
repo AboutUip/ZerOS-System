@@ -24,6 +24,7 @@ KernelLogger.info("LockScreen", "模块初始化");
         static _showUserList = false;
         static _selectedUserIndex = -1; // 用户列表中选中的用户索引（用于键盘导航）
         static _passwordInputVisible = false; // 密码输入框是否可见
+        static _keydownHandler = null; // 键盘事件处理器引用（用于移除监听器）
         
         /**
          * 初始化锁屏界面
@@ -1481,6 +1482,12 @@ KernelLogger.info("LockScreen", "模块初始化");
          * 隐藏锁屏界面
          */
         static _hideLockScreen() {
+            // 移除键盘事件监听器，防止拦截其他程序的输入
+            if (LockScreen._keydownHandler) {
+                document.removeEventListener('keydown', LockScreen._keydownHandler);
+                LockScreen._keydownHandler = null;
+            }
+            
             if (LockScreen.container) {
                 LockScreen.container.classList.add('lockscreen-fade-out');
                 setTimeout(() => {
@@ -1538,7 +1545,16 @@ KernelLogger.info("LockScreen", "模块初始化");
         static _setupKeyboardListeners() {
             let keyPressed = false;
             
-            document.addEventListener('keydown', (e) => {
+            // 检查锁屏是否可见，如果不可见则不处理事件
+            const handleKeydown = (e) => {
+                // 如果锁屏容器不存在或不可见，不处理事件（允许其他程序正常输入）
+                if (!LockScreen.container || 
+                    !LockScreen.container.parentElement || 
+                    LockScreen.container.style.display === 'none' ||
+                    getComputedStyle(LockScreen.container).display === 'none' ||
+                    LockScreen.container.offsetParent === null) {
+                    return; // 锁屏不可见，不拦截事件
+                }
                 // 如果用户列表显示，优先处理用户列表导航
                 if (LockScreen._showUserList && LockScreen._userListContainer) {
                     // 方向键导航用户列表
@@ -1749,7 +1765,12 @@ KernelLogger.info("LockScreen", "模块初始化");
                         }, 100);
                     }
                 }
-            }, { once: false });
+            };
+            
+            document.addEventListener('keydown', handleKeydown, { once: false });
+            
+            // 保存事件处理器引用，以便后续移除
+            LockScreen._keydownHandler = handleKeydown;
             
             // 点击屏幕也可以触发
             LockScreen.container.addEventListener('click', (e) => {
