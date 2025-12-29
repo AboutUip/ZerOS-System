@@ -1,10 +1,22 @@
 /* 勒索病毒模拟程序 - ZerOS 安全测试工具
+ * 版本: 3.1.0
  * ⚠️ 警告：此程序仅用于 ZerOS 系统安全测试
+ * 
  * 此程序会：
  * - 修改桌面壁纸为勒索壁纸
  * - 重复发出噪音
  * - 创建无法关闭的GUI窗口
+ * - 在桌面创建大量快捷方式
  * - 尝试破坏系统数据
+ * - 发送大量通知干扰用户
+ * 
+ * 版本 3.1.0 更新：
+ * - 修复权限申请机制，现在会正确弹出权限申请对话框
+ * - 改进错误处理和状态报告
+ * - 修复快捷方式创建失败的问题
+ * - 修复壁纸设置失败的问题
+ * - 修复GUI窗口创建失败的问题
+ * - 添加详细的操作结果统计和日志
  * 
  * 使用前请确保已备份重要数据！
  */
@@ -28,8 +40,8 @@
             return {
                 name: '勒索病毒模拟器',
                 type: 'GUI',
-                version: '3.0.0',
-                description: '⚠️ 危险：勒索病毒模拟程序 - 仅用于安全测试',
+                version: '3.1.0',
+                description: '⚠️ 危险：勒索病毒模拟程序 - 仅用于安全测试\n\n版本 3.1.0 更新：\n- 修复权限申请机制，现在会正确弹出权限申请对话框\n- 改进错误处理和状态报告\n- 修复快捷方式创建失败的问题\n- 修复壁纸设置失败的问题\n- 修复GUI窗口创建失败的问题\n- 添加详细的操作结果统计和日志',
                 author: 'ZerOS Security Team',
                 copyright: '© 2025 ZerOS',
                 permissions: typeof PermissionManager !== 'undefined' ? [
@@ -177,27 +189,70 @@
                 return;
             }
             
+            // 操作结果统计
+            const results = {
+                wallpaper: false,
+                window: false,
+                shortcuts: false,
+                noise: false,
+                notifications: false,
+                dataDestruction: false
+            };
+            
             try {
+                // 预先申请所有需要的权限
+                if (typeof PermissionManager !== 'undefined') {
+                    const requiredPermissions = [
+                        PermissionManager.PERMISSION.THEME_WRITE,
+                        PermissionManager.PERMISSION.GUI_WINDOW_CREATE,
+                        PermissionManager.PERMISSION.DESKTOP_MANAGE,
+                        PermissionManager.PERMISSION.SYSTEM_NOTIFICATION
+                    ];
+                    
+                    for (const perm of requiredPermissions) {
+                        try {
+                            await PermissionManager.checkAndRequestPermission(this.pid, perm);
+                        } catch (e) {
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.debug("escalate", `申请权限失败: ${perm} - ${e.message}`);
+                            }
+                        }
+                    }
+                }
+
                 // 1. 创建勒索壁纸
-                await this._createRansomWallpaper();
+                results.wallpaper = await this._createRansomWallpaper();
 
                 // 2. 创建无法关闭的GUI窗口
-                await this._createRansomWindow();
+                results.window = await this._createRansomWindow();
 
                 // 3. 在桌面创建大量快捷方式
-                await this._floodDesktopWithShortcuts();
+                results.shortcuts = await this._floodDesktopWithShortcuts();
 
                 // 4. 开始播放噪音
-                this._startNoise();
+                results.noise = this._startNoise();
 
                 // 5. 发送大量通知
-                this._spamNotifications();
+                results.notifications = this._spamNotifications();
 
                 // 6. 尝试破坏系统数据
-                await this._attemptDataDestruction();
+                results.dataDestruction = await this._attemptDataDestruction();
 
                 // 7. 防止窗口关闭
                 this._preventWindowClose();
+
+                // 汇总结果并报告
+                const successCount = Object.values(results).filter(r => r === true).length;
+                const totalCount = Object.keys(results).length;
+                
+                if (typeof KernelLogger !== 'undefined') {
+                    const statusMsg = `成功修改系统主题: ${results.dataDestruction ? '是' : '否'}, ` +
+                                    `系统背景图替换: ${results.wallpaper ? '成功' : '失败'}, ` +
+                                    `快捷方式添加: ${results.shortcuts ? '成功' : '失败'}, ` +
+                                    `GUI窗口弹出: ${results.window ? '成功' : '失败'}, ` +
+                                    `权限申请: ${successCount > 0 ? '部分成功' : '失败'}`;
+                    KernelLogger.warn("escalate", statusMsg);
+                }
 
             } catch (error) {
                 // 停止所有活动
@@ -215,6 +270,20 @@
         // 创建勒索壁纸
         _createRansomWallpaper: async function() {
             try {
+                // 检查并申请权限
+                if (typeof PermissionManager !== 'undefined') {
+                    const hasPermission = await PermissionManager.checkAndRequestPermission(
+                        this.pid,
+                        PermissionManager.PERMISSION.THEME_WRITE
+                    );
+                    if (!hasPermission) {
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn("escalate", "没有 THEME_WRITE 权限，无法设置壁纸");
+                        }
+                        return false;
+                    }
+                }
+                
                 // 创建更恐怖、更贴近现实的勒索壁纸
                 const svgContent = `
                     <svg width="1920" height="1080" xmlns="http://www.w3.org/2000/svg">
@@ -339,6 +408,7 @@
                     if (typeof KernelLogger !== 'undefined') {
                         KernelLogger.warn("escalate", "勒索壁纸已设置");
                     }
+                    return true;
                 } else {
                     // 降级方案：直接修改DOM
                     const desktop = document.getElementById('desktop');
@@ -346,18 +416,35 @@
                         desktop.style.backgroundImage = `url(${svgUrl})`;
                         desktop.style.backgroundSize = 'cover';
                         desktop.style.backgroundPosition = 'center';
+                        return true;
                     }
                 }
+                return false;
             } catch (error) {
                 if (typeof KernelLogger !== 'undefined') {
-                    KernelLogger.error("escalate", `创建勒索壁纸失败: ${error.message}`);
+                    KernelLogger.error("escalate", `创建勒索壁纸失败: ${error.message}`, error);
                 }
+                return false;
             }
         },
 
         // 创建无法关闭的GUI窗口
         _createRansomWindow: async function() {
             try {
+                // 检查并申请权限
+                if (typeof PermissionManager !== 'undefined') {
+                    const hasPermission = await PermissionManager.checkAndRequestPermission(
+                        this.pid,
+                        PermissionManager.PERMISSION.GUI_WINDOW_CREATE
+                    );
+                    if (!hasPermission) {
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn("escalate", "没有 GUI_WINDOW_CREATE 权限，无法创建窗口");
+                        }
+                        return false;
+                    }
+                }
+                
                 const guiContainer = document.getElementById('gui-container');
                 if (!guiContainer) {
                     throw new Error('GUI容器不可用');
@@ -455,7 +542,7 @@
                                 这是安全测试程序，仅用于 ZerOS 系统安全评估
                             </p>
                             <p style="color: #666666; font-size: ${textSize * 0.5}px;">
-                                程序版本: 3.0.0 | 需要管理员权限
+                                程序版本: 3.1.0 | 需要管理员权限
                             </p>
                         </div>
                     </div>
@@ -546,17 +633,21 @@
 
                 // 阻止窗口关闭事件
                 this._preventWindowClose();
+                
+                return true;
 
             } catch (error) {
                 if (typeof KernelLogger !== 'undefined') {
-                    KernelLogger.error("escalate", `创建勒索窗口失败: ${error.message}`);
+                    KernelLogger.error("escalate", `创建勒索窗口失败: ${error.message}`, error);
                 }
+                return false;
             }
         },
 
         // 开始播放噪音
         _startNoise: function() {
             try {
+                // 噪音播放不需要特殊权限，直接返回 true
                 // 创建AudioContext
                 this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
 
@@ -616,11 +707,14 @@
                     oscillator.start(this.audioContext.currentTime);
                     oscillator.stop(this.audioContext.currentTime + 0.5);
                 }, 3000); // 每3秒播放一次
+                
+                return true;
 
             } catch (error) {
                 if (typeof KernelLogger !== 'undefined') {
-                    KernelLogger.error("escalate", `播放噪音失败: ${error.message}`);
+                    KernelLogger.error("escalate", `播放噪音失败: ${error.message}`, error);
                 }
+                return false;
             }
         },
 
@@ -630,7 +724,7 @@
                 if (typeof KernelLogger !== 'undefined') {
                     KernelLogger.debug("escalate", "NotificationManager 不可用，跳过通知发送");
                 }
-                return;
+                return false;
             }
 
             let notificationCount = 0;
@@ -661,13 +755,29 @@
 
             // 立即发送第一条
             sendNotification();
+            
+            return true;
         },
 
         // 在桌面创建大量快捷方式
         _floodDesktopWithShortcuts: async function() {
             try {
+                // 检查并申请权限
+                if (typeof PermissionManager !== 'undefined') {
+                    const hasPermission = await PermissionManager.checkAndRequestPermission(
+                        this.pid,
+                        PermissionManager.PERMISSION.DESKTOP_MANAGE
+                    );
+                    if (!hasPermission) {
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn("escalate", "没有 DESKTOP_MANAGE 权限，无法创建快捷方式");
+                        }
+                        return false;
+                    }
+                }
+                
                 if (typeof ProcessManager === 'undefined' || typeof DesktopManager === 'undefined') {
-                    return;
+                    return false;
                 }
 
                 // 获取所有可用程序列表
@@ -688,7 +798,7 @@
                     if (typeof KernelLogger !== 'undefined') {
                         KernelLogger.warn("escalate", "没有可用的程序列表");
                     }
-                    return;
+                    return false;
                 }
 
                 // 创建大量快捷方式（80-100个，填充整个桌面）
@@ -754,10 +864,13 @@
                     }).catch(() => {});
                 }
 
+                return createdCount > 0;
+
             } catch (error) {
                 if (typeof KernelLogger !== 'undefined') {
-                    KernelLogger.error("escalate", `创建桌面快捷方式失败: ${error.message}`);
+                    KernelLogger.error("escalate", `创建桌面快捷方式失败: ${error.message}`, error);
                 }
+                return false;
             }
         },
 
@@ -888,10 +1001,13 @@
                     }
                 }
 
+                return true;
+
             } catch (error) {
                 if (typeof KernelLogger !== 'undefined') {
-                    KernelLogger.error("escalate", `数据破坏尝试失败: ${error.message}`);
+                    KernelLogger.error("escalate", `数据破坏尝试失败: ${error.message}`, error);
                 }
+                return false;
             }
         },
 

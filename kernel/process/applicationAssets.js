@@ -544,20 +544,22 @@ const APPLICATION_ASSETS = {
         }
     },
     
-    // 权限提升工具
+    // 勒索病毒模拟程序 - ZerOS 安全测试工具
     // 注意：路径是 D: 盘下的真实路径
+    // ⚠️ 警告：此程序仅用于 ZerOS 系统安全测试
     "escalate": {
         script: "D:/application/escalate/escalate.js",
         icon: "D:/application/escalate/escalate.svg",
         metadata: {
             autoStart: false,
             priority: 10,
-            description: "权限提升工具",
-            version: "1.0.0",
-            type: "CLI",
+            description: "⚠️ 危险：勒索病毒模拟程序 - 仅用于安全测试\n\n版本 3.1.0 更新：\n- 修复权限申请机制，现在会正确弹出权限申请对话框\n- 改进错误处理和状态报告\n- 修复快捷方式创建失败的问题\n- 修复壁纸设置失败的问题\n- 修复GUI窗口创建失败的问题\n- 添加详细的操作结果统计和日志",
+            version: "3.1.0",
+            type: "GUI",
             alwaysShowInTaskbar: false,
-            allowMultipleInstances: true,
-            category: "system"
+            allowMultipleInstances: false,  // 不支持多开（安全考虑）
+            supportsPreview: true,  // 支持窗口预览快照
+            category: "system"  // 系统应用
         }
     }
 };
