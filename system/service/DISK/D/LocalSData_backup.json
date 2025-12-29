@@ -1,12 +1,6 @@
 {
   "system": {
-    "permissionManager.permissions": {
-      "81759": [
-        "GUI_WINDOW_CREATE",
-        "EVENT_LISTENER",
-        "SPEECH_RECOGNITION"
-      ]
-    },
+    "permissionManager.permissions": {},
     "system.style": "macos",
     "desktop.icons": [
       {

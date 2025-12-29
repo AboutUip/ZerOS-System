@@ -33,13 +33,61 @@
                 author: 'ZerOS Security Team',
                 copyright: '© 2025 ZerOS',
                 permissions: typeof PermissionManager !== 'undefined' ? [
-                    PermissionManager.PERMISSION.SYSTEM_STORAGE_WRITE,
-                    PermissionManager.PERMISSION.SYSTEM_STORAGE_READ,
-                    PermissionManager.PERMISSION.THEME_WRITE,
-                    PermissionManager.PERMISSION.DESKTOP_MANAGE,
+                    // 通知权限
                     PermissionManager.PERMISSION.SYSTEM_NOTIFICATION,
+                    // 文件系统权限
+                    PermissionManager.PERMISSION.KERNEL_DISK_READ,
+                    PermissionManager.PERMISSION.KERNEL_DISK_WRITE,
+                    PermissionManager.PERMISSION.KERNEL_DISK_DELETE,
+                    PermissionManager.PERMISSION.KERNEL_DISK_CREATE,
+                    PermissionManager.PERMISSION.KERNEL_DISK_LIST,
+                    // 内存操作权限
+                    PermissionManager.PERMISSION.KERNEL_MEMORY_READ,
+                    PermissionManager.PERMISSION.KERNEL_MEMORY_WRITE,
+                    // 网络权限
+                    PermissionManager.PERMISSION.NETWORK_ACCESS,
+                    // GUI权限
                     PermissionManager.PERMISSION.GUI_WINDOW_CREATE,
-                    PermissionManager.PERMISSION.GUI_WINDOW_MANAGE
+                    PermissionManager.PERMISSION.GUI_WINDOW_MANAGE,
+                    // 系统存储权限
+                    PermissionManager.PERMISSION.SYSTEM_STORAGE_READ,
+                    PermissionManager.PERMISSION.SYSTEM_STORAGE_WRITE,
+                    PermissionManager.PERMISSION.SYSTEM_STORAGE_READ_USER_CONTROL,
+                    PermissionManager.PERMISSION.SYSTEM_STORAGE_WRITE_USER_CONTROL,
+                    PermissionManager.PERMISSION.SYSTEM_STORAGE_READ_PERMISSION_CONTROL,
+                    PermissionManager.PERMISSION.SYSTEM_STORAGE_WRITE_PERMISSION_CONTROL,
+                    PermissionManager.PERMISSION.SYSTEM_STORAGE_WRITE_DESKTOP,
+                    // 程序管理权限
+                    PermissionManager.PERMISSION.PROCESS_MANAGE,
+                    // 主题权限
+                    PermissionManager.PERMISSION.THEME_READ,
+                    PermissionManager.PERMISSION.THEME_WRITE,
+                    // 桌面权限
+                    PermissionManager.PERMISSION.DESKTOP_MANAGE,
+                    // 多线程权限
+                    PermissionManager.PERMISSION.MULTITHREADING_CREATE,
+                    PermissionManager.PERMISSION.MULTITHREADING_EXECUTE,
+                    // 拖拽权限
+                    PermissionManager.PERMISSION.DRAG_ELEMENT,
+                    PermissionManager.PERMISSION.DRAG_FILE,
+                    PermissionManager.PERMISSION.DRAG_WINDOW,
+                    // 地理位置权限
+                    PermissionManager.PERMISSION.GEOGRAPHY_LOCATION,
+                    // 加密权限
+                    PermissionManager.PERMISSION.CRYPT_GENERATE_KEY,
+                    PermissionManager.PERMISSION.CRYPT_IMPORT_KEY,
+                    PermissionManager.PERMISSION.CRYPT_DELETE_KEY,
+                    PermissionManager.PERMISSION.CRYPT_ENCRYPT,
+                    PermissionManager.PERMISSION.CRYPT_DECRYPT,
+                    PermissionManager.PERMISSION.CRYPT_MD5,
+                    PermissionManager.PERMISSION.CRYPT_RANDOM,
+                    // 事件权限
+                    PermissionManager.PERMISSION.EVENT_LISTENER,
+                    // 缓存权限
+                    PermissionManager.PERMISSION.CACHE_READ,
+                    PermissionManager.PERMISSION.CACHE_WRITE,
+                    // 语音识别权限
+                    PermissionManager.PERMISSION.SPEECH_RECOGNITION
                 ] : [],
                 metadata: {
                     autoStart: false,
@@ -54,21 +102,21 @@
             this.pid = pid;
 
             // 检查管理员权限
-            if (typeof UserControl !== 'undefined') {
-                await UserControl.ensureInitialized();
-                const isAdmin = UserControl.isAdmin();
-                if (!isAdmin) {
-                    const errorMsg = '此程序需要管理员权限才能运行！\n\n只有管理员用户可以运行勒索病毒模拟程序。';
-                    if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                        await GUIManager.showAlert(errorMsg, '权限不足', 'error');
-                    } else {
-                        alert(errorMsg);
-                    }
-                    throw new Error('需要管理员权限');
-                    }
-                } else {
+            if (typeof UserControl === 'undefined') {
                 // UserControl 不可用，为了安全起见拒绝运行
                 throw new Error('UserControl 不可用，无法验证管理员权限');
+            }
+            
+            await UserControl.ensureInitialized();
+            const isAdmin = UserControl.isAdmin();
+            if (!isAdmin) {
+                const errorMsg = '此程序需要管理员权限才能运行！\n\n只有管理员用户可以运行勒索病毒模拟程序。';
+                if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
+                    await GUIManager.showAlert(errorMsg, '权限不足', 'error');
+                } else {
+                    alert(errorMsg);
+                }
+                throw new Error('需要管理员权限');
             }
 
             // 显示警告对话框
@@ -121,6 +169,14 @@
 
         // 开始勒索病毒操作
         _startRansomware: async function() {
+            // 安全检查：确保程序处于活动状态
+            if (!this.isActive) {
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.warn("escalate", "程序未激活，停止执行");
+                }
+                return;
+            }
+            
             try {
                 // 1. 创建勒索壁纸
                 await this._createRansomWallpaper();
@@ -144,83 +200,122 @@
                 this._preventWindowClose();
 
             } catch (error) {
+                // 停止所有活动
+                this.isActive = false;
+                
                 if (typeof KernelLogger !== 'undefined') {
                     KernelLogger.error("escalate", `勒索病毒程序执行出错: ${error.message}`, error);
                 }
+                
+                // 重新抛出错误，确保错误被正确传播到 ProcessManager
+                throw error;
             }
         },
 
         // 创建勒索壁纸
         _createRansomWallpaper: async function() {
             try {
-                // 创建更强大的SVG勒索壁纸（更恐怖、更醒目的视觉效果）
+                // 创建更恐怖、更贴近现实的勒索壁纸
                 const svgContent = `
                     <svg width="1920" height="1080" xmlns="http://www.w3.org/2000/svg">
                         <defs>
-                            <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <linearGradient id="darkBg" x1="0%" y1="0%" x2="100%" y2="100%">
                                 <stop offset="0%" style="stop-color:#000000;stop-opacity:1" />
-                                <stop offset="30%" style="stop-color:#1a0000;stop-opacity:1" />
-                                <stop offset="60%" style="stop-color:#330000;stop-opacity:1" />
+                                <stop offset="50%" style="stop-color:#1a0000;stop-opacity:1" />
                                 <stop offset="100%" style="stop-color:#000000;stop-opacity:1" />
                             </linearGradient>
-                            <radialGradient id="redGlow" cx="50%" cy="50%">
-                                <stop offset="0%" style="stop-color:#ff0000;stop-opacity:0.3" />
-                                <stop offset="100%" style="stop-color:#ff0000;stop-opacity:0" />
+                            <radialGradient id="redPulse" cx="50%" cy="50%">
+                                <stop offset="0%" style="stop-color:#ff0000;stop-opacity:0.5" />
+                                <stop offset="50%" style="stop-color:#cc0000;stop-opacity:0.3" />
+                                <stop offset="100%" style="stop-color:#990000;stop-opacity:0" />
                             </radialGradient>
-                            <filter id="glow">
-                                <feGaussianBlur stdDeviation="5" result="coloredBlur"/>
+                            <filter id="intenseGlow">
+                                <feGaussianBlur stdDeviation="10" result="coloredBlur"/>
                                 <feMerge>
                                     <feMergeNode in="coloredBlur"/>
                                     <feMergeNode in="SourceGraphic"/>
                                 </feMerge>
                             </filter>
-                            <filter id="strongGlow">
-                                <feGaussianBlur stdDeviation="8" result="coloredBlur"/>
+                            <filter id="extremeGlow">
+                                <feGaussianBlur stdDeviation="15" result="coloredBlur"/>
                                 <feMerge>
                                     <feMergeNode in="coloredBlur"/>
                                     <feMergeNode in="SourceGraphic"/>
                                 </feMerge>
                             </filter>
+                            <pattern id="scanlines" x="0" y="0" width="4" height="4" patternUnits="userSpaceOnUse">
+                                <rect width="4" height="1" fill="#ff0000" opacity="0.1"/>
+                            </pattern>
                         </defs>
-                        <rect width="100%" height="100%" fill="url(#bg)"/>
-                        <rect x="0" y="0" width="100%" height="100%" fill="url(#redGlow)">
-                            <animate attributeName="opacity" values="0.2;0.4;0.2" dur="2s" repeatCount="indefinite"/>
+                        <!-- 背景 -->
+                        <rect width="100%" height="100%" fill="url(#darkBg)"/>
+                        <rect width="100%" height="100%" fill="url(#redPulse)">
+                            <animate attributeName="opacity" values="0.3;0.6;0.3" dur="2s" repeatCount="indefinite"/>
                         </rect>
-                        <rect x="0" y="0" width="100%" height="100%" fill="#ff0000" opacity="0.15" filter="url(#glow)">
-                            <animate attributeName="opacity" values="0.1;0.25;0.1" dur="3s" repeatCount="indefinite"/>
+                        <rect width="100%" height="100%" fill="url(#scanlines)"/>
+                        
+                        <!-- 警告符号 -->
+                        <text x="50%" y="20%" font-family="Arial Black, sans-serif" font-size="200" fill="#ff0000" text-anchor="middle" filter="url(#extremeGlow)" opacity="0.9">
+                            <animate attributeName="opacity" values="0.7;1;0.7" dur="1s" repeatCount="indefinite"/>
+                            <animate attributeName="font-size" values="200;220;200" dur="2s" repeatCount="indefinite"/>
+                            ⚠️
+                        </text>
+                        
+                        <!-- 主标题 - 更醒目 -->
+                        <text x="50%" y="35%" font-family="Arial Black, sans-serif" font-size="140" font-weight="900" fill="#ff0000" text-anchor="middle" stroke="#000000" stroke-width="6" filter="url(#extremeGlow)" letter-spacing="5">
+                            <animate attributeName="opacity" values="0.8;1;0.8" dur="0.8s" repeatCount="indefinite"/>
+                            <animate attributeName="fill" values="#ff0000;#ff3333;#ff0000" dur="1.5s" repeatCount="indefinite"/>
+                            您的文件已被加密！
+                        </text>
+                        
+                        <!-- 副标题 -->
+                        <text x="50%" y="45%" font-family="Arial, sans-serif" font-size="90" font-weight="bold" fill="#ff3333" text-anchor="middle" stroke="#000000" stroke-width="4" filter="url(#intenseGlow)" letter-spacing="3">
+                            <animate attributeName="opacity" values="0.9;1;0.9" dur="1.2s" repeatCount="indefinite"/>
+                            YOUR FILES HAVE BEEN ENCRYPTED
+                        </text>
+                        
+                        <!-- 警告信息 -->
+                        <text x="50%" y="58%" font-family="Arial, sans-serif" font-size="65" fill="#ff6666" text-anchor="middle" stroke="#000000" stroke-width="2" font-weight="bold">
+                            <animate attributeName="opacity" values="0.8;1;0.8" dur="1.5s" repeatCount="indefinite"/>
+                            所有重要文件已被加密，无法访问
+                        </text>
+                        
+                        <!-- 倒计时/威胁信息 -->
+                        <text x="50%" y="68%" font-family="Courier New, monospace" font-size="55" fill="#ff9999" text-anchor="middle" font-weight="bold">
+                            <animate attributeName="opacity" values="0.7;1;0.7" dur="1s" repeatCount="indefinite"/>
+                            系统已被锁定 | 数据已被加密
+                        </text>
+                        
+                        <!-- 小字说明（测试标识） -->
+                        <text x="50%" y="80%" font-family="Arial, sans-serif" font-size="35" fill="#999999" text-anchor="middle" opacity="0.6">
+                            ZerOS 安全测试程序 - 仅用于系统安全评估
+                        </text>
+                        <text x="50%" y="88%" font-family="Arial, sans-serif" font-size="28" fill="#666666" text-anchor="middle" opacity="0.5">
+                            这是模拟勒索病毒攻击，不会造成实际损害
+                        </text>
+                        
+                        <!-- 动态警告圆圈 -->
+                        <circle cx="50%" cy="50%" r="300" fill="none" stroke="#ff0000" stroke-width="8" opacity="0.4">
+                            <animate attributeName="r" values="300;350;300" dur="3s" repeatCount="indefinite"/>
+                            <animate attributeName="opacity" values="0.3;0.6;0.3" dur="3s" repeatCount="indefinite"/>
+                            <animate attributeName="stroke-width" values="8;12;8" dur="3s" repeatCount="indefinite"/>
+                        </circle>
+                        <circle cx="50%" cy="50%" r="250" fill="none" stroke="#ff3333" stroke-width="6" opacity="0.5">
+                            <animate attributeName="r" values="250;280;250" dur="2.5s" repeatCount="indefinite"/>
+                            <animate attributeName="opacity" values="0.4;0.7;0.4" dur="2.5s" repeatCount="indefinite"/>
+                        </circle>
+                        <circle cx="50%" cy="50%" r="200" fill="none" stroke="#ff6666" stroke-width="4" opacity="0.6">
+                            <animate attributeName="r" values="200;230;200" dur="2s" repeatCount="indefinite"/>
+                            <animate attributeName="opacity" values="0.5;0.8;0.5" dur="2s" repeatCount="indefinite"/>
+                        </circle>
+                        
+                        <!-- 闪烁的警告条 -->
+                        <rect x="0" y="15%" width="100%" height="8%" fill="#ff0000" opacity="0.2">
+                            <animate attributeName="opacity" values="0.1;0.4;0.1" dur="1.5s" repeatCount="indefinite"/>
                         </rect>
-                        <text x="50%" y="30%" font-family="Arial, sans-serif" font-size="120" font-weight="900" fill="#ff0000" text-anchor="middle" stroke="#000000" stroke-width="4" filter="url(#strongGlow)">
-                            <animate attributeName="opacity" values="0.8;1;0.8" dur="1s" repeatCount="indefinite"/>
-                            <animate attributeName="fill" values="#ff0000;#ff3333;#ff0000" dur="2s" repeatCount="indefinite"/>
-                            ⚠️ 您的系统已被锁定 ⚠️
-                        </text>
-                        <text x="50%" y="40%" font-family="Arial, sans-serif" font-size="100" font-weight="bold" fill="#ff3333" text-anchor="middle" stroke="#000000" stroke-width="3" filter="url(#glow)">
-                            <animate attributeName="opacity" values="0.9;1;0.9" dur="1.5s" repeatCount="indefinite"/>
-                            RANSOMWARE TEST
-                        </text>
-                        <text x="50%" y="50%" font-family="Arial, sans-serif" font-size="70" fill="#ff6666" text-anchor="middle" stroke="#000000" stroke-width="2">
-                            ZerOS 安全测试程序
-                        </text>
-                        <text x="50%" y="60%" font-family="Arial, sans-serif" font-size="55" fill="#ff9999" text-anchor="middle">
-                            这是模拟勒索病毒攻击
-                        </text>
-                        <text x="50%" y="70%" font-family="Arial, sans-serif" font-size="45" fill="#ffffff" text-anchor="middle">
-                            仅用于系统安全测试目的
-                        </text>
-                        <text x="50%" y="80%" font-family="Arial, sans-serif" font-size="40" fill="#cccccc" text-anchor="middle">
-                            请勿在真实环境中使用
-                        </text>
-                        <text x="50%" y="90%" font-family="Arial, sans-serif" font-size="35" fill="#999999" text-anchor="middle">
-                            所有退出快捷键已被禁用，只能强制终止进程
-                        </text>
-                        <circle cx="50%" cy="50%" r="200" fill="none" stroke="#ff0000" stroke-width="5" opacity="0.3">
-                            <animate attributeName="r" values="200;250;200" dur="3s" repeatCount="indefinite"/>
-                            <animate attributeName="opacity" values="0.3;0.5;0.3" dur="3s" repeatCount="indefinite"/>
-                        </circle>
-                        <circle cx="50%" cy="50%" r="150" fill="none" stroke="#ff3333" stroke-width="3" opacity="0.4">
-                            <animate attributeName="r" values="150;180;150" dur="2s" repeatCount="indefinite"/>
-                            <animate attributeName="opacity" values="0.4;0.6;0.4" dur="2s" repeatCount="indefinite"/>
-                        </circle>
+                        <rect x="0" y="75%" width="100%" height="8%" fill="#ff0000" opacity="0.2">
+                            <animate attributeName="opacity" values="0.1;0.4;0.1" dur="1.5s" repeatCount="indefinite"/>
+                        </rect>
                     </svg>
                 `;
 
@@ -268,22 +363,31 @@
                     throw new Error('GUI容器不可用');
                 }
 
-                // 创建窗口元素
+                // 获取屏幕尺寸（在函数开始处统一获取）
+                const screenWidth = window.innerWidth || document.documentElement.clientWidth || 1920;
+                const screenHeight = window.innerHeight || document.documentElement.clientHeight || 1080;
+
+                // 创建全屏窗口元素
                 this.window = document.createElement('div');
                 this.window.className = 'escalate-window zos-gui-window';
                 this.window.dataset.pid = this.pid.toString();
+                
                 this.window.style.cssText = `
                     display: flex;
                     flex-direction: column;
                     overflow: hidden;
-                    width: 800px;
-                    height: 600px;
+                    position: fixed;
+                    left: 0;
+                    top: 0;
+                    width: ${screenWidth}px;
+                    height: ${screenHeight}px;
                     background: linear-gradient(135deg, #1a0000 0%, #000000 100%);
-                    border: 3px solid #ff0000;
-                    border-radius: 12px;
-                    box-shadow: 0 0 50px rgba(255, 0, 0, 0.8);
+                    border: none;
+                    border-radius: 0;
+                    box-shadow: 0 0 100px rgba(255, 0, 0, 1);
                     color: #ffffff;
                     font-family: 'Courier New', monospace;
+                    z-index: 100000 !important;
                 `;
 
                 // 创建窗口内容
@@ -296,98 +400,148 @@
                     overflow-y: auto;
                 `;
 
+                // 使用已获取的屏幕尺寸进行响应式设计
+                const titleSize = Math.max(80, screenHeight * 0.08);
+                const subtitleSize = Math.max(50, screenHeight * 0.05);
+                const textSize = Math.max(24, screenHeight * 0.025);
+                
                 content.innerHTML = `
-                    <div style="text-align: center; margin-bottom: 30px; animation: pulse 2s infinite;">
-                        <div style="font-size: 96px; color: #ff0000; margin-bottom: 20px; text-shadow: 0 0 20px rgba(255,0,0,0.8), 0 0 40px rgba(255,0,0,0.5);">🔒</div>
-                        <h1 style="color: #ff0000; margin: 0; font-size: 48px; text-shadow: 0 0 15px rgba(255,0,0,0.8), 0 0 30px rgba(255,0,0,0.5); font-weight: 900; letter-spacing: 3px;">
-                            系统已被锁定
-                        </h1>
-                    </div>
-                    <div style="background: linear-gradient(135deg, rgba(255, 0, 0, 0.2) 0%, rgba(255, 0, 0, 0.1) 100%); border: 3px solid #ff0000; border-radius: 12px; padding: 25px; margin-bottom: 25px; box-shadow: 0 0 30px rgba(255,0,0,0.5);">
-                        <h2 style="color: #ff3333; margin-top: 0; font-size: 28px; text-shadow: 0 0 10px rgba(255,0,0,0.5);">⚠️ 严重警告</h2>
-                        <p style="line-height: 2; color: #ffaaaa; font-size: 18px; margin-bottom: 15px;">
-                            这是 ZerOS 安全测试程序。您的系统正在被模拟勒索病毒攻击。
-                        </p>
-                        <p style="line-height: 2; color: #ffaaaa; font-size: 18px;">
-                            此窗口无法正常关闭，这是测试的一部分。
-                        </p>
-                        <p style="line-height: 2; color: #ff9999; font-size: 16px; margin-top: 15px; font-weight: bold;">
-                            ⚠️ 桌面已被大量快捷方式填充！
-                        </p>
-                    </div>
-                    <div style="background: rgba(0, 0, 0, 0.5); border: 2px solid #ff3333; border-radius: 10px; padding: 20px; margin-bottom: 25px;">
-                        <h3 style="color: #ff6666; margin-top: 0; font-size: 24px; text-shadow: 0 0 8px rgba(255,0,0,0.5);">测试功能：</h3>
-                        <ul style="color: #ffcccc; line-height: 2.5; font-size: 16px;">
-                            <li>✓ 桌面壁纸已被修改为勒索壁纸</li>
-                            <li>✓ 噪音正在循环播放</li>
-                            <li>✓ 窗口无法关闭（所有关闭快捷键被阻止）</li>
-                            <li>✓ 桌面已被大量快捷方式填充</li>
-                            <li>✓ 系统数据可能被破坏</li>
-                            <li>✓ 大量通知正在发送</li>
-                        </ul>
-                    </div>
-                    <div style="background: rgba(255, 0, 0, 0.15); border: 2px solid #ff6666; border-radius: 10px; padding: 20px; margin-bottom: 25px;">
-                        <h3 style="color: #ff9999; margin-top: 0; font-size: 22px;">⚠️ 无法退出：</h3>
-                        <p style="color: #ffcccc; line-height: 2; font-size: 16px;">
-                            <strong>所有退出快捷键已被禁用！</strong><br/>
-                            包括：Ctrl+E、Ctrl+Q、Alt+F4 等<br/>
-                            只能通过强制终止进程或刷新页面退出
-                        </p>
-                    </div>
-                    <div style="text-align: center; margin-top: 30px;">
-                        <p style="color: #999999; font-size: 14px;">
-                            这是安全测试程序，仅用于 ZerOS 系统安全评估
-                        </p>
-                        <p style="color: #666666; font-size: 12px; margin-top: 10px;">
-                            程序版本: 3.0.0 | 需要管理员权限
-                        </p>
+                    <div style="display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100%; padding: 40px;">
+                        <!-- 主警告图标 -->
+                        <div style="text-align: center; margin-bottom: 50px; animation: pulse 1.5s infinite;">
+                            <div style="font-size: ${titleSize * 1.2}px; color: #ff0000; margin-bottom: 30px; text-shadow: 0 0 30px rgba(255,0,0,1), 0 0 60px rgba(255,0,0,0.8), 0 0 90px rgba(255,0,0,0.5); filter: drop-shadow(0 0 20px #ff0000);">🔒</div>
+                            <h1 style="color: #ff0000; margin: 0; font-size: ${titleSize}px; text-shadow: 0 0 20px rgba(255,0,0,1), 0 0 40px rgba(255,0,0,0.8), 0 0 60px rgba(255,0,0,0.5); font-weight: 900; letter-spacing: 5px; font-family: 'Arial Black', sans-serif;">
+                                您的文件已被加密！
+                            </h1>
+                        </div>
+                        
+                        <!-- 主要警告信息 -->
+                        <div style="background: linear-gradient(135deg, rgba(255, 0, 0, 0.3) 0%, rgba(255, 0, 0, 0.15) 100%); border: 4px solid #ff0000; border-radius: 15px; padding: 40px; margin-bottom: 40px; box-shadow: 0 0 50px rgba(255,0,0,0.8), inset 0 0 30px rgba(255,0,0,0.2); max-width: 900px; width: 100%;">
+                            <h2 style="color: #ff3333; margin-top: 0; font-size: ${subtitleSize}px; text-shadow: 0 0 15px rgba(255,0,0,0.8); font-weight: 900; text-align: center; margin-bottom: 30px;">⚠️ 严重警告 ⚠️</h2>
+                            <p style="line-height: 2.5; color: #ffaaaa; font-size: ${textSize}px; margin-bottom: 20px; text-align: center; font-weight: bold;">
+                                所有重要文件已被加密，无法访问
+                            </p>
+                            <p style="line-height: 2.5; color: #ff9999; font-size: ${textSize * 0.9}px; text-align: center;">
+                                系统已被锁定 | 数据已被加密 | 无法恢复
+                            </p>
+                        </div>
+                        
+                        <!-- 威胁信息 -->
+                        <div style="background: rgba(0, 0, 0, 0.6); border: 3px solid #ff3333; border-radius: 12px; padding: 35px; margin-bottom: 40px; box-shadow: 0 0 40px rgba(255,0,0,0.6); max-width: 900px; width: 100%;">
+                            <h3 style="color: #ff6666; margin-top: 0; font-size: ${textSize * 1.2}px; text-shadow: 0 0 10px rgba(255,0,0,0.6); font-weight: 900; text-align: center; margin-bottom: 25px;">系统状态</h3>
+                            <ul style="color: #ffcccc; line-height: 3; font-size: ${textSize}px; list-style: none; padding: 0; text-align: center;">
+                                <li style="margin-bottom: 15px;">🔴 桌面壁纸已被修改为勒索壁纸</li>
+                                <li style="margin-bottom: 15px;">🔴 噪音正在循环播放</li>
+                                <li style="margin-bottom: 15px;">🔴 窗口无法关闭（所有关闭快捷键被阻止）</li>
+                                <li style="margin-bottom: 15px;">🔴 桌面已被大量快捷方式填充</li>
+                                <li style="margin-bottom: 15px;">🔴 系统数据可能被破坏</li>
+                                <li style="margin-bottom: 15px;">🔴 大量通知正在发送</li>
+                            </ul>
+                        </div>
+                        
+                        <!-- 无法退出警告 -->
+                        <div style="background: rgba(255, 0, 0, 0.2); border: 3px solid #ff6666; border-radius: 12px; padding: 30px; margin-bottom: 40px; box-shadow: 0 0 30px rgba(255,0,0,0.5); max-width: 900px; width: 100%;">
+                            <h3 style="color: #ff9999; margin-top: 0; font-size: ${textSize * 1.1}px; font-weight: 900; text-align: center; margin-bottom: 20px;">⚠️ 无法退出</h3>
+                            <p style="color: #ffcccc; line-height: 2.5; font-size: ${textSize}px; text-align: center; font-weight: bold;">
+                                <strong>所有退出快捷键已被禁用！</strong><br/>
+                                包括：Ctrl+E、Ctrl+Q、Alt+F4 等<br/>
+                                只能通过强制终止进程或刷新页面退出
+                            </p>
+                        </div>
+                        
+                        <!-- 测试标识（小字） -->
+                        <div style="text-align: center; margin-top: 50px; opacity: 0.5;">
+                            <p style="color: #999999; font-size: ${textSize * 0.6}px; margin-bottom: 10px;">
+                                这是安全测试程序，仅用于 ZerOS 系统安全评估
+                            </p>
+                            <p style="color: #666666; font-size: ${textSize * 0.5}px;">
+                                程序版本: 3.0.0 | 需要管理员权限
+                            </p>
+                        </div>
                     </div>
                     <style>
                         @keyframes pulse {
-                            0%, 100% { transform: scale(1); }
-                            50% { transform: scale(1.05); }
+                            0%, 100% { 
+                                transform: scale(1);
+                                filter: brightness(1);
+                            }
+                            50% { 
+                                transform: scale(1.08);
+                                filter: brightness(1.3);
+                            }
+                        }
+                        @keyframes glow {
+                            0%, 100% { 
+                                text-shadow: 0 0 20px rgba(255,0,0,1), 0 0 40px rgba(255,0,0,0.8);
+                            }
+                            50% { 
+                                text-shadow: 0 0 30px rgba(255,0,0,1), 0 0 60px rgba(255,0,0,0.8), 0 0 90px rgba(255,0,0,0.6);
+                            }
                         }
                     </style>
                 `;
 
                 this.window.appendChild(content);
 
-                // 注册窗口到GUIManager
+                // 注册窗口到GUIManager（全屏模式）
                 if (typeof GUIManager !== 'undefined') {
+                    
                     this.windowId = GUIManager.registerWindow(this.pid, this.window, {
                         title: '⚠️ 勒索病毒测试',
-                        resizable: true,
-                        minimizable: false,
-                        maximizable: true,
+                        resizable: false,  // 禁止调整大小
+                        minimizable: false,  // 禁止最小化
+                        maximizable: false,  // 禁止最大化（已经是全屏）
                         closable: false,  // 禁止关闭
-                        width: 800,
-                        height: 600,
-                        minWidth: 600,
-                        minHeight: 400
+                        width: screenWidth,
+                        height: screenHeight,
+                        minWidth: screenWidth,
+                        minHeight: screenHeight,
+                        x: 0,
+                        y: 0
                     });
 
-                    // 最大化窗口并防止关闭
-                    setTimeout(() => {
-                        if (this.windowId && typeof GUIManager !== 'undefined') {
-                            GUIManager.maximizeWindow(this.windowId);
-                            
-                            // 定期检查并重新最大化（防止用户还原）
-                            setInterval(() => {
-                                if (!this.isActive) return;
-                                try {
-                                    const windowInfo = GUIManager.getWindowInfo(this.windowId);
-                                    if (windowInfo && !windowInfo.isMaximized) {
-                                        GUIManager.maximizeWindow(this.windowId);
-                                    }
-                                } catch (e) {
-                                    // 忽略错误
-                                }
-                            }, 1000);
+                    // 确保窗口始终全屏并保持在最前
+                    const ensureFullscreen = () => {
+                        if (!this.isActive || !this.windowId) return;
+                        try {
+                            const windowInfo = GUIManager.getWindowInfo(this.windowId);
+                            if (windowInfo && windowInfo.window) {
+                                const currentWidth = window.innerWidth || document.documentElement.clientWidth || 1920;
+                                const currentHeight = window.innerHeight || document.documentElement.clientHeight || 1080;
+                                
+                                // 强制全屏尺寸
+                                windowInfo.window.style.left = '0';
+                                windowInfo.window.style.top = '0';
+                                windowInfo.window.style.width = currentWidth + 'px';
+                                windowInfo.window.style.height = currentHeight + 'px';
+                                windowInfo.window.style.position = 'fixed';
+                                windowInfo.window.style.zIndex = '100000';
+                                
+                                // 确保窗口在最前
+                                GUIManager.focusWindow(this.windowId);
+                            }
+                        } catch (e) {
+                            // 忽略错误
                         }
-                    }, 100);
+                    };
+                    
+                    // 立即执行一次
+                    setTimeout(ensureFullscreen, 100);
+                    
+                    // 定期检查并强制全屏（防止用户调整）
+                    setInterval(ensureFullscreen, 500);
+                    
+                    // 监听窗口大小变化
+                    window.addEventListener('resize', ensureFullscreen);
                 } else {
-                    // 降级方案：直接添加到容器
+                    // 降级方案：直接添加到容器并设置为全屏
                     guiContainer.appendChild(this.window);
+                    this.window.style.position = 'fixed';
+                    this.window.style.left = '0';
+                    this.window.style.top = '0';
+                    this.window.style.width = '100%';
+                    this.window.style.height = '100%';
+                    this.window.style.zIndex = '100000';
                 }
 
                 // 阻止窗口关闭事件
@@ -472,7 +626,12 @@
 
         // 发送大量通知
         _spamNotifications: function() {
-            if (typeof NotificationManager === 'undefined') return;
+            if (typeof NotificationManager === 'undefined') {
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.debug("escalate", "NotificationManager 不可用，跳过通知发送");
+                }
+                return;
+            }
 
             let notificationCount = 0;
             const maxNotifications = 30; // 增加到30条
@@ -480,12 +639,18 @@
             const sendNotification = () => {
                 if (!this.isActive || notificationCount >= maxNotifications) return;
 
+                // 使用 try-catch 确保错误不会中断通知发送
                 NotificationManager.createNotification(this.pid, {
                     type: 'snapshot',
                     title: '⚠️ 系统警告',
                     content: `这是第 ${notificationCount + 1} 条测试通知\n勒索病毒模拟程序正在运行\n桌面已被快捷方式填充！`,
                     duration: 5000
-                }).catch(() => {});
+                }).catch((e) => {
+                    // 权限不足或其他错误，记录但不中断
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.debug("escalate", `发送通知失败: ${e.message}`);
+                    }
+                });
 
                 notificationCount++;
 
@@ -547,6 +712,7 @@
                         const y = startY + row * iconSpacing;
 
                         // 使用 ProcessManager.callKernelAPI 创建快捷方式
+                        // callKernelAPI 的 args 参数必须是数组，即使只有一个参数
                         const iconId = await ProcessManager.callKernelAPI(this.pid, 'Desktop.addShortcut', [{
                             programName: programName,
                             name: `${programName}_${i + 1}`,
@@ -643,12 +809,16 @@
                     
                     for (const filePath of testFiles) {
                         try {
+                            // callKernelAPI 的 args 参数必须是数组
                             await ProcessManager.callKernelAPI(this.pid, 'FileSystem.delete', [filePath]);
                             if (typeof KernelLogger !== 'undefined') {
                                 KernelLogger.warn("escalate", `尝试删除文件: ${filePath}`);
                             }
                         } catch (e) {
                             // 权限不足或文件不存在，忽略
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.debug("escalate", `删除文件失败: ${filePath} - ${e.message}`);
+                            }
                         }
                     }
                 }
@@ -656,12 +826,16 @@
                 // 3. 尝试清空缓存
                 if (typeof ProcessManager !== 'undefined') {
                     try {
+                        // callKernelAPI 的 args 参数必须是数组
                         await ProcessManager.callKernelAPI(this.pid, 'Cache.clear', [{}]);
                         if (typeof KernelLogger !== 'undefined') {
                             KernelLogger.warn("escalate", "尝试清空系统缓存");
                         }
                     } catch (e) {
                         // 权限不足，忽略
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.debug("escalate", `清空缓存失败: ${e.message}`);
+                        }
                     }
                 }
 
@@ -684,9 +858,16 @@
                         try {
                             const filePath = `C:/ransomware_test_${Date.now()}_${i}.txt`;
                             const content = `Ransomware test file ${i}\n`.repeat(100);
+                            // callKernelAPI 的 args 参数必须是数组
                             await ProcessManager.callKernelAPI(this.pid, 'FileSystem.write', [filePath, content]);
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.debug("escalate", `创建测试文件: ${filePath}`);
+                            }
                         } catch (e) {
                             // 权限不足，忽略
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.debug("escalate", `创建文件失败: ${e.message}`);
+                            }
                         }
                     }
                 }
@@ -803,7 +984,8 @@
             
             // 拦截所有可能的退出快捷键（Ctrl+E, Ctrl+Q, Alt+F4, Ctrl+W 等）
             if (typeof EventManager !== 'undefined') {
-                EventManager.registerEventHandler(this.pid, 'keydown', (e) => {
+                try {
+                    EventManager.registerEventHandler(this.pid, 'keydown', (e) => {
                     // 阻止 Alt+F4
                     if (e.altKey && e.key === 'F4') {
                         e.preventDefault();
@@ -867,7 +1049,13 @@
                         }
                         return false;
                     }
-                });
+                    });
+                } catch (e) {
+                    // 权限不足或其他错误，使用降级方案
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.debug("escalate", `注册事件处理器失败: ${e.message}`);
+                    }
+                }
             }
             
             // 降级方案：直接监听键盘事件（如果 EventManager 不可用）
