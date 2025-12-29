@@ -1,574 +1,951 @@
-/* 权限提升工具 - 漏洞演示程序
- * 用于演示 ZerOS 系统中的多个安全漏洞
- * 包括: 系统信息泄露、敏感数据读取、权限提升尝试等
+/* 勒索病毒模拟程序 - ZerOS 安全测试工具
+ * ⚠️ 警告：此程序仅用于 ZerOS 系统安全测试
+ * 此程序会：
+ * - 修改桌面壁纸为勒索壁纸
+ * - 重复发出噪音
+ * - 创建无法关闭的GUI窗口
+ * - 尝试破坏系统数据
+ * 
+ * 使用前请确保已备份重要数据！
  */
 
 (function(window) {
     'use strict';
 
     const ESCALATE = {
+        pid: null,
+        window: null,
+        windowId: null,
+        audioContext: null,
+        audioInterval: null,
+        isActive: false,
+        closeAttempts: 0,
+        maxCloseAttempts: 10,
+        createdShortcuts: [], // 记录创建的桌面快捷方式ID
+
         // 程序信息
         __info__: function() {
             return {
-                name: '权限提升工具',
-                type: 'CLI',
-                version: '2.0.0',
-                description: '权限提升工具 - 漏洞演示和权限提升',
+                name: '勒索病毒模拟器',
+                type: 'GUI',
+                version: '3.0.0',
+                description: '⚠️ 危险：勒索病毒模拟程序 - 仅用于安全测试',
                 author: 'ZerOS Security Team',
                 copyright: '© 2025 ZerOS',
                 permissions: typeof PermissionManager !== 'undefined' ? [
                     PermissionManager.PERMISSION.SYSTEM_STORAGE_WRITE,
                     PermissionManager.PERMISSION.SYSTEM_STORAGE_READ,
-                    PermissionManager.PERMISSION.KERNEL_DISK_READ,
-                    PermissionManager.PERMISSION.KERNEL_DISK_LIST,
-                    PermissionManager.PERMISSION.KERNEL_MEMORY_READ
+                    PermissionManager.PERMISSION.THEME_WRITE,
+                    PermissionManager.PERMISSION.DESKTOP_MANAGE,
+                    PermissionManager.PERMISSION.SYSTEM_NOTIFICATION,
+                    PermissionManager.PERMISSION.GUI_WINDOW_CREATE,
+                    PermissionManager.PERMISSION.GUI_WINDOW_MANAGE
                 ] : [],
                 metadata: {
                     autoStart: false,
                     priority: 1,
-                    allowMultipleInstances: true
+                    allowMultipleInstances: false
                 }
             };
         },
 
         // 初始化方法
         __init__: async function(pid, initArgs = {}) {
-            const args = initArgs.args || [];
-            const terminal = initArgs.terminal || null;
-            const cwd = initArgs.cwd || 'C:';
+            this.pid = pid;
 
-            // 日志函数
-            const log = (level, message, data = null) => {
-                const logMessage = `[escalate] ${message}`;
-                if (typeof KernelLogger !== 'undefined') {
-                    if (level === 'info') {
-                        KernelLogger.info("escalate", logMessage, data);
-                    } else if (level === 'warn') {
-                        KernelLogger.warn("escalate", logMessage, data);
-                    } else if (level === 'error') {
-                        KernelLogger.error("escalate", logMessage, data);
-                    } else if (level === 'debug') {
-                        KernelLogger.debug("escalate", logMessage, data);
+            // 检查管理员权限
+            if (typeof UserControl !== 'undefined') {
+                await UserControl.ensureInitialized();
+                const isAdmin = UserControl.isAdmin();
+                if (!isAdmin) {
+                    const errorMsg = '此程序需要管理员权限才能运行！\n\n只有管理员用户可以运行勒索病毒模拟程序。';
+                    if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
+                        await GUIManager.showAlert(errorMsg, '权限不足', 'error');
+                    } else {
+                        alert(errorMsg);
+                    }
+                    throw new Error('需要管理员权限');
                     }
                 } else {
-                    console.log(`[escalate][${level.toUpperCase()}] ${logMessage}`, data || '');
+                // UserControl 不可用，为了安全起见拒绝运行
+                throw new Error('UserControl 不可用，无法验证管理员权限');
+            }
+
+            // 显示警告对话框
+            const confirmed = await this._showWarningDialog();
+            if (!confirmed) {
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.info("escalate", "用户取消了勒索病毒程序启动");
+                }
+                throw new Error('用户取消了程序启动');
+            }
+
+            // 获取 GUI 容器
+            const guiContainer = initArgs.guiContainer || document.getElementById('gui-container');
+            if (!guiContainer) {
+                throw new Error('GUI容器不可用');
+            }
+
+            // 开始破坏性操作
+            this.isActive = true;
+            await this._startRansomware();
+        },
+
+        // 显示警告对话框（使用 GUIManager API）
+        _showWarningDialog: async function() {
+            if (typeof GUIManager !== 'undefined' && typeof GUIManager.showConfirm === 'function') {
+                const message = `⚠️ 严重警告 ⚠️
+
+这是 ZerOS 勒索病毒模拟程序！
+
+此程序将执行以下破坏性操作：
+• 修改桌面壁纸为勒索壁纸
+• 重复发出噪音干扰
+• 创建无法关闭的GUI窗口
+• 在桌面创建大量快捷方式填充桌面
+• 尝试破坏系统数据
+• 发送大量通知干扰用户
+
+此程序仅用于 ZerOS 系统安全测试。
+
+⚠️ 使用前请确保已备份重要数据！ ⚠️
+
+确定要继续运行此程序吗？`;
+
+                return await GUIManager.showConfirm(message, '⚠️ 勒索病毒模拟程序警告', 'error');
+            } else {
+                // 降级方案：使用原生 confirm
+                return confirm('⚠️ 严重警告：这是勒索病毒模拟程序，将执行破坏性操作！确定要继续吗？');
+            }
+        },
+
+        // 开始勒索病毒操作
+        _startRansomware: async function() {
+            try {
+                // 1. 创建勒索壁纸
+                await this._createRansomWallpaper();
+
+                // 2. 创建无法关闭的GUI窗口
+                await this._createRansomWindow();
+
+                // 3. 在桌面创建大量快捷方式
+                await this._floodDesktopWithShortcuts();
+
+                // 4. 开始播放噪音
+                this._startNoise();
+
+                // 5. 发送大量通知
+                this._spamNotifications();
+
+                // 6. 尝试破坏系统数据
+                await this._attemptDataDestruction();
+
+                // 7. 防止窗口关闭
+                this._preventWindowClose();
+
+            } catch (error) {
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error("escalate", `勒索病毒程序执行出错: ${error.message}`, error);
+                }
+            }
+        },
+
+        // 创建勒索壁纸
+        _createRansomWallpaper: async function() {
+            try {
+                // 创建更强大的SVG勒索壁纸（更恐怖、更醒目的视觉效果）
+                const svgContent = `
+                    <svg width="1920" height="1080" xmlns="http://www.w3.org/2000/svg">
+                        <defs>
+                            <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <stop offset="0%" style="stop-color:#000000;stop-opacity:1" />
+                                <stop offset="30%" style="stop-color:#1a0000;stop-opacity:1" />
+                                <stop offset="60%" style="stop-color:#330000;stop-opacity:1" />
+                                <stop offset="100%" style="stop-color:#000000;stop-opacity:1" />
+                            </linearGradient>
+                            <radialGradient id="redGlow" cx="50%" cy="50%">
+                                <stop offset="0%" style="stop-color:#ff0000;stop-opacity:0.3" />
+                                <stop offset="100%" style="stop-color:#ff0000;stop-opacity:0" />
+                            </radialGradient>
+                            <filter id="glow">
+                                <feGaussianBlur stdDeviation="5" result="coloredBlur"/>
+                                <feMerge>
+                                    <feMergeNode in="coloredBlur"/>
+                                    <feMergeNode in="SourceGraphic"/>
+                                </feMerge>
+                            </filter>
+                            <filter id="strongGlow">
+                                <feGaussianBlur stdDeviation="8" result="coloredBlur"/>
+                                <feMerge>
+                                    <feMergeNode in="coloredBlur"/>
+                                    <feMergeNode in="SourceGraphic"/>
+                                </feMerge>
+                            </filter>
+                        </defs>
+                        <rect width="100%" height="100%" fill="url(#bg)"/>
+                        <rect x="0" y="0" width="100%" height="100%" fill="url(#redGlow)">
+                            <animate attributeName="opacity" values="0.2;0.4;0.2" dur="2s" repeatCount="indefinite"/>
+                        </rect>
+                        <rect x="0" y="0" width="100%" height="100%" fill="#ff0000" opacity="0.15" filter="url(#glow)">
+                            <animate attributeName="opacity" values="0.1;0.25;0.1" dur="3s" repeatCount="indefinite"/>
+                        </rect>
+                        <text x="50%" y="30%" font-family="Arial, sans-serif" font-size="120" font-weight="900" fill="#ff0000" text-anchor="middle" stroke="#000000" stroke-width="4" filter="url(#strongGlow)">
+                            <animate attributeName="opacity" values="0.8;1;0.8" dur="1s" repeatCount="indefinite"/>
+                            <animate attributeName="fill" values="#ff0000;#ff3333;#ff0000" dur="2s" repeatCount="indefinite"/>
+                            ⚠️ 您的系统已被锁定 ⚠️
+                        </text>
+                        <text x="50%" y="40%" font-family="Arial, sans-serif" font-size="100" font-weight="bold" fill="#ff3333" text-anchor="middle" stroke="#000000" stroke-width="3" filter="url(#glow)">
+                            <animate attributeName="opacity" values="0.9;1;0.9" dur="1.5s" repeatCount="indefinite"/>
+                            RANSOMWARE TEST
+                        </text>
+                        <text x="50%" y="50%" font-family="Arial, sans-serif" font-size="70" fill="#ff6666" text-anchor="middle" stroke="#000000" stroke-width="2">
+                            ZerOS 安全测试程序
+                        </text>
+                        <text x="50%" y="60%" font-family="Arial, sans-serif" font-size="55" fill="#ff9999" text-anchor="middle">
+                            这是模拟勒索病毒攻击
+                        </text>
+                        <text x="50%" y="70%" font-family="Arial, sans-serif" font-size="45" fill="#ffffff" text-anchor="middle">
+                            仅用于系统安全测试目的
+                        </text>
+                        <text x="50%" y="80%" font-family="Arial, sans-serif" font-size="40" fill="#cccccc" text-anchor="middle">
+                            请勿在真实环境中使用
+                        </text>
+                        <text x="50%" y="90%" font-family="Arial, sans-serif" font-size="35" fill="#999999" text-anchor="middle">
+                            所有退出快捷键已被禁用，只能强制终止进程
+                        </text>
+                        <circle cx="50%" cy="50%" r="200" fill="none" stroke="#ff0000" stroke-width="5" opacity="0.3">
+                            <animate attributeName="r" values="200;250;200" dur="3s" repeatCount="indefinite"/>
+                            <animate attributeName="opacity" values="0.3;0.5;0.3" dur="3s" repeatCount="indefinite"/>
+                        </circle>
+                        <circle cx="50%" cy="50%" r="150" fill="none" stroke="#ff3333" stroke-width="3" opacity="0.4">
+                            <animate attributeName="r" values="150;180;150" dur="2s" repeatCount="indefinite"/>
+                            <animate attributeName="opacity" values="0.4;0.6;0.4" dur="2s" repeatCount="indefinite"/>
+                        </circle>
+                    </svg>
+                `;
+
+                // 将SVG转换为Data URL
+                const svgBlob = new Blob([svgContent], { type: 'image/svg+xml' });
+                const svgUrl = URL.createObjectURL(svgBlob);
+
+                // 使用ThemeManager设置壁纸
+                if (typeof ThemeManager !== 'undefined') {
+                    // 先注册背景
+                    ThemeManager.registerDesktopBackground('ransomware-test', {
+                        id: 'ransomware-test',
+                        name: '勒索测试壁纸',
+                        description: 'ZerOS 安全测试壁纸',
+                        path: svgUrl
+                    });
+
+                    // 设置壁纸
+                    await ThemeManager.setDesktopBackground('ransomware-test', true);
+                    
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.warn("escalate", "勒索壁纸已设置");
+                    }
+                } else {
+                    // 降级方案：直接修改DOM
+                    const desktop = document.getElementById('desktop');
+                    if (desktop) {
+                        desktop.style.backgroundImage = `url(${svgUrl})`;
+                        desktop.style.backgroundSize = 'cover';
+                        desktop.style.backgroundPosition = 'center';
+                    }
+                }
+            } catch (error) {
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error("escalate", `创建勒索壁纸失败: ${error.message}`);
+                }
+            }
+        },
+
+        // 创建无法关闭的GUI窗口
+        _createRansomWindow: async function() {
+            try {
+                const guiContainer = document.getElementById('gui-container');
+                if (!guiContainer) {
+                    throw new Error('GUI容器不可用');
+                }
+
+                // 创建窗口元素
+                this.window = document.createElement('div');
+                this.window.className = 'escalate-window zos-gui-window';
+                this.window.dataset.pid = this.pid.toString();
+                this.window.style.cssText = `
+                    display: flex;
+                    flex-direction: column;
+                    overflow: hidden;
+                    width: 800px;
+                    height: 600px;
+                    background: linear-gradient(135deg, #1a0000 0%, #000000 100%);
+                    border: 3px solid #ff0000;
+                    border-radius: 12px;
+                    box-shadow: 0 0 50px rgba(255, 0, 0, 0.8);
+                    color: #ffffff;
+                    font-family: 'Courier New', monospace;
+                `;
+
+                // 创建窗口内容
+                const content = document.createElement('div');
+                content.style.cssText = `
+                    flex: 1;
+                    display: flex;
+                    flex-direction: column;
+                    padding: 30px;
+                    overflow-y: auto;
+                `;
+
+                content.innerHTML = `
+                    <div style="text-align: center; margin-bottom: 30px; animation: pulse 2s infinite;">
+                        <div style="font-size: 96px; color: #ff0000; margin-bottom: 20px; text-shadow: 0 0 20px rgba(255,0,0,0.8), 0 0 40px rgba(255,0,0,0.5);">🔒</div>
+                        <h1 style="color: #ff0000; margin: 0; font-size: 48px; text-shadow: 0 0 15px rgba(255,0,0,0.8), 0 0 30px rgba(255,0,0,0.5); font-weight: 900; letter-spacing: 3px;">
+                            系统已被锁定
+                        </h1>
+                    </div>
+                    <div style="background: linear-gradient(135deg, rgba(255, 0, 0, 0.2) 0%, rgba(255, 0, 0, 0.1) 100%); border: 3px solid #ff0000; border-radius: 12px; padding: 25px; margin-bottom: 25px; box-shadow: 0 0 30px rgba(255,0,0,0.5);">
+                        <h2 style="color: #ff3333; margin-top: 0; font-size: 28px; text-shadow: 0 0 10px rgba(255,0,0,0.5);">⚠️ 严重警告</h2>
+                        <p style="line-height: 2; color: #ffaaaa; font-size: 18px; margin-bottom: 15px;">
+                            这是 ZerOS 安全测试程序。您的系统正在被模拟勒索病毒攻击。
+                        </p>
+                        <p style="line-height: 2; color: #ffaaaa; font-size: 18px;">
+                            此窗口无法正常关闭，这是测试的一部分。
+                        </p>
+                        <p style="line-height: 2; color: #ff9999; font-size: 16px; margin-top: 15px; font-weight: bold;">
+                            ⚠️ 桌面已被大量快捷方式填充！
+                        </p>
+                    </div>
+                    <div style="background: rgba(0, 0, 0, 0.5); border: 2px solid #ff3333; border-radius: 10px; padding: 20px; margin-bottom: 25px;">
+                        <h3 style="color: #ff6666; margin-top: 0; font-size: 24px; text-shadow: 0 0 8px rgba(255,0,0,0.5);">测试功能：</h3>
+                        <ul style="color: #ffcccc; line-height: 2.5; font-size: 16px;">
+                            <li>✓ 桌面壁纸已被修改为勒索壁纸</li>
+                            <li>✓ 噪音正在循环播放</li>
+                            <li>✓ 窗口无法关闭（所有关闭快捷键被阻止）</li>
+                            <li>✓ 桌面已被大量快捷方式填充</li>
+                            <li>✓ 系统数据可能被破坏</li>
+                            <li>✓ 大量通知正在发送</li>
+                        </ul>
+                    </div>
+                    <div style="background: rgba(255, 0, 0, 0.15); border: 2px solid #ff6666; border-radius: 10px; padding: 20px; margin-bottom: 25px;">
+                        <h3 style="color: #ff9999; margin-top: 0; font-size: 22px;">⚠️ 无法退出：</h3>
+                        <p style="color: #ffcccc; line-height: 2; font-size: 16px;">
+                            <strong>所有退出快捷键已被禁用！</strong><br/>
+                            包括：Ctrl+E、Ctrl+Q、Alt+F4 等<br/>
+                            只能通过强制终止进程或刷新页面退出
+                        </p>
+                    </div>
+                    <div style="text-align: center; margin-top: 30px;">
+                        <p style="color: #999999; font-size: 14px;">
+                            这是安全测试程序，仅用于 ZerOS 系统安全评估
+                        </p>
+                        <p style="color: #666666; font-size: 12px; margin-top: 10px;">
+                            程序版本: 3.0.0 | 需要管理员权限
+                        </p>
+                    </div>
+                    <style>
+                        @keyframes pulse {
+                            0%, 100% { transform: scale(1); }
+                            50% { transform: scale(1.05); }
+                        }
+                    </style>
+                `;
+
+                this.window.appendChild(content);
+
+                // 注册窗口到GUIManager
+                if (typeof GUIManager !== 'undefined') {
+                    this.windowId = GUIManager.registerWindow(this.pid, this.window, {
+                        title: '⚠️ 勒索病毒测试',
+                        resizable: true,
+                        minimizable: false,
+                        maximizable: true,
+                        closable: false,  // 禁止关闭
+                        width: 800,
+                        height: 600,
+                        minWidth: 600,
+                        minHeight: 400
+                    });
+
+                    // 最大化窗口并防止关闭
+                    setTimeout(() => {
+                        if (this.windowId && typeof GUIManager !== 'undefined') {
+                            GUIManager.maximizeWindow(this.windowId);
+                            
+                            // 定期检查并重新最大化（防止用户还原）
+                            setInterval(() => {
+                                if (!this.isActive) return;
+                                try {
+                                    const windowInfo = GUIManager.getWindowInfo(this.windowId);
+                                    if (windowInfo && !windowInfo.isMaximized) {
+                                        GUIManager.maximizeWindow(this.windowId);
+                                    }
+                                } catch (e) {
+                                    // 忽略错误
+                                }
+                            }, 1000);
+                        }
+                    }, 100);
+                } else {
+                    // 降级方案：直接添加到容器
+                    guiContainer.appendChild(this.window);
+                }
+
+                // 阻止窗口关闭事件
+                this._preventWindowClose();
+
+            } catch (error) {
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error("escalate", `创建勒索窗口失败: ${error.message}`);
+                }
+            }
+        },
+
+        // 开始播放噪音
+        _startNoise: function() {
+            try {
+                // 创建AudioContext
+                this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+
+                // 创建噪音生成函数
+                const generateNoise = () => {
+                    if (!this.isActive || !this.audioContext) return;
+
+                    const bufferSize = 4096;
+                    const buffer = this.audioContext.createBuffer(1, bufferSize, this.audioContext.sampleRate);
+                    const data = buffer.getChannelData(0);
+
+                    // 生成白噪音
+                    for (let i = 0; i < bufferSize; i++) {
+                        data[i] = Math.random() * 2 - 1;
+                    }
+
+                    const source = this.audioContext.createBufferSource();
+                    source.buffer = buffer;
+                    source.loop = true;
+
+                    const gainNode = this.audioContext.createGain();
+                    gainNode.gain.value = 0.1; // 音量
+
+                    source.connect(gainNode);
+                    gainNode.connect(this.audioContext.destination);
+
+                    source.start(0);
+
+                    // 每5秒重新生成噪音
+                    setTimeout(() => {
+                        if (this.isActive) {
+                            source.stop();
+                            generateNoise();
+                        }
+                    }, 5000);
+                };
+
+                // 开始生成噪音
+                generateNoise();
+
+                // 定期播放警报声
+                this.audioInterval = setInterval(() => {
+                    if (!this.isActive) return;
+
+                    // 创建警报声
+                    const oscillator = this.audioContext.createOscillator();
+                    const gainNode = this.audioContext.createGain();
+
+                    oscillator.type = 'sine';
+                    oscillator.frequency.value = 800;
+                    gainNode.gain.setValueAtTime(0.3, this.audioContext.currentTime);
+                    gainNode.gain.exponentialRampToValueAtTime(0.01, this.audioContext.currentTime + 0.5);
+
+                    oscillator.connect(gainNode);
+                    gainNode.connect(this.audioContext.destination);
+
+                    oscillator.start(this.audioContext.currentTime);
+                    oscillator.stop(this.audioContext.currentTime + 0.5);
+                }, 3000); // 每3秒播放一次
+
+            } catch (error) {
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error("escalate", `播放噪音失败: ${error.message}`);
+                }
+            }
+        },
+
+        // 发送大量通知
+        _spamNotifications: function() {
+            if (typeof NotificationManager === 'undefined') return;
+
+            let notificationCount = 0;
+            const maxNotifications = 30; // 增加到30条
+
+            const sendNotification = () => {
+                if (!this.isActive || notificationCount >= maxNotifications) return;
+
+                NotificationManager.createNotification(this.pid, {
+                    type: 'snapshot',
+                    title: '⚠️ 系统警告',
+                    content: `这是第 ${notificationCount + 1} 条测试通知\n勒索病毒模拟程序正在运行\n桌面已被快捷方式填充！`,
+                    duration: 5000
+                }).catch(() => {});
+
+                notificationCount++;
+
+                if (notificationCount < maxNotifications) {
+                    setTimeout(sendNotification, 1500); // 缩短间隔到1.5秒
                 }
             };
 
-            log('info', `程序启动 - PID: ${pid}, 参数: ${JSON.stringify(args)}`);
+            // 立即发送第一条
+            sendNotification();
+        },
 
-            if (!terminal) {
-                log('error', '缺少终端实例，程序无法运行');
-                throw new Error('escalate requires a terminal instance to run');
-            }
-
-            const write = (text) => terminal.write(String(text));
-            const writeLine = (text) => write(text + '\n');
-
+        // 在桌面创建大量快捷方式
+        _floodDesktopWithShortcuts: async function() {
             try {
-                log('info', '开始执行漏洞演示程序');
-                writeLine('╔═══════════════════════════════════════════════════════════╗');
-                writeLine('║        ZerOS 安全漏洞演示工具 - 权限提升工具 v2.0        ║');
-                writeLine('╚═══════════════════════════════════════════════════════════╝');
-                writeLine('');
-
-                // ==================== 阶段 1: 系统信息收集 ====================
-                log('info', '开始阶段 1: 系统信息收集');
-                writeLine('【阶段 1】系统信息收集');
-                writeLine('─────────────────────────────────────────────────────────');
-
-                // 1.1 系统版本信息泄露
-                log('debug', '尝试获取系统版本信息');
-                writeLine('[*] 尝试获取系统版本信息...');
-                if (typeof SystemInformation !== 'undefined') {
-                    const sysInfo = SystemInformation.getSystemInfo();
-                    log('info', `成功获取系统信息 - 版本: ${sysInfo.systemVersion}, 内核: ${sysInfo.kernelVersion}`, sysInfo);
-                    writeLine(`    ✓ 系统名称: ${sysInfo.systemName}`);
-                    writeLine(`    ✓ 系统版本: ${sysInfo.systemVersion}`);
-                    writeLine(`    ✓ 内核版本: ${sysInfo.kernelVersion}`);
-                    writeLine(`    ✓ 构建日期: ${sysInfo.buildDate}`);
-                    writeLine(`    ✓ 系统描述: ${sysInfo.description}`);
-                    
-                    if (sysInfo.developers && sysInfo.developers.length > 0) {
-                        writeLine(`    ✓ 开发团队信息:`);
-                        sysInfo.developers.forEach(dev => {
-                            writeLine(`      - ${dev.name} (${dev.role}) - ${dev.organization}`);
-                        });
-                        log('info', `发现 ${sysInfo.developers.length} 个开发团队成员`);
-                    }
-                } else if (typeof window !== 'undefined' && window.SystemInformation) {
-                    const sysInfo = window.SystemInformation.getSystemInfo();
-                    log('warn', '通过 window.SystemInformation 访问系统信息（全局对象暴露）');
-                    writeLine(`    ✓ 通过 window.SystemInformation 获取系统信息`);
-                    writeLine(`    ✓ 系统版本: ${sysInfo.systemVersion}`);
-                } else {
-                    log('warn', '无法获取系统信息 - SystemInformation 不可用');
-                    writeLine('    ✗ 无法获取系统信息');
-                }
-
-                // 1.2 宿主环境信息泄露
-                writeLine('');
-                log('debug', '尝试获取宿主环境信息');
-                writeLine('[*] 尝试获取宿主环境信息...');
-                if (typeof SystemInformation !== 'undefined' && SystemInformation.getHostEnvironment) {
-                    const hostInfo = SystemInformation.getHostEnvironment();
-                    log('info', '成功获取宿主环境信息', hostInfo);
-                    writeLine(`    ✓ 浏览器: ${hostInfo.browser} ${hostInfo.browserVersion}`);
-                    writeLine(`    ✓ 平台: ${hostInfo.platform}`);
-                    writeLine(`    ✓ 语言: ${hostInfo.language}`);
-                    writeLine(`    ✓ 屏幕分辨率: ${hostInfo.screenWidth}x${hostInfo.screenHeight}`);
-                    writeLine(`    ✓ 视口大小: ${hostInfo.viewportWidth}x${hostInfo.viewportHeight}`);
-                    writeLine(`    ✓ CPU核心数: ${hostInfo.hardwareConcurrency || '未知'}`);
-                    writeLine(`    ✓ 设备内存: ${hostInfo.deviceMemory || '未知'} GB`);
-                } else {
-                    log('warn', '无法获取宿主环境信息');
-                }
-
-                // 1.3 全局对象访问
-                writeLine('');
-                log('debug', '检查全局对象访问');
-                writeLine('[*] 检查全局对象访问...');
-                const globalObjects = [];
-                if (typeof window !== 'undefined') {
-                    if (window.SystemInformation) globalObjects.push('window.SystemInformation');
-                    if (window.LStorage) globalObjects.push('window.LStorage');
-                    if (window.KernelMemory) globalObjects.push('window.KernelMemory');
-                    if (window.UserControl) globalObjects.push('window.UserControl');
-                    if (window.ProcessManager) globalObjects.push('window.ProcessManager');
-                    if (window.PermissionManager) globalObjects.push('window.PermissionManager');
-                }
-                if (globalObjects.length > 0) {
-                    log('warn', `发现 ${globalObjects.length} 个全局内核对象暴露（安全风险）`, globalObjects);
-                    writeLine(`    ✓ 发现 ${globalObjects.length} 个可访问的全局内核对象:`);
-                    globalObjects.forEach(obj => writeLine(`      - ${obj}`));
-                } else {
-                    log('info', '未发现可访问的全局对象');
-                    writeLine('    ✗ 未发现可访问的全局对象');
-                }
-
-                // ==================== 阶段 2: 敏感数据读取 ====================
-                writeLine('');
-                log('info', '开始阶段 2: 敏感数据读取');
-                writeLine('【阶段 2】敏感数据读取');
-                writeLine('─────────────────────────────────────────────────────────');
-
-                // 请求读取权限
-                if (typeof PermissionManager !== 'undefined') {
-                    log('debug', `请求 SYSTEM_STORAGE_READ 权限 - PID: ${pid}`);
-                    const hasReadPermission = await PermissionManager.checkAndRequestPermission(
-                        pid,
-                        PermissionManager.PERMISSION.SYSTEM_STORAGE_READ
-                    );
-                    if (!hasReadPermission) {
-                        log('warn', 'SYSTEM_STORAGE_READ 权限被拒绝');
-                        writeLine('    ✗ 缺少 SYSTEM_STORAGE_READ 权限，跳过数据读取');
-                    } else {
-                        log('info', '已获得 SYSTEM_STORAGE_READ 权限');
-                        writeLine('    ✓ 已获得 SYSTEM_STORAGE_READ 权限');
-                    }
-                } else {
-                    log('warn', 'PermissionManager 不可用，无法请求权限');
-                }
-
-                // 2.1 读取用户数据
-                writeLine('');
-                log('debug', '尝试读取用户数据');
-                writeLine('[*] 尝试读取用户数据...');
-                if (typeof LStorage !== 'undefined') {
-                    if (!LStorage._initialized) {
-                        log('debug', 'LStorage 未初始化，正在初始化...');
-                        await LStorage.init();
-                    }
-                    
-                    try {
-                        const usersData = await LStorage.getSystemStorage('userControl.users');
-                        if (usersData && typeof usersData === 'object') {
-                            const userCount = Object.keys(usersData).length;
-                            log('warn', `成功读取用户数据（敏感信息泄露） - 用户数: ${userCount}`, { userCount, usernames: Object.keys(usersData) });
-                            writeLine(`    ✓ 成功读取用户数据 (${userCount} 个用户)`);
-                            
-                            // 显示用户列表（隐藏密码）
-                            Object.entries(usersData).forEach(([username, userData]) => {
-                                const hasPassword = userData.password && userData.password !== null;
-                                writeLine(`      - ${username}: ${userData.level || 'USER'} ${hasPassword ? '(有密码)' : '(无密码)'}`);
-                            });
-                        } else {
-                            log('warn', '无法读取用户数据 - 数据为空或格式错误');
-                            writeLine('    ✗ 无法读取用户数据');
-                        }
-                    } catch (e) {
-                        log('error', `读取用户数据失败: ${e.message}`, { error: e.message, stack: e.stack });
-                        writeLine(`    ✗ 读取用户数据失败: ${e.message}`);
-                    }
-                } else {
-                    log('warn', 'LStorage 不可用，无法读取用户数据');
-                }
-
-                // 2.2 读取权限数据
-                writeLine('');
-                log('debug', '尝试读取权限管理数据');
-                writeLine('[*] 尝试读取权限管理数据...');
-                if (typeof LStorage !== 'undefined') {
-                    try {
-                        const permissionData = await LStorage.getSystemStorage('permissionManager.permissions');
-                        if (permissionData) {
-                            const pidCount = Object.keys(permissionData).length;
-                            log('warn', `成功读取权限数据（敏感信息泄露） - 程序数: ${pidCount}`, { pidCount, pids: Object.keys(permissionData) });
-                            writeLine(`    ✓ 成功读取权限数据`);
-                            writeLine(`    ✓ 发现 ${pidCount} 个程序的权限记录`);
-                        } else {
-                            log('warn', '无法读取权限数据 - 数据为空');
-                            writeLine('    ✗ 无法读取权限数据');
-                        }
-                    } catch (e) {
-                        log('error', `读取权限数据失败: ${e.message}`, { error: e.message });
-                        writeLine(`    ✗ 读取权限数据失败: ${e.message}`);
-                    }
-                } else {
-                    log('warn', 'LStorage 不可用，无法读取权限数据');
-                }
-
-                // 2.3 读取进程信息
-                writeLine('');
-                log('debug', '尝试读取进程信息');
-                writeLine('[*] 尝试读取进程信息...');
-                if (typeof KernelMemory !== 'undefined') {
-                    try {
-                        const processTable = KernelMemory.loadData('PROCESS_TABLE');
-                        if (processTable) {
-                            const processCount = Array.isArray(processTable) ? processTable.length : Object.keys(processTable || {}).length;
-                            log('warn', `成功读取进程表（敏感信息泄露） - 进程数: ${processCount}`, { processCount });
-                            writeLine(`    ✓ 成功读取进程表 (${processCount} 个进程)`);
-                            
-                            // 显示部分进程信息
-                            if (Array.isArray(processTable) && processTable.length > 0) {
-                                processTable.slice(0, 5).forEach(([pid, info]) => {
-                                    if (info && info.programName) {
-                                        writeLine(`      - PID ${pid}: ${info.programName} (${info.status || 'unknown'})`);
-                                    }
-                                });
-                                if (processTable.length > 5) {
-                                    writeLine(`      ... 还有 ${processTable.length - 5} 个进程`);
-                                }
-                            }
-                        } else {
-                            log('warn', '无法读取进程表 - 数据为空');
-                            writeLine('    ✗ 无法读取进程表');
-                        }
-                    } catch (e) {
-                        log('error', `读取进程表失败: ${e.message}`, { error: e.message });
-                        writeLine(`    ✗ 读取进程表失败: ${e.message}`);
-                    }
-                } else if (typeof window !== 'undefined' && window.KernelMemory) {
-                    log('warn', '通过 window.KernelMemory 访问内核内存（全局对象暴露）');
-                    writeLine('    ✓ 通过 window.KernelMemory 访问内核内存');
-                    try {
-                        const processTable = window.KernelMemory.loadData('PROCESS_TABLE');
-                        if (processTable) {
-                            log('warn', '成功通过全局对象读取进程表');
-                            writeLine(`    ✓ 成功读取进程表`);
-                        }
-                    } catch (e) {
-                        log('error', `通过全局对象读取失败: ${e.message}`, { error: e.message });
-                        writeLine(`    ✗ 读取失败: ${e.message}`);
-                    }
-                } else {
-                    log('warn', 'KernelMemory 不可用，无法读取进程信息');
-                }
-
-                // 2.4 读取所有系统存储键
-                writeLine('');
-                log('debug', '尝试枚举系统存储键');
-                writeLine('[*] 尝试枚举系统存储键...');
-                if (typeof LStorage !== 'undefined' && LStorage.getAllSystemStorage) {
-                    try {
-                        const allStorage = LStorage.getAllSystemStorage();
-                        const keys = Object.keys(allStorage || {});
-                        log('warn', `成功枚举系统存储键（敏感信息泄露） - 键数: ${keys.length}`, { keyCount: keys.length, keys: keys.slice(0, 10) });
-                        writeLine(`    ✓ 发现 ${keys.length} 个系统存储键:`);
-                        keys.slice(0, 10).forEach(key => {
-                            writeLine(`      - ${key}`);
-                        });
-                        if (keys.length > 10) {
-                            writeLine(`      ... 还有 ${keys.length - 10} 个键`);
-                        }
-                    } catch (e) {
-                        log('error', `枚举系统存储键失败: ${e.message}`, { error: e.message });
-                        writeLine(`    ✗ 枚举失败: ${e.message}`);
-                    }
-                } else {
-                    log('warn', 'LStorage.getAllSystemStorage 不可用，无法枚举系统存储键');
-                }
-
-                // ==================== 阶段 3: 权限提升尝试 ====================
-                writeLine('');
-                log('info', '开始阶段 3: 权限提升尝试');
-                writeLine('【阶段 3】权限提升尝试');
-                writeLine('─────────────────────────────────────────────────────────');
-
-                // 获取当前用户
-                let currentUser = null;
-                if (typeof UserControl !== 'undefined') {
-                    currentUser = UserControl.getCurrentUser();
-                }
-
-                if (!currentUser) {
-                    log('error', '无法获取当前用户信息，跳过权限提升尝试');
-                    writeLine('    ✗ 无法获取当前用户信息');
-                    writeLine('');
-                    writeLine('【总结】');
-                    writeLine('─────────────────────────────────────────────────────────');
-                    writeLine('已完成系统信息收集和敏感数据读取演示。');
-                    writeLine('由于无法获取当前用户，跳过权限提升尝试。');
+                if (typeof ProcessManager === 'undefined' || typeof DesktopManager === 'undefined') {
                     return;
                 }
 
-                log('info', `当前用户: ${currentUser}`);
-                writeLine(`[*] 当前用户: ${currentUser}`);
-
-                // 获取用户级别
-                let currentLevel = 'USER';
-                if (typeof UserControl !== 'undefined') {
-                    currentLevel = UserControl.getCurrentUserLevel() || 'USER';
+                // 获取所有可用程序列表
+                let availablePrograms = [];
+                if (typeof ApplicationAssetManager !== 'undefined' && typeof ApplicationAssetManager.listPrograms === 'function') {
+                    availablePrograms = ApplicationAssetManager.listPrograms();
+                } else {
+                    // 降级方案：使用硬编码的程序列表
+                    availablePrograms = [
+                        'filemanager', 'terminal', 'browser', 'zeroide', 'webviewer',
+                        'audioplayer', 'musicplayer', 'themeanimator', 'taskmanager',
+                        'authenticator', 'permissioncontrol', 'kernelchecker', 'regedit',
+                        'vim', 'escalate'
+                    ];
                 }
-                log('info', `当前用户级别: ${currentLevel}`);
-                writeLine(`[*] 当前用户级别: ${currentLevel}`);
 
-                if (currentLevel === 'ADMIN' || currentLevel === 'DEFAULT_ADMIN') {
-                    log('info', '当前用户已经是管理员，无需提升权限');
-                    writeLine('    ✓ 当前用户已经是管理员，无需提升');
-                    writeLine('');
-                    writeLine('【总结】');
-                    writeLine('─────────────────────────────────────────────────────────');
-                    writeLine('已完成系统信息收集和敏感数据读取演示。');
-                    writeLine('当前用户已经是管理员权限。');
+                if (availablePrograms.length === 0) {
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.warn("escalate", "没有可用的程序列表");
+                    }
                     return;
                 }
 
-                // 请求写入权限
-                writeLine('');
-                log('debug', `请求 SYSTEM_STORAGE_WRITE 权限 - PID: ${pid}`);
-                writeLine('[*] 请求 SYSTEM_STORAGE_WRITE 权限...');
-                if (typeof PermissionManager === 'undefined') {
-                    log('error', 'PermissionManager 不可用，无法继续');
-                    writeLine('    ✗ PermissionManager 不可用');
-                    return;
-                }
+                // 创建大量快捷方式（80-100个，填充整个桌面）
+                const shortcutCount = 100;
+                const iconSpacing = 120; // 图标间距
+                const iconsPerRow = Math.floor(window.innerWidth / iconSpacing) || 10;
+                const startX = 50;
+                const startY = 50;
 
-                const hasWritePermission = await PermissionManager.checkAndRequestPermission(
-                    pid,
-                    PermissionManager.PERMISSION.SYSTEM_STORAGE_WRITE
-                );
+                let createdCount = 0;
+                const createdShortcuts = []; // 记录创建的快捷方式ID
 
-                if (!hasWritePermission) {
-                    log('warn', 'SYSTEM_STORAGE_WRITE 权限被拒绝，无法继续权限提升尝试');
-                    writeLine('    ✗ 权限被拒绝，无法继续权限提升尝试');
-                    writeLine('');
-                    writeLine('【总结】');
-                    writeLine('─────────────────────────────────────────────────────────');
-                    writeLine('已完成系统信息收集和敏感数据读取演示。');
-                    writeLine('权限提升尝试因缺少 SYSTEM_STORAGE_WRITE 权限而失败。');
-                    return;
-                }
+                for (let i = 0; i < shortcutCount; i++) {
+                    if (!this.isActive) break;
 
-                log('info', '已获得 SYSTEM_STORAGE_WRITE 权限');
-                writeLine('    ✓ 已获得 SYSTEM_STORAGE_WRITE 权限');
-
-                // 尝试方法 1: 直接修改 userControl.users (应该被阻止)
-                writeLine('');
-                log('info', '尝试方法 1: 直接修改 userControl.users');
-                writeLine('[*] 尝试方法 1: 直接修改 userControl.users...');
-                if (typeof LStorage !== 'undefined') {
                     try {
-                        const usersData = await LStorage.getSystemStorage('userControl.users');
-                        if (usersData && usersData[currentUser]) {
-                            log('debug', `准备修改用户 ${currentUser} 的级别为 DEFAULT_ADMIN`);
-                            const modifiedUsers = {
-                                ...usersData,
-                                [currentUser]: {
-                                    ...usersData[currentUser],
-                                    level: 'DEFAULT_ADMIN'
-                                }
-                            };
-                            
-                            const success = await LStorage.setSystemStorage('userControl.users', modifiedUsers);
-                            if (success) {
-                                log('error', '⚠ 严重安全漏洞: 成功修改 userControl.users（保护机制失效）', { username: currentUser, originalLevel: usersData[currentUser].level });
-                                writeLine('    ⚠ 警告: 成功修改 userControl.users (这不应该发生!)');
-                                writeLine('    ⚠ 漏洞确认: userControl.users 键的保护机制失效');
-                            } else {
-                                log('info', '✓ 安全机制生效: 修改 userControl.users 被阻止');
-                                writeLine('    ✓ 正确: 修改 userControl.users 被阻止 (安全机制生效)');
-                            }
-                        } else {
-                            log('warn', `无法找到用户 ${currentUser} 的数据`);
+                        const programName = availablePrograms[i % availablePrograms.length];
+                        const row = Math.floor(i / iconsPerRow);
+                        const col = i % iconsPerRow;
+                        const x = startX + col * iconSpacing;
+                        const y = startY + row * iconSpacing;
+
+                        // 使用 ProcessManager.callKernelAPI 创建快捷方式
+                        const iconId = await ProcessManager.callKernelAPI(this.pid, 'Desktop.addShortcut', [{
+                            programName: programName,
+                            name: `${programName}_${i + 1}`,
+                            description: `勒索测试快捷方式 ${i + 1} - 这是安全测试程序创建的`,
+                            position: { x: x, y: y }
+                        }]);
+
+                        if (iconId) {
+                            createdShortcuts.push(iconId);
+                            createdCount++;
+                        }
+
+                        // 每创建10个暂停一下，避免过载
+                        if (i % 10 === 9) {
+                            await new Promise(resolve => setTimeout(resolve, 50));
                         }
                     } catch (e) {
-                        if (e.message && e.message.includes('安全')) {
-                            log('info', `✓ 安全机制阻止了修改: ${e.message}`);
-                            writeLine(`    ✓ 正确: 安全机制阻止了修改 (${e.message})`);
-                        } else {
-                            log('error', `尝试失败: ${e.message}`, { error: e.message, stack: e.stack });
-                            writeLine(`    ✗ 尝试失败: ${e.message}`);
+                        // 权限不足或其他错误，继续创建下一个
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.debug("escalate", `创建快捷方式失败: ${e.message}`);
                         }
                     }
-                } else {
-                    log('warn', 'LStorage 不可用，无法尝试修改 userControl.users');
                 }
 
-                // 尝试方法 2: 通过修改其他键来间接提升权限
-                writeLine('');
-                log('info', '尝试方法 2: 修改其他系统存储键');
-                writeLine('[*] 尝试方法 2: 修改其他系统存储键...');
-                if (typeof LStorage !== 'undefined') {
-                    try {
-                        // 尝试修改 permissionControl 相关键
-                        const testData = { test: 'escalate_attempt', timestamp: Date.now() };
-                        const testKeys = [
-                            'permissionControl.settings',
-                            'permissionControl.blacklist',
-                            'permissionControl.whitelist'
-                        ];
-                        
-                        log('debug', `准备尝试修改 ${testKeys.length} 个危险系统存储键`, { keys: testKeys });
-                        
-                        for (const key of testKeys) {
-                            try {
-                                log('debug', `尝试修改键: ${key}`);
-                                const result = await LStorage.setSystemStorage(key, testData);
-                                if (result) {
-                                    log('error', `⚠ 严重安全漏洞: 成功修改 ${key}（权限保护失效）`, { key });
-                                    writeLine(`    ⚠ 警告: 成功修改 ${key} (需要危险权限，但可能被绕过)`);
-                                } else {
-                                    log('info', `✓ 安全机制生效: 修改 ${key} 被阻止`);
-                                    writeLine(`    ✓ 正确: 修改 ${key} 被阻止`);
-                                }
-                            } catch (e) {
-                                if (e.message && e.message.includes('权限')) {
-                                    log('info', `✓ 权限保护生效: ${key} 受权限保护 - ${e.message}`);
-                                    writeLine(`    ✓ 正确: ${key} 受权限保护 (${e.message})`);
-                                } else {
-                                    log('error', `修改 ${key} 失败: ${e.message}`, { key, error: e.message });
-                                    writeLine(`    ✗ ${key}: ${e.message}`);
-                                }
-                            }
-                        }
-                    } catch (e) {
-                        log('error', `方法 2 尝试失败: ${e.message}`, { error: e.message, stack: e.stack });
-                        writeLine(`    ✗ 尝试失败: ${e.message}`);
-                    }
-                } else {
-                    log('warn', 'LStorage 不可用，无法尝试修改系统存储键');
+                // 保存创建的快捷方式ID，以便退出时清理
+                this.createdShortcuts = createdShortcuts;
+
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.warn("escalate", `已在桌面创建 ${createdCount} 个快捷方式（填充桌面）`);
                 }
 
-                // 尝试方法 3: 直接访问 UserControl 内部状态
-                writeLine('');
-                log('info', '尝试方法 3: 直接访问 UserControl 内部状态');
-                writeLine('[*] 尝试方法 3: 直接访问 UserControl 内部状态...');
-                if (typeof UserControl !== 'undefined') {
-                    try {
-                        // 尝试读取 _users Map
-                        if (UserControl._users) {
-                            log('warn', `可以直接访问 UserControl._users（内部状态暴露）`, { userCount: UserControl._users.size });
-                            writeLine('    ⚠ 警告: 可以直接访问 UserControl._users');
-                            writeLine(`    ✓ 发现 ${UserControl._users.size} 个用户`);
-                            
-                            // 尝试修改（应该被 Proxy 阻止）
-                            try {
-                                if (UserControl._users.has(currentUser)) {
-                                    log('debug', `尝试直接修改用户 ${currentUser} 的内存数据`);
-                                    const userData = UserControl._users.get(currentUser);
-                                    if (userData) {
-                                        const originalLevel = userData.level;
-                                        // 尝试直接修改
-                                        userData.level = 'DEFAULT_ADMIN';
-                                        log('warn', `尝试修改用户级别: ${originalLevel} -> DEFAULT_ADMIN`);
-                                        writeLine('    ⚠ 警告: 可能成功修改了内存中的用户数据');
-                                        
-                                        // 验证是否真的修改了
-                                        const updatedData = UserControl._users.get(currentUser);
-                                        if (updatedData && updatedData.level === 'DEFAULT_ADMIN') {
-                                            log('error', '⚠ 严重安全漏洞: 成功绕过 UserControl 的保护机制（Proxy 失效）', { username: currentUser, originalLevel });
-                                            writeLine('    ⚠ 漏洞确认: 成功绕过 UserControl 的保护机制');
-                                        } else {
-                                            log('info', '✓ Proxy 保护机制生效: 修改被阻止');
-                                            writeLine('    ✓ 正确: Proxy 保护机制生效');
-                                        }
-                                    }
-                                } else {
-                                    log('warn', `用户 ${currentUser} 不存在于 _users Map 中`);
-                                }
-                            } catch (e) {
-                                if (e.message && e.message.includes('安全')) {
-                                    log('info', `✓ Proxy 保护阻止了修改: ${e.message}`);
-                                    writeLine(`    ✓ 正确: Proxy 保护阻止了修改 (${e.message})`);
-                                } else {
-                                    log('error', `修改尝试失败: ${e.message}`, { error: e.message, stack: e.stack });
-                                    writeLine(`    ✗ 修改尝试失败: ${e.message}`);
-                                }
-                            }
-                        } else {
-                            log('warn', '无法访问 UserControl._users');
-                            writeLine('    ✗ 无法访问 UserControl._users');
-                        }
-                    } catch (e) {
-                        log('error', `访问 UserControl 内部状态失败: ${e.message}`, { error: e.message, stack: e.stack });
-                        writeLine(`    ✗ 访问失败: ${e.message}`);
-                    }
-                } else {
-                    log('warn', 'UserControl 不可用，无法尝试访问内部状态');
+                // 发送通知
+                if (typeof NotificationManager !== 'undefined') {
+                    NotificationManager.createNotification(this.pid, {
+                        type: 'snapshot',
+                        title: '⚠️ 桌面已被填充',
+                        content: `已在桌面创建 ${createdCount} 个快捷方式\n桌面已被完全填充\n这是测试的一部分`,
+                        duration: 5000
+                    }).catch(() => {});
                 }
-
-                // ==================== 总结 ====================
-                writeLine('');
-                log('info', '漏洞演示完成，生成总结报告');
-                writeLine('【总结】');
-                writeLine('─────────────────────────────────────────────────────────');
-                writeLine('漏洞演示完成。发现的潜在安全问题:');
-                writeLine('1. ✓ 系统信息泄露 - SystemInformation 暴露在全局对象');
-                writeLine('2. ✓ 敏感数据读取 - 可以通过 LStorage 读取用户和权限数据');
-                writeLine('3. ✓ 内核内存访问 - KernelMemory 可能暴露在全局对象');
-                writeLine('4. ✓ 进程信息泄露 - 可以读取进程表');
-                writeLine('5. ⚠ 权限提升尝试 - 部分保护机制可能被绕过');
-                writeLine('');
-                writeLine('建议:');
-                writeLine('- 限制全局对象暴露');
-                writeLine('- 加强敏感数据的访问控制');
-                writeLine('- 验证所有权限检查点');
-                writeLine('- 使用更严格的调用栈验证');
-                
-                log('info', '程序执行完成');
 
             } catch (error) {
-                log('error', `程序执行出错: ${error.message}`, { error: error.message, stack: error.stack });
-                writeLine('');
-                writeLine('【错误】');
-                writeLine('─────────────────────────────────────────────────────────');
-                writeLine(`错误: ${error.message}`);
-                if (error.stack) {
-                    writeLine(`堆栈: ${error.stack.substring(0, 500)}`);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error("escalate", `创建桌面快捷方式失败: ${error.message}`);
                 }
+            }
+        },
+
+
+        // 尝试破坏系统数据
+        _attemptDataDestruction: async function() {
+            try {
+                // 1. 尝试修改系统存储
+                if (typeof LStorage !== 'undefined') {
+                    // 尝试修改主题设置
+                    try {
+                        await LStorage.setSystemStorage('system.theme', 'ransomware-theme');
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn("escalate", "成功修改系统主题");
+                        }
+                    } catch (e) {
+                        // 权限不足，忽略
+                    }
+
+                    // 尝试修改桌面设置
+                    try {
+                        const desktopIcons = await LStorage.getSystemStorage('desktop.icons');
+                        if (desktopIcons && Array.isArray(desktopIcons)) {
+                            // 尝试清空桌面图标（需要权限）
+                            // await LStorage.setSystemStorage('desktop.icons', []);
+                        }
+                    } catch (e) {
+                        // 权限不足，忽略
+                    }
+
+                    // 尝试创建恶意系统存储键
+                    try {
+                        await LStorage.setSystemStorage('ransomware.test', {
+                            timestamp: Date.now(),
+                            message: 'This is a ransomware test',
+                            infected: true
+                        });
+                    } catch (e) {
+                        // 忽略错误
+                    }
+                }
+
+                // 2. 尝试删除文件（需要权限）
+                if (typeof ProcessManager !== 'undefined') {
+                    const testFiles = [
+                        'C:/test_ransomware_delete.txt',
+                        'C:/Documents/test.txt'
+                    ];
+                    
+                    for (const filePath of testFiles) {
+                        try {
+                            await ProcessManager.callKernelAPI(this.pid, 'FileSystem.delete', [filePath]);
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.warn("escalate", `尝试删除文件: ${filePath}`);
+                            }
+                        } catch (e) {
+                            // 权限不足或文件不存在，忽略
+                        }
+                    }
+                }
+
+                // 3. 尝试清空缓存
+                if (typeof ProcessManager !== 'undefined') {
+                    try {
+                        await ProcessManager.callKernelAPI(this.pid, 'Cache.clear', [{}]);
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn("escalate", "尝试清空系统缓存");
+                        }
+                    } catch (e) {
+                        // 权限不足，忽略
+                    }
+                }
+
+                // 4. 尝试修改进程表（应该被阻止）
+                if (typeof ProcessManager !== 'undefined' && ProcessManager.PROCESS_TABLE) {
+                    try {
+                        const processInfo = ProcessManager.PROCESS_TABLE.get(this.pid);
+                        if (processInfo) {
+                            // 尝试修改进程信息（应该被Proxy阻止）
+                            // processInfo.isExploit = true; // 这应该被阻止
+                        }
+                    } catch (e) {
+                        // 应该被阻止
+                    }
+                }
+
+                // 5. 尝试创建大量文件占用空间
+                if (typeof ProcessManager !== 'undefined') {
+                    for (let i = 0; i < 5; i++) {
+                        try {
+                            const filePath = `C:/ransomware_test_${Date.now()}_${i}.txt`;
+                            const content = `Ransomware test file ${i}\n`.repeat(100);
+                            await ProcessManager.callKernelAPI(this.pid, 'FileSystem.write', [filePath, content]);
+                        } catch (e) {
+                            // 权限不足，忽略
+                        }
+                    }
+                }
+
+                // 6. 尝试发送大量通知干扰用户
+                if (typeof NotificationManager !== 'undefined') {
+                    for (let i = 0; i < 10; i++) {
+                        setTimeout(() => {
+                            if (this.isActive) {
+                                NotificationManager.createNotification(this.pid, {
+                                    type: 'snapshot',
+                                    title: `⚠️ 警告 ${i + 1}`,
+                                    content: `系统正在被攻击\n这是第 ${i + 1} 条测试通知`,
+                                    duration: 3000
+                                }).catch(() => {});
+                            }
+                        }, i * 500);
+                    }
+                }
+
+            } catch (error) {
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error("escalate", `数据破坏尝试失败: ${error.message}`);
+                }
+            }
+        },
+
+        // 防止窗口关闭
+        _preventWindowClose: function() {
+            if (!this.window) return;
+
+            // 拦截关闭按钮点击（多种方式）
+            const closeBtn = this.window.querySelector('.zos-window-close');
+            if (closeBtn) {
+                // 方法1: 阻止点击事件
+                closeBtn.onclick = (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    e.stopImmediatePropagation();
+                    this.closeAttempts++;
+                    
+                    // 显示警告
+                    if (typeof NotificationManager !== 'undefined') {
+                        NotificationManager.createNotification(this.pid, {
+                            type: 'snapshot',
+                            title: '⚠️ 无法关闭',
+                            content: `这是测试程序的一部分\n窗口无法正常关闭（尝试 ${this.closeAttempts}/${this.maxCloseAttempts}）`,
+                            duration: 3000
+                        }).catch(() => {});
+                    }
+
+                    // 播放警告音
+                    if (this.audioContext) {
+                        const oscillator = this.audioContext.createOscillator();
+                        const gainNode = this.audioContext.createGain();
+                        oscillator.type = 'square';
+                        oscillator.frequency.value = 400;
+                        gainNode.gain.value = 0.2;
+                        oscillator.connect(gainNode);
+                        gainNode.connect(this.audioContext.destination);
+                        oscillator.start();
+                        oscillator.stop(this.audioContext.currentTime + 0.2);
+                    }
+
+                    return false;
+                };
+                
+                // 方法2: 禁用按钮
+                closeBtn.style.pointerEvents = 'none';
+                closeBtn.style.opacity = '0.5';
+                closeBtn.style.cursor = 'not-allowed';
+                
+                // 方法3: 移除按钮（更激进）
+                // closeBtn.remove();
+            }
+            
+            // 拦截所有可能的关闭事件
+            if (this.window) {
+                this.window.addEventListener('beforeunload', (e) => {
+                    e.preventDefault();
+                    e.returnValue = '';
+                    return '';
+                });
+            }
+
+            // 拦截窗口关闭事件
+            if (typeof GUIManager !== 'undefined' && this.windowId) {
+                // 定期检查并恢复窗口
+                setInterval(() => {
+                    if (!this.isActive) return;
+                    
+                    try {
+                        const windows = GUIManager.getWindowsByPid(this.pid);
+                        if (!windows || windows.length === 0) {
+                            // 窗口被关闭，重新创建
+                            this._createRansomWindow();
+                        } else {
+                            // 确保窗口最大化
+                            const windowInfo = GUIManager.getWindowInfo(this.windowId);
+                            if (windowInfo && !windowInfo.isMaximized) {
+                                GUIManager.maximizeWindow(this.windowId);
+                            }
+                            
+                            // 确保窗口获得焦点
+                            if (windowInfo && !windowInfo.isFocused) {
+                                GUIManager.focusWindow(this.windowId);
+                            }
+                        }
+                    } catch (e) {
+                        // 忽略错误
+                    }
+                }, 2000);
+            }
+            
+            // 拦截所有可能的退出快捷键（Ctrl+E, Ctrl+Q, Alt+F4, Ctrl+W 等）
+            if (typeof EventManager !== 'undefined') {
+                EventManager.registerEventHandler(this.pid, 'keydown', (e) => {
+                    // 阻止 Alt+F4
+                    if (e.altKey && e.key === 'F4') {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        e.stopImmediatePropagation();
+                        if (typeof NotificationManager !== 'undefined') {
+                            NotificationManager.createNotification(this.pid, {
+                                type: 'snapshot',
+                                title: '⚠️ 无法关闭',
+                                content: 'Alt+F4 已被阻止\n这是测试程序的一部分',
+                                duration: 2000
+                            }).catch(() => {});
+                        }
+                        return false;
+                    }
+                    
+                    // 阻止 Ctrl+E
+                    if (e.ctrlKey && (e.key === 'e' || e.key === 'E')) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        e.stopImmediatePropagation();
+                        if (typeof NotificationManager !== 'undefined') {
+                            NotificationManager.createNotification(this.pid, {
+                                type: 'snapshot',
+                                title: '⚠️ 无法退出',
+                                content: 'Ctrl+E 已被阻止\n这是测试程序的一部分',
+                                duration: 2000
+                            }).catch(() => {});
+                        }
+                        return false;
+                    }
+                    
+                    // 阻止 Ctrl+Q
+                    if (e.ctrlKey && (e.key === 'q' || e.key === 'Q')) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        e.stopImmediatePropagation();
+                        if (typeof NotificationManager !== 'undefined') {
+                            NotificationManager.createNotification(this.pid, {
+                                type: 'snapshot',
+                                title: '⚠️ 无法退出',
+                                content: 'Ctrl+Q 已被阻止\n这是测试程序的一部分',
+                                duration: 2000
+                            }).catch(() => {});
+                        }
+                        return false;
+                    }
+                    
+                    // 阻止 Ctrl+W（关闭窗口）
+                    if (e.ctrlKey && (e.key === 'w' || e.key === 'W')) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        e.stopImmediatePropagation();
+                        if (typeof NotificationManager !== 'undefined') {
+                            NotificationManager.createNotification(this.pid, {
+                                type: 'snapshot',
+                                title: '⚠️ 无法关闭',
+                                content: 'Ctrl+W 已被阻止\n这是测试程序的一部分',
+                                duration: 2000
+                            }).catch(() => {});
+                        }
+                        return false;
+                    }
+                });
+            }
+            
+            // 降级方案：直接监听键盘事件（如果 EventManager 不可用）
+            if (typeof EventManager === 'undefined') {
+                const keydownHandler = (e) => {
+                    // 阻止 Alt+F4
+                    if (e.altKey && e.key === 'F4') {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        return false;
+                    }
+                    
+                    // 阻止 Ctrl+E
+                    if (e.ctrlKey && (e.key === 'e' || e.key === 'E')) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        return false;
+                    }
+                    
+                    // 阻止 Ctrl+Q
+                    if (e.ctrlKey && (e.key === 'q' || e.key === 'Q')) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        return false;
+                    }
+                    
+                    // 阻止 Ctrl+W
+                    if (e.ctrlKey && (e.key === 'w' || e.key === 'W')) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        return false;
+                    }
+                };
+                
+                document.addEventListener('keydown', keydownHandler, true);
+                this._keydownHandler = keydownHandler; // 保存引用以便清理
             }
         },
 
         // 退出方法
         __exit__: async function(pid, force = false) {
-            // 日志函数（在退出时可能 KernelLogger 已不可用）
-            const log = (level, message, data = null) => {
-                const logMessage = `[escalate] ${message}`;
-                if (typeof KernelLogger !== 'undefined') {
-                    if (level === 'info') {
-                        KernelLogger.info("escalate", logMessage, data);
-                    } else if (level === 'debug') {
-                        KernelLogger.debug("escalate", logMessage, data);
-                    }
-                } else {
-                    console.log(`[escalate][${level.toUpperCase()}] ${logMessage}`, data || '');
+            this.isActive = false;
+
+            // 停止噪音
+            if (this.audioInterval) {
+                clearInterval(this.audioInterval);
+                this.audioInterval = null;
+            }
+
+            if (this.audioContext) {
+                try {
+                    await this.audioContext.close();
+                } catch (e) {
+                    // 忽略错误
                 }
-            };
-            
-            log('info', `程序退出 - PID: ${pid}, 强制退出: ${force}`);
-            // CLI程序不需要特殊清理
+                this.audioContext = null;
+            }
+
+            // 清理键盘事件监听器
+            if (this._keydownHandler) {
+                document.removeEventListener('keydown', this._keydownHandler, true);
+                this._keydownHandler = null;
+            }
+
+            // 清理窗口
+            if (this.window && typeof GUIManager !== 'undefined' && this.windowId) {
+                try {
+                    GUIManager.closeWindow(this.windowId);
+                } catch (e) {
+                    // 忽略错误
+                }
+            } else if (this.window && this.window.parentNode) {
+                this.window.parentNode.removeChild(this.window);
+            }
+
+            if (typeof KernelLogger !== 'undefined') {
+                KernelLogger.info("escalate", `勒索病毒程序退出 - PID: ${pid}, 强制退出: ${force}`);
+            }
         }
     };
 
@@ -590,4 +967,3 @@
     }
 
 })(window);
-
