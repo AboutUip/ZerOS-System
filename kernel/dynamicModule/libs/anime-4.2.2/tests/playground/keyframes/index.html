@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Keyframes</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <link href="../assets/css/styles.css" rel="stylesheet">
+  <style>
+
+    :root {
+      --test: 2em;
+      --from: calc(100px - var(--test));
+      --to: calc(100px + var(--test));
+    }
+
+    body {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+
+    .playground {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .square {
+      --d: 4rem;
+      position: relative;
+      width: var(--d);
+      height: var(--d);
+      margin-top: calc(var(--d) * -.5);
+      margin-left: calc(var(--d) * -.5);
+      border-radius: calc(var(--d) * .125);
+      margin: 2px;
+      cursor: pointer;
+      font-size: 100px;
+    }
+
+    @keyframes css {
+      0%   { left: 0rem; top: 0rem; }
+      30%  { left: 0rem; top: -2.5rem; rotate: 45deg; animation-timing-function: ease-out }
+      40%  { left: 17rem; top: -2.5rem; }
+      50%  { left: 17rem; top: 2.5rem; rotate: 90deg; }
+      70%  { left: 0rem; top: 2.5rem; }
+      100% { left: 0rem; top: 0rem; rotate: 180deg; }
+    }
+
+    .css {
+      background-color: var(--yellow);
+    }
+
+    .css.is-animated {
+      animation: css 4s linear forwards infinite;
+    }
+
+    .waapi {
+      background-color: var(--orange);
+    }
+
+    .anime {
+      background-color: var(--red);
+    }
+  </style>
+</head>
+<body>
+  <div class="playground">
+    <div class="square css"></div>
+    <div class="square waapi"></div>
+    <div class="square anime"></div>
+  </div>
+  <script type="module" src="./index.js"></script>
+</body>
+</html>

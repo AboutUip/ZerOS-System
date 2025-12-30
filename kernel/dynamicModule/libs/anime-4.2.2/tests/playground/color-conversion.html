@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Color conversion tests / Anime.js</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <link href="assets/css/styles.css" rel="stylesheet">
+  <style>
+    body {
+      width: 100%;
+      height: 100vh;
+    }
+    .color-tests {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    .section-title {
+      display: block;
+      width: 100%;
+      margin-bottom: 10px;
+      padding: 10px;
+      border-bottom: 1px solid currentColor;
+    }
+    .color-test {
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
+      align-items: center;
+      min-width: 150px;
+      flex-shrink: 0;
+      text-align: center;
+      font-size: 10px;
+      line-height: 1em;
+      font-family: monospace;
+    }
+    .color-el {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      width: 12.5vw;
+      height: 12.5vw;
+      /*border-radius: 50%;*/
+      margin-top: 10px;
+      background-color: red;
+    }
+  </style>
+</head>
+<body>
+  <section class="color-section">
+    <h1 class="section-title">HEX</h1>
+    <div class="color-tests">
+      <div class="color-test hex-to-hex-shorthand">#F47<br>▾<br>#6AF</div>
+      <div class="color-test hex-to-hex">#FF4477<br>▾<br>#66AAFF</div>
+      <div class="color-test hex-to-rgb">#FF4477<br>▾<br>rgb(102,170,255)</div>
+      <div class="color-test hex-to-hsl">#FF4477<br>▾<br>hsl(213,100%,70%)</div>
+      <div class="color-test hex-to-rgba">#FF4477<br>▾<br>rgba(102,170,255,.15)</div>
+      <div class="color-test hex-to-hsla">#FF4477<br>▾<br>hsla(213,100%,70%,.15)</div>
+      <div class="color-test hex6-to-rgba">#FF447799<br>▾<br>rgba(102,170,255,.15)</div>
+      <div class="color-test hex6-to-hsla">#FF447799<br>▾<br>hsla(213,100%,70%,.15)</div>
+    </div>
+  </section>
+  <section class="color-section">
+    <h1 class="section-title">RGB</h1>
+    <div class="color-tests">
+      <div class="color-test rgb-to-hex-shorthand">rgb(255,68,119)<br>▾<br>#6AF</div>
+      <div class="color-test rgb-to-hex">rgb(255,68,119)<br>▾<br>#66AAFF</div>
+      <div class="color-test rgb-to-rgb">rgb(255,68,119)<br>▾<br>rgb(102,170,255)</div>
+      <div class="color-test rgb-to-hsl">rgb(255,68,119)<br>▾<br>hsl(213,100%,70%)</div>
+      <div class="color-test rgb-to-rgba">rgb(255,68,119)<br>▾<br>rgba(102,170,255,.15)</div>
+      <div class="color-test rgb-to-hsla">rgb(255,68,119)<br>▾<br>hsla(213,100%,70%,.15)</div>
+      <div class="color-test rgba-to-rgba">rgba(255,68,119,.5)<br>▾<br>rgba(102,170,255,.15)</div>
+      <div class="color-test rgba-to-hsla">rgba(255,68,119,.5)<br>▾<br>hsla(213,100%,70%,.15)</div>
+    </div>
+  </section>
+  <section class="color-section">
+    <h1 class="section-title">HSL</h1>
+    <div class="color-tests">
+      <div class="color-test hsl-to-hex-shorthand">hsl(344,100%,63%)<br>▾<br>#6AF</div>
+      <div class="color-test hsl-to-hex">hsl(344,100%,63%)<br>▾<br>#66AAFF</div>
+      <div class="color-test hsl-to-rgb">hsl(344,100%,63%)<br>▾<br>rgb(102,170,255)</div>
+      <div class="color-test hsl-to-hsl">hsl(344,100%,63%)<br>▾<br>hsl(213,100%,70%)</div>
+      <div class="color-test hsl-to-rgba">hsl(344,100%,63%)<br>▾<br>rgba(102,170,255,.15)</div>
+      <div class="color-test hsl-to-hsla">hsl(344,100%,63%)<br>▾<br>hsla(213,100%,70%,.15)</div>
+      <div class="color-test hsla-to-rgba">hsla(344,100%,63%,.5)<br>▾<br>rgba(102,170,255,.15)</div>
+      <div class="color-test hsla-to-hsla">hsla(344,100%,63%,.5)<br>▾<br>hsla(213,100%,70%,.15)</div>
+    </div>
+  </section>
+  <script type="module">
+    import { animate } from '../../../dist/modules/index.js';
+
+    const colorTestEls = document.querySelectorAll('.color-test');
+
+    function createTest(el) {
+      const testHtml = el.innerHTML;
+      const testValues = testHtml.split('<br>▾<br>');
+      const colorEl = document.createElement('div');
+      colorEl.classList.add('color-el');
+      el.appendChild(colorEl);
+
+      const animation = animate(colorEl, {
+        backgroundColor: [testValues[0], testValues[1]],
+        scale: 1,
+        ease: 'inOut',
+        duration: 4000,
+        loop: true,
+        alternate: true,
+      });
+    }
+
+    for (var i = 0; i < colorTestEls.length; i++) {
+      createTest(colorTestEls[i]);
+    }
+  </script>
+</body>
+</html>

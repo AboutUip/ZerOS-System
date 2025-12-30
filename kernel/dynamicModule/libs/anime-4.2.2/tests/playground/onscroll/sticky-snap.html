@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>sticky snap</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <link href="../assets/css/styles.css" rel="stylesheet">
+  <link href="./assets/onscroll.css" rel="stylesheet">
+  <style>
+    body, html {
+      position: relative;
+      scroll-snap-type: y mandatory;
+      overscroll-behavior-y: none;
+    }
+    .section-content {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    .snap {
+      height: calc(100vh - 1px);
+      scroll-snap-align: start;
+      scroll-snap-stop: always;
+      border: 1px dotted var(--red);
+    }
+    .half {
+      width: 50%;
+    }
+    .sticky-container {
+      position: absolute;
+      top: 100vh;
+      right: 0;
+      bottom: 100vh;
+    }
+    .sticky {
+      perspective: 1000px;
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      border: 1px dotted var(--green);
+    }
+    .stack {
+      border: 2px dashed rgba(255,255,255,.25);
+      padding: .5rem;
+      box-sizing: content-box;
+      border-radius: 1.5rem;
+    }
+    .stack .card {
+      width: calc(100% - 1rem);
+      height: calc(100% - 1rem);
+      margin: .5rem;
+      transform-origin: 50% bottom;
+    }
+  </style>
+</head>
+<body class="grid">
+  <div class="sticky-container half">
+    <section class="sticky">
+      <div class="section-content">
+        <div class="stack">
+          <div class="card"><div class="front"></div><div class="back"></div></div>
+          <div class="card"><div class="front"></div><div class="back"></div></div>
+          <div class="card"><div class="front"></div><div class="back"></div></div>
+          <div class="card"><div class="front"></div><div class="back"></div></div>
+          <div class="card"><div class="front"></div><div class="back"></div></div>
+          <div class="card"><div class="front"></div><div class="back"></div></div>
+          <div class="card"><div class="front"></div><div class="back"></div></div>
+          <div class="card"><div class="front"></div><div class="back"></div></div>
+        </div>
+      </div>
+    </section>
+  </div>
+  <section class="snap">
+    <div class="section-content">
+      <h2>Scroll down</h2>
+    </div>
+  </section>
+  <section class="snap half">
+    <div class="section-content">
+      <h2>Start sticky</h2>
+    </div>
+  </section>
+  <section class="snap half">
+    <div class="section-content"><h2>Animation 1</h2></div>
+  </section>
+  <section class="snap half">
+    <div class="section-content"><h2>Animation 2</h2></div>
+  </section>
+  <section class="snap half">
+    <div class="section-content"><h2>Animation 3</h2></div>
+  </section>
+  <section class="snap half">
+    <div class="section-content"><h2>Animation 4</h2></div>
+  </section>
+  <section class="snap half">
+    <div class="section-content"><h2>Animation 5</h2></div>
+  </section>
+  <section class="snap half">
+    <div class="section-content"><h2>Animation 6</h2></div>
+  </section>
+  <section class="snap half">
+    <div class="section-content"><h2>Animation 7</h2></div>
+  </section>
+  <section class="snap half">
+    <div class="section-content"><h2>Animation 8</h2></div>
+  </section>
+  <section class="snap">
+    <div class="section-content">
+      <h2>End sticky</h2>
+    </div>
+  </section>
+  <script type="module" src="./assets/sticky-snap.js"></script>
+</body>
+</html>

@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Text / Hover effects / Anime.js</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <link href="../../assets/css/styles.css" rel="stylesheet">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@100..900&display=swap" rel="stylesheet">
+  <style>
+
+    body {
+      display: flex;
+      justify-content: center;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100svh;
+      font-family: "Noto Sans JP", sans-serif;
+      font-kerning: none;
+      font-variant-ligatures: none;
+      text-rendering: optimizeSpeed;
+    }
+
+    main {
+      margin: 0 auto;
+      padding: 20px;
+      width: 100%;
+      max-width: 1200px;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 20px;
+      justify-content: center;
+      container-type: inline-size;
+    }
+
+    article {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      min-height: 200px;
+      padding: 20px;
+      container-type: inline-size;
+      border-radius: 1cqw;
+      background: #2A2A2A;
+      color: #D0D0D0;
+      transition: background-color .25s ease-out;
+    }
+
+    article:has(p) {
+      /*justify-content: flex-start;*/
+      align-items: flex-start;
+    }
+
+    article:hover {
+      cursor: default;
+      background: #303030;
+    }
+
+    article h2 {
+      text-align: center;
+      font-size: clamp(20px, 8cqw, 30px);
+      will-change: transform;
+    }
+
+    .word-3d {
+      perspective: 1000px;
+      position: relative;
+      transform-style: preserve-3d;
+      transform-origin: 50% 50% 1rem;
+    }
+
+    .face {
+      position: absolute;
+      left: 0;
+      opacity: 0;
+    }
+
+    .face-front {
+      opacity: 1;
+    }
+
+    .face-bottom {
+      top: 100%;
+      transform-origin: 50% 0%;
+      transform: rotateX(90deg);
+    }
+
+    .face-top {
+      bottom: 100%;
+      transform-origin: 50% 100%;
+      transform: rotateX(-90deg);
+    }
+
+    .face-back {
+      top: 0;
+      transform-origin: 50% 50%;
+      transform: translateZ(2.5rem) rotateX(-180deg);
+    }
+
+  </style>
+</head>
+<body>
+  <main>
+    <article id="horizontal-split">
+      <h2>Horizontal split</h2>
+    </article>
+    <article id="wavy-text-effect">
+      <h2>Waaaaavvvvy</h2>
+    </article>
+    <article id="raining-letters">
+      <h2>Raining letters</h2>
+    </article>
+    <article id="subtle-highlight">
+      <h2>Subtle text highlight</h2>
+    </article>
+    <article id="words-3d-jp">
+      <h2>3Dで単語を回転させる</h2>
+    </article>
+    <article id="exploding-characters">
+      <h2>Exploding characters</h2>
+    </article>
+  </main>
+  <script type="module" src="./index.js"></script>
+</body>
+</html>

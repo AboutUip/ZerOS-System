@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Timeline seamless loop / Anime.js</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <link href="../assets/css/styles.css" rel="stylesheet">
+  <style>
+    body {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      position: absolute;
+      overflow: hidden;
+      width: 100%;
+      height: 100%;
+    }
+    #test-wrapper {
+      position: relative;
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      width: 1px;
+      height: 100vh;
+    }
+
+    #test-wrapper:before,
+    #test-wrapper:after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      display: block;
+      transform: translate(-50%, -50%);
+      border: 1px solid #FFF;
+      border-radius: 50%;
+    }
+    #test-wrapper:before {
+      width: 13vh;
+      height: 13vh;
+    }
+    #test-wrapper:after {
+      width: 18vh;
+      height: 18vh;
+    }
+    .el {
+      position: absolute;
+      opacity: 1;
+      width: 12px;
+      height: 26vh;
+      top: 50%;
+      left: 50%;
+      margin-left: -6px;
+      margin-top: -13vh;
+      transform-origin: 50% 50%;
+      background: white;
+    }
+  </style>
+</head>
+<body>
+  <div id="test-wrapper"></div>
+  <script type="module" src="index.js"></script>
+</body>
+</html>

@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Timeline tests | anime.js</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <link href="../../assets/css/styles.css" rel="stylesheet">
+  <style>
+    body {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      position: absolute;
+      overflow: hidden;
+      width: 100%;
+      height: 100%;
+    }
+    #test-wrapper {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      padding: 2rem;
+      max-width: 32rem;
+    }
+    #timeline-test {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 2rem;
+    }
+    #progress-bar {
+      width: 100%;
+    }
+    .square {
+      position: relative;
+      width: 5rem;
+      height: 5rem;
+      background-color: currentColor;
+    }
+  </style>
+</head>
+<body>
+  <div id="test-wrapper">
+    <div id="timeline-test">
+      <div id="square-1" class="square red"></div>
+      <div id="square-2" class="square red"></div>
+      <div id="square-3" class="square red"></div>
+    </div>
+  </div>
+  <script type="module" src="./index.js"></script>
+</body>
+</html>

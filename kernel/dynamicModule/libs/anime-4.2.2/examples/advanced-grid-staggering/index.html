@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Advanced grid staggering / Anime.js</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <link href="../assets/css/styles.css" rel="stylesheet">
+  <style>
+    body {
+      --rows: 41;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+
+    .stagger-visualizer {
+      position: relative;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      align-items: center;
+      width: calc(var(--rows) * 1rem);
+      height: calc(var(--rows) * 1rem);
+    }
+
+    .stagger-visualizer .dot {
+      position: relative;
+      width: .25rem;
+      height: .25rem;
+      margin: .375rem;
+      background-color: currentColor;
+      border-radius: 50%;
+    }
+
+    .stagger-visualizer .cursor {
+      position: absolute;
+      z-index: 1;
+      top: 0;
+      left: 0;
+      width: 1rem;
+      height: 1rem;
+      background-color: currentColor;
+      border-radius: 50%;
+    }
+  </style>
+</head>
+<body>
+  <div class="stagger-visualizer">
+    <div class="cursor red"></div>
+  </div>
+</body>
+<script type="module" src="./index.js"></script>
+</html>

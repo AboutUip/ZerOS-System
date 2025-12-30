@@ -23,6 +23,10 @@ class DesktopManager {
     static _iconSpacing = 20;
     // 是否已初始化
     static _initialized = false;
+    // 图标容器ResizeObserver（用于监听容器尺寸变化，确保尺寸就绪后再排列）
+    static _iconsContainerResizeObserver = null;
+    // 桌面容器ResizeObserver（用于监听桌面容器尺寸变化）
+    static _desktopContainerResizeObserver = null;
     // 存储键
     static STORAGE_KEY_ICONS = 'desktop.icons';
     static STORAGE_KEY_ARRANGEMENT = 'desktop.arrangement';
@@ -138,6 +142,12 @@ class DesktopManager {
         // 应用当前排列模式
         DesktopManager._applyArrangementMode();
         
+        // 设置桌面容器ResizeObserver
+        DesktopManager._setupDesktopContainerResizeObserver();
+        
+        // 设置图标容器ResizeObserver
+        DesktopManager._setupIconsContainerResizeObserver();
+        
         // 监听窗口大小变化和任务栏位置变化
         DesktopManager._setupLayoutListeners();
     }
@@ -215,13 +225,25 @@ class DesktopManager {
         // 重新应用排列模式（确保排列样式正确）
         DesktopManager._applyArrangementMode();
         
-        // 延迟重新排列图标，确保布局已完全更新
-        requestAnimationFrame(() => {
-            if (DesktopManager._autoArrange) {
-                DesktopManager._arrangeIcons();
-            }
-        });
+        // 设置ResizeObserver监听容器尺寸变化，确保尺寸就绪后再排列
+        DesktopManager._setupIconsContainerResizeObserver();
         
+        // 立即检查一次，如果尺寸已就绪则立即排列，否则等待ResizeObserver触发
+        if (DesktopManager._iconsContainer && DesktopManager._desktopContainer) {
+            const iconsContainerRect = DesktopManager._iconsContainer.getBoundingClientRect();
+            const desktopContainerRect = DesktopManager._desktopContainer.getBoundingClientRect();
+            
+            // 如果容器尺寸已就绪，立即排列
+            if (iconsContainerRect.width > 0 && iconsContainerRect.height > 0 && 
+                desktopContainerRect.width > 0 && desktopContainerRect.height > 0) {
+                requestAnimationFrame(() => {
+                    if (DesktopManager._autoArrange) {
+                        DesktopManager._arrangeIcons();
+                    }
+                });
+            }
+            // 否则等待ResizeObserver触发（在_setupIconsContainerResizeObserver中处理）
+        }
     }
     
     /**
@@ -270,6 +292,71 @@ class DesktopManager {
         }
         
         return { position, width, height };
+    }
+    
+    /**
+     * 设置图标容器ResizeObserver（监听容器尺寸变化，确保尺寸就绪后再排列）
+     */
+    static _setupIconsContainerResizeObserver() {
+        if (!DesktopManager._iconsContainer || typeof ResizeObserver === 'undefined') {
+            return;
+        }
+        
+        // 如果已有观察器，先断开
+        if (DesktopManager._iconsContainerResizeObserver) {
+            DesktopManager._iconsContainerResizeObserver.disconnect();
+        }
+        
+        // 创建新的ResizeObserver
+        DesktopManager._iconsContainerResizeObserver = new ResizeObserver((entries) => {
+            for (const entry of entries) {
+                const { width, height } = entry.contentRect;
+                
+                // 只有当容器尺寸大于0时才排列图标
+                if (width > 0 && height > 0) {
+                    // 使用 requestAnimationFrame 确保在下一帧排列，避免在布局计算过程中排列
+                    requestAnimationFrame(() => {
+                        if (DesktopManager._autoArrange && DesktopManager._iconsContainer) {
+                            DesktopManager._arrangeIcons();
+                        }
+                    });
+                }
+            }
+        });
+        
+        // 开始观察图标容器
+        DesktopManager._iconsContainerResizeObserver.observe(DesktopManager._iconsContainer);
+    }
+    
+    /**
+     * 设置桌面容器ResizeObserver（监听桌面容器尺寸变化）
+     */
+    static _setupDesktopContainerResizeObserver() {
+        if (!DesktopManager._desktopContainer || typeof ResizeObserver === 'undefined') {
+            return;
+        }
+        
+        // 如果已有观察器，先断开
+        if (DesktopManager._desktopContainerResizeObserver) {
+            DesktopManager._desktopContainerResizeObserver.disconnect();
+        }
+        
+        // 创建新的ResizeObserver
+        DesktopManager._desktopContainerResizeObserver = new ResizeObserver((entries) => {
+            for (const entry of entries) {
+                const { width, height } = entry.contentRect;
+                
+                // 当桌面容器尺寸变化时，更新图标容器布局
+                if (width > 0 && height > 0) {
+                    requestAnimationFrame(() => {
+                        DesktopManager._updateIconsContainerLayout();
+                    });
+                }
+            }
+        });
+        
+        // 开始观察桌面容器
+        DesktopManager._desktopContainerResizeObserver.observe(DesktopManager._desktopContainer);
     }
     
     /**
@@ -547,45 +634,32 @@ class DesktopManager {
         // 强制浏览器重新计算布局（确保获取最新的尺寸）
         void container.offsetWidth;
         
-        // 使用 clientWidth/clientHeight 获取实际可用空间（不包括 padding）
-        // 注意：clientWidth/clientHeight 已经减去了 padding，所以这就是实际可用尺寸
-        let containerWidth = container.clientWidth || 0;
-        let containerHeight = container.clientHeight || 0;
+        // 使用 getBoundingClientRect 获取实际尺寸（最可靠的方法）
+        const rect = container.getBoundingClientRect();
+        let containerWidth = rect.width || 0;
+        let containerHeight = rect.height || 0;
         
-        // 如果 clientWidth/clientHeight 为 0，尝试使用其他方法获取尺寸
+        // 如果 getBoundingClientRect 返回0，尝试使用 clientWidth/clientHeight
         if (containerWidth === 0 || containerHeight === 0) {
-            // 使用 getBoundingClientRect 获取实际尺寸（包括 padding）
-            const rect = container.getBoundingClientRect();
-            if (rect.width > 0 && rect.height > 0) {
-                const spacing = DesktopManager._iconSpacing;
-                containerWidth = Math.max(0, rect.width - spacing * 2);
-                containerHeight = Math.max(0, rect.height - spacing * 2);
-            } else {
-                // 容器还未完全布局，延迟排列
-                KernelLogger.debug("DesktopManager", `列表排列: 容器尺寸未就绪，延迟排列`);
-                setTimeout(() => {
-                    if (DesktopManager._autoArrange) {
-                        DesktopManager._arrangeIcons();
-                    }
-                }, 100);
-                return;
-            }
+            containerWidth = container.clientWidth || container.offsetWidth || 0;
+            containerHeight = container.clientHeight || container.offsetHeight || 0;
+        }
+        
+        // 计算实际可用尺寸（减去 padding）
+        const spacing = DesktopManager._iconSpacing;
+        // 由于 box-sizing 是 border-box，实际可用尺寸需要减去 padding（左右各一个 spacing，上下各一个 spacing）
+        containerWidth = Math.max(0, containerWidth - spacing * 2);
+        containerHeight = Math.max(0, containerHeight - spacing * 2);
+        
+        // 如果容器尺寸仍然为0，说明容器还未就绪，直接返回
+        // ResizeObserver 会在容器尺寸就绪时自动触发排列
+        if (containerWidth <= 0 || containerHeight <= 0) {
+            KernelLogger.debug("DesktopManager", `列表排列: 容器尺寸未就绪 (${containerWidth}x${containerHeight})，等待ResizeObserver触发`);
+            return;
         }
         
         const iconWidth = DesktopManager._getIconWidth();
         const iconHeight = DesktopManager._getIconHeight();
-        const spacing = DesktopManager._iconSpacing;
-        
-        // 确保容器尺寸有效
-        if (containerWidth <= 0 || containerHeight <= 0) {
-            KernelLogger.debug("DesktopManager", `列表排列: 容器尺寸无效: ${containerWidth}x${containerHeight}，延迟重试`);
-            setTimeout(() => {
-                if (DesktopManager._autoArrange) {
-                    DesktopManager._arrangeIcons();
-                }
-            }, 100);
-            return;
-        }
         
         // 计算每列可容纳的图标数（垂直方向）
         // 容器已经有 padding，所以可用高度就是 containerHeight

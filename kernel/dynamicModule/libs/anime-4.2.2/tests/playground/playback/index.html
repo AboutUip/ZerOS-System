@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Playback tests / anime.js</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <link href="../assets/css/styles.css" rel="stylesheet">
+  <style>
+    body {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      position: absolute;
+      overflow: hidden;
+      width: 100%;
+      height: 100%;
+    }
+    #animation {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 2rem;
+      max-width: 32rem;
+    }
+    .square {
+      position: relative;
+      width: 5rem;
+      height: 5rem;
+      background-color: currentColor;
+    }
+    #controls-panel {
+      position: fixed;
+      top: 2rem;
+      left: 2rem;
+    }
+  </style>
+</head>
+<body>
+  <div id="controls-panel">
+    <fieldset>
+      <legend>Engine</legend>
+      <label for="engine-frameRate">Frame rate</label>
+      <input type="range" id="engine-frameRate" name="engine-frameRate" value="60" min="0" max="120" step="1">
+      <input type="text" id="engine-fps" value="60">
+      <br>
+      <label for="engine-playbackRate">Playback rate</label>
+      <input type="range" id="engine-playbackRate" name="engine-playbackRate" value="1" min="0" max="2" step=".0001">
+      <input type="text" id="engine-speed" value="1">
+      <br>
+    </fieldset>
+    <fieldset>
+      <legend>Animation</legend>
+      <label for="animation-frameRate">Frame rate</label>
+      <input type="range" id="animation-frameRate" name="animation-frameRate" value="60" min="0" max="120" step="1">
+      <input type="text" id="animation-fps" value="60">
+      <br>
+      <label for="animation-playbackRate">Playback rate</label>
+      <input type="range" id="animation-playbackRate" name="animation-playbackRate" value="1" min="0" max="2" step=".01">
+      <input type="text" id="animation-speed" value="1">
+      <br>
+      <label for="animation-time-drift">Time drift</label>
+      <input type="text" id="animation-time-drift" value="0">
+      <br>
+      <label for="animation-reversed">Reversed</label>
+      <input type="text" id="animation-reversed" value="false">
+      <br>
+    </fieldset>
+  </div>
+  <div id="animation">
+    <div class="square red"></div>
+    <div class="square red"></div>
+    <div class="square red"></div>
+    <div class="square red"></div>
+    <div class="square red"></div>
+    <div class="square red"></div>
+    <div class="square red"></div>
+    <div class="square red"></div>
+    <div class="square red"></div>
+    <div class="square red"></div>
+    <div class="square red"></div>
+  </div>
+  <fieldset>
+    <label for="animation-currentTime">Current time</label>
+    <input type="range" id="animation-progress" name="animation-progress" value="0" min="0" max="1" step=".0001">
+    <input type="text" id="animation-currentTime" value="0">
+    <input type="button" id="animation-play" value="play">
+    <input type="button" id="animation-reverse" value="reverse">
+    <input type="button" id="animation-resume" value="resume">
+    <input type="button" id="animation-alternate" value="alternate">
+    <input type="button" id="animation-pause" value="pause">
+  </fieldset>
+  <script type="module" src="./index.js"></script>
+</body>
+</html>

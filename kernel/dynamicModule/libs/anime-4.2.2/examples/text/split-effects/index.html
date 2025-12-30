@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Text / Split effects / Anime.js</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <link href="../../assets/css/styles.css" rel="stylesheet">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@100..900&display=swap" rel="stylesheet">
+  <style>
+    body {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      gap: 2rem;
+      width: 100%;
+      min-height: 100dvh;
+      padding: 2rem;
+      font-family: "Noto Sans JP", sans-serif;
+      font-kerning: none;
+      font-variant-ligatures: none;
+      text-rendering: optimizeSpeed;
+    }
+
+    main {
+      display: flex;
+      flex-direction: row;
+      justify-content: center;
+      gap: 2rem;
+      width: calc(100% - 12rem);
+      max-width: 820px;
+    }
+
+    main p {
+      width: 100%;
+      text-align: center;
+      will-change: transform;
+    }
+
+    main p span {
+      will-change: color, transform;
+    }
+
+  </style>
+</head>
+<body class="is-debug">
+  <main>
+    <p>
+      Wave propagation and fluid dynamics encompass several interconnected physical phenomena that govern how water moves through oceanic systems, demonstrating the fundamental principles of energy transfer and momentum conservation. Wave "continuation" describes how energy persists through water long after the initial disturbance has passed, with individual water particles following elliptical orbital paths that decrease in amplitude with depth, creating the illusion of forward motion while actually moving in circular patterns. "Differential flow" occurs because various layers of water move at different velocities—surface currents respond to wind stress differently than deeper thermohaline circulation, and coastal waters behave distinctly from open ocean systems. A related phenomenon is "hydrodynamic lag," where water masses respond gradually to driving forces, whether from atmospheric pressure, gravitational pull, or temperature gradients. This lag affects everything from floating objects like debris and marine organisms to distinct water bodies themselves, such as upwelling zones and convergence areas. In oceanic circulation, deep water acts as the primary driver, with surface waves, spray, and foam representing secondary responses to local conditions. Water masses with different densities, such as warm surface layers and cold deep currents, or areas with varying salinity, exhibit more independent behavior than uniform water columns. Extreme manifestations of these forces create phenomena like rogue waves and storm surges, while calmer conditions require precise balance between competing forces to maintain stable patterns. Even apparently static water bodies demonstrate constant motion through molecular vibration, thermal convection, and microscopic currents that prevent true stagnation and maintain the ocean's dynamic equilibrium.
+    </p>
+  </main>
+  <fieldset>
+    <button id="revert">REVERT</button>
+    <button id="split">SPLIT & ANIMATE</button>
+    <button id="reorder">TIDY UP</button>
+    <button id="debug">SHOW DEBUG</button>
+  </fieldset>
+  <script type="module" src="./index.js"></script>
+</body>
+</html>

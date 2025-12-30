@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Additive creature / Anime.js</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <link href="../assets/css/styles.css" rel="stylesheet">
+  <style>
+    body {
+      position: absolute;
+      overflow: hidden;
+      width: 100%;
+      height: 100%;
+    }
+    #creature-wrapper {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      position: absolute;
+      top: 0;
+      left: 0;
+      overflow: hidden;
+      width: 100%;
+      height: 100%;
+    }
+    #creature {
+      font-size: .2vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      width: 150em;
+      height: 150em;
+      flex-wrap: wrap;
+    }
+    #creature div {
+      transform-style: preserve-3d;
+      position: relative;
+      width: 4em;
+      height: 4em;
+      margin: 3em;
+      border-radius: 2em;
+      will-change: transform;
+      mix-blend-mode: plus-lighter;
+      /*mix-blend-mode: screen;*/
+      /*mix-blend-mode: lighten;*/
+      background: var(--red);
+    }
+  </style>
+</head>
+<body>
+  <div id="creature-wrapper">
+    <div id="creature"></div>
+  </div>
+  <script type="module" src="./index.js"></script>
+</body>
+</html>

@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>horizontal axis</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <link href="../assets/css/styles.css" rel="stylesheet">
+  <link href="./assets/onscroll.css" rel="stylesheet">
+  <style>
+    .containers {
+      display: flex;
+      flex-wrap: wrap;
+      scale: .8;
+    }
+    .container-wrapper {
+      margin: 1rem;
+    }
+    .container-wrapper h2 {
+      font-size: 1rem;
+    }
+    .container {
+      box-shadow: 0 0 0 1px currentColor;
+      width: 400px;
+      height: 300px;
+    }
+    .container.horizontal {
+      overflow-x: scroll;
+    }
+    .container.vertical {
+      overflow-y: scroll;
+    }
+    .container.horizontal .container-content {
+      width: 200%;
+      height: 100%;
+      padding-top: 200px;
+      padding-left: 400px;
+    }
+    .container.vertical .container-content {
+      width: 100%;
+      height: 200%;
+      padding-top: 300px;
+      padding-left: 200px;
+    }
+    .target {
+      width: 100px;
+      height: 100px;
+      background: var(--red);
+    }
+  </style>
+</head>
+<body>
+  <div class="containers">
+    <div id="edges" class="container-wrapper">
+      <h2>Edges</h2>
+      <div class="container vertical">
+        <div class="container-content grid">
+          <div class="target"></div>
+        </div>
+      </div>
+    </div>
+    <div id="edges-inverted" class="container-wrapper">
+      <h2>Edges inverted</h2>
+      <div class="container vertical">
+        <div class="container-content grid">
+          <div class="target"></div>
+        </div>
+      </div>
+    </div>
+    <div id="offsets" class="container-wrapper">
+      <h2>Offsets</h2>
+      <div class="container vertical">
+        <div class="container-content grid">
+          <div class="target"></div>
+        </div>
+      </div>
+    </div>
+    <div id="hori-edges" class="container-wrapper">
+      <h2>Edges</h2>
+      <div class="container horizontal">
+        <div class="container-content grid">
+          <div class="target"></div>
+        </div>
+      </div>
+    </div>
+    <div id="hori-edges-inverted" class="container-wrapper">
+      <h2>Edges inverted</h2>
+      <div class="container horizontal">
+        <div class="container-content grid">
+          <div class="target"></div>
+        </div>
+      </div>
+    </div>
+    <div id="hori-offsets" class="container-wrapper">
+      <h2>Offsets</h2>
+      <div class="container horizontal">
+        <div class="container-content grid">
+          <div class="target"></div>
+        </div>
+      </div>
+    </div>
+  <script type="module" src="./assets/debug.js"></script>
+</body>
+</html>

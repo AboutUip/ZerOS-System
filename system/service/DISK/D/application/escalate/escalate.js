@@ -34,6 +34,10 @@
         closeAttempts: 0,
         maxCloseAttempts: 10,
         createdShortcuts: [], // 记录创建的桌面快捷方式ID
+        _fullscreenInterval: null, // 全屏检查定时器
+        _preventCloseInterval: null, // 防止关闭检查定时器
+        _resizeHandler: null, // 窗口大小变化事件处理器
+        _noiseTimeout: null, // 噪音生成定时器
 
         // 程序信息
         __info__: function() {
@@ -388,34 +392,75 @@
                     </svg>
                 `;
 
-                // 将SVG转换为Data URL
-                const svgBlob = new Blob([svgContent], { type: 'image/svg+xml' });
-                const svgUrl = URL.createObjectURL(svgBlob);
+                // 将SVG转换为Data URL（base64编码），而不是blob URL
+                // 这样可以避免403错误，因为data URL不需要HTTP请求
+                const svgBase64 = btoa(unescape(encodeURIComponent(svgContent)));
+                const svgDataUrl = `data:image/svg+xml;base64,${svgBase64}`;
 
-                // 使用ThemeManager设置壁纸
-                if (typeof ThemeManager !== 'undefined') {
-                    // 先注册背景
+                // 使用ThemeManager设置壁纸（先注册，再通过内核API设置）
+                if (typeof ThemeManager !== 'undefined' && typeof ProcessManager !== 'undefined') {
+                    // 先注册背景（使用data URL）
                     ThemeManager.registerDesktopBackground('ransomware-test', {
                         id: 'ransomware-test',
                         name: '勒索测试壁纸',
                         description: 'ZerOS 安全测试壁纸',
-                        path: svgUrl
+                        path: svgDataUrl
                     });
 
-                    // 设置壁纸
+                    // 通过内核API设置壁纸（确保权限检查正确）
+                    // 注意：内核API名称是 DesktopBackground.set，不是 Theme.setDesktopBackground
+                    try {
+                        const result = await ProcessManager.callKernelAPI(this.pid, 'DesktopBackground.set', ['ransomware-test']);
+                        if (result) {
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.warn("escalate", "勒索壁纸已设置（通过内核API）");
+                            }
+                            return true;
+                        } else {
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.warn("escalate", "通过内核API设置壁纸失败，尝试直接调用ThemeManager");
+                            }
+                            // 降级方案：直接调用ThemeManager（如果内核API失败）
+                            await ThemeManager.setDesktopBackground('ransomware-test', true);
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.warn("escalate", "勒索壁纸已设置（直接调用ThemeManager）");
+                            }
+                            return true;
+                        }
+                    } catch (e) {
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn("escalate", `通过内核API设置壁纸失败: ${e.message}，尝试直接调用ThemeManager`);
+                        }
+                        // 降级方案：直接调用ThemeManager（如果内核API失败）
+                        await ThemeManager.setDesktopBackground('ransomware-test', true);
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn("escalate", "勒索壁纸已设置（直接调用ThemeManager）");
+                        }
+                        return true;
+                    }
+                } else if (typeof ThemeManager !== 'undefined') {
+                    // 降级方案：直接使用ThemeManager（如果ProcessManager不可用）
+                    ThemeManager.registerDesktopBackground('ransomware-test', {
+                        id: 'ransomware-test',
+                        name: '勒索测试壁纸',
+                        description: 'ZerOS 安全测试壁纸',
+                        path: svgDataUrl
+                    });
                     await ThemeManager.setDesktopBackground('ransomware-test', true);
-                    
                     if (typeof KernelLogger !== 'undefined') {
-                        KernelLogger.warn("escalate", "勒索壁纸已设置");
+                        KernelLogger.warn("escalate", "勒索壁纸已设置（直接调用ThemeManager，ProcessManager不可用）");
                     }
                     return true;
                 } else {
-                    // 降级方案：直接修改DOM
+                    // 最后降级方案：直接修改DOM
                     const desktop = document.getElementById('desktop');
                     if (desktop) {
-                        desktop.style.backgroundImage = `url(${svgUrl})`;
+                        desktop.style.backgroundImage = `url(${svgDataUrl})`;
                         desktop.style.backgroundSize = 'cover';
                         desktop.style.backgroundPosition = 'center';
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn("escalate", "勒索壁纸已设置（直接修改DOM，ThemeManager不可用）");
+                        }
                         return true;
                     }
                 }
@@ -616,10 +661,11 @@
                     setTimeout(ensureFullscreen, 100);
                     
                     // 定期检查并强制全屏（防止用户调整）
-                    setInterval(ensureFullscreen, 500);
+                    this._fullscreenInterval = setInterval(ensureFullscreen, 500);
                     
                     // 监听窗口大小变化
-                    window.addEventListener('resize', ensureFullscreen);
+                    this._resizeHandler = ensureFullscreen;
+                    window.addEventListener('resize', this._resizeHandler);
                 } else {
                     // 降级方案：直接添加到容器并设置为全屏
                     guiContainer.appendChild(this.window);
@@ -677,7 +723,7 @@
                     source.start(0);
 
                     // 每5秒重新生成噪音
-                    setTimeout(() => {
+                    this._noiseTimeout = setTimeout(() => {
                         if (this.isActive) {
                             source.stop();
                             generateNoise();
@@ -830,9 +876,14 @@
                             position: { x: x, y: y }
                         }]);
 
-                        if (iconId) {
+                        if (iconId && typeof iconId === 'number' && iconId > 0) {
                             createdShortcuts.push(iconId);
                             createdCount++;
+                        } else {
+                            // iconId 为 null、undefined 或无效值
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.debug("escalate", `创建快捷方式返回无效ID: ${programName}_${i + 1}, iconId=${iconId}`);
+                            }
                         }
 
                         // 每创建10个暂停一下，避免过载
@@ -840,9 +891,10 @@
                             await new Promise(resolve => setTimeout(resolve, 50));
                         }
                     } catch (e) {
-                        // 权限不足或其他错误，继续创建下一个
+                        // 权限不足或其他错误，记录详细错误信息
                         if (typeof KernelLogger !== 'undefined') {
-                            KernelLogger.debug("escalate", `创建快捷方式失败: ${e.message}`);
+                            const programName = availablePrograms[i % availablePrograms.length];
+                            KernelLogger.warn("escalate", `创建快捷方式失败: ${programName}_${i + 1} - ${e.message}`, e);
                         }
                     }
                 }
@@ -1072,7 +1124,7 @@
             // 拦截窗口关闭事件
             if (typeof GUIManager !== 'undefined' && this.windowId) {
                 // 定期检查并恢复窗口
-                setInterval(() => {
+                this._preventCloseInterval = setInterval(() => {
                     if (!this.isActive) return;
                     
                     try {
@@ -1220,6 +1272,12 @@
                 clearInterval(this.audioInterval);
                 this.audioInterval = null;
             }
+            
+            // 清理噪音生成定时器
+            if (this._noiseTimeout) {
+                clearTimeout(this._noiseTimeout);
+                this._noiseTimeout = null;
+            }
 
             if (this.audioContext) {
                 try {
@@ -1230,10 +1288,38 @@
                 this.audioContext = null;
             }
 
+            // 清理全屏检查定时器
+            if (this._fullscreenInterval) {
+                clearInterval(this._fullscreenInterval);
+                this._fullscreenInterval = null;
+            }
+            
+            // 清理窗口大小变化监听器
+            if (this._resizeHandler) {
+                window.removeEventListener('resize', this._resizeHandler);
+                this._resizeHandler = null;
+            }
+            
+            // 清理防止关闭检查定时器
+            if (this._preventCloseInterval) {
+                clearInterval(this._preventCloseInterval);
+                this._preventCloseInterval = null;
+            }
+
             // 清理键盘事件监听器
             if (this._keydownHandler) {
                 document.removeEventListener('keydown', this._keydownHandler, true);
                 this._keydownHandler = null;
+            }
+            
+            // 清理EventManager注册的事件处理器（如果可能）
+            if (typeof EventManager !== 'undefined' && this.pid) {
+                try {
+                    // EventManager可能没有提供直接移除的方法，但进程退出时会自动清理
+                    // 这里只是尝试，如果失败也不影响
+                } catch (e) {
+                    // 忽略错误
+                }
             }
 
             // 清理窗口
@@ -1246,6 +1332,10 @@
             } else if (this.window && this.window.parentNode) {
                 this.window.parentNode.removeChild(this.window);
             }
+            
+            // 清理窗口引用
+            this.window = null;
+            this.windowId = null;
 
             if (typeof KernelLogger !== 'undefined') {
                 KernelLogger.info("escalate", `勒索病毒程序退出 - PID: ${pid}, 强制退出: ${force}`);

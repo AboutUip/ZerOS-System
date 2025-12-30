@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Typewriter / Anime.js</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <link href="../assets/css/styles.css" rel="stylesheet">
+  <style>
+    body {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+
+    .playground {
+      position: relative;
+      display: flex;
+      flex-direction: row;
+      justify-content: center;
+      align-items: center;
+      flex-wrap: wrap;
+      width: 30%;
+    }
+
+    .playground .typewriter {
+      position: relative;
+      flex-shrink: 0;
+    }
+
+    .playground .typewriter span {
+      white-space: pre;
+      display: inline-block;
+      font-family: Input Mono, monospace;
+    }
+
+    .playground .typewriter .cursor {
+      position: absolute;
+      top: -2px;
+      bottom: 0px;
+      left: 1ch;
+      width: 2px;
+      background-color: var(--red);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="playground">
+    <div class="typewriter">
+      <span>H</span><span>e</span><span>l</span><span>l</span><span>o</span><span> </span><span>w</span><span>o</span><span>r</span><span>l</span><span>d</span><span>,</span><span> </span><span>t</span><span>h</span><span>i</span><span>s</span><span> </span><span>i</span><span>s</span><span> </span><span>o</span><span>n</span><span>l</span><span>y</span><span> </span><span>a</span><span> </span><span>t</span><span>e</span><span>s</span><span>t</span><span>.</span>
+      <div class="cursor"></div>
+    </div>
+  </div>
+
+  <script type="module" src="./index.js"></script>
+
+</body>
+</html>

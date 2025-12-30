@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>function based values</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <link href="../assets/css/styles.css" rel="stylesheet">
+  <link href="./assets/onscroll.css" rel="stylesheet">
+  <style>
+    .log {
+      position: fixed;
+      z-index: 10;
+      overflow-y: scroll;
+      width: 22ch;
+      height: 20ch;
+      padding-left: 1ch;
+      padding-right: 1ch;
+      font-family: ui-monospace, monospace;
+      white-space: pre;
+      background-color: rgba(0, 0, 0, .5);
+    }
+
+    body {
+      display: flex;
+      flex-wrap: nowrap;
+    }
+
+    .container {
+      display: flex;
+      flex-wrap: nowrap;
+      flex-grow: 1;
+      flex-shrink: 0;
+    }
+
+    .section {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      flex-shrink: 0;
+      width: 100vw;
+      height: 100lvh;
+      border: 1px dotted var(--green);
+    }
+
+    @media (orientation: landscape) {
+      body {
+        overflow-x: scroll;
+      }
+      body .container.grid {
+        width: 300vw;
+        flex-direction: row;
+      }
+    }
+
+    @media (orientation: portrait) {
+      body {
+        overflow-y: scroll;
+      }
+      body .container.grid {
+        height: 300lvh;
+        flex-direction: column;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container grid">
+    <div class="section">
+      <div class="stack">
+        <div class="card"><div class="front"></div><div class="back"></div></div>
+        <div class="card"><div class="front"></div><div class="back"></div></div>
+        <div class="card"><div class="front"></div><div class="back"></div></div>
+        <div class="card"><div class="front"></div><div class="back"></div></div>
+      </div>
+    </div>
+    <div class="section">
+      <div class="stack">
+        <div class="card"><div class="front"></div><div class="back"></div></div>
+        <div class="card"><div class="front"></div><div class="back"></div></div>
+        <div class="card"><div class="front"></div><div class="back"></div></div>
+        <div class="card"><div class="front"></div><div class="back"></div></div>
+      </div>
+    </div>
+    <div class="section">
+      <div class="stack">
+        <div class="card"><div class="front"></div><div class="back"></div></div>
+        <div class="card"><div class="front"></div><div class="back"></div></div>
+        <div class="card"><div class="front"></div><div class="back"></div></div>
+        <div class="card"><div class="front"></div><div class="back"></div></div>
+      </div>
+    </div>
+  </div>
+  <script type="module" src="./assets/function-based-values.js"></script>
+</body>
+</html>

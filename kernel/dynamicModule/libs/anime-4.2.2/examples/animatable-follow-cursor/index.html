@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Animatable follow cursor / Anime.js</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <link href="../assets/css/styles.css" rel="stylesheet">
+  <style>
+    body {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      position: absolute;
+      top: 0;
+      left: 0;
+      overflow: hidden;
+      width: 100%;
+      height: 100vh;
+    }
+
+    .particles {
+      --size: 21;
+      --diameter: 1em;
+      --margin: 0em;
+      font-size: 10px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      flex-wrap: wrap;
+      width: calc(var(--size) * 1em);
+      height: calc(var(--size) * 1em);
+    }
+
+    .particles div {
+      position: relative;
+      width: calc(var(--diameter) - var(--margin) * 2);
+      height: calc(var(--diameter) - var(--margin) * 2);
+      margin: var(--margin);
+      background: var(--red);
+      mix-blend-mode: plus-lighter;
+      box-shadow: 0 0 10px 0 var(--red);
+      border-radius: .5rem;
+      opacity: .75;
+    }
+  </style>
+</head>
+<body>
+  <div class="particles"></div>
+  <script type="module" src="./index.js"></script>
+</body>
+</html>

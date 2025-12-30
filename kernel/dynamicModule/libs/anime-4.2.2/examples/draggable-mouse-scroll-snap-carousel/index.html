@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Draggable mouse scroll snap carousel / Anime.js</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <link href="../assets/css/styles.css" rel="stylesheet">
+  <style>
+    * {
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;
+      user-select: none;
+    }
+    body, html {
+      overflow: hidden;
+      background: #000;
+
+    }
+    #snap-carousel {
+      --spacing: 30px;
+      overflow: visible;
+      position: absolute;
+      top: 0;
+      left: 100px;
+      width: calc(100% - 200px);
+      height: 100%;
+    }
+    .carousel {
+      overflow: visible;
+      display: flex;
+      justify-content: flex-start;
+      height: 100%;
+      padding: var(--spacing) 0;
+      will-change: transform;
+    }
+    .carousel-item {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-size: 15vw;
+      flex-shrink: 0;
+      width: calc(50% - (var(--spacing) * 1.5));
+      height: 100%;
+      margin-left: var(--spacing);
+      background-color: var(--red);
+      border-radius: var(--spacing);
+      list-style: none;
+      will-change: transform;
+    }
+  </style>
+</head>
+<body>
+  <div id="snap-carousel">
+    <ul class="carousel">
+      <li class="draggable carousel-item">1</li>
+      <li class="draggable carousel-item">2</li>
+      <li class="draggable carousel-item">3</li>
+      <li class="draggable carousel-item">4</li>
+      <li class="draggable carousel-item">5</li>
+      <li class="draggable carousel-item">6</li>
+      <li class="draggable carousel-item">7</li>
+      <li class="draggable carousel-item">8</li>
+    </ul>
+  </div>
+  <script src="./index.js" type="module"></script>
+</body>
+
+</html>

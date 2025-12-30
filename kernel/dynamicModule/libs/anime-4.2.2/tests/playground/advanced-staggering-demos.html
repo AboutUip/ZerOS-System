@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Advanced staggering demos / Anime.js</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <link href="assets/css/styles.css" rel="stylesheet">
+  <style>
+    body {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      align-items: center;
+      position: absolute;
+      height: 100%;
+    }
+    #test-wrapper {
+      display: flex;
+      flex-direction: row;
+      justify-content: center;
+      align-items: center;
+      flex-wrap: wrap;
+      flex-shrink: 0;
+      width: 100%;
+      height: 100%;
+      overflow: scroll;
+    }
+    .demo {
+      position: relative;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      align-items: center;
+      flex-grow: 1;
+      flex-shrink: 0;
+      width: 20%;
+      height: 25%;
+      min-height: 11rem;
+      padding: 4rem 0 0 0;
+      border-bottom: none;
+      box-shadow: inset 0 0 1px rgba(255, 255, 255, .6);
+    }
+    .demo h1 {
+      position: absolute;
+      top: .75rem;
+      left: 1rem;
+    }
+    .demo span {
+      width: 1rem;
+      height: 1rem;
+      border: 2px solid currentColor;
+    }
+    .demo .demo-line {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      width: 11rem;
+      height: 1rem;
+      box-shadow: inset 0 0 0 2px rgba(255, 255, 255, .2);
+    }
+    .demo .demo-grid {
+      position: relative;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      width: 10rem;
+      height: 5rem;
+      margin: auto;
+      border: none;
+      flex-grow: 0;
+      flex-shrink: 0;
+      box-shadow: inset 0 0 0 2px rgba(255, 255, 255, .2);
+    }
+  </style>
+</head>
+<body>
+  <div id="test-wrapper">
+    <section class="demo normal">
+      <h1>Normal</h1>
+      <div class="demo-line">
+        <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+      </div>
+    </section>
+
+    <section class="demo normal-reversed">
+      <h1>Normal reversed</h1>
+      <div class="demo-line">
+        <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+      </div>
+    </section>
+
+    <section class="demo from-center">
+      <h1>From center</h1>
+      <div class="demo-line">
+        <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+      </div>
+    </section>
+
+    <section class="demo from-center-reversed">
+      <h1>From center reversed</h1>
+      <div class="demo-line">
+        <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+      </div>
+    </section>
+
+    <section class="demo from-last">
+      <h1>From last</h1>
+      <div class="demo-line">
+        <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+      </div>
+    </section>
+
+    <section class="demo from-last-reversed">
+      <h1>From last reversed</h1>
+      <div class="demo-line">
+        <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+      </div>
+    </section>
+
+    <section class="demo from-index">
+      <h1>From index</h1>
+      <div class="demo-line">
+        <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+      </div>
+    </section>
+
+    <section class="demo from-index-reversed">
+      <h1>From index reversed</h1>
+      <div class="demo-line">
+        <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+      </div>
+    </section>
+
+    <section class="demo range">
+      <h1>Range</h1>
+      <div class="demo-line">
+        <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+      </div>
+    </section>
+
+    <section class="demo range-reversed">
+      <h1>Range reversed</h1>
+      <div class="demo-line">
+        <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+      </div>
+    </section>
+
+    <section class="demo range-from-last">
+      <h1>Range from last</h1>
+      <div class="demo-line">
+        <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+      </div>
+    </section>
+
+    <section class="demo range-from-last-reversed">
+      <h1>Range from last reversed</h1>
+      <div class="demo-line">
+        <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+      </div>
+    </section>
+
+    <section class="demo range-from-center">
+      <h1>Range from center</h1>
+      <div class="demo-line">
+        <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+      </div>
+    </section>
+
+    <section class="demo range-from-center-reversed">
+      <h1>Range from center reversed</h1>
+      <div class="demo-line">
+        <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+      </div>
+    </section>
+
+    <section class="demo ease">
+      <h1>Easing from center</h1>
+      <div class="demo-line">
+        <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+      </div>
+    </section>
+
+    <section class="demo ease-reversed">
+      <h1>Easing from center reversed</h1>
+      <div class="demo-line">
+        <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+      </div>
+    </section>
+
+    <section class="demo">
+      <h1>Coordinates</h1>
+      <div class="demo-grid grid">
+        <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+        <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+        <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+        <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+        <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+      </div>
+    </section>
+
+    <section class="demo">
+      <h1>Coordinates reversed</h1>
+      <div class="demo-grid grid-reversed">
+        <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+        <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+        <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+        <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+        <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+      </div>
+    </section>
+
+    <section class="demo">
+      <h1>Coordinates axis</h1>
+      <div class="demo-grid grid-axis">
+        <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+        <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+        <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+        <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+        <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+      </div>
+    </section>
+
+    <section class="demo">
+      <h1>Coordinates axis reversed</h1>
+      <div class="demo-grid grid-axis-reversed">
+        <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+        <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+        <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+        <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+        <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+      </div>
+    </section>
+  </div>
+  <script type="module">
+    import { createTimeline, stagger } from '../../../dist/modules/index.js';
+
+    const red = '#F64E4D';
+
+    const animations = createTimeline({
+      ease: 'expo.out',
+      alternate: true,
+      loop: true
+    })
+    .add('.normal span', {
+      translateY: stagger('-.5em'),
+      color: red,
+      delay: stagger(100)
+    }, 0)
+    .add('.normal-reversed span', {
+      translateY: stagger('-.5em', { reversed: true  }),
+      color: red,
+      delay: stagger(100, { reversed: true  }),
+    }, 0)
+    .add('.from-last span', {
+      translateY: stagger('-.5em', {from: 'last'}),
+      color: red,
+      delay: stagger(100, {from: 'last'})
+    }, 0)
+    .add('.from-last-reversed span', {
+      translateY: stagger('-.5em', { from: 'last', reversed: true  }),
+      color: red,
+      delay: stagger(100, { from: 'last', reversed: true  }),
+    }, 0)
+    .add('.from-center span', {
+      translateY: stagger('-.5em', {from: 'center'}),
+      color: red,
+      delay: stagger(100, {from: 'center'})
+    }, 0)
+    .add('.from-center-reversed span', {
+      translateY: stagger('-.5em', { from: 'center', reversed: true  }),
+      color: red,
+      delay: stagger(100, { from: 'center', reversed: true  }),
+    }, 0)
+    .add('.from-index span', {
+      translateY: stagger('-.5em', {from: 3}),
+      color: red,
+      delay: stagger(100, {from: 3})
+    }, 0)
+    .add('.from-index-reversed span', {
+      translateY: stagger('-.5em', { from: 3, reversed: true  }),
+      color: red,
+      delay: stagger(100, { from: 3, reversed: true  }),
+    }, 0)
+    .add('.range span', {
+      translateY: stagger(['-2em', '2em']),
+      color: red,
+      delay: stagger([0, 600])
+    }, 0)
+    .add('.range-reversed span', {
+      translateY: stagger(['-2em', '2em'], { reversed: true }),
+      color: red,
+      delay: stagger([0, 600], { reversed: true }),
+    }, 0)
+    .add('.range-from-last span', {
+      translateY: stagger(['-2em', '2em'], {from: 'last'}),
+      color: red,
+      delay: stagger([0, 600], {from: 'last'})
+    }, 0)
+    .add('.range-from-last-reversed span', {
+      translateY: stagger(['-2em', '2em'], { from: 'last', reversed: true }),
+      color: red,
+      delay: stagger([0, 600], { from: 'last', reversed: true }),
+    }, 0)
+    .add('.range-from-center span', {
+      translateY: stagger(['-2em', '2em'], {from: 'center'}),
+      color: red,
+      delay: stagger([0, 600], {from: 'center'})
+    }, 0)
+    .add('.range-from-center-reversed span', {
+      translateY: stagger(['-2em', '2em'], { from: 'center', reversed: true }),
+      color: red,
+      delay: stagger([0, 600], { from: 'center', reversed: true }),
+    }, 0)
+    .add('.ease span', {
+      translateY: stagger(['2rem', '-2rem'], {from: 'center', ease: 'easeOutQuad'}),
+      color: red,
+      delay: stagger([0, 600], {from: 'center', ease: 'easeOutExpo'})
+    }, 0)
+    .add('.ease-reversed span', {
+      translateY: stagger(['2rem', '-2rem'], {from: 'center', reversed: true , ease: 'easeOutQuad'}),
+      color: red,
+      delay: stagger([0, 600], {from: 'center', reversed: true , ease: 'easeOutExpo'}),
+    }, 0)
+    .add('.grid span', {
+      scale: stagger([1, 0], {grid: [10, 5], from: 38}),
+      color: red,
+      delay: stagger(100, {grid: [10, 5], from: 38})
+    }, 0)
+    .add('.grid-reversed span', {
+      scale: stagger([1, 0], {grid: [10, 5], from: 38, reversed: true }),
+      color: red,
+      delay: stagger(100, {grid: [10, 5], from: 38, reversed: true })
+    }, 0)
+    .add('.grid-axis span', {
+      translateX: stagger('.5rem', {grid: [10, 5], from: 38, axis: 'x'}),
+      translateY: stagger('.5rem', {grid: [10, 5], from: 38, axis: 'y'}),
+      color: red,
+      delay: stagger(100, {grid: [10, 5], from: 38})
+    }, 0)
+    .add('.grid-axis-reversed span', {
+      translateX: stagger('.5rem', {grid: [10, 5], from: 38, axis: 'x', reversed: true }),
+      translateY: stagger('.5rem', {grid: [10, 5], from: 38, axis: 'y', reversed: true }),
+      color: red,
+      delay: stagger(100, {grid: [10, 5], from: 38, reversed: true })
+    }, 0);
+
+  </script>
+</body>
+</html>

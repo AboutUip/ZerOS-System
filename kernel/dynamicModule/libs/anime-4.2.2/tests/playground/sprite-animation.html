@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Typewriter / Anime.js</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <link href="assets/css/styles.css" rel="stylesheet">
+  <style>
+    body {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+
+    .playground {
+      position: relative;
+      display: flex;
+      flex-direction: row;
+      justify-content: center;
+      align-items: center;
+      flex-wrap: wrap;
+      width: 30%;
+    }
+
+    .playground .ryu {
+      width: 79px;
+      height: 112px;
+      background-image: url(assets/media/ryu.png);
+      background-repeat: no-repeat;
+      background-size: 790px 112px;
+      image-rendering: pixelated;
+      transform: scale(3);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="playground">
+    <div class="ryu"></div>
+  </div>
+
+  <script type="module">
+
+    import { animate } from '../../../dist/modules/index.js';
+
+    const ryu = animate('.ryu', {
+      backgroundPosition: '100% 0px',
+      ease: 'steps(9)',
+      duration: 450,
+      loop: true
+    });
+
+  </script>
+
+</body>
+</html>

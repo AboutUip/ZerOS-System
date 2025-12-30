@@ -1,0 +1,108 @@
+:root {
+  --black: #252423;
+  --white: #F6F4F2;
+  --red: #FF4B4B;
+  --orange: #FF8F42;
+  --lightorange: #FFC730;
+  --yellow: #F6FF56;
+  --citrus: #A4FF4F;
+  --green: #18FF74;
+  --darkgreen: #00D672;
+  --turquoise: #3CFFEC;
+  --skyblue: #61C3FF;
+  --kingblue: #5A87FF;
+  --lavender: #8453E3;
+  --purple: #C26EFF;
+  --pink: #FB89FB;
+}
+
+*, *:before, *:after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  font: inherit;
+  vertical-align: baseline;
+}
+
+html,
+body {
+  background-color: var(--black);
+  color: var(--white);
+  font-family: sans-serif;
+}
+
+.black { color: var(--black); }
+.white { color: var(--white); }
+.red { color: var(--red); }
+.blue { color: var(--skyblue); }
+.green { color: var(--green); }
+
+.grid {
+  --one-cell: 100px;
+  --border-color: rgba(255,255,255,.75);
+  flex-grow: 1;
+  position: relative;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+}
+
+.grid:before {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  z-index: 0;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  background:
+    linear-gradient(-90deg, rgba(255,255,255,.05) 1px, transparent 1px),
+    linear-gradient(rgba(255,255,255,.05) 1px, transparent 1px),
+    linear-gradient(-90deg, rgba(255,255,255,.04) 1px, transparent 1px),
+    linear-gradient(rgba(255,255,255,.04) 1px, transparent 1px);
+  background-size:
+    calc(var(--one-cell) / 10) calc(var(--one-cell) / 10),
+    calc(var(--one-cell) / 10) calc(var(--one-cell) / 10),
+    var(--one-cell) var(--one-cell), var(--one-cell) var(--one-cell),
+    var(--one-cell) var(--one-cell), var(--one-cell) var(--one-cell);
+  background-position: 0 -1px;
+  backface-visibility: hidden;
+}
+
+.grid:before {
+  width: calc(75px + 100%);
+  left: -75px;
+}
+
+@media (min-width: 500px) {
+  .grid:before {
+    width: 100%;
+    left: 0;
+  }
+}
+
+.log {
+  --width: 22ch;
+  --height: 20ch;
+  position: fixed;
+  z-index: 10;
+  top: 0;
+  overflow-y: scroll;
+  width: var(--width);
+  height: var(--height);
+  padding-left: 1ch;
+  padding-right: 1ch;
+  padding-bottom: 1ch;
+  font-family: ui-monospace, monospace;
+  white-space: pre;
+  background-color: rgba(0, 0, 0, .5);
+}
+.log span {
+  animation: reveal 2s ease-in-out forwards;
+}
+@keyframes reveal {
+  from { opacity: 1; }
+  to { opacity: .4; }
+}

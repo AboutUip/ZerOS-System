@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Draggable playground / Anime.js</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <link href="../assets/css/styles.css" rel="stylesheet">
+  <style>
+
+    body {
+      --one-cell: 100px;
+      --border-color: rgba(255,255,255,.75);
+    }
+
+    .grid::before {
+      content: "";
+      pointer-events: none;
+      position: absolute;
+      z-index: 0;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(-90deg, rgba(255,255,255,.05) 1px, transparent 1px), linear-gradient(rgba(255,255,255,.05) 1px, transparent 1px), linear-gradient(-90deg, rgba(255,255,255,.04) 1px, transparent 1px), linear-gradient(rgba(255,255,255,.04) 1px, transparent 1px), linear-gradient(transparent 3px, var(--black) 3px, var(--black) calc(var(--one-cell) - 2px), transparent calc(var(--one-cell) - 2px)), linear-gradient(-90deg, var(--white) 1px, transparent 1px), linear-gradient(-90deg, transparent 3px, var(--black) 3px, var(--black) calc(var(--one-cell) - 2px), transparent calc(var(--one-cell) - 2px)), linear-gradient(var(--white) 1px, transparent 1px), var(--black);
+      background-size: calc(var(--one-cell) / 10) calc(var(--one-cell) / 10), calc(var(--one-cell) / 10) calc(var(--one-cell) / 10), var(--one-cell) var(--one-cell), var(--one-cell) var(--one-cell), var(--one-cell) var(--one-cell), var(--one-cell) var(--one-cell), var(--one-cell) var(--one-cell), var(--one-cell) var(--one-cell);
+      background-position: calc(var(--one-cell) * .25) -1px;
+    }
+
+    #draggables {
+      overflow: hidden;
+      position: relative;
+      display: flex;
+      flex-grow: 1;
+      flex-wrap: wrap;
+      justify-content: flex-start;
+      align-items: flex-start;
+      padding: 0 0 var(--one-cell) 0;
+      transform-origin: 50% 0% 0px;
+      will-change: transform;
+    }
+
+    .example {
+      position: relative;
+      min-width: calc(var(--one-cell) * 1);
+      margin: calc(var(--one-cell) * .25);
+      margin-bottom: 0;
+    }
+
+    @media (min-width: 500px) {
+      #draggables.grid {
+        padding-bottom: calc(var(--one-cell) * 1);
+      }
+      #draggables.grid:before {
+        width: calc(100% + calc(var(--one-cell) * .5));
+        left: calc(var(--one-cell) * -.5);
+        background-position: calc(var(--one-cell) * 1) -1px;
+      }
+      .example {
+        margin: calc(var(--one-cell) * .5);
+        margin-bottom: 0;
+      }
+    }
+
+    .example h2 {
+      font-family: Input Mono;
+      height: calc(var(--one-cell) * .5);
+      padding-top: 15px;
+      padding-bottom: 15px;
+    }
+
+    .example-content {
+      display: flex;
+      justify-content: flex-start;
+      width: 100%;
+    }
+
+    .example-content-vertical {
+      flex-direction: column;
+    }
+
+    .draggable {
+      display: flex;
+      position: relative;
+      z-index: 100;
+    }
+
+    .draggable::after {
+      content: "";
+      display: block;
+      pointer-events: none;
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 20px;
+      height: 20px;
+      margin-left: -10px;
+      margin-top: -10px;
+      background-size: 5px 5px;
+      background-image:
+        radial-gradient(circle at center, var(--black) 1px, transparent 0),
+        radial-gradient(circle at center, var(--black) 1px, transparent 0);
+    }
+
+    .carousel .draggable {
+      padding-top: 1rem;
+      padding-left: 1rem;
+      color: var(--black);
+    }
+
+    .rectangle {
+      width: calc(var(--one-cell) * 2);
+      height: calc(var(--one-cell) * 1);
+      background-color: var(--red);
+      border-radius: 20px;
+    }
+
+    .square {
+      width: calc(var(--one-cell) * .8);
+      height: calc(var(--one-cell) * .8);
+      background-color: var(--red);
+      border-radius: 20px;
+    }
+
+    .bar {
+      overflow: hidden;
+      width: calc(var(--one-cell) * .1);
+      height: calc(var(--one-cell) * .8);
+      background-color: var(--red);
+      border-radius: 20px;
+    }
+
+    .margin {
+      position: relative;
+      z-index: 1;
+      box-shadow: 0 0 0 1px var(--border-color);
+      border-radius: 20px;
+      padding: 10px;
+    }
+
+    .margin:before {
+      content: "";
+      pointer-events: none;
+      display: block;
+      position: absolute;
+      z-index: 2;
+      left: 10px;
+      top: 10px;
+      width: calc(100% - 20px);
+      height: calc(100% - 20px);
+      border: 1px dashed rgba(255,255,255,.25);
+      border-radius: 10px;
+    }
+
+    .margin-overlay {
+      position: absolute;
+      pointer-events: none;
+      z-index: 3;
+      top: calc(var(--one-cell) * .5);
+      left: 0;
+      width: 100%;
+      height: calc(100% - calc(var(--one-cell) * .5));
+    }
+
+    .margin-overlay + .margin:before {
+      display: none;
+    }
+
+    .margin-overlay + .margin {
+      box-shadow: none;
+    }
+
+    .margin .draggable {
+      background-color: var(--red);
+      border-radius: 10px;
+    }
+
+    .range-x {
+      width: calc(var(--one-cell) * 3);
+      height: calc(var(--one-cell) * 1);
+    }
+
+    .range-y {
+      width: calc(var(--one-cell) * 1);
+      height: calc(var(--one-cell) * 3);
+    }
+
+    .dynamic {
+      width: calc(var(--one-cell) * 3);
+      height: calc(var(--one-cell) * 1);
+    }
+
+    .dynamic .square,
+    .dynamic .bar {
+      position: absolute;
+      left: 0;
+      top: 0;
+    }
+
+    .dynamic .bar-left {
+      left: 0;
+      right: auto;
+      border-radius: 10px 0 0 10px;
+    }
+
+    .dynamic .bar-right {
+      left: auto;
+      right: 0;
+      border-radius: 0 10px 10px 0;
+    }
+
+    .container {
+      overflow: hidden;
+      width: calc((var(--one-cell) * 3));
+      height: calc((var(--one-cell) * 3));
+    }
+
+    .container.overflow {
+      overflow: auto;
+      overscroll-behavior: contain;
+    }
+
+    #fixed-container {
+      width: calc((var(--one-cell) * 2));
+      height: calc((var(--one-cell) * 1));
+      box-shadow: 0 0 0 1px var(--border-color);
+      border-radius: 20px;
+    }
+
+    #fixed {
+      position: fixed;
+      top: calc((var(--one-cell) * .75));
+      left: calc((var(--one-cell) * .25));
+      box-shadow: 0 0 1rem 0 rgba(0,0,0,.2);
+    }
+
+    @media (min-width: 500px) {
+      #fixed {
+        position: fixed;
+        top: calc((var(--one-cell) * 1));
+        left: calc((var(--one-cell) * .5));
+      }
+    }
+
+    #container-no-scroll {
+      overflow: visible;
+      z-index: 2;
+    }
+
+    .transformed-example {
+      transform: scaleY(.75) scaleX(.75) rotate(-40deg) skew(15deg);
+    }
+
+    .transformed-example .margin-overlay {
+      top: 0;
+      width: calc((var(--one-cell) * 3));
+      height: calc((var(--one-cell) * 3));
+    }
+
+    .scroller,
+    .scroller:before {
+      width: calc((var(--one-cell) * 8) - 20px);
+      height: calc((var(--one-cell) * 8) - 20px);
+    }
+
+    .list {
+      position: relative;
+      overflow: visible;
+      width: 100%;
+      height: calc((var(--one-cell) * 3) - 20px);
+    }
+
+    .list-item {
+      position: absolute;
+      width: 100%;
+      height: calc(var(--one-cell) * .5);
+    }
+
+    .carousel {
+      display: flex;
+      position: relative;
+      overflow: visible;
+      width: 100%;
+      height: calc((var(--one-cell) * 3) - 20px);
+    }
+
+    .carousel-buttons {
+      position: fixed;
+      bottom: .5rem;
+      left: 2rem;
+      right: 2rem;
+      z-index: 1;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .button {
+      padding: .25em .5em;
+      border-radius: 10px;
+      cursor: pointer;
+    }
+
+    .carousel-item {
+      width: calc((var(--one-cell) * 3) - 20px);
+      height: calc((var(--one-cell) * 3) - 20px);
+    }
+
+    .carousel-item:nth-child(even),
+    .list-item:nth-child(even) {
+      background-color: var(--yellow);
+    }
+
+    .carousel-link {
+      display: block;
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      right: 20px;
+      bottom: 20px;
+      border: 2px dotted var(--red);
+    }
+
+    #snap-carousel {
+      display: flex;
+      overflow: hidden;
+    }
+
+    #snap-carousel .carousel {
+      display: flex;
+      flex-shrink: 0;
+      width: auto;
+    }
+
+    #snap-carousel .carousel-item {
+      flex-shrink: 0;
+      width: 100px;
+    }
+
+    #snap-carousel .carousel-item:nth-child(2n) {
+      width: 200px;
+    }
+
+    #snap-carousel .carousel-item:nth-child(4n) {
+      width: 280px;
+    }
+
+    .flicker .carousel-item:not(:last-child) {
+      margin-right: 10px;
+    }
+
+    #map-props {
+      overflow: initial;
+      perspective: 1000px;
+      touch-action: pan-x;
+      width: 100%;
+      height: calc((var(--one-cell) * 1));
+      margin-top: 2rem;
+      margin-bottom: 2rem;
+    }
+
+    #map-props .carousel {
+      position: relative;
+      transform-style: preserve-3d;
+      height: 100%;
+    }
+
+    #map-props .carousel-item {
+      pointer-events: none;
+      position: absolute;
+      transform-style: preserve-3d;
+      left: 0;
+      top: 0;
+      width: min(25%, 105px);
+      height: calc((var(--one-cell) * 1));
+      border-radius: 10px;
+      background: var(--yellow);
+      backface-visibility: hidden;
+    }
+
+/*    #map-props .carousel-item:after {
+      transform: scale(2.75);
+    }*/
+
+    .form {
+      top: 62px;
+      left: 60px;
+      background: var(--black);
+      padding: 20px;
+      box-shadow: 0 0 0 1px var(--red);
+    }
+
+    .trigger {
+      position: absolute;
+      width: calc(var(--one-cell) * 3.2);
+      height: calc(var(--one-cell) * 3.2);
+      margin-left: calc(var(--one-cell) * -1.2);
+      margin-top: calc(var(--one-cell) * -1.2);
+      background: var(--yellow);
+    }
+
+    #onsnap-callback {
+      z-index: 3;
+    }
+
+    /* Drawer */
+
+    #toggle-drawer {
+      position: absolute;
+      z-index: 1;
+      top: .5em;
+      right: .5em;
+      left: .5em;
+      bottom: .5em;
+      border-radius: .75em;
+      width: auto;
+      height: auto;
+    }
+
+    .drawer {
+      overscroll-behavior: contain;
+      position: fixed;
+      z-index: 999;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      width: 100%;
+      border-top-left-radius: .5rem;
+      border-top-right-radius: .5rem;
+      background-color: var(--red);
+      will-change: transform;
+      box-shadow: 0 500px 0 0 var(--red);
+    }
+
+    .drawer-content {
+      overflow: auto;
+      overscroll-behavior: contain;
+      position: relative;
+      z-index: 0;
+      max-height: calc(100svh - 2rem);
+      padding: 3rem 2rem;
+    }
+
+    .drawer-trigger {
+      position: absolute;
+      z-index: 1;
+      width: 100%;
+      height: 3rem;
+      background-color: var(--red);
+      border-top-left-radius: .5rem;
+      border-top-right-radius: .5rem;
+    }
+
+    .drawer-trigger::after {
+      content: "";
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      display: block;
+      width: 5rem;
+      height: .25rem;
+      border-radius: .25rem;
+      background-color: #FFF;
+      transform: translate3d(-50%,-50%, 0);
+    }
+
+    .drawer-content p,
+    .drawer-content button {
+      margin-bottom: 10px;
+    }
+
+    #nested-draggable {
+      position: absolute;
+      top: 1rem;
+      right: 1rem;
+      background: var(--yellow);
+      margin-bottom: 10px;
+      border-radius: .5rem;
+    }
+
+  </style>
+</head>
+<body>
+  <div id="draggables" class="grid">
+    <div class="example">
+      <h2>Fixed (vel: <span id="log">0</span>)</h2>
+      <div id="fixed-container" class="example-content">
+        <div id="fixed" class="draggable rectangle">
+          <button id="toggle-drawer" class="button"><span>Toggle Drawer</span></button>
+        </div>
+      </div>
+    </div>
+    <div class="example">
+      <h2>Snap</h2>
+      <div class="example-content example-content-vertical">
+        <div id="body-snap" class="draggable rectangle"></div>
+      </div>
+    </div>
+    <div class="example">
+      <h2>Snap X</h2>
+      <div class="example-content example-content-vertical">
+        <div class="range margin range-x">
+          <div class="draggable square"></div>
+        </div>
+      </div>
+    </div>
+    <div class="example">
+      <h2>Snap Y</h2>
+      <div class="example-content">
+        <div class="range margin range-y">
+          <div class="draggable square"></div>
+        </div>
+      </div>
+    </div>
+    <div class="example">
+      <h2>Container</h2>
+      <div class="example-content example-content-vertical">
+        <div id="container-no-scroll" class="container margin">
+          <div class="draggable square"></div>
+        </div>
+      </div>
+    </div>
+    <div class="example">
+      <h2>Container auto scroll</h2>
+      <div class="example-content example-content-vertical">
+        <div class="margin margin-overlay"></div>
+        <div id="container-scroll" class="container margin overflow">
+          <div class="scroller grid">
+            <div class="draggable square"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="example">
+      <h2>Transformed container</h2>
+      <div class="example-content example-content-vertical transformed-example">
+        <div class="margin margin-overlay"></div>
+        <div id="transformed-container" class="container overflow margin">
+          <div class="scroller grid">
+            <div class="draggable square"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="example">
+      <h2>Snap carousel</h2>
+      <div class="example-content example-content-vertical">
+        <div class="margin margin-overlay"></div>
+        <div id="snap-carousel" class="flicker container margin">
+          <ul class="carousel">
+            <a href="https://animejs.com" target="_blank" class="draggable carousel-item"></a>
+            <li class="draggable carousel-item"><a href="https://animejs.com" target="_blank" class="carousel-link"></a></li>
+            <a href="https://animejs.com" target="_blank" class="draggable carousel-item"></a>
+            <li class="draggable carousel-item"><a href="https://animejs.com" target="_blank" class="carousel-link"></a></li>
+            <a href="https://animejs.com" target="_blank" class="draggable carousel-item"></a>
+            <li class="draggable carousel-item"><a href="https://animejs.com" target="_blank" class="carousel-link"></a></li>
+            <a href="https://animejs.com" target="_blank" class="draggable carousel-item"></a>
+            <li class="draggable carousel-item"><a href="https://animejs.com" target="_blank" class="carousel-link"></a></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div class="example">
+      <h2>Bounded flick</h2>
+      <div class="example-content example-content-vertical">
+        <div class="margin margin-overlay"></div>
+        <div id="bounded-flick" class="flicker container margin">
+          <ul class="carousel">
+            <li class="draggable carousel-item"></li>
+            <li class="draggable carousel-item"></li>
+            <li class="draggable carousel-item"></li>
+            <li class="draggable carousel-item"></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div class="example">
+      <h2>Object target</h2>
+      <div class="example-content example-content-vertical">
+        <div class="margin margin-overlay"></div>
+        <div id="infinite-flick" class="flicker container margin">
+          <ul class="carousel">
+            <li class="draggable carousel-item">1</li>
+            <li class="draggable carousel-item">2</li>
+            <li class="draggable carousel-item">1</li>
+            <li class="draggable carousel-item">2</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div class="example">
+      <h2>onSnap() callback</h2>
+      <div class="example-content example-content-vertical">
+        <div class="margin margin-overlay"></div>
+        <div id="onsnap-callback" class="container margin overflow">
+          <ul class="list">
+            <li class="draggable list-item"></li>
+            <li class="draggable list-item"></li>
+            <li class="draggable list-item"></li>
+            <li class="draggable list-item"></li>
+            <li class="draggable list-item"></li>
+            <li class="draggable list-item"></li>
+            <li class="draggable list-item"></li>
+            <li class="draggable list-item"></li>
+            <li class="draggable list-item"></li>
+            <li class="draggable list-item"></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="example">
+      <h2>Array container</h2>
+      <div class="example-content example-content-vertical">
+        <div id="array-container" class="container margin">
+          <div class="draggable square"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="example">
+      <h2>Dynamic padding</h2>
+      <div class="example-content example-content-vertical">
+        <div class="range margin dynamic">
+          <div class="draggable bar bar-left"></div>
+          <div class="draggable bar bar-right"></div>
+          <div class="draggable square"></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="drawer">
+    <div id="nested-draggable" class="draggable square"></div>
+    <div class="drawer-trigger"></div>
+    <div class="drawer-content">
+      <div id="map-props">
+        <ul class="carousel">
+          <li class="draggable carousel-item"></li>
+          <li class="draggable carousel-item"></li>
+          <li class="draggable carousel-item"></li>
+          <li class="draggable carousel-item"></li>
+          <li class="draggable carousel-item"></li>
+          <li class="draggable carousel-item"></li>
+          <li class="draggable carousel-item"></li>
+          <li class="draggable carousel-item"></li>
+          <li class="draggable carousel-item"></li>
+          <li class="draggable carousel-item"></li>
+          <li class="draggable carousel-item"></li>
+          <li class="draggable carousel-item"></li>
+        </ul>
+      </div>
+      <fieldset class="carousel-buttons">
+        <button class="button carousel-prev">PREV</button>
+        <button class="button carousel-next">NEXT</button>
+      </fieldset>
+      <p>
+        This is the drawer content. <a href="https://animejs.com">This is a link with a <span>span</span>.</a> Lorem ipsum dolor sit amet, consectetur adipiscing elit. Aliquam iaculis cursus nisi sit amet pulvinar. This is the drawer content. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Aliquam iaculis cursus nisi sit amet pulvinar. This is the drawer content. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Aliquam iaculis cursus nisi sit amet pulvinar. This is the drawer content. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Aliquam iaculis cursus nisi sit amet pulvinar.
+      </p>
+      <p>
+        This is the drawer content. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Aliquam iaculis cursus nisi sit amet pulvinar. This is the drawer content. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Aliquam iaculis cursus nisi sit amet pulvinar. This is the drawer content. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Aliquam iaculis cursus nisi sit amet pulvinar. This is the drawer content. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Aliquam iaculis cursus nisi sit amet pulvinar.
+      </p>
+      <p>
+        This is the drawer content. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Aliquam iaculis cursus nisi sit amet pulvinar. This is the drawer content. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Aliquam iaculis cursus nisi sit amet pulvinar. This is the drawer content. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Aliquam iaculis cursus nisi sit amet pulvinar. This is the drawer content. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Aliquam iaculis cursus nisi sit amet pulvinar.
+      </p>
+      <p>
+        This is the drawer content. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Aliquam iaculis cursus nisi sit amet pulvinar. This is the drawer content. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Aliquam iaculis cursus nisi sit amet pulvinar. This is the drawer content. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Aliquam iaculis cursus nisi sit amet pulvinar. This is the drawer content. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Aliquam iaculis cursus nisi sit amet pulvinar.
+      </p>
+    </div>
+  </div>
+
+  <script src="./index.js" type="module"></script>
+
+</body>
+
+</html>

@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Timeline 50K stars / Anime.js</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <link href="../assets/css/styles.css" rel="stylesheet">
+  <style>
+    body {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      position: absolute;
+      overflow: hidden;
+      width: 100%;
+      height: 100%;
+    }
+    #animation {
+      overflow: hidden;
+      position: relative;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      width: 720px;
+      height: 480px;
+    }
+    .star-button {
+      --bg-1: #212830;
+      --bg-2: #3D444D;
+      position: absolute;
+      display: flex;
+      justify-content: space-between;
+      align-content: center;
+      width: fit-content;
+      min-width: 220px;
+      background: var(--bg-1);
+      border: 2px solid var(--bg-2);
+      border-radius: 10px;
+      padding: 8px 30px 8px 22px;
+      font-family: "system-ui", "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif;
+      font-size: 26px;
+      color: #FFFFFF;
+      letter-spacing: 0;
+      text-align: right;
+      transform-origin: 50% 50%;
+      height: 56px;
+    }
+    .star-button span {
+      line-height: 1.4;
+      font-variant-numeric: tabular-nums;
+    }
+    .star-button .label {
+      padding: 0 20px;
+      width: 120px;
+      text-align: center;
+    }
+    .star-button .count {
+      position: relative;
+      display: inline-block;
+      z-index: 2;
+      padding: 0 10px;
+      min-width: 40px;
+      text-align: center;
+    }
+    .star-button .count::before {
+      content: "";
+      position: absolute;
+      z-index: -1;
+      top: -2px;
+      left: -4px;
+      right: -4px;
+      bottom: -2px;
+      display: block;
+      border-radius: 20px;
+      background-color: var(--bg-2);
+    }
+    .star-particle {
+      position: absolute;
+      z-index: 2;
+      top: 50%;
+      left: 22px;
+      width: 36px;
+      height: 36px;
+      margin-top: -18px;
+      overflow: visible;
+    }
+    .star-icon {
+      color: #E3B342;
+    }
+    .star-icon polygon {
+      transform-box: fill-box;
+      transform-origin: 50% 50%;
+    }
+    .cursor {
+      position: absolute;
+      z-index: 2;
+      top: 50%;
+      left: 50%;
+      width: 40px;
+      height: 40px;
+      margin: 0 0 0 -10px;
+      background-image: url(cursor.png);
+      background-size: 80px 40px;
+    }
+  </style>
+</head>
+<body>
+  <div id="animation">
+    <div class="star-button">
+      <svg class="star-icon" width="36px" height="36px" viewBox="0 0 36 36">
+        <g id="start" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd" stroke-linecap="round" stroke-linejoin="round">
+          <polygon stroke="currentColor" stroke-width="3" points="8.75528701 32.6404834 10.3867069 22.2854985 3 15.0120846 13.4003021 13.4259819 18 4 22.5996979 13.4259819 33 15.0120846 25.6132931 22.2175227 27.244713 32.6404834 18 27.7915408"></polygon>
+        </g>
+      </svg>
+      <span class="label">Star</span>
+      <span class="count">0</span>
+    </div>
+    <div class="cursor"></div>
+  </div>
+  <script type="module" src="./index.js"></script>
+</body>
+</html>

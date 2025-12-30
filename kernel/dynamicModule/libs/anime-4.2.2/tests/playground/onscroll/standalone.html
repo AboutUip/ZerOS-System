@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>standalone</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <link href="../assets/css/styles.css" rel="stylesheet">
+  <link href="./assets/onscroll.css" rel="stylesheet">
+  <style>
+    .log {
+      position: fixed;
+      z-index: 10;
+      top: 0;
+      overflow-y: scroll;
+      width: 22ch;
+      height: 50ch;
+      padding-left: 1ch;
+      padding-right: 1ch;
+      padding-bottom: 1ch;
+      font-family: ui-monospace, monospace;
+      white-space: pre;
+      background-color: rgba(0, 0, 0, .5);
+    }
+    .log span {
+      animation: reveal 2s ease-in-out forwards;
+    }
+    @keyframes reveal {
+      from { opacity: 1; }
+      to { opacity: .4; }
+    }
+    #log-4 {
+      right: 0ch;
+    }
+    #log-3 {
+      right: 22ch;
+    }
+    #log-2 {
+      right: 44ch;
+    }
+    #log-1 {
+      right: 66ch;
+    }
+    .lazy-load {
+      margin: 1rem;
+      padding: .5rem;
+      border-radius: 1rem;
+      background-color: var(--white);
+    }
+  </style>
+</head>
+<body class="grid">
+  <div id="log-1" class="log"></div>
+  <div id="log-2" class="log"></div>
+  <div id="log-3" class="log"></div>
+  <div id="log-4" class="log"></div>
+  <section id="section-01">
+    <h2>⬇︎</h2>
+  </section>
+  <div class="spacer"></div>
+  <section id="section-02">
+    <h2>⬇︎</h2>
+  </section>
+  <section id="section-03">
+    <h2>⬇︎</h2>
+  </section>
+  <section id="section-04">
+    <h2>⬇︎</h2>
+  </section>
+  <section>
+    <img class="lazy-load" data-src="./assets/card.svg" width="120" height="160" />
+    <img class="lazy-load" data-src="./assets/card.svg" width="120" height="160" />
+    <img class="lazy-load" data-src="./assets/card.svg" width="120" height="160" />
+    <img class="lazy-load" data-src="./assets/card.svg" width="120" height="160" />
+  </section>
+  <script type="module" src="./assets/standalone.js"></script>
+</body>
+</html>

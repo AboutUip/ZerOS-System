@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Additive animations / Anime.js</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <link href="assets/css/styles.css" rel="stylesheet">
+  <style>
+    body {
+      position: absolute;
+      overflow: hidden;
+      width: 100%;
+      height: 100%;
+      cursor: grab;
+      user-select: none;
+      background: black;
+    }
+    body:active {
+      cursor: grabbing;
+    }
+    .sphere {
+      font-size: 1.5px;
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      color: var(--red);
+    }
+    .ball {
+      --diam: 100px;
+      opacity: .85;
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: var(--diam);
+      height: var(--diam);
+      margin: calc(var(--diam) * -.5) 0 0 calc(var(--diam) * -.5);
+      border-radius: 50%;
+      border: 2px solid currentColor;
+    }
+    .ball:before,
+    .ball:after {
+      content: "";
+      display: block;
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+    }
+    .ball:before {
+      z-index: 1;
+      opacity: 1;
+      box-shadow: inset 0px 0px 25em 0px currentColor,  0px 0px 10em 1px currentColor, 0px 0px 5em 1px currentColor;
+    }
+    .ball:after {
+      z-index: 3;
+      opacity: .35;
+      box-shadow: inset 0 0 30em 0 currentColor;
+      background-image: radial-gradient(circle at 50% 50%, currentColor 0%, transparent 100%);
+    }
+    .sphere i {
+      display: block;
+      position: absolute;
+      z-index: 2;
+      top: 50%;
+      left: 50%;
+      width: 6em;
+      height: 2em;
+      margin: -3em 0 0 -1em;
+      background: currentColor;
+      opacity: .85;
+      mix-blend-mode: plus-lighter;
+      box-shadow: 0em 0em 15em 0em currentColor, 0em 0em 5em 0em currentColor;
+      will-change: transform;
+    }
+    .sphere i.p:after {
+      content: "";
+      display: block;
+      position: absolute;
+      z-index: 2;
+      top: -2em;
+      left: 2em;
+      width: 2em;
+      height: 6em;
+      background-color: currentColor;
+    }
+  </style>
+  <div>
+
+  </div>
+</head>
+<body>
+
+  <script type="module">
+    import { animate, createTimer, createTimeline, stagger, utils, engine } from '../../../dist/modules/index.js';
+
+    const maxParticles = 200;
+    const activeRadius = 100;
+    const speedScale = 2;
+    const spheres = [];
+    const shperesPool = [];
+    const colors = ['#18ff74', '#FFC730', '#ff4b4b'];
+    const odds = [0,0,1];
+    let curIndex = 0;
+
+    class Particle {
+      constructor(sphere) {
+        const i = sphere.index;
+        this.$el = document.createElement('i');
+        this.index = i;
+        this.prevSphere = sphere;
+        this.nextSphere = sphere;
+        this.inTransit = false;
+        this.$el.classList.add(i == 1 || i == 2 && utils.random(0, 1) ? 'p' : 'm');
+        utils.set(this.$el, { x: sphere.x, y: sphere.y, color: colors[curIndex] });
+        this.loop = createTimer({
+          duration: utils.random(250, 1000) * speedScale,
+          loop: true,
+          onLoop: () => { this.updatePosition() },
+        });
+        sphere.$el.appendChild(this.$el);
+      }
+
+      updatePosition(direct) {
+        const prev = this.prevSphere;
+        const next = this.nextSphere;
+        const move = this.inTransit || direct;
+        const x = move ? (prev.x + next.x) / 2 : next.x;
+        const y = move ? (prev.y + next.y) / 2 : next.y;
+        const r = move ? 5 : activeRadius * (next.index === this.index ? 1 : .85);
+        const a = utils.random(0, 1, 2) * Math.PI * 2;
+        if (move) {
+          this.inTransit = false;
+        } else if (utils.randomPick(odds)) {
+          this.inTransit = true;
+          this.prevSphere = next;
+          this.nextSphere = utils.randomPick(spheres);
+        }
+        animate(this.$el, {
+          x: Math.cos(a) * r + x,
+          y: Math.sin(a) * r + y,
+          duration: 1100 * speedScale,
+          ease: 'inOut(2.25)',
+          composition: 'blend'
+        });
+      }
+    }
+
+    class Sphere {
+      constructor(x, y) {
+        this.x = x;
+        this.y = y;
+        this.index = curIndex;
+        this.particles = [];
+        this.$el = document.createElement('div');
+        this.$ball = document.createElement('div');
+        this.$ball.classList.add('ball');
+        this.$el.classList.add('sphere');
+        this.$el.appendChild(this.$ball);
+        document.body.appendChild(this.$el);
+        spheres.push(this);
+        for (let i = 0; i < maxParticles; i++) {
+          this.particles.push(new Particle(this));
+        }
+        utils.set(this.$ball, { x: x, y: y });
+        animate(this.$ball, {
+          opacity: [.5, 1],
+          alternate: true,
+          loop: true
+        })
+        this.init(x, y);
+      }
+
+      init(x, y) {
+        this.x = x;
+        this.y = y;
+        this.particles.forEach(p => {
+          const a = utils.random(0, 1, 2) * Math.PI * 2;
+          const r = utils.random(60, 120);
+          animate(p.$el, {
+            x: '+=' + utils.round(Math.cos(a) * r, 2),
+            y: '+=' + utils.round(Math.sin(a) * r, 2),
+            duration: utils.random(500, 2500),
+            delay: utils.random(0, 150),
+            ease: 'out(3)',
+            composition: 'blend',
+          });
+        });
+        animate(this.$ball, {
+          x: this.x,
+          y: this.y,
+          color: colors[curIndex],
+          scale: [0, 1],
+          ease: 'outElastic(0.9, 1)',
+          duration: 900,
+        });
+      }
+
+      remove() {
+        const index = this.index;
+        spheres.forEach(sphere => {
+          sphere.particles.forEach(particle => {
+            const next = particle.nextSphere;
+            if (next && next.index === index) {
+              const randomSphere = utils.randomPick(spheres.filter(s => s.index !== index));
+              particle.nextSphere = randomSphere;
+              particle.prevSphere = randomSphere;
+              particle.updatePosition(true);
+            }
+          });
+        });
+      }
+    }
+
+    // const sphre1 = new Sphere(-300, 100);
+
+
+    document.onpointerdown = e => {
+      const x = e.clientX - (window.innerWidth / 2);
+      const y = e.clientY - (window.innerHeight / 2);
+      if (spheres.length >= colors.length) {
+        spheres[curIndex].init(x, y);
+      } else {
+        new Sphere(x, y);
+      }
+      curIndex++;
+      if (curIndex >= colors.length) curIndex = 0;
+    }
+
+  </script>
+</body>
+</html>

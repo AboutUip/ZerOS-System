@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>SVG Graph / Anime.js</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <link href="../assets/css/styles.css" rel="stylesheet">
+  <style>
+    body {
+      min-height: 100lvh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    #graph {
+      position: relative;
+      border: 1px solid rgba(255,255,255,.1);
+      width: 942px;
+      height: 352px;
+      background: #272421;
+    }
+    svg {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+    }
+    #views {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      font-family: BerkeleyMono-Regular;
+      font-size: 50px;
+      text-align: right;
+    }
+    #label {
+      display: block;
+      font-size: 20px;
+      color: #F6F4F2;
+    }
+    #count {
+      font-family: BerkeleyMono-Regular;
+      font-size: 50px;
+      color: #B7FF54;
+      text-align: right;
+    }
+  </style>
+</head>
+<body>
+  <div id="graph">
+    <svg width="940" height="290" viewBox="0 0 940 290"><defs><linearGradient id="c" x1="50%" x2="50%" y1=".399%" y2="87.205%"><stop offset="0%" stop-color="#B7FF54" stop-opacity=".211"/><stop offset="100%" stop-color="#B7FF54" stop-opacity="0"/></linearGradient><rect id="b" width="900" height="250" x="0" y="0"/><path id="a" d="M0,0 L940,0 L940,290 L0,290 L0,0 Z"/></defs><g fill="none" fill-rule="evenodd"><use xlink:href="#a" fill="#272421"/><g transform="translate(20 20)"><mask id="d" fill="#fff"><use xlink:href="#b"/></mask><path fill="url(#c)" stroke="#B7FF54" stroke-width="4" d="M-29.9084975,125.442049 C0.592599392,125.442049 26.5003803,199.691642 59.4112837,199.691642 C92.322187,199.691642 113.7965,108.141783 127.38192,79.926918 C140.96734,51.7120527 152.068784,5.15668539 180.801803,30.2096433 C209.534821,55.2626012 212.50407,56.7639176 230.281891,56.7639176 C248.059712,56.7639176 281.005076,76.9686041 289.048637,107.339775 C297.092198,137.710946 301.167159,161.192233 318.659135,171.388065 C336.151111,181.583897 346.858132,163.610445 355.870023,132.663097 C364.881913,101.715749 367.137656,101.502549 393.914073,101.502549 C420.69049,101.502549 435.873542,104.822478 454.251861,114.536107 C472.63018,124.249736 492.205061,129.256489 502.089999,151.958408 C511.974938,174.660327 523.807615,199.691642 549.270028,199.691642 C574.732442,199.691642 579.028989,136.335995 586.711365,114.536107 C594.393742,92.7362195 620.605115,121.939481 640.47249,125.442049 C660.339864,128.944617 697.353541,112.61418 705.490168,133.317716 C713.626795,154.021252 727.481496,188.892846 756.256164,188.892846 C785.030831,188.892846 781.166604,121.152289 823.970316,113.461034 C866.774027,105.769778 893.00728,107.339775 907.900967,107.339775 C907.900967,107.339775 907.900967,166.243609 907.900967,284.051276 L-29.9084975,284.051276 C-29.9084975,178.017092 -29.9084975,125.14735 -29.9084975,125.442049 Z" mask="url(#d)"/></g></g></svg>
+    <div id="views"><span id="label">views</span><span id="count">1145097</span></div>
+  </div>
+  <script type="module" src="./index.js"></script>
+</body>
+</html>

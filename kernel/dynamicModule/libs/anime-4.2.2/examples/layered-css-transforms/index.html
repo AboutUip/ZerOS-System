@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Layered CSS transforms / Anime.js</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <link href="../assets/css/styles.css" rel="stylesheet">
+  <style>
+    body {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+
+    .layered-animations {
+      position: relative;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      width: 16rem;
+      height: 16rem;
+      transform: scale(1.75);
+    }
+
+    .layered-animations .shape {
+      position: absolute;
+      overflow: visible;
+      width: 8rem;
+      height: 8rem;
+      stroke: currentColor;
+      fill: transparent;
+    }
+
+    .layered-animations .small.shape {
+      width: 1.5rem;
+      height: 1.5rem;
+      stroke: currentColor;
+      stroke-width: 2px;
+      fill: currentColor;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="layered-animations">
+    <svg class="small shape color-red" viewBox="0 0 96 96">
+      <rect width="48" height="48" x="24" y="24" fill-rule="evenodd" stroke-linecap="square"/>
+    </svg>
+    <svg class="small shape color-red" viewBox="0 0 96 96">
+      <polygon fill-rule="evenodd" points="48 17.28 86.4 80.11584 9.6 80.11584" stroke-linecap="square"/>
+    </svg>
+    <svg class="small shape color-red" viewBox="0 0 96 96">
+      <circle cx="48" cy="48" r="32" fill-rule="evenodd" stroke-linecap="square"/>
+    </svg>
+    <svg class="shape" viewBox="0 0 96 96">
+      <circle cx="48" cy="48" r="28" fill-rule="evenodd" stroke-linecap="square"/>
+    </svg>
+    <svg class="shape" viewBox="0 0 96 96">
+      <rect width="48" height="48" x="24" y="24" fill-rule="evenodd" stroke-linecap="square"/>
+    </svg>
+    <svg class="shape" viewBox="0 0 96 96">
+      <polygon fill-rule="evenodd" points="48 17.28 86.4 80.11584 9.6 80.11584" stroke-linecap="square"/>
+    </svg>
+  </div>
+
+  <script type="module" src="./index.js"></script>
+
+</body>
+</html>

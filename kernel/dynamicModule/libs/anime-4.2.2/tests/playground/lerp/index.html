@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Lerp tests / Anime.js</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <link href="../assets/css/styles.css" rel="stylesheet">
+  <style>
+    body {
+      display: flex;
+      flex-direction: column;
+      flex-wrap: wrap;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+
+    .container {
+      display: flex;
+      flex-wrap: wrap;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      gap: .5rem;
+      padding: 1rem;
+    }
+
+    .square {
+      width: 100px;
+      height: 100px;
+      background: var(--red);
+      border-radius: 1rem;
+      padding: 1rem;
+    }
+
+    .button {
+      border-radius: 1rem;
+      padding: 1rem;
+    }
+
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>input</h2>
+    <div class="square input"></div>
+  </div>
+  <div class="container">
+    <h2>lerped</h2>
+    <div class="square lerped"></div>
+  </div>
+  <div class="container">
+    <h2>damped</h2>
+    <div class="square damped"></div>
+  </div>
+  <script type="module" src="./index.js"></script>
+</body>
+</html>

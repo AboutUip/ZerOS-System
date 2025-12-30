@@ -25,6 +25,10 @@ KernelLogger.info("LockScreen", "模块初始化");
         static _selectedUserIndex = -1; // 用户列表中选中的用户索引（用于键盘导航）
         static _passwordInputVisible = false; // 密码输入框是否可见
         static _keydownHandler = null; // 键盘事件处理器引用（用于移除监听器）
+        static _passwordVisible = false; // 密码是否可见（用于切换显示/隐藏密码）
+        static _togglePasswordButton = null; // 密码可见性切换按钮
+        static _clickHandler = null; // 容器点击事件处理器引用（用于移除监听器）
+        static _userSwitchKeydownHandler = null; // 用户切换快捷键处理器引用（用于移除监听器）
         
         /**
          * 初始化锁屏界面
@@ -562,6 +566,48 @@ KernelLogger.info("LockScreen", "模块初始化");
             });
             LockScreen.passwordInput = passwordInput;
             
+            // 密码可见性切换按钮
+            const togglePasswordButton = document.createElement('button');
+            togglePasswordButton.className = 'lockscreen-toggle-password';
+            togglePasswordButton.id = 'lockscreen-toggle-password';
+            togglePasswordButton.setAttribute('aria-label', '显示/隐藏密码');
+            togglePasswordButton.innerHTML = `
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M1 12C1 12 5 4 12 4C19 4 23 12 23 12C23 12 19 20 12 20C5 20 1 12 1 12Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            `;
+            togglePasswordButton.style.cssText = `
+                width: 32px;
+                height: 32px;
+                border-radius: 50%;
+                background: transparent;
+                border: none;
+                color: rgba(255, 255, 255, 0.6);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                cursor: pointer;
+                transition: all 0.2s ease;
+                outline: none;
+                flex-shrink: 0;
+                padding: 0;
+            `;
+            togglePasswordButton.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                LockScreen._togglePasswordVisibility();
+            });
+            togglePasswordButton.addEventListener('mouseenter', () => {
+                togglePasswordButton.style.color = 'rgba(255, 255, 255, 0.9)';
+                togglePasswordButton.style.background = 'rgba(255, 255, 255, 0.1)';
+            });
+            togglePasswordButton.addEventListener('mouseleave', () => {
+                togglePasswordButton.style.color = 'rgba(255, 255, 255, 0.6)';
+                togglePasswordButton.style.background = 'transparent';
+            });
+            LockScreen._togglePasswordButton = togglePasswordButton;
+            
             const loginButton = document.createElement('button');
             loginButton.className = 'lockscreen-login-button';
             loginButton.id = 'lockscreen-login-button';
@@ -573,6 +619,7 @@ KernelLogger.info("LockScreen", "模块初始化");
             LockScreen.loginButton = loginButton;
             
             passwordContainer.appendChild(passwordInput);
+            passwordContainer.appendChild(togglePasswordButton);
             passwordContainer.appendChild(loginButton);
             loginContainer.appendChild(passwordContainer);
             
@@ -670,7 +717,18 @@ KernelLogger.info("LockScreen", "模块初始化");
             
             const timeEl = document.getElementById('lockscreen-time');
             if (timeEl) {
-                timeEl.textContent = `${hours}:${minutes}`;
+                const oldTime = timeEl.textContent;
+                const newTime = `${hours}:${minutes}`;
+                
+                // 如果时间改变，触发动画
+                if (oldTime && oldTime !== newTime) {
+                    timeEl.classList.add('updating');
+                    setTimeout(() => {
+                        timeEl.classList.remove('updating');
+                    }, 400);
+                }
+                
+                timeEl.textContent = newTime;
             }
             
             const dateEl = document.getElementById('lockscreen-date');
@@ -1112,10 +1170,22 @@ KernelLogger.info("LockScreen", "模块初始化");
             }
             LockScreen._passwordInputVisible = false;
             
-            // 清空密码输入
+            // 清空密码输入并重置密码可见性
             if (LockScreen.passwordInput) {
                 LockScreen.passwordInput.value = '';
+                LockScreen.passwordInput.type = 'password';
                 LockScreen.passwordInput.blur();
+                LockScreen._passwordVisible = false;
+            }
+            
+            // 重置密码可见性按钮图标
+            if (LockScreen._togglePasswordButton) {
+                LockScreen._togglePasswordButton.innerHTML = `
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M1 12C1 12 5 4 12 4C19 4 23 12 23 12C23 12 19 20 12 20C5 20 1 12 1 12Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                `;
             }
             
             // 重置选中索引
@@ -1230,6 +1300,45 @@ KernelLogger.info("LockScreen", "模块初始化");
         }
         
         /**
+         * 切换密码可见性
+         */
+        static _togglePasswordVisibility() {
+            if (!LockScreen.passwordInput || !LockScreen._togglePasswordButton) {
+                return;
+            }
+            
+            LockScreen._passwordVisible = !LockScreen._passwordVisible;
+            LockScreen.passwordInput.type = LockScreen._passwordVisible ? 'text' : 'password';
+            
+            // 更新图标
+            if (LockScreen._passwordVisible) {
+                LockScreen._togglePasswordButton.innerHTML = `
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M17.94 17.94C16.2306 19.243 14.1491 19.9649 12 20C5 20 1 12 1 12C2.24389 9.6819 3.96914 7.65663 6.06 6.06M9.9 4.24C10.5883 4.0789 11.2931 3.99836 12 4C19 4 23 12 23 12C22.393 13.1356 21.6691 14.2048 20.84 15.19M14.12 14.12C13.8454 14.4148 13.5141 14.6512 13.1462 14.8151C12.7782 14.9791 12.3809 15.0673 11.9781 15.0744C11.5753 15.0815 11.1747 15.0074 10.8017 14.8565C10.4287 14.7056 10.0907 14.4811 9.80786 14.1983C9.52503 13.9155 9.30294 13.5795 9.15403 13.2086C9.00512 12.8376 8.93284 12.4389 8.94189 12.0361C8.95094 11.6333 9.04119 11.2349 9.20705 10.8657C9.3729 10.4966 9.61076 10.1633 9.90588 9.88588" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path d="M1 1L23 23" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                `;
+            } else {
+                LockScreen._togglePasswordButton.innerHTML = `
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M1 12C1 12 5 4 12 4C19 4 23 12 23 12C23 12 19 20 12 20C5 20 1 12 1 12Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                `;
+            }
+            
+            // 重新聚焦输入框
+            setTimeout(() => {
+                if (LockScreen.passwordInput) {
+                    LockScreen.passwordInput.focus();
+                    // 将光标移到末尾
+                    const length = LockScreen.passwordInput.value.length;
+                    LockScreen.passwordInput.setSelectionRange(length, length);
+                }
+            }, 10);
+        }
+        
+        /**
          * 显示密码输入界面
          */
         static _showPasswordInput() {
@@ -1269,6 +1378,11 @@ KernelLogger.info("LockScreen", "模块初始化");
                     LockScreen._passwordInputVisible = true;
                     if (LockScreen.passwordInput) {
                         LockScreen.passwordInput.style.display = 'block';
+                        LockScreen.passwordInput.type = 'password'; // 确保初始状态是隐藏密码
+                        LockScreen._passwordVisible = false;
+                    }
+                    if (LockScreen._togglePasswordButton) {
+                        LockScreen._togglePasswordButton.style.display = 'flex';
                     }
                     if (LockScreen.loginButton) {
                         LockScreen.loginButton.style.display = 'flex';
@@ -1294,6 +1408,9 @@ KernelLogger.info("LockScreen", "模块初始化");
                     }
                     if (LockScreen.passwordInput) {
                         LockScreen.passwordInput.style.display = 'none';
+                    }
+                    if (LockScreen._togglePasswordButton) {
+                        LockScreen._togglePasswordButton.style.display = 'none';
                     }
                     if (hintText) {
                         hintText.textContent = '按回车键或任意键登录';
@@ -1408,6 +1525,11 @@ KernelLogger.info("LockScreen", "模块初始化");
                 LockScreen._hideLoadingOverlay();
                 
                 if (success) {
+                    // 登录成功，显示成功动画
+                    if (LockScreen.loginButton) {
+                        LockScreen.loginButton.classList.add('success');
+                    }
+                    
                     // 登录成功，显示成功消息
                     LockScreen._showLoadingOverlay('登录成功，正在进入系统...');
                     
@@ -1447,10 +1569,18 @@ KernelLogger.info("LockScreen", "模块初始化");
                     }
                     
                     LockScreen._hideLoadingOverlay();
+                    // 清理登录按钮的成功状态
+                    if (LockScreen.loginButton) {
+                        LockScreen.loginButton.classList.remove('success');
+                    }
                     // 隐藏锁屏界面
                     LockScreen._hideLockScreen();
                 } else {
                     // 登录失败
+                    const passwordContainer = document.getElementById('lockscreen-password-container');
+                    if (passwordContainer) {
+                        passwordContainer.classList.add('error');
+                    }
                     if (LockScreen.passwordInput) {
                         LockScreen.passwordInput.value = '';
                         LockScreen.passwordInput.focus();
@@ -1458,7 +1588,22 @@ KernelLogger.info("LockScreen", "模块初始化");
                         LockScreen.passwordInput.classList.add('error');
                         setTimeout(() => {
                             LockScreen.passwordInput.classList.remove('error');
+                            if (passwordContainer) {
+                                passwordContainer.classList.remove('error');
+                            }
                         }, 500);
+                    }
+                    
+                    // 显示错误提示（短暂显示）
+                    const hintText = document.getElementById('lockscreen-hint');
+                    if (hintText) {
+                        const originalText = hintText.textContent;
+                        hintText.textContent = '密码错误，请重试';
+                        hintText.style.color = 'rgba(255, 100, 100, 0.9)';
+                        setTimeout(() => {
+                            hintText.textContent = originalText;
+                            hintText.style.color = 'rgba(255, 255, 255, 0.85)';
+                        }, 2000);
                     }
                 }
             } catch (e) {
@@ -1467,13 +1612,32 @@ KernelLogger.info("LockScreen", "模块初始化");
                 KernelLogger.error('LockScreen', `登录失败: ${e.message}`, e);
                 
                 // 显示错误提示
+                const passwordContainer = document.getElementById('lockscreen-password-container');
+                if (passwordContainer) {
+                    passwordContainer.classList.add('error');
+                }
                 if (LockScreen.passwordInput) {
                     LockScreen.passwordInput.value = '';
                     LockScreen.passwordInput.focus();
                     LockScreen.passwordInput.classList.add('error');
                     setTimeout(() => {
                         LockScreen.passwordInput.classList.remove('error');
+                        if (passwordContainer) {
+                            passwordContainer.classList.remove('error');
+                        }
                     }, 500);
+                }
+                
+                // 显示错误提示（短暂显示）
+                const hintText = document.getElementById('lockscreen-hint');
+                if (hintText) {
+                    const originalText = hintText.textContent;
+                    hintText.textContent = '登录失败，请重试';
+                    hintText.style.color = 'rgba(255, 100, 100, 0.9)';
+                    setTimeout(() => {
+                        hintText.textContent = originalText;
+                        hintText.style.color = 'rgba(255, 255, 255, 0.85)';
+                    }, 2000);
                 }
             }
         }
@@ -1482,17 +1646,53 @@ KernelLogger.info("LockScreen", "模块初始化");
          * 隐藏锁屏界面
          */
         static _hideLockScreen() {
-            // 移除键盘事件监听器，防止拦截其他程序的输入
+            // 移除所有事件监听器，防止拦截其他程序的输入
             if (LockScreen._keydownHandler) {
                 document.removeEventListener('keydown', LockScreen._keydownHandler);
                 LockScreen._keydownHandler = null;
             }
             
+            // 移除用户切换快捷键监听器
+            if (LockScreen._userSwitchKeydownHandler) {
+                document.removeEventListener('keydown', LockScreen._userSwitchKeydownHandler);
+                LockScreen._userSwitchKeydownHandler = null;
+            }
+            
+            // 移除容器点击事件监听器
+            if (LockScreen._clickHandler && LockScreen.container) {
+                LockScreen.container.removeEventListener('click', LockScreen._clickHandler);
+                LockScreen._clickHandler = null;
+            }
+            
+            // 清理状态
+            LockScreen._passwordInputVisible = false;
+            LockScreen._passwordVisible = false;
+            LockScreen._showUserList = false;
+            LockScreen._selectedUserIndex = -1;
+            
+            // 确保隐藏加载蒙版
+            if (LockScreen._isLoading) {
+                LockScreen._hideLoadingOverlay();
+            }
+            
             if (LockScreen.container) {
                 LockScreen.container.classList.add('lockscreen-fade-out');
                 setTimeout(() => {
-                    if (LockScreen.container && LockScreen.container.parentElement) {
-                        LockScreen.container.parentElement.removeChild(LockScreen.container);
+                    // 清理容器引用前，确保所有事件监听器已移除
+                    if (LockScreen.container) {
+                        // 再次确认移除所有事件监听器（双重保险）
+                        if (LockScreen._clickHandler) {
+                            LockScreen.container.removeEventListener('click', LockScreen._clickHandler);
+                            LockScreen._clickHandler = null;
+                        }
+                        
+                        // 从DOM中移除容器
+                        if (LockScreen.container.parentElement) {
+                            LockScreen.container.parentElement.removeChild(LockScreen.container);
+                        }
+                        
+                        // 清空容器引用
+                        LockScreen.container = null;
                     }
                     
                     // 显示系统内容（桌面）
@@ -1743,10 +1943,15 @@ KernelLogger.info("LockScreen", "模块初始化");
                     return;
                 }
                 
-                // 如果无密码模式且输入框可见，按任意键登录（除了特殊键）
+                // 如果无密码模式且输入框可见，按任意可打印字符键登录（除了特殊键和回车键）
+                // 注意：回车键已经在上面处理，这里排除回车键以避免重复处理
                 if (!LockScreen.isPasswordMode && LockScreen._passwordInputVisible && 
-                    e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+                    e.key !== 'Enter' &&
+                    e.key.length === 1 && 
+                    !e.ctrlKey && !e.metaKey && !e.altKey &&
+                    /[\w\s\u4e00-\u9fa5]/.test(e.key)) { // 只匹配字母、数字、空格和中文
                     e.preventDefault();
+                    e.stopPropagation();
                     LockScreen._handleLogin();
                     return;
                 }
@@ -1764,6 +1969,8 @@ KernelLogger.info("LockScreen", "模块初始化");
                     LockScreen._showPasswordInput();
                     
                     // 如果是可打印字符且是密码模式，直接输入
+                    // 注意：只在输入框刚显示且尚未获得焦点时才设置初始值
+                    // 如果输入框已经有内容或已获得焦点，不应该覆盖
                     if (LockScreen.isPasswordMode && 
                         LockScreen.passwordInput && 
                         e.key.length === 1 && 
@@ -1772,9 +1979,19 @@ KernelLogger.info("LockScreen", "模块初始化");
                         !e.altKey) {
                         e.preventDefault();
                         setTimeout(() => {
-                            if (LockScreen.passwordInput) {
-                                LockScreen.passwordInput.value = e.key;
+                            if (LockScreen.passwordInput && document.activeElement !== LockScreen.passwordInput) {
+                                // 只在输入框未获得焦点且内容为空时才设置初始值
+                                // 如果已经有内容，应该追加而不是覆盖
+                                if (!LockScreen.passwordInput.value) {
+                                    LockScreen.passwordInput.value = e.key;
+                                } else {
+                                    // 如果已有内容，追加字符（但通常这种情况不应该发生，因为输入框应该已获得焦点）
+                                    LockScreen.passwordInput.value += e.key;
+                                }
                                 LockScreen.passwordInput.focus();
+                                // 将光标移到末尾
+                                const length = LockScreen.passwordInput.value.length;
+                                LockScreen.passwordInput.setSelectionRange(length, length);
                             }
                         }, 100);
                     }
@@ -1787,11 +2004,12 @@ KernelLogger.info("LockScreen", "模块初始化");
             LockScreen._keydownHandler = handleKeydown;
             
             // 点击屏幕也可以触发
-            LockScreen.container.addEventListener('click', (e) => {
+            const clickHandler = (e) => {
                 // 如果点击的是登录按钮、用户切换按钮或用户列表，不触发
                 if (e.target.closest('.lockscreen-login-button') || 
                     e.target.closest('.lockscreen-user-switch') ||
-                    e.target.closest('.lockscreen-user-list')) {
+                    e.target.closest('.lockscreen-user-list') ||
+                    e.target.closest('.lockscreen-toggle-password')) {
                     return;
                 }
                 
@@ -1808,7 +2026,9 @@ KernelLogger.info("LockScreen", "模块初始化");
                     // 如果密码输入框已显示，点击时聚焦
                     LockScreen.passwordInput.focus();
                 }
-            }, { once: false });
+            };
+            LockScreen.container.addEventListener('click', clickHandler, { once: false });
+            LockScreen._clickHandler = clickHandler;
             
             // 登录按钮点击事件
             if (LockScreen.loginButton) {
@@ -1823,7 +2043,23 @@ KernelLogger.info("LockScreen", "模块初始化");
             }
             
             // 用户切换按钮快捷键（Ctrl+U 或 Alt+U）
-            document.addEventListener('keydown', (e) => {
+            const userSwitchKeydownHandler = (e) => {
+                // 检查锁屏是否可见
+                if (!LockScreen.container || !LockScreen.container.parentElement) {
+                    return;
+                }
+                
+                // 检查锁屏是否真的可见
+                const computedStyle = getComputedStyle(LockScreen.container);
+                const isDisplayNone = computedStyle.display === 'none';
+                const isVisibilityHidden = computedStyle.visibility === 'hidden';
+                const hasFadeOutClass = LockScreen.container.classList.contains('lockscreen-fade-out');
+                const opacity = parseFloat(computedStyle.opacity) || 1;
+                
+                if (isDisplayNone || isVisibilityHidden || (hasFadeOutClass && opacity < 0.1)) {
+                    return;
+                }
+                
                 if ((e.ctrlKey || e.altKey) && (e.key === 'u' || e.key === 'U') && 
                     LockScreen._userList.length > 1 && 
                     !LockScreen._showUserList) {
@@ -1833,7 +2069,9 @@ KernelLogger.info("LockScreen", "模块初始化");
                     // 初始化选中索引
                     LockScreen._selectedUserIndex = LockScreen._currentUserIndex;
                 }
-            }, { once: false });
+            };
+            document.addEventListener('keydown', userSwitchKeydownHandler, { once: false });
+            LockScreen._userSwitchKeydownHandler = userSwitchKeydownHandler;
         }
         
         /**

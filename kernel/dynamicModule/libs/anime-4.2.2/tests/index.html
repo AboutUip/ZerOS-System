@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Anime.js tests</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="../node_modules/mocha/mocha.css" />
+    <link rel="icon" href="./assets/favicon.png?v=5">
+    <style>
+      @font-face {
+        font-family: "Altinn";
+        src: url(./assets/Altinn-DINExp.woff2) format("woff2");
+        font-weight: normal;
+        font-style: normal;
+        font-display: swap;
+      }
+      :root {
+        --color-white: #F6F4F2; /* White */
+        --color-black: #2E2C2C; /* Black */
+        --color-red: #FF4B4B;/* red: */
+        --color-orange: #FF8F42;/* orange: */
+        --color-lightorange: #FFC730;/* lightorange: */
+        --color-yellow: #F6FF56;/* yellow: */
+        --color-citrus: #A4FF4F;/* citrus: */
+        --color-green: #18FF74;/* green: */
+        --color-darkgreen: #00D672;/* darkgreen: */
+        --color-turquoise: #3CFFEC;/* turquoise: */
+        --color-skyblue: #61C3FF;/* skyblue: */
+        --color-kingblue: #5A87FF;/* kingblue: */
+        --color-lavender: #8453E3;/* lavender: */
+        --color-purple: #C26EFF;/* purple: */
+        --color-pink: #FB89FB;/* pink: */
+        --width: 100px;
+        --mocha-test-pass-color: var(--color-green);
+        --mocha-test-fail-color: var(--color-red);
+        --mocha-stats-em-color: var(--color-white);
+      }
+      *, *:before, *:after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+        border: 0;
+      }
+      html,
+      body {
+        font-family: "Altinn";
+        font-size: 16px;
+        background-color: var(--color-black);
+        color: var(--color-white);
+      }
+      body {
+        padding-top: 40px;
+      }
+      /* Mocha styles */
+      #open-in-popup {
+        position: fixed;
+        top: 0;
+        right: 0;
+        z-index: 1;
+        width: 40px;
+        height: 40px;
+        background-color: transparent;
+        color: var(--color-white);
+        border-radius: 50%;
+        cursor: pointer;
+        opacity: .65;
+      }
+      #open-in-popup:before,
+      #open-in-popup:after {
+        content: "";
+        position: absolute;
+        width: 12px;
+        height: 12px;
+        border: 1px solid var(--color-white);
+      }
+      #open-in-popup:before {
+        left: 12px;
+        top: 14px;
+      }
+      #open-in-popup:after {
+        left: 16px;
+        top: 10px;
+      }
+      #open-in-popup:hover {
+        opacity: 1;
+      }
+      #mocha {
+        font-family: inherit;
+        position: relative;
+        right: 0;
+        z-index: 1;
+        width: 100%;
+        margin: 0 0 0 auto;
+        padding: 0 1rem 1rem 1rem;
+      }
+      #mocha em {
+        font-style: normal;
+      }
+      #mocha-stats {
+        top: 0;
+        left: 0;
+        right: 0;
+        width: 100%;
+        padding: 9px 44px 10px 10px!important;
+        background-color: var(--color-black);
+      }
+      #mocha-stats .progress-contain {
+        float: none;
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        width: 100%;
+      }
+      #mocha-stats .progress-element {
+        visibility: visible;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 1px;
+        color: var(--color-white);
+        accent-color: currentColor;
+        background-color: rgba(255,255,255, .1);
+      }
+      #mocha-stats.pass .progress-element,
+      #mocha-stats.pass .progress-text {
+        color: var(--color-green);
+      }
+      #mocha-stats.fail .progress-element,
+      #mocha-stats.fail .progress-text {
+        color: var(--color-red);
+      }
+      #mocha-stats .progress-element::-webkit-progress-bar {
+        background: transparent;
+      }
+      #mocha-stats .progress-element::-webkit-progress-value {
+        background: currentColor;
+      }
+      #mocha-stats .progress-ring {
+        display: none;
+      }
+      #mocha-stats .progress-text {
+        position: absolute;
+        right: 39px;
+        top: -27px;
+      }
+      #mocha-stats li {
+        padding: 0 10px 0 0;
+        margin: 0;
+      }
+      #mocha-stats li.result {
+        color: var(--mocha-test-pass-color);
+        position: absolute;
+        right: 90px;
+        padding: 0;
+      }
+      #mocha .suite {
+        margin-left: 0;
+      }
+      #mocha .test {
+        margin-left: 0;
+      }
+      #mocha .suite h1 {
+        margin-top: 15px;
+        margin-bottom: 5px;
+        font-size: 1rem;
+        text-transform: uppercase;
+      }
+      #mocha .test h2 {
+        padding-right: 20px;
+        padding-left: 14px;
+      }
+      #mocha .test.fail pre,
+      #mocha-stats .duration em { color: var(--color-white); }
+      #mocha-stats .passes em,
+      #mocha .test.pass::before { color: var(--color-green); }
+      #mocha .test.pass.medium .duration { background: var(--color-citrus); color: var(--color-black); }
+      #mocha-stats .failures em,
+      #mocha .test.fail,
+      #mocha .test pre.error,
+      #mocha .test.fail::before { color: var(--color-red); }
+      #mocha .test.pass.slow .duration { background: var(--color-red); }
+      #mocha .test a.replay { color: var(--color-black); }
+      #mocha .test pre {
+        box-shadow: none;
+        padding: 8px 12px;
+        background-color: rgba(0,0,0,.2);
+        border: 1px solid rgba(0,0,0,.2);
+        border-radius: 3px;
+        width: 100%;
+        max-width: 100%;
+        margin-left: 0px;
+        margin-right: 0px;
+      }
+      /* Tests specific styles */
+      #tests {
+        opacity: .0001;
+        position: absolute;
+        display: flex;
+        flex-wrap: wrap;
+        z-index: 0;
+        left: 0;
+        top: 0;
+        width: 100%;
+        padding: 10px;
+      }
+      #tests .target-class {
+        width: 1rem;
+        height: 1rem;
+        background-color: var(--color-darkgreen);
+        border: 1px solid var(--color-black);
+      }
+      #tests .css-properties,
+      #tests .with-inline-transforms {
+        width: 150px;
+        height: 1rem;
+        font-size: 2rem;
+        background-color: var(--color-citrus);
+        border: 1px solid var(--color-black);
+      }
+      #tests .test {
+        position: relative;
+        width: 100%;
+        margin: .5rem;
+        border: 1px solid var(--color-darkgreen);
+      }
+      #tests .small-test {
+        width: calc(50% - 1rem);
+      }
+      #tests svg {
+        position: relative;
+        width: 100%;
+      }
+      #tests svg path {
+        stroke-linecap: round;
+      }
+      #tests img {
+        vertical-align: middle;
+      }
+      #input-number {
+        font-size: 2rem;
+        vertical-align: middle;
+        background: transparent;
+        border: none;
+        color: var(--color-citrus);
+      }
+      #tests #square {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 1rem;
+        height: 1rem;
+        margin-left: -.5rem;
+        margin-top: -.5rem;
+        background-color: white;
+      }
+      #tests #stagger div {
+        width: 1rem;
+        height: 1rem;
+        background-color: var(--color-citrus);
+        border: 1px solid var(--color-black);
+      }
+      #tests #grid {
+        display: flex;
+        flex-wrap: wrap;
+      }
+      #tests #grid div {
+        width: 20%;
+        height: 1.675rem;
+        background-color: var(--color-darkgreen);
+        border: 1px solid var(--color-black);
+      }
+      @media (min-width: 600px) {
+        #mocha,
+        #tests {
+          width: 50%;
+        }
+        #tests {
+          opacity: 1;
+          top: 40px;
+        }
+      }
+   </style>
+  </head>
+  <body>
+    <div id="tests"></div>
+    <div id="mocha"></div>
+    <button id="open-in-popup"></button>
+    <script src="../dist/bundles/anime.umd.min.js"></script>
+    <script type="module" src="../tests/setup.js"></script>
+    <script type="module" src="../tests/run.js"></script>
+    <script type="text/javascript">
+      const popupWindowTitle = 'Anime.js tests terminal';
+      const openInPopupButtonEl = document.querySelector('#open-in-popup');
+      if (window.document.title === popupWindowTitle) {
+        openInPopupButtonEl.style.display = 'none';
+      } else {
+        openInPopupButtonEl.onclick = () => { window.open(location.href, popupWindowTitle, 'width=478,height=592,top=0,left=0'); }
+      }
+    </script>
+  </body>
+</html>

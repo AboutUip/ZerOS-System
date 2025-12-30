@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>horizontal axis</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <link href="../assets/css/styles.css" rel="stylesheet">
+  <link href="./assets/onscroll.css" rel="stylesheet">
+  <style>
+    body, html {
+      position: relative;
+      height: 800svh;
+    }
+    .sticky-wrapper {
+      --width: calc(100vw - 16vw);
+      --height: calc(100svh - 16vw);
+      transform-style: preserve-3d;
+      position: fixed;
+      left: 8vw;
+      top: 8vw;
+      width: var(--width);
+      height: var(--height);
+      perspective: 1000px;
+    }
+    .sticky-container {
+      transform-style: preserve-3d;
+      overflow-x: auto;
+      overflow-y: hidden;
+      border: 1px dotted var(--green);
+      background-color: var(--black);
+    }
+    .sticky-scroller {
+      transform-style: preserve-3d;
+      position: relative;
+      display: flex;
+      justify-content: flex-start;
+      align-items: flex-start;
+      width: 400vw;
+      height: 100%;
+    }
+    .sticky {
+      transform-style: preserve-3d;
+      perspective: 1000px;
+      position: sticky;
+      left: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      width: var(--width);
+      height: var(--height);
+    }
+    .stack {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      border: 2px dashed rgba(255,255,255,.25);
+      padding: .5rem;
+      box-sizing: content-box;
+      border-radius: 1.5rem;
+    }
+    .stack h2 {
+      font-size: 1rem;
+    }
+    .stack .card {
+      width: calc(100% - 1rem);
+      height: calc(100% - 1rem);
+      margin: .5rem;
+      transform-origin: 50% bottom;
+    }
+  </style>
+</head>
+<body class="grid">
+  <div class="sticky-wrapper">
+    <div class="sticky-container">
+      <div class="sticky-scroller grid">
+        <div class="sticky">
+          <div class="stack">
+            <h2>⬅︎</h2>
+            <div class="card"><div class="front"></div><div class="back"></div></div>
+            <div class="card"><div class="front"></div><div class="back"></div></div>
+            <div class="card"><div class="front"></div><div class="back"></div></div>
+            <div class="card"><div class="front"></div><div class="back"></div></div>
+            <div class="card"><div class="front"></div><div class="back"></div></div>
+            <div class="card"><div class="front"></div><div class="back"></div></div>
+            <div class="card"><div class="front"></div><div class="back"></div></div>
+            <div class="card"><div class="front"></div><div class="back"></div></div>
+            <div class="card"><div class="front"></div><div class="back"></div></div>
+            <div class="card"><div class="front"></div><div class="back"></div></div>
+            <div class="card"><div class="front"></div><div class="back"></div></div>
+            <div class="card"><div class="front"></div><div class="back"></div></div>
+            <div class="card"><div class="front"></div><div class="back"></div></div>
+            <div class="card"><div class="front"></div><div class="back"></div></div>
+            <div class="card"><div class="front"></div><div class="back"></div></div>
+            <div class="card"><div class="front"></div><div class="back"></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script type="module" src="./assets/horizontal-container.js"></script>
+</body>
+</html>

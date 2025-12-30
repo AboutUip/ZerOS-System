@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>WAAPI tests / anime.js</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <link href="../../assets/css/styles.css" rel="stylesheet">
+  <style>
+    body {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      width: 100%;
+      height: 200vh;
+    }
+    #demo {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      flex-direction: column;
+    }
+    #animation {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 2rem;
+      width: 100%;
+      margin-bottom: 10rem;
+    }
+    .square {
+      --bg: var(--green);
+      position: relative;
+      width: 4rem;
+      height: 4rem;
+      margin: .5rem;
+      background-color: currentColor;
+    }
+    #controls-panel {
+      position: fixed;
+      top: 2rem;
+      right: 2rem;
+    }
+  </style>
+</head>
+<body>
+  <div id="demo">
+    <div id="controls-panel">
+      <fieldset>
+        <legend>Animation</legend>
+        <label for="animation-playbackRate">Playback rate</label>
+        <input type="range" id="animation-playbackRate" name="animation-playbackRate" value="1" min="0" max="2" step=".01">
+        <input type="text" id="animation-speed" value="1">
+        <br>
+        <label for="animation-time-drift">Time drift</label>
+        <input type="text" id="animation-time-drift" value="0">
+        <br>
+        <label for="animation-currentTime">Current time</label>
+        <input type="range" id="animation-progress" name="animation-progress" value="0" min="0" max="1" step=".0001">
+        <input type="text" id="animation-currentTime" value="0">
+        <br>
+        <input type="button" id="animation-play" value="play">
+        <input type="button" id="animation-reverse" value="reverse">
+        <input type="button" id="animation-pause" value="pause">
+        <input type="button" id="animation-alternate" value="alternate">
+        <input type="button" id="animation-resume" value="resume">
+        <input type="button" id="animation-cancel" value="cancel">
+        <input type="button" id="animation-revert" value="revert">
+        <input type="button" id="animation-restart" value="restart">
+      </fieldset>
+    </div>
+    <div id="animation">
+      <div class="square red"></div>
+      <div class="square red"></div>
+      <div class="square red"></div>
+      <div class="square red"></div>
+      <div class="square red"></div>
+      <div class="square red"></div>
+      <div class="square red"></div>
+      <div class="square red"></div>
+      <div class="square red"></div>
+      <div class="square red"></div>
+      <div class="square red"></div>
+    </div>
+  </div>
+  <script type="module" src="./index.js"></script>
+</body>
+</html>

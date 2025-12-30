@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>SVG motion path responsive tests / Anime.js</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <link href="../assets/css/styles.css" rel="stylesheet">
+  <style>
+    body {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      position: absolute;
+      overflow: hidden;
+      width: 100%;
+      height: 100%;
+    }
+    h2 {
+      margin-bottom: 20px;
+    }
+    .container {
+      position: relative;
+      margin-bottom: 20px;
+    }
+    .container > svg {
+      width: 100%;
+      box-shadow: 0px 0px 1px 1px red;
+      overflow: visible;
+    }
+    .dom-el {
+      position: absolute;
+      top: -1rem;
+      left: -1rem;
+      width: 2rem;
+      height: 2rem;
+      color: var(--red);
+      border: 2px solid currentColor;
+    }
+    .rect-el {
+      stroke: var(--green);
+    }
+  </style>
+</head>
+<body>
+<h2>No specified width</h2>
+<div class="container no-specified-width">
+  <svg viewBox="0 0 256 112">
+    <path id="noSpecifiedWidth" fill="none" stroke="#FFF" d="M8,56 C8,33.90861 25.90861,16 48,16 C70.09139,16 88,33.90861 88,56 C88,78.09139 105.90861,92 128,92 C150.09139,92 160,72 160,56 C160,40 148,24 128,24 C108,24 96,40 96,56 C96,72 105.90861,92 128,92 C154,93 168,78 168,56 C168,33.90861 185.90861,16 208,16 C230.09139,16 248,33.90861 248,56 C248,78.09139 230.09139,96 208,96 L48,96 C25.90861,96 8,78.09139 8,56 Z"/>
+    <rect class="rect-el" fill="none" stroke-width="2" x="-10" y="-10" width="20" height="20"/>
+  </svg>
+  <div class="dom-el"></div>
+</div>
+<h2>Specified width</h2>
+<div class="container specified-width">
+  <svg viewBox="0 0 256 112" width="200" height="200">
+    <path id="specifiedWidth" fill="none" stroke="#FFF" d="M8,56 C8,33.90861 25.90861,16 48,16 C70.09139,16 88,33.90861 88,56 C88,78.09139 105.90861,92 128,92 C150.09139,92 160,72 160,56 C160,40 148,24 128,24 C108,24 96,40 96,56 C96,72 105.90861,92 128,92 C154,93 168,78 168,56 C168,33.90861 185.90861,16 208,16 C230.09139,16 248,33.90861 248,56 C248,78.09139 230.09139,96 208,96 L48,96 C25.90861,96 8,78.09139 8,56 Z"/>
+    <rect class="rect-el" fill="none" stroke-width="2" x="-10" y="-10" width="20" height="20"/>
+  </svg>
+  <div class="dom-el"></div>
+</div>
+<h2>preserveAspectRatio with specified width</h2>
+<div class="container preserveAspectRatio">
+  <svg viewBox="0 0 256 112" width="200" height="200" preserveAspectRatio="xMidYMid slice">
+    <path id="preserveAspectRatio" fill="none" stroke="#FFF" d="M8,56 C8,33.90861 25.90861,16 48,16 C70.09139,16 88,33.90861 88,56 C88,78.09139 105.90861,92 128,92 C150.09139,92 160,72 160,56 C160,40 148,24 128,24 C108,24 96,40 96,56 C96,72 105.90861,92 128,92 C154,93 168,78 168,56 C168,33.90861 185.90861,16 208,16 C230.09139,16 248,33.90861 248,56 C248,78.09139 230.09139,96 208,96 L48,96 C25.90861,96 8,78.09139 8,56 Z"/>
+    <rect class="rect-el" fill="none" stroke-width="2" x="-10" y="-10" width="20" height="20"/>
+  </svg>
+  <div class="dom-el"></div>
+</div>
+
+</div>
+<script type="module" src="./index.js"></script>
+</body>
+</html>

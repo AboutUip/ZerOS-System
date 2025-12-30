@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Draggable callbacks / Anime.js</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <link href="../../assets/css/styles.css" rel="stylesheet">
+  <style>
+    body {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100dvh;
+    }
+    .log {
+      --width: 30ch;
+      right: 0;
+      z-index: 0;
+    }
+    #log-0 {
+      right: 0ch;
+    }
+    #log-1 {
+      right: calc(var(--width) * 1);
+    }
+    #container {
+      position: relative;
+      z-index: 1;
+      width: 50dvw;
+      height: 50dvh;
+      border: 1px solid var(--red);
+    }
+    .draggable {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      width: 4rem;
+      height: 4rem;
+      background-color: var(--red);
+    }
+  </style>
+</head>
+<body>
+  <div id="log-1" class="log"></div>
+  <div id="log-2" class="log"></div>
+  <div id="container">
+    <div id="manual" class="draggable">A</div>
+    <div id="animated" class="draggable">B</div>
+  </div>
+  <script src="./index.js" type="module"></script>
+</body>
+</html>

@@ -1,11 +1,11 @@
 {
   "system": {
     "system.dailyQuote": {
-      "value": "必为痛苦的悔恨而丧失现在的心情。偶尔的抱怨发泄一下，也是十分必要的。但是无休止的抱怨只会增添烦恼，只能向别人显示自己的无能。抱怨是一种致命的消极心态，一旦自己的抱怨成为恶习，那么人生就会暗无天日，不仅自己好心境全无，而且别人跟着也倒霉。",
+      "value": "人生没有过不去的坎，只有过不去的人。",
       "expiresAt": 0,
-      "createdAt": 1767028949454,
-      "updatedAt": 1767028949454,
-      "size": 356
+      "createdAt": 1767064382425,
+      "updatedAt": 1767064382425,
+      "size": 56
     }
   },
   "programs": {
@@ -55,35 +55,29 @@
           "data": {
             "city": "晋城市",
             "ip": "219.147.46.241",
-            "tips": "天气干冷，穿厚一点吧！",
-            "low_temperature": -3,
+            "tips": "天气阴冷，穿暖和点吧！",
+            "low_temperature": -2,
             "moji_city_id": 1945,
-            "night_condition": "晴",
-            "quality_level": "良",
-            "tomorrow_aqi": 117,
-            "tomorrow_condition": "晴转多云",
-            "tomorrow_high_temperature": 8,
-            "tomorrow_low_temperature": -3,
+            "night_condition": "多云",
+            "quality_level": "轻度",
+            "tomorrow_aqi": 105,
+            "tomorrow_condition": "中雪转小雪",
+            "tomorrow_high_temperature": -1,
+            "tomorrow_low_temperature": -5,
             "tomorrow_quality_level": "轻度",
-            "tomorrow_weather_icon_id": "0",
-            "update_time": "2025-12-29 20:56:08",
+            "tomorrow_weather_icon_id": "15",
+            "update_time": "2025-12-30 10:50:59",
             "today": {
-              "current_temp": "4℃",
+              "current_temp": "1℃",
               "current_cond": "晴",
-              "night_condition": "晴",
-              "tomorrow_condition": "晴转多云",
-              "low": "-3℃",
-              "quality": "良",
+              "night_condition": "多云",
+              "tomorrow_condition": "中雪转小雪",
+              "low": "-2℃",
+              "quality": "轻度",
               "alert": "暂无预警信息",
-              "update_time": "2025-12-29 20:15:04"
+              "update_time": "2025-12-30 10:27:03"
             },
             "seven_day": [
-              {
-                "date": "2025-12-28",
-                "cond": "晴",
-                "high": "12℃",
-                "low": "-2℃"
-              },
               {
                 "date": "2025-12-29",
                 "cond": "晴",
@@ -94,37 +88,37 @@
                 "date": "2025-12-30",
                 "cond": "晴转多云",
                 "high": "8℃",
-                "low": "-3℃"
+                "low": "-2℃"
               },
               {
                 "date": "2025-12-31",
-                "cond": "大雪转中雪",
-                "high": "0℃",
-                "low": "-6℃"
+                "cond": "中雪转小雪",
+                "high": "-1℃",
+                "low": "-5℃"
               },
               {
                 "date": "2026-01-01",
-                "cond": "多云",
-                "high": "0℃",
-                "low": "-9℃"
+                "cond": "晴",
+                "high": "1℃",
+                "low": "-10℃"
               },
               {
                 "date": "2026-01-02",
                 "cond": "晴",
-                "high": "0℃",
-                "low": "-9℃"
+                "high": "2℃",
+                "low": "-7℃"
               },
               {
                 "date": "2026-01-03",
                 "cond": "晴",
-                "high": "4℃",
-                "low": "-7℃"
+                "high": "5℃",
+                "low": "-5℃"
               },
               {
                 "date": "2026-01-04",
-                "cond": "多云转晴",
+                "cond": "晴",
                 "high": "3℃",
-                "low": "-5℃"
+                "low": "-6℃"
               },
               {
                 "date": "2026-01-05",
@@ -135,20 +129,20 @@
               {
                 "date": "2026-01-06",
                 "cond": "晴",
-                "high": "5℃",
-                "low": "-6℃"
+                "high": "4℃",
+                "low": "-7℃"
               },
               {
                 "date": "2026-01-07",
                 "cond": "晴",
-                "high": "6℃",
-                "low": "-5℃"
+                "high": "5℃",
+                "low": "-6℃"
               },
               {
                 "date": "2026-01-08",
-                "cond": "多云",
-                "high": "4℃",
-                "low": "-7℃"
+                "cond": "晴",
+                "high": "6℃",
+                "low": "-5℃"
               },
               {
                 "date": "2026-01-09",
@@ -173,14 +167,20 @@
                 "cond": "多云",
                 "high": "4℃",
                 "low": "-7℃"
+              },
+              {
+                "date": "2026-01-13",
+                "cond": "多云",
+                "high": "4℃",
+                "low": "-7℃"
               }
             ]
           }
         },
-        "expiresAt": 1767056021892,
-        "createdAt": 1767012821892,
-        "updatedAt": 1767012821892,
-        "size": 1709
+        "expiresAt": 1767106111299,
+        "createdAt": 1767062911299,
+        "updatedAt": 1767062911299,
+        "size": 1718
       }
     }
   }

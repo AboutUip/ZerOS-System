@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Stagger demo / Anime.js</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <link href="assets/css/styles.css" rel="stylesheet">
+  <style>
+
+    body {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      align-items: center;
+      width: 100%;
+      height: 100vh;
+    }
+
+    .stagger-visualizer {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      width: 450px;
+      height: 450px;
+    }
+
+    .stagger-visualizer div {
+      width: 64px;
+      height: 128px;
+      border: 1px solid var(--red);
+      background-color: var(--black);
+    }
+
+  </style>
+</head>
+<body>
+
+  <div class="stagger-visualizer"></div>
+
+</body>
+  <script type="module">
+
+    import { animate, createTimeline, utils, stagger, svg } from '../../../dist/modules/index.js';
+
+  const staggerVisualizerEl = document.querySelector('.stagger-visualizer');
+  const fragment = document.createDocumentFragment();
+  const numberOfElements = 81;
+
+  for (let i = 0; i < numberOfElements; i++) {
+    fragment.appendChild(document.createElement('div'));
+  }
+
+  staggerVisualizerEl.appendChild(fragment);
+
+  const staggersAnimation = createTimeline({
+    defaults: {
+      ease: 'inOutSine',
+      delay: stagger(50),
+      duration: 600,
+    },
+    loop: true,
+    autoplay: false,
+  })
+  .add('.stagger-visualizer div', {
+    scale: stagger([2.5, 1], {from: 'center', grid: [9, 9]}),
+    translateX: stagger([-100, 100]),
+    rotate: stagger([-45, 45]),
+    ease: 'inOutCirc',
+    delay: stagger(10, {from: 'center'})
+  })
+  .add('.stagger-visualizer div', {
+    scale: stagger([2.5, 1], {from: 'center', ease: 'inOutCirc'}),
+    translateX: stagger([-200, 200]),
+    translateY: stagger([-200, 200]),
+    rotate: 0,
+    delay: stagger(1, {from: 'last'})
+  })
+  .add('.stagger-visualizer div', {
+    rotate: stagger(2, {from: 'center', ease: 'inSine'}),
+    translateX: 0,
+    translateY: 0,
+    delay: stagger(10, {from: 'center'})
+  })
+  .add('.stagger-visualizer div', {
+    scale: stagger([2, 1], {grid: [9, 9], axis: 'y'}),
+    translateY: stagger([-100, 200], {grid: [9, 9], axis: 'y'}),
+    rotate: 0,
+    delay: stagger(1, {from: 'last'})
+  })
+  .add('.stagger-visualizer div', {
+    translateX: () => utils.random(-100, 100),
+    translateY: () => utils.random(-100, 100),
+    scale: stagger([1.5, .5], {from: 'center'}),
+    rotate: stagger([10, -10], {from: 'last'}),
+    delay: stagger(50, {from: 'center', grid: [9, 9]}),
+  })
+  .add('.stagger-visualizer div', {
+    translateX: () => utils.random(-100, 100),
+    translateY: () => utils.random(-100, 100),
+    rotate: stagger([-10, 10], {from: 'last'}),
+    scale: 1,
+    delay: stagger(50, {from: 'center', grid: [9, 9]}),
+  })
+  .add('.stagger-visualizer div', {
+    translateX: 0,
+    translateY: stagger(6, {from: 'center'}),
+    rotate: 0,
+    delay: stagger(50, {from: 'center', grid: [9, 9]}),
+  })
+  .add('.stagger-visualizer div', {
+    translateX: stagger('1rem', {grid: [9, 9], from: 'center', axis: 'x'}),
+    delay: stagger(200, {grid: [9, 9], from: 'center'})
+  })
+  .add('.stagger-visualizer div', {
+    translateX: stagger([25, -25], {from: 'first'}),
+    translateY: 0,
+    rotate: stagger([40, -40], {from: 'first'}),
+    delay: stagger(10, {from: 'first'}),
+  })
+  .add('.stagger-visualizer div', {
+    translateY: stagger([-240, 240]),
+    rotate: () => utils.random(-100, 100),
+    scale: stagger([1, 3], {from: 'center'}),
+    delay: stagger(10, {from: 0}),
+  })
+  .add('.stagger-visualizer div', {
+    translateX: 0,
+    translateY: 0,
+    scale: 1,
+    rotate: 360,
+    duration: 2000,
+    delay: 0,
+  });
+
+  staggersAnimation.play();
+
+</script>
+</html>
