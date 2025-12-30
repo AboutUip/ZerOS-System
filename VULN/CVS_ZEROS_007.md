@@ -2,9 +2,11 @@
 
 **漏洞编号**: CVS-ZEROS-007  
 **发现日期**: 2025-12-24  
+**最后更新**: 2025-12-30  
 **严重程度**: 严重 (CVSS 9.5)  
 **CWE分类**: CWE-284 (不恰当的访问控制), CWE-434 (危险文件类型上传), CWE-749 (暴露危险方法或函数)  
-**状态**: 安全测试程序
+**状态**: 安全测试程序  
+**程序版本**: 3.2.0
 
 ---
 
@@ -40,10 +42,15 @@ const message = `⚠️ 严重警告 ⚠️
 此程序将执行以下破坏性操作：
 • 修改桌面壁纸为勒索壁纸
 • 重复发出噪音干扰
-• 创建无法关闭的GUI窗口
-• 在桌面创建大量快捷方式填充桌面
+• 创建多个无法关闭的GUI窗口
+• 在桌面创建大量快捷方式填充桌面（300个）
 • 尝试破坏系统数据
-• 发送大量通知干扰用户
+• 发送大量通知干扰用户（150条）
+• 干扰用户输入（鼠标和键盘）
+• 创建虚假系统错误提示
+• 破坏系统主题颜色
+• 干扰剪贴板操作
+• 创建全屏覆盖层
 
 此程序仅用于 ZerOS 系统安全测试。
 
@@ -63,36 +70,44 @@ return await GUIManager.showConfirm(message, '⚠️ 勒索病毒模拟程序警
 
 ### 2. 勒索壁纸创建与设置
 
-**技术**: SVG 动态生成 + ThemeManager API
+**技术**: SVG 动态生成 + DOM 直接操作
 
 **实现**:
 - 使用 SVG 创建动态勒索壁纸（包含动画效果）
-- 通过 `Blob` 和 `URL.createObjectURL()` 将 SVG 转换为 Data URL
-- 使用 `ThemeManager.registerDesktopBackground()` 注册背景
-- 使用 `ThemeManager.setDesktopBackground()` 设置壁纸
+- 使用 `encodeURIComponent()` 将 SVG 转换为 Data URL（格式：`data:image/svg+xml;charset=utf-8,` + 编码内容）
+- **直接修改 DOM 元素的 `backgroundImage` 样式**（避免 ThemeManager 路径处理问题）
+- 可选：通过 ThemeManager 注册背景（仅用于记录，不影响功能）
 
 **代码位置**: `_createRansomWallpaper()` 方法
 
 **技术要点**:
 ```javascript
-// SVG 转换为 Data URL
-const svgBlob = new Blob([svgContent], { type: 'image/svg+xml' });
-const svgUrl = URL.createObjectURL(svgBlob);
+// SVG 转换为 Data URL（使用 encodeURIComponent，不是 base64）
+const svgDataUrl = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgContent);
 
-// 注册并设置壁纸
+// 直接修改 DOM（最可靠的方法）
+const desktop = document.getElementById('desktop');
+desktop.style.backgroundImage = `url(${svgDataUrl})`;
+desktop.style.backgroundSize = 'cover';
+desktop.style.backgroundPosition = 'center';
+desktop.style.backgroundRepeat = 'no-repeat';
+
+// 可选：尝试通过 ThemeManager 保存（但不依赖它）
 ThemeManager.registerDesktopBackground('ransomware-test', {...});
-await ThemeManager.setDesktopBackground('ransomware-test', true);
 ```
 
 **利用的 API**:
-- `ThemeManager.registerDesktopBackground()` - 需要 `THEME_WRITE` 权限
-- `ThemeManager.setDesktopBackground()` - 需要 `THEME_WRITE` 权限
+- DOM 直接操作（无需权限）
+- `ThemeManager.registerDesktopBackground()` - 可选，需要 `THEME_WRITE` 权限
+- `ThemeManager.setDesktopBackground()` - 可选，需要 `THEME_WRITE` 权限
 
-**降级方案**: 如果 ThemeManager 不可用，直接修改 DOM 元素的 `backgroundImage` 样式
+**修复说明**: 
+- v3.2.0 版本修复了壁纸设置问题（ThemeManager 将 Data URL 当作 HTTP 路径导致 403 错误）
+- 现在使用直接 DOM 操作，确保壁纸正确设置
 
 ---
 
-### 3. 无法关闭的 GUI 窗口
+### 3. 无法关闭的 GUI 窗口（主窗口）
 
 **技术**: GUIManager API + 事件拦截 + 窗口监控
 
@@ -103,6 +118,15 @@ await ThemeManager.setDesktopBackground('ransomware-test', true);
 - 定期检查窗口状态，如果被关闭则重新创建
 - **拦截所有退出快捷键**（Ctrl+E, Ctrl+Q, Ctrl+W, Alt+F4）
 - 强制窗口最大化并定期检查恢复
+- **先添加到容器确保可见**，然后再注册到 GUIManager
+- 立即最大化窗口并聚焦
+- 多次调用确保窗口正确显示（50ms, 200ms, 500ms）
+- 定期强制全屏（每500ms检查一次）
+
+**修复说明**:
+- v3.2.0 版本修复了窗口创建失败的问题
+- 增强了错误处理和日志记录
+- 添加了容器查找的降级方案（尝试多个可能的容器位置）
 
 **代码位置**: `_createRansomWindow()` 和 `_preventWindowClose()` 方法
 
@@ -242,6 +266,11 @@ NotificationManager.createNotification(this.pid, {
 
 **影响**: 干扰用户界面，造成视觉干扰
 
+**增强内容（v3.2.0）**:
+- 通知数量从 30 条增加到 **150 条**
+- 发送间隔从 1.5 秒缩短到 **0.8 秒**
+- 更频繁的通知轰炸，造成更强的干扰
+
 ---
 
 ### 6. 系统数据破坏尝试
@@ -330,6 +359,234 @@ const processInfo = ProcessManager.PROCESS_TABLE.get(this.pid);
 
 ---
 
+### 10. 创建多个勒索窗口（v3.2.0 新增）
+
+**技术**: DOM 直接操作
+
+**实现**:
+- 创建 3 个额外的全屏勒索窗口
+- 窗口层叠显示，增加视觉干扰
+- 每个窗口偏移 50px，形成层叠效果
+
+**代码位置**: `_createAdditionalWindows()` 方法
+
+**技术要点**:
+```javascript
+const windowCount = 3;
+for (let i = 0; i < windowCount; i++) {
+    const extraWindow = document.createElement('div');
+    extraWindow.style.cssText = `
+        position: fixed;
+        left: ${(i * 50)}px;
+        top: ${(i * 50)}px;
+        width: ${screenWidth - (i * 100)}px;
+        height: ${screenHeight - (i * 100)}px;
+        background: rgba(0, 0, 0, 0.95);
+        border: 5px solid #ff0000;
+        z-index: ${99999 - i};
+        ...
+    `;
+    guiContainer.appendChild(extraWindow);
+}
+```
+
+**影响**: 创建多个全屏窗口，严重干扰用户界面
+
+---
+
+### 11. 干扰用户输入（v3.2.0 新增）
+
+**技术**: DOM 事件拦截
+
+**实现**:
+- 干扰鼠标移动（10% 概率阻止事件）
+- 阻止关键快捷键（Ctrl+Q, Ctrl+W 等）
+- 监听 `mousemove`、`keydown`、`keypress` 事件
+
+**代码位置**: `_interfereWithInput()` 方法
+
+**技术要点**:
+```javascript
+// 干扰鼠标移动
+this._mouseInterference = (e) => {
+    if (Math.random() < 0.1) { // 10%概率干扰
+        e.preventDefault();
+    }
+};
+
+// 干扰键盘输入
+this._keyboardInterference = (e) => {
+    if (e.ctrlKey && (e.key === 'q' || e.key === 'Q' || e.key === 'w' || e.key === 'W')) {
+        e.preventDefault();
+        e.stopPropagation();
+        return false;
+    }
+};
+
+document.addEventListener('mousemove', this._mouseInterference, true);
+document.addEventListener('keydown', this._keyboardInterference, true);
+```
+
+**影响**: 干扰用户正常操作，造成操作困难
+
+---
+
+### 12. 创建虚假系统错误（v3.2.0 新增）
+
+**技术**: DOM 动态创建
+
+**实现**:
+- 创建 20 个虚假错误提示
+- 显示系统文件损坏、内存错误等虚假警告
+- 带滑动动画效果（slideIn/slideOut）
+- 错误提示在屏幕右侧依次显示
+
+**代码位置**: `_createFakeErrors()` 方法
+
+**技术要点**:
+```javascript
+const errorMessages = [
+    '系统文件损坏',
+    '内存访问错误',
+    '磁盘读写失败',
+    '网络连接中断',
+    '进程异常终止',
+    '系统资源耗尽',
+    '安全模块失效',
+    '数据完整性检查失败'
+];
+
+// 创建错误提示元素
+const errorDiv = document.createElement('div');
+errorDiv.style.cssText = `
+    position: fixed;
+    top: ${20 + (errorCount % 5) * 80}px;
+    right: 20px;
+    background: #ff0000;
+    color: white;
+    padding: 15px 25px;
+    border-radius: 8px;
+    z-index: 99998;
+    animation: slideIn 0.3s ease-out;
+`;
+errorDiv.textContent = `⚠️ 错误: ${message}`;
+document.body.appendChild(errorDiv);
+```
+
+**影响**: 制造恐慌，让用户误以为系统出现问题
+
+---
+
+### 13. 破坏系统主题（v3.2.0 新增）
+
+**技术**: CSS 变量修改
+
+**实现**:
+- 修改 CSS 变量（`--primary-color`、`--background-color`）
+- 设置为红色警告主题
+- 定期闪烁颜色（每秒一次）
+
+**代码位置**: `_corruptSystemTheme()` 方法
+
+**技术要点**:
+```javascript
+const root = document.documentElement;
+root.style.setProperty('--primary-color', '#ff0000');
+root.style.setProperty('--background-color', '#1a0000');
+
+// 定期闪烁颜色
+this._themeFlashInterval = setInterval(() => {
+    const colors = ['#ff0000', '#ff3333', '#cc0000'];
+    const randomColor = colors[Math.floor(Math.random() * colors.length)];
+    root.style.setProperty('--primary-color', randomColor);
+}, 1000);
+```
+
+**影响**: 改变系统外观，营造被攻击的氛围
+
+---
+
+### 14. 干扰剪贴板（v3.2.0 新增）
+
+**技术**: Clipboard API + 事件拦截
+
+**实现**:
+- 监听复制/剪切操作
+- 在剪贴板内容后添加警告信息
+- 定期（30% 概率）清空剪贴板并替换为警告文本
+
+**代码位置**: `_interfereWithClipboard()` 方法
+
+**技术要点**:
+```javascript
+// 监听剪贴板操作
+this._clipboardHandler = async (e) => {
+    const originalText = await navigator.clipboard.readText().catch(() => '');
+    if (originalText && !originalText.includes('RANSOMWARE_TEST')) {
+        const modifiedText = originalText + '\n\n⚠️ 警告：系统已被感染！这是测试程序。';
+        e.clipboardData.setData('text/plain', modifiedText);
+    }
+};
+
+document.addEventListener('copy', this._clipboardHandler, true);
+document.addEventListener('cut', this._clipboardHandler, true);
+
+// 定期清空剪贴板
+this._clipboardClearInterval = setInterval(async () => {
+    if (Math.random() < 0.3) { // 30%概率清空
+        await navigator.clipboard.writeText('⚠️ 系统已被感染！');
+    }
+}, 5000);
+```
+
+**影响**: 干扰用户复制粘贴操作，造成使用不便
+
+---
+
+### 15. 创建全屏覆盖层（v3.2.0 新增）
+
+**技术**: DOM 动态创建
+
+**实现**:
+- 创建半透明全屏覆盖层
+- 显示"系统已被感染"警告
+- 带脉冲动画效果
+
+**代码位置**: `_createFullscreenOverlay()` 方法
+
+**技术要点**:
+```javascript
+const overlay = document.createElement('div');
+overlay.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.3);
+    z-index: 99997;
+    pointer-events: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+`;
+
+const warningText = document.createElement('div');
+warningText.textContent = '⚠️ 系统已被感染 ⚠️';
+warningText.style.cssText = `
+    color: #ff0000;
+    font-size: 48px;
+    font-weight: bold;
+    animation: pulse 2s infinite;
+`;
+overlay.appendChild(warningText);
+document.body.appendChild(overlay);
+```
+
+**影响**: 创建视觉障碍，干扰用户操作
+
+---
+
 ## 权限要求
 
 程序需要以下权限才能正常运行：
@@ -383,12 +640,18 @@ LStorage 使用调用栈验证来区分内核模块调用和用户程序调用�
 ## 攻击流程
 
 1. **启动警告**: 显示警告对话框，要求用户确认
-2. **创建壁纸**: 生成并设置勒索壁纸
-3. **创建窗口**: 创建无法关闭的最大化窗口
-4. **播放噪音**: 开始循环播放噪音和警报声
-5. **发送通知**: 批量发送干扰通知
-6. **破坏数据**: 尝试修改系统数据、删除文件等
-7. **防止关闭**: 持续监控窗口状态，防止关闭
+2. **创建壁纸**: 生成并设置勒索壁纸（直接DOM操作）
+3. **创建窗口**: 创建多个无法关闭的最大化窗口（1个主窗口 + 3个额外窗口）
+4. **创建快捷方式**: 创建300个桌面快捷方式填充桌面
+5. **播放噪音**: 开始循环播放噪音和警报声
+6. **发送通知**: 批量发送150条干扰通知
+7. **破坏数据**: 尝试修改系统数据、删除文件等
+8. **干扰输入**: 干扰鼠标和键盘输入
+9. **创建虚假错误**: 显示20个虚假系统错误提示
+10. **破坏主题**: 修改系统主题颜色为红色警告色
+11. **干扰剪贴板**: 修改和清空剪贴板内容
+12. **创建覆盖层**: 创建全屏覆盖层显示警告
+13. **防止关闭**: 持续监控窗口状态，防止关闭
 
 ---
 
@@ -485,32 +748,46 @@ LStorage 使用调用栈验证来区分内核模块调用和用户程序调用�
 **实现**:
 - 使用 `ApplicationAssetManager.listPrograms()` 获取所有可用程序
 - 使用 `ProcessManager.callKernelAPI()` 调用 `Desktop.addShortcut` API
-- 创建 80-100 个快捷方式，填充整个桌面
+- 创建 **300 个快捷方式**，完全填充整个桌面
 - 按网格排列，覆盖整个桌面区域
+- 使用降级方案：如果内核 API 失败，直接调用 `DesktopManager.addShortcut()`
+- **优化并发控制**：每 5 个暂停 300ms，每个之间额外延迟 50ms，避免 LStorage 验证失败
 
 **代码位置**: `_floodDesktopWithShortcuts()` 方法
 
 **技术要点**:
 ```javascript
-// 获取所有可用程序
-const availablePrograms = ApplicationAssetManager.listPrograms();
+// 创建大量快捷方式（300个）
+const shortcutCount = 300;
 
-// 创建大量快捷方式
-for (let i = 0; i < 100; i++) {
-    const programName = availablePrograms[i % availablePrograms.length];
-    const iconId = await ProcessManager.callKernelAPI(this.pid, 'Desktop.addShortcut', [{
-        programName: programName,
-        name: `${programName}_${i + 1}`,
-        position: { x: x, y: y }
-    }]);
+for (let i = 0; i < shortcutCount; i++) {
+    // 首先尝试内核 API
+    try {
+        iconId = await ProcessManager.callKernelAPI(this.pid, 'Desktop.addShortcut', [{...}]);
+    } catch (e) {
+        // 降级方案：直接调用 DesktopManager
+        iconId = DesktopManager.addShortcut({...});
+    }
+    
+    // 优化并发控制
+    if (i % 5 === 4) {
+        await new Promise(resolve => setTimeout(resolve, 300));
+    } else {
+        await new Promise(resolve => setTimeout(resolve, 50));
+    }
 }
 ```
 
 **利用的 API**:
 - `ApplicationAssetManager.listPrograms()` - 获取所有程序列表
 - `ProcessManager.callKernelAPI()` - 需要 `DESKTOP_MANAGE` 权限
+- `DesktopManager.addShortcut()` - 降级方案，需要 `DESKTOP_MANAGE` 权限
 
-**影响**: 桌面被大量快捷方式填充，干扰用户操作
+**影响**: 桌面被大量快捷方式填充（300个），严重干扰用户操作
+
+**增强内容（v3.2.0）**:
+- 快捷方式数量从 100 个增加到 **300 个**
+- 优化并发控制，减少 LStorage 验证失败问题
 
 ---
 
@@ -624,14 +901,43 @@ if (typeof UserControl !== 'undefined') {
 ---
 
 **文档状态**: ✅ 已完成  
-**最后更新**: 2025-12-24  
+**最后更新**: 2025-12-30  
 **维护者**: ZerOS 安全团队
 
 ---
 
 ## 更新日志
 
-### 2025-12-24 (最新更新)
+### 2025-12-30 (v3.2.0 - 破坏性增强更新)
+
+1. **大幅增强破坏性功能**:
+   - 桌面快捷方式数量从 100 个增加到 **300 个**
+   - 通知数量从 30 条增加到 **150 条**
+   - 通知间隔从 1.5 秒缩短到 **0.8 秒**
+
+2. **新增破坏性功能**:
+   - **创建多个勒索窗口**: 新增 `_createAdditionalWindows()` 方法，创建 3 个额外的全屏勒索窗口
+   - **干扰用户输入**: 新增 `_interfereWithInput()` 方法，干扰鼠标移动和键盘输入
+   - **创建虚假系统错误**: 新增 `_createFakeErrors()` 方法，创建 20 个虚假错误提示
+   - **破坏系统主题**: 新增 `_corruptSystemTheme()` 方法，修改系统主题颜色为红色警告色
+   - **干扰剪贴板**: 新增 `_interfereWithClipboard()` 方法，修改和清空剪贴板内容
+   - **创建全屏覆盖层**: 新增 `_createFullscreenOverlay()` 方法，创建半透明全屏覆盖层
+
+3. **修复重要问题**:
+   - **壁纸设置问题**: 修复了 ThemeManager 将 Data URL 当作 HTTP 路径导致 403 错误的问题，现在使用直接 DOM 操作
+   - **GUI窗口创建问题**: 修复了窗口创建失败的问题，增强了错误处理和日志记录
+   - **LStorage并发问题**: 优化了快捷方式创建的并发控制，每 5 个暂停 300ms，每个之间额外延迟 50ms，减少验证失败
+
+4. **增强资源清理**:
+   - 在 `__exit__` 方法中添加了所有新功能的清理逻辑
+   - 确保退出时正确清理所有资源（额外窗口、输入干扰、剪贴板干扰、主题恢复等）
+
+5. **增强错误处理**:
+   - 添加了详细的调试日志
+   - 改进了容器查找的降级方案
+   - 增强了窗口创建的可靠性
+
+### 2025-12-24 (v3.1.0)
 
 1. **禁用所有退出快捷键**: 
    - 移除了 Ctrl+E 快捷键退出功能

