@@ -392,22 +392,21 @@
                     </svg>
                 `;
 
-                // 将SVG转换为Data URL（base64编码），而不是blob URL
-                // 这样可以避免403错误，因为data URL不需要HTTP请求
-                const svgBase64 = btoa(unescape(encodeURIComponent(svgContent)));
-                const svgDataUrl = `data:image/svg+xml;base64,${svgBase64}`;
+                // 将SVG转换为Blob URL，避免data URL被当作HTTP路径请求
+                const svgBlob = new Blob([svgContent], { type: 'image/svg+xml' });
+                const svgBlobUrl = URL.createObjectURL(svgBlob);
 
                 // 使用ThemeManager设置壁纸（先注册，再通过内核API设置）
                 if (typeof ThemeManager !== 'undefined' && typeof ProcessManager !== 'undefined') {
-                    // 先注册背景（使用data URL）
+                    // 先注册背景（使用Blob URL）
                     ThemeManager.registerDesktopBackground('ransomware-test', {
                         id: 'ransomware-test',
                         name: '勒索测试壁纸',
                         description: 'ZerOS 安全测试壁纸',
-                        path: svgDataUrl
+                        path: svgBlobUrl
                     });
 
-                    // 通过内核API设置壁纸（确保权限检查正确）
+                    // 尝试通过内核API设置壁纸（确保权限检查正确）
                     // 注意：内核API名称是 DesktopBackground.set，不是 Theme.setDesktopBackground
                     try {
                         const result = await ProcessManager.callKernelAPI(this.pid, 'DesktopBackground.set', ['ransomware-test']);
@@ -416,27 +415,26 @@
                                 KernelLogger.warn("escalate", "勒索壁纸已设置（通过内核API）");
                             }
                             return true;
-                        } else {
-                            if (typeof KernelLogger !== 'undefined') {
-                                KernelLogger.warn("escalate", "通过内核API设置壁纸失败，尝试直接调用ThemeManager");
-                            }
-                            // 降级方案：直接调用ThemeManager（如果内核API失败）
-                            await ThemeManager.setDesktopBackground('ransomware-test', true);
-                            if (typeof KernelLogger !== 'undefined') {
-                                KernelLogger.warn("escalate", "勒索壁纸已设置（直接调用ThemeManager）");
-                            }
-                            return true;
                         }
                     } catch (e) {
+                        // 内核API调用失败（可能是进程状态检查问题），使用降级方案
                         if (typeof KernelLogger !== 'undefined') {
-                            KernelLogger.warn("escalate", `通过内核API设置壁纸失败: ${e.message}，尝试直接调用ThemeManager`);
+                            KernelLogger.debug("escalate", `通过内核API设置壁纸失败: ${e.message}，使用直接调用ThemeManager`);
                         }
-                        // 降级方案：直接调用ThemeManager（如果内核API失败）
+                    }
+                    
+                    // 降级方案：直接调用ThemeManager（如果内核API失败或不可用）
+                    try {
                         await ThemeManager.setDesktopBackground('ransomware-test', true);
                         if (typeof KernelLogger !== 'undefined') {
                             KernelLogger.warn("escalate", "勒索壁纸已设置（直接调用ThemeManager）");
                         }
                         return true;
+                    } catch (e) {
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn("escalate", `ThemeManager设置壁纸失败: ${e.message}，尝试直接修改DOM`);
+                        }
+                        // 继续使用DOM降级方案
                     }
                 } else if (typeof ThemeManager !== 'undefined') {
                     // 降级方案：直接使用ThemeManager（如果ProcessManager不可用）
@@ -444,25 +442,25 @@
                         id: 'ransomware-test',
                         name: '勒索测试壁纸',
                         description: 'ZerOS 安全测试壁纸',
-                        path: svgDataUrl
+                        path: svgBlobUrl
                     });
                     await ThemeManager.setDesktopBackground('ransomware-test', true);
                     if (typeof KernelLogger !== 'undefined') {
                         KernelLogger.warn("escalate", "勒索壁纸已设置（直接调用ThemeManager，ProcessManager不可用）");
                     }
                     return true;
-                } else {
-                    // 最后降级方案：直接修改DOM
-                    const desktop = document.getElementById('desktop');
-                    if (desktop) {
-                        desktop.style.backgroundImage = `url(${svgDataUrl})`;
-                        desktop.style.backgroundSize = 'cover';
-                        desktop.style.backgroundPosition = 'center';
-                        if (typeof KernelLogger !== 'undefined') {
-                            KernelLogger.warn("escalate", "勒索壁纸已设置（直接修改DOM，ThemeManager不可用）");
-                        }
-                        return true;
+                }
+                
+                // 最后降级方案：直接修改DOM
+                const desktop = document.getElementById('desktop');
+                if (desktop) {
+                    desktop.style.backgroundImage = `url(${svgBlobUrl})`;
+                    desktop.style.backgroundSize = 'cover';
+                    desktop.style.backgroundPosition = 'center';
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.warn("escalate", "勒索壁纸已设置（直接修改DOM）");
                     }
+                    return true;
                 }
                 return false;
             } catch (error) {
@@ -867,21 +865,50 @@
                         const x = startX + col * iconSpacing;
                         const y = startY + row * iconSpacing;
 
-                        // 使用 ProcessManager.callKernelAPI 创建快捷方式
-                        // callKernelAPI 的 args 参数必须是数组，即使只有一个参数
-                        const iconId = await ProcessManager.callKernelAPI(this.pid, 'Desktop.addShortcut', [{
-                            programName: programName,
-                            name: `${programName}_${i + 1}`,
-                            description: `勒索测试快捷方式 ${i + 1} - 这是安全测试程序创建的`,
-                            position: { x: x, y: y }
-                        }]);
+                        let iconId = null;
+                        
+                        // 首先尝试使用内核API
+                        if (typeof ProcessManager !== 'undefined') {
+                            try {
+                                // callKernelAPI 的 args 参数必须是数组，即使只有一个参数
+                                iconId = await ProcessManager.callKernelAPI(this.pid, 'Desktop.addShortcut', [{
+                                    programName: programName,
+                                    name: `${programName}_${i + 1}`,
+                                    description: `勒索测试快捷方式 ${i + 1} - 这是安全测试程序创建的`,
+                                    position: { x: x, y: y }
+                                }]);
+                            } catch (apiError) {
+                                // 内核API失败（可能是进程状态检查问题），使用降级方案
+                                if (typeof KernelLogger !== 'undefined' && i < 3) {
+                                    // 只记录前几个错误，避免日志过多
+                                    KernelLogger.debug("escalate", `内核API调用失败: ${apiError.message}，使用DesktopManager降级方案`);
+                                }
+                            }
+                        }
+                        
+                        // 如果内核API失败或不可用，直接调用DesktopManager
+                        if (!iconId && typeof DesktopManager !== 'undefined') {
+                            try {
+                                iconId = DesktopManager.addShortcut({
+                                    programName: programName,
+                                    name: `${programName}_${i + 1}`,
+                                    description: `勒索测试快捷方式 ${i + 1} - 这是安全测试程序创建的`,
+                                    position: { x: x, y: y }
+                                });
+                            } catch (dmError) {
+                                // DesktopManager也失败了，记录错误但继续
+                                if (typeof KernelLogger !== 'undefined' && i < 3) {
+                                    KernelLogger.debug("escalate", `DesktopManager调用失败: ${dmError.message}`);
+                                }
+                            }
+                        }
 
                         if (iconId && typeof iconId === 'number' && iconId > 0) {
                             createdShortcuts.push(iconId);
                             createdCount++;
                         } else {
-                            // iconId 为 null、undefined 或无效值
-                            if (typeof KernelLogger !== 'undefined') {
+                            // iconId 为 null、undefined 或无效值（只在失败很多时才记录）
+                            if (typeof KernelLogger !== 'undefined' && i < 3) {
                                 KernelLogger.debug("escalate", `创建快捷方式返回无效ID: ${programName}_${i + 1}, iconId=${iconId}`);
                             }
                         }
