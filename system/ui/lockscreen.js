@@ -1686,13 +1686,15 @@ KernelLogger.info("LockScreen", "模块初始化");
                             LockScreen._clickHandler = null;
                         }
                         
-                        // 从DOM中移除容器
+                        // 从DOM中移除容器（但保留引用，以便后续恢复）
                         if (LockScreen.container.parentElement) {
                             LockScreen.container.parentElement.removeChild(LockScreen.container);
                         }
                         
-                        // 清空容器引用
-                        LockScreen.container = null;
+                        // 隐藏容器（但不删除引用，以便后续恢复）
+                        LockScreen.container.style.display = 'none';
+                        LockScreen.container.style.opacity = '0';
+                        LockScreen.container.style.visibility = 'hidden';
                     }
                     
                     // 显示系统内容（桌面）

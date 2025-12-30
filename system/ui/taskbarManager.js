@@ -333,19 +333,15 @@ class TaskbarManager {
                 }
             }
             
-            // Ctrl+L: 锁定屏幕
+            // Ctrl+L: 锁定屏幕（全局功能，优先级高于输入框的本地功能）
             if (e.ctrlKey && (e.key === 'l' || e.key === 'L') && !e.shiftKey && !e.altKey && !e.metaKey) {
-                // 检查是否在输入框中（如果是，则不锁定屏幕）
+                // 锁屏是全局功能，即使焦点在输入框中也要处理
+                // 但需要检查是否是真正的输入框（排除终端输入框等特殊情况）
                 const activeElement = document.activeElement;
-                if (activeElement && (
-                    activeElement.tagName === 'INPUT' ||
-                    activeElement.tagName === 'TEXTAREA' ||
-                    activeElement.isContentEditable
-                )) {
-                    // 在输入框中，不处理（让用户正常输入）
-                    return;
-                }
+                const isTerminalInput = activeElement && activeElement.closest && activeElement.closest('.bash-window');
                 
+                // 如果是终端输入框，允许锁屏（锁屏优先级高于终端清屏）
+                // 如果是其他输入框，也允许锁屏（锁屏是全局功能）
                 // 始终阻止默认行为（防止浏览器默认行为）
                 e.preventDefault();
                 e.stopPropagation();
@@ -614,8 +610,13 @@ class TaskbarManager {
             }
             
             // 如果锁屏已初始化且容器存在，直接显示；否则重新初始化
-            if (LockScreen._initialized && LockScreen.container && LockScreen.container.parentElement) {
-                // 锁屏已存在且已添加到DOM，显示它
+            if (LockScreen._initialized && LockScreen.container) {
+                // 如果容器不在DOM中，重新添加到DOM
+                if (!LockScreen.container.parentElement) {
+                    document.body.appendChild(LockScreen.container);
+                }
+                
+                // 锁屏已存在，显示它
                 LockScreen.container.style.display = 'flex';
                 LockScreen.container.style.opacity = '1';
                 LockScreen.container.style.visibility = 'visible';

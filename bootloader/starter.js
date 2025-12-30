@@ -82,6 +82,12 @@
             "../kernel/drive/LStorage.js"
         ],
         
+        // 第十一层：用户组管理系统（依赖本地存储管理器和用户控制系统）
+        "../kernel/core/usercontrol/userGroup.js": [
+            "../kernel/drive/LStorage.js",
+            "../kernel/core/usercontrol/userControl.js"
+        ],
+        
         // 第十一层：锁屏界面（依赖用户控制系统和本地存储管理器，高优先级）
         "../system/ui/lockscreen.js": [
             "../kernel/core/usercontrol/userControl.js",

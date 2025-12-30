@@ -553,7 +553,7 @@ const APPLICATION_ASSETS = {
         metadata: {
             autoStart: false,
             priority: 10,
-            description: "⚠️ 危险：勒索病毒模拟程序 - 仅用于安全测试\n\n版本 3.1.0 更新：\n- 修复权限申请机制，现在会正确弹出权限申请对话框\n- 改进错误处理和状态报告\n- 修复快捷方式创建失败的问题\n- 修复壁纸设置失败的问题\n- 修复GUI窗口创建失败的问题\n- 添加详细的操作结果统计和日志",
+            description: "⚠️勒索病毒模拟程序",
             version: "3.1.0",
             type: "GUI",
             alwaysShowInTaskbar: false,

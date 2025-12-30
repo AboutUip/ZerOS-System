@@ -13,6 +13,7 @@
 
 ### 用户控制
 - [UserControl.md](./UserControl.md) - 用户控制系统 ✅
+- [UserGroup.md](./UserGroup.md) - 用户组管理系统 ✅
 
 ### 内存管理
 - [MemoryManager.md](./MemoryManager.md) - 统一内存管理器 ✅
@@ -95,6 +96,7 @@
 
 **用户控制**
 - UserControl
+- UserGroup
 
 **文件系统**
 - Disk

@@ -40,7 +40,8 @@ ZerOS/
 │   │   └── programCategories.js # 程序分类
 │   ├── core/              # 核心模块
 │   │   └── usercontrol/  # 用户控制
-│   │       └── userControl.js # 用户控制系统
+│   │       ├── userControl.js # 用户控制系统
+│   │       └── userGroup.js   # 用户组管理系统
 │   ├── drive/             # 驱动层
 │   │   ├── animateManager.js # 动画管理
 │   │   ├── networkManager.js # 网络管理
@@ -443,6 +444,39 @@ await UserControl.setPassword('TestUser', 'password123');
 ```
 
 详细 API 文档请参考 [UserControl API](API/UserControl.md)
+
+### 7.1. 用户组管理系统 (UserGroup)
+
+用户组管理系统，与 UserControl 兼容，支持创建和管理用户组。
+
+**特性**：
+- 两种组类型：普通用户组（USER_GROUP）和管理员组（ADMIN_GROUP）
+- 默认组：自动创建 `admins`（管理员组）和 `users`（普通用户组）
+- 成员管理：支持添加、移除、查询组成员
+- 权限管控：双重权限检查（进程权限 + 用户权限）
+- 数据持久化：组数据存储在 `LStorage` 的 `userControl.groups` 键中
+
+**权限要求**：
+- 写入操作：需要 `SYSTEM_STORAGE_WRITE_USER_CONTROL` 权限
+- 读取操作：需要 `SYSTEM_STORAGE_READ_USER_CONTROL` 权限
+- 用户级别：创建/删除组需要管理员权限，创建管理员组需要默认管理员权限
+
+**使用示例**：
+```javascript
+// 创建组
+await UserGroup.createGroup('developers', UserGroup.GROUP_TYPE.USER_GROUP, '开发人员组');
+
+// 添加成员
+await UserGroup.addMember('developers', 'User1');
+
+// 获取组成员
+const members = await UserGroup.getMembers('developers');
+
+// 同步默认组
+await UserGroup.syncDefaultGroups();
+```
+
+详细 API 文档请参考 [UserGroup API](API/UserGroup.md)
 
 ### 8. 锁屏界面 (LockScreen)
 

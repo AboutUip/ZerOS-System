@@ -936,6 +936,7 @@ class LStorage {
         if (typeof PermissionManager !== 'undefined' && PermissionManager.PERMISSION) {
             // 用户控制相关键（危险权限，仅管理员可授予）
             SENSITIVE_KEY_PERMISSIONS['userControl.users'] = PermissionManager.PERMISSION.SYSTEM_STORAGE_READ_USER_CONTROL;
+            SENSITIVE_KEY_PERMISSIONS['userControl.groups'] = PermissionManager.PERMISSION.SYSTEM_STORAGE_READ_USER_CONTROL;
             SENSITIVE_KEY_PERMISSIONS['userControl.settings'] = PermissionManager.PERMISSION.SYSTEM_STORAGE_READ_USER_CONTROL;
             SENSITIVE_KEY_PERMISSIONS['userControl.currentUser'] = PermissionManager.PERMISSION.SYSTEM_STORAGE_READ_USER_CONTROL;
             
@@ -1388,6 +1389,7 @@ class LStorage {
         if (typeof PermissionManager !== 'undefined' && PermissionManager.PERMISSION) {
             // 危险权限（仅管理员可授予）
             DANGEROUS_KEY_PERMISSIONS['userControl.users'] = PermissionManager.PERMISSION.SYSTEM_STORAGE_WRITE_USER_CONTROL;
+            DANGEROUS_KEY_PERMISSIONS['userControl.groups'] = PermissionManager.PERMISSION.SYSTEM_STORAGE_WRITE_USER_CONTROL;
             DANGEROUS_KEY_PERMISSIONS['userControl.settings'] = PermissionManager.PERMISSION.SYSTEM_STORAGE_WRITE_USER_CONTROL;
             DANGEROUS_KEY_PERMISSIONS['permissionControl.blacklist'] = PermissionManager.PERMISSION.SYSTEM_STORAGE_WRITE_PERMISSION_CONTROL;
             DANGEROUS_KEY_PERMISSIONS['permissionControl.whitelist'] = PermissionManager.PERMISSION.SYSTEM_STORAGE_WRITE_PERMISSION_CONTROL;
@@ -1403,6 +1405,7 @@ class LStorage {
         // 定义危险键列表（用于权限检查，即使 PermissionManager 未定义也需要检查）
         const DANGEROUS_KEYS = {
             'userControl.users': true,
+            'userControl.groups': true,
             'userControl.settings': true,
             'permissionControl.blacklist': true,
             'permissionControl.whitelist': true,
@@ -1424,8 +1427,10 @@ class LStorage {
         
         if (isDangerousKey) {
             // 对于危险键，即使是内核模块调用，也要进行严格验证
-            // 对于 userControl.users 键，需要更严格的验证
+            // 对于 userControl.* 键，需要更严格的验证
             const isUserControlUsersKey = (key === 'userControl.users');
+            const isUserControlGroupsKey = (key === 'userControl.groups');
+            const isUserControlKey = isUserControlUsersKey || isUserControlGroupsKey;
             const isPermissionControlKey = key.startsWith('permissionControl.') || key === 'permissionManager.permissions';
             
             if (isKernelModuleCall) {
@@ -1436,12 +1441,22 @@ class LStorage {
                     if (stack) {
                         // 对于 userControl.users 键，只允许 UserControl 模块写入
                         if (isUserControlUsersKey) {
-                            if (/kernel[\/\\]core[\/\\]usercontrol[\/\\]/i.test(stack)) {
+                            if (/kernel[\/\\]core[\/\\]usercontrol[\/\\]userControl\.js/i.test(stack)) {
                                 allowed = true;
                                 KernelLogger.debug("LStorage", `UserControl 模块调用，允许写入 ${key}`);
                             } else {
                                 KernelLogger.error("LStorage", `安全警告：检测到疑似伪造的内核模块调用，拒绝写入 ${key}`);
                                 throw new Error(`安全验证失败：只有 UserControl 模块可以写入 userControl.users 键`);
+                            }
+                        }
+                        // 对于 userControl.groups 键，只允许 UserGroup 模块写入
+                        else if (isUserControlGroupsKey) {
+                            if (/kernel[\/\\]core[\/\\]usercontrol[\/\\]userGroup\.js/i.test(stack)) {
+                                allowed = true;
+                                KernelLogger.debug("LStorage", `UserGroup 模块调用，允许写入 ${key}`);
+                            } else {
+                                KernelLogger.error("LStorage", `安全警告：检测到疑似伪造的内核模块调用，拒绝写入 ${key}`);
+                                throw new Error(`安全验证失败：只有 UserGroup 模块可以写入 userControl.groups 键`);
                             }
                         }
                         // 对于 permissionControl.* 和 permissionManager.permissions 键，只允许 PermissionManager 模块写入
@@ -1476,10 +1491,10 @@ class LStorage {
                 // 继续执行写入操作
             } else {
                 // 用户程序调用：需要危险权限（仅管理员可授予）
-                // 对于 userControl.users 键，绝对不允许用户程序直接写入
-                if (isUserControlUsersKey) {
-                    KernelLogger.error("LStorage", `安全拒绝：用户程序尝试直接写入 userControl.users 键（PID: ${currentPid || 'unknown'}）`);
-                    throw new Error(`安全策略：不允许用户程序直接写入 userControl.users 键`);
+                // 对于 userControl.* 键，绝对不允许用户程序直接写入
+                if (isUserControlKey) {
+                    KernelLogger.error("LStorage", `安全拒绝：用户程序尝试直接写入 ${key} 键（PID: ${currentPid || 'unknown'}）`);
+                    throw new Error(`安全策略：不允许用户程序直接写入 ${key} 键`);
                 }
                 
                 if (typeof PermissionManager === 'undefined') {

@@ -1,6 +1,10 @@
 {
   "system": {
-    "permissionManager.permissions": {},
+    "permissionManager.permissions": {
+      "musicplayer": [
+        "SYSTEM_NOTIFICATION"
+      ]
+    },
     "system.style": "macos",
     "desktop.icons": [
       {
@@ -40,6 +44,15 @@
         "createdAt": 1765486941047
       },
       {
+        "id": 14,
+        "programName": "sparkai",
+        "name": "讯飞星火AI",
+        "icon": "D:/application/sparkai/sparkai.svg",
+        "description": "讯飞星火AI",
+        "position": null,
+        "createdAt": 1767018018812
+      },
+      {
         "id": 4,
         "programName": "snake",
         "name": "贪吃蛇",
@@ -56,19 +69,10 @@
         "description": "画板",
         "position": null,
         "createdAt": 1766307135134
-      },
-      {
-        "id": 14,
-        "programName": "sparkai",
-        "name": "讯飞星火AI",
-        "icon": "D:/application/sparkai/sparkai.svg",
-        "description": "讯飞星火AI",
-        "position": null,
-        "createdAt": 1767018018812
       }
     ],
     "musicplayer.settings": {
-      "useNotification": false,
+      "useNotification": true,
       "favorites": [
         "3208050",
         "5245130",
@@ -86,7 +90,10 @@
         "65439742",
         "7214806",
         "158956406",
-        "478175196"
+        "478175196",
+        "526814564",
+        "527940427",
+        "454556985"
       ],
       "playlists": []
     },
@@ -223,6 +230,12 @@
         "album": "Once Upon a Time",
         "lyrics": "[00:00.000]Once Upon a Time - Max Oazo/Moonessa\n[00:03.810]   \n[00:03.810]Lyrics by：Jennifer Jung\n[00:07.620]   \n[00:07.620]Composed by：Chiril Oarza\n[00:11.440]   \n[00:11.440]It's been a couple years since I've seen your face\n[00:13.840]自从上次见你 一别几年\n[00:13.840]Wondering what your up to now to now\n[00:16.810]想知道你现在忙些什么\n[00:16.810]Yea my head is still up in space\n[00:19.050]我仍然有着不切实际的幻想\n[00:19.050]I guess it never came down down\n[00:22.060]大概这一片痴心永远不会改了\n[00:22.060]I can tell you that I've changed a bit tho\n[00:24.600]想告诉你 我有了点不同\n[00:24.600]Not too much since then too much since then\n[00:27.370]但和从前比 没有变化太多\n[00:27.370]We were always rebellious kids\n[00:29.500]我们过去总是像孩子般叛逆\n[00:29.500]Do you remember when\n[00:32.030]你还记得那时候\n[00:32.030]We were ridin' through the night night\n[00:35.150]我们在黑夜里穿梭\n[00:35.150]The moon was on our side\n[00:37.450]与明月同行\n[00:37.450]Once upon a time time time\n[00:39.720]很久很久以前的时候\n[00:39.720]Once upon a time time time\n[00:42.310]很久很久以前的时候\n[00:42.310]As high as the stars in the sky sky\n[00:45.570]与繁星比肩\n[00:45.570]Crossing all the lines\n[00:47.630]跨越所有的界限\n[00:47.630]Once upon a time time time\n[00:50.290]很久很久以前的时候\n[00:50.290]Once upon a time time time\n[01:14.940]很久很久以前的时候\n[01:14.940]Hey yeah yeah yeah yeah yeah\n[01:17.280]   \n[01:17.280]Oh yeah\n[01:19.810]   \n[01:19.810]Hey yeah yeah yeah yeah yeah\n[01:22.620]   \n[01:22.620]Oh yeah\n[01:25.240]   \n[01:25.240]Hey yeah yeah yeah yeah yeah\n[01:27.790]   \n[01:27.790]Oh yeah\n[01:30.500]   \n[01:30.500]Hey yeah yeah yeah yeah yeah\n[01:33.040]   \n[01:33.040]Oh yeah\n[01:38.540]   \n[01:38.540]Do you recall all the promises\n[01:40.930]你回想起我们许下的所有诺言了吗\n[01:40.930]We used to make back then back then\n[01:43.630]我们过去常常说话不作数\n[01:43.630]Can you tell me are they still on\n[01:46.090]你能回答我 那些承诺还有效吗\n[01:46.090]Or is that silly of me to think\n[01:48.890]我现在还念着这些 是不是太傻了\n[01:48.890]The years I find separate us\n[01:51.390]我们分开的这些年\n[01:51.390]I think of you now and then then\n[01:54.110]我时而想起你\n[01:54.110]Won't let memories fade to dust\n[01:56.600]不让往事灰飞烟灭\n[01:56.600]Baby remember when\n[01:58.970]宝贝还记得那时候\n[01:58.970]We were ridin' through the night night\n[02:02.080]我们在黑夜里穿梭\n[02:02.080]The moon was on our side\n[02:04.470]与明月同行\n[02:04.470]Once upon a time time time\n[02:06.740]很久很久以前的时候\n[02:06.740]Once upon a time time time\n[02:09.390]很久很久以前的时候\n[02:09.390]As high as the stars in the sky\n[02:12.680]与繁星比肩\n[02:12.680]Crossing all the lines\n[02:15.060]跨越所有的界限\n[02:15.060]Once upon a time time time\n[02:17.320]很久很久以前的时候\n[02:17.320]Once upon a time time time\n[02:41.910]很久很久以前的时候\n[02:41.910]Hey yeah yeah yeah yeah yeah\n[02:44.290]   \n[02:44.290]Oh yeah\n[02:46.940]   \n[02:46.940]Hey yeah yeah yeah yeah yeah\n[02:49.700]   \n[02:49.700]Oh yeah\n[02:52.150]   \n[02:52.150]Hey yeah yeah yeah yeah yeah\n[02:55.230]   \n[02:55.230]Oh yeah\n[02:57.410]   \n[02:57.410]Hey yeah yeah yeah yeah yeah\n[03:00.260]   \n[03:00.260]Oh yeah\n[03:02.280]   \n[03:02.280]We were ridin' through the night night\n[03:05.360]我们在黑夜里穿梭\n[03:05.360]The moon was on our side\n[03:07.430]与明月同行\n[03:07.430]Once upon a time time time\n[03:10.120]很久很久以前的时候\n[03:10.120]Once upon a time time time\n[03:12.740]很久很久以前的时候\n[03:12.740]As high as the stars in the sky\n[03:15.440]与繁星比肩\n[03:15.440]Crossing all the lines\n[03:17.890]跨越所有的界限\n[03:17.890]Once upon a time time time\n[03:20.590]很久很久以前的时候\n[03:20.590]Once upon a time time time\n[03:25.059]很久很久以前的时候\n"
       },
+      "148525212": {
+        "name": "辞九门回忆 (抖音七夕版)",
+        "artist": "孙言多&迈克迪",
+        "album": "",
+        "lyrics": null
+      },
       "152459727": {
         "name": "Call Me Now",
         "artist": "Michael Calfan&INNA",
@@ -337,6 +350,12 @@
         "album": "",
         "lyrics": "[00:00.430]陪我过个冬 (秋去冬来月如风) (DJ版) - 李嘉嘉\n[00:03.320]词：卅卅\n[00:03.740]曲：卅卅\n[00:04.150]编曲：DJ阿幻\n[00:04.860]混音：DJ阿幻\n[00:05.710]统筹：大喜@熊猫闹海\n[00:05.980]企划：豆子@熊猫闹海\n[00:06.240]营销推广：阿圆@熊猫闹海/kk小组@昌禾文化/林芝小组@昌禾文化/4k@织乐文化\n[00:10.600]独家助推：网益文化@荣儿/鱼叔\n[00:12.350]OP/SP出品：昌禾文化\n[00:15.060]秋去冬来 月如风\n[00:17.190]能否陪我过个冬\n[00:18.950]缘起在人群中看你\n[00:20.740]缘散看你在人群中\n[00:22.570]爱无影 去无踪\n[00:24.320]竹篮打水一场空\n[00:26.140]大雪封山失了控\n[00:27.840]再也没有了你的梦\n[00:29.690]山与山 不相逢\n[00:31.440]相隔千里雾蒙蒙\n[00:33.210]年年月月花相似\n[00:34.980]岁岁年年人不同\n[00:36.700]大风吹倒了梧桐树\n[00:38.510]梧桐相思无人顾\n[00:40.270]山鸟与鱼不同路\n[00:42.050]你我终究是陌路\n[00:43.870]愿许大雪能知我意\n[00:47.270]掩我心中意难平\n[00:50.500]愿许山海也知我心\n[00:54.090]翻过相思八千里\n[00:57.660]可奈大雪怎知我意\n[01:01.060]怎会散我意难平\n[01:04.720]可奈你未曾知我心\n[01:08.350]怎懂相思八千里\n[01:26.330]秋去冬来 月如风\n[01:28.330]能否陪我过个冬\n[01:30.100]缘起在人群中看你\n[01:31.830]缘散看你在人群中\n[01:33.670]爱无影 去无踪\n[01:35.420]竹篮打水一场空\n[01:37.270]大雪封山失了控\n[01:38.980]再也没有了你的梦\n[01:40.820]山与山 不相逢\n[01:42.530]相隔千里雾蒙蒙\n[01:44.320]年年月月花相似\n[01:46.110]岁岁年年人不同\n[01:47.890]大风吹倒了梧桐树\n[01:49.660]梧桐相思无人顾\n[01:51.400]山鸟与鱼不同路\n[01:53.200]你我终究是陌路\n[01:55.100]愿许大雪能知我意\n[01:58.030]掩我心中意难平\n[02:01.470]愿许山海也知我心\n[02:05.180]翻过相思八千里\n[02:08.760]可奈大雪怎知我意\n[02:12.230]怎会散我意难平\n[02:15.730]可奈你未曾知我心\n[02:19.320]怎懂相思八千里\n"
       },
+      "454556985": {
+        "name": "莫问归期辞九门回忆1.3倍速",
+        "artist": "沃布吉岛小怪兽",
+        "album": "莫问归期辞九门回忆1.3倍速",
+        "lyrics": "[00:00.000]莫问归期辞九门回忆1.3倍速 - 沃布吉岛小怪兽\n[00:00.740]原曲：莫问归期 - 蒋雪儿/辞九门回忆 - 邓寓君(等什么君)\n[00:01.590]词：刘涛/堇临/虫二颠\n[00:01.950]曲：刘涛/妖狐公子/唯子\n[00:02.120]藏进心口的刺\n[00:05.370]不枉寻 也如此\n[00:08.680]沉默有时 最后因你放肆\n[00:15.200]浓墨难沾心事\n[00:18.470]寒夜怎寄相思\n[00:21.690]沉默有时 念想有时\n[00:26.620]谁诀别相思成疾莫问天涯\n[00:31.090]也莫问归期\n[00:33.580]怎奈何无人了解 情断之时\n[00:38.030]冷暖自知\n[00:39.940]谁诀别相思成疾莫问天涯\n[00:44.170]也莫问归期\n[00:46.640]怎奈何无人了解 我心思\n[00:54.050]戏子多秋\n[00:56.500]可怜一处情深旧\n[00:59.760]满座衣冠皆老朽\n[01:02.990]黄泉故事无止休\n[01:06.260]戏无骨难左右\n[01:09.510]换过一折又重头\n[01:12.840]只道最是人间不能留\n[01:48.380]藏进心口的刺\n[01:51.640]不枉寻 也如此\n[01:54.890]沉默有时 最后因你放肆\n[02:01.500]浓墨难沾心事\n[02:04.670]寒夜怎寄相思\n[02:07.920]沉默有时 念想有时\n[02:12.920]谁诀别相思成疾莫问天涯\n[02:17.340]也莫问归期\n[02:19.840]怎奈何无人了解 情断之时\n[02:24.300]冷暖自知\n[02:26.190]谁诀别相思成疾莫问天涯\n[02:30.430]也莫问归期\n[02:32.930]怎奈何无人了解 我心思\n[02:40.310]戏子多秋\n[02:42.710]可怜一处情深旧\n[02:45.990]满座衣冠皆老朽\n[02:49.260]黄泉故事无止休\n[02:52.500]戏无骨难左右\n[02:55.790]换过一折又重头\n[02:59.000]只道最是人间不能留\n[03:06.460]误闯天家\n[03:08.920]劝余放下手中砂\n[03:12.150]送那人御街打马\n[03:15.430]才子佳人断佳话\n[03:18.730]怜余来苦咽下\n[03:21.960]求不得佛前茶\n[03:25.270]只留三寸土种二月花\n[03:31.470]谁诀别相思成疾莫问天涯\n[03:35.870]也莫问归期\n[03:38.320]怎奈何无人了解 情断之时\n[03:42.800]冷暖自知\n[03:44.660]谁诀别相思成疾莫问天涯\n[03:48.930]也莫问归期\n[03:51.360]怎奈何无人了解 我心思\n"
+      },
       "467771759": {
         "name": "QQ爱 (热播DJ版)",
         "artist": "赫本的猫",
@@ -414,9 +433,21 @@
         "artist": "暴躁emo",
         "album": "",
         "lyrics": null
+      },
+      "526814564": {
+        "name": "天亮以前说再见（宋思明进行曲）",
+        "artist": "DJ健",
+        "album": "天亮以前说再见（宋思明进行曲）",
+        "lyrics": "[00:00.000]天亮以前说再见（宋思明进行曲）-DJ 健\n[00:00.070]词：康梓峰\n[00:00.110]曲：康梓峰\n[00:00.150]去迎接\n[00:01.110]应该你的\n[00:02.430]更好的明天\n[00:04.710]昙花若只一现\n[00:07.020]更要开的耀眼\n[00:09.360]别回头去拥有\n[00:11.040]属于你更好的世界\n[00:13.830]天亮以前说再见\n[00:16.140]让我留在今天\n[00:18.450]去保护\n[00:19.350]我和你的\n[00:20.700]最好的夏天\n[00:22.950]情丝若水三千\n[00:25.290]只取一瓢眷恋\n[00:27.300]当你来过的纪念\n[00:54.420]水花只能开在雨天\n[00:59.010]烟花要绽放在黑夜\n[01:03.510]雪花多舍不得冬天\n[01:08.100]像我舍不得和你说再见\n[01:12.720]谎言并不代表欺骗\n[01:17.280]诺言也不一定兑现\n[01:21.810]誓言就都留给时间\n[01:26.460]就请把从前留在今天\n[01:31.590]天亮以前说再见\n[01:33.840]笑着泪流满面\n[01:36.120]去迎接\n[01:37.050]应该你的\n[01:38.460]更好的明天\n[01:40.740]昙花若只一现\n[01:43.020]更要开的耀眼\n[01:45.300]别回头去拥有\n[01:47.010]属于你更好的世界\n[01:49.830]天亮以前说再见\n[01:52.170]让我留在今天\n[01:54.420]去保护\n[01:55.380]我和你的\n[01:56.730]最好的夏天\n[01:59.010]情丝若水三千\n[02:01.290]只取一瓢眷恋\n[02:03.300]当你来过的纪念\n"
+      },
+      "527940427": {
+        "name": "精卫 (DJ戏腔版)",
+        "artist": "DJ九局",
+        "album": "精卫 (DJ戏腔版)",
+        "lyrics": "[00:00.000]精卫(DJ 氛围版)-DJ 九局\n[00:00.110]词：30 年前，50 年后/烧灯续昼\n[00:00.220]曲：30 年前，50 年后\n[00:00.330]所谓有求而不得\n[00:03.450]人心欲壑\n[00:05.190]可填沧海\n[00:06.510]成败不堪一说\n[00:08.640]如人间过客\n[00:09.930]总追着虚无漂泊\n[00:12.150]趟着泪河\n[00:13.860]沉沦沉默\n[00:14.760]万物终归向海\n[00:17.160]何必衔木石来\n[00:19.170]月色随风摇摆\n[00:20.850]我仍飞奔向海\n[00:22.020]我只是太想要份爱\n[00:25.410]我只是太想被好好对待\n[00:28.920]但是我存在的意义呢\n[00:32.400]填满我悲欢的执着呢\n[00:35.880]我明白\n[00:36.630]我心中的海\n[00:38.280]填满不回来\n[00:39.600]回来\n[00:43.080]所谓有求而不得\n[00:43.950]人心欲壑\n[00:44.910]可填沧海\n[00:45.480]成败不堪一说\n[00:47.070]如人间过客\n[00:48.420]总追着虚无漂泊\n[00:49.200]趟着泪河\n[00:49.590]沉沦沉默\n[00:56.130]万物终归向海\n[00:56.850]何必衔木石来\n[00:57.270]月色随风摇摆\n[00:59.010]我仍飞奔向海\n[00:59.610]我只是太想要份爱\n[01:03.660]我只是太想被好好对待\n[01:04.440]但是我存在的意义呢\n[01:05.520]填满我悲欢的执着呢\n[01:06.420]我明白\n[01:06.900]我心中的海\n[01:07.890]填满不回来\n[01:16.440]回来\n[01:23.370]所谓有求而不得\n[01:28.770]人心欲壑\n[01:38.760]可填沧海\n[01:39.150]成败不堪一说\n[01:40.140]如人间过客\n[01:40.620]总追着虚无漂泊\n[01:41.490]趟着泪河\n[01:41.880]沉沦沉默\n[01:42.840]万物终归向海\n[01:43.410]何必衔木石来\n[01:44.040]月色随风摇摆\n[01:44.880]我仍飞奔向海\n[01:45.600]我只是太想要份爱\n[01:54.540]我只是太想被好好对待\n[01:55.380]但是我存在的意义呢\n[01:57.690]填满我悲欢的执着呢\n[01:59.490]我明白\n[01:59.970]我心中的海\n[02:02.670]填满不回来\n[02:03.630]回来\n"
       }
     },
-    "system.desktopBackground": "local_D__cache_random_anime_bg_1765983395242_jpg",
+    "system.desktopBackground": "local_D__cache_wallpaper_community_409819_mp4",
     "system.localDesktopBackgrounds": [
       {
         "id": "local_C___back2_png",
@@ -447,6 +478,12 @@
         "name": "wallpaper_community_427633.mp4",
         "description": "本地视频: D:/cache/wallpaper_community_427633.mp4（静音循环播放）",
         "path": "D:/cache/wallpaper_community_427633.mp4"
+      },
+      {
+        "id": "local_D__cache_wallpaper_community_409819_mp4",
+        "name": "wallpaper_community_409819.mp4",
+        "description": "本地视频: D:/cache/wallpaper_community_409819.mp4（静音循环播放）",
+        "path": "D:/cache/wallpaper_community_409819.mp4"
       }
     ],
     "taskbarPosition": "bottom",
@@ -482,14 +519,14 @@
       },
       "defaultKeyId": null
     },
-    "snake.highScore": 180,
+    "snake.highScore": 190,
     "userControl.users": {
       "root": {
         "level": "DEFAULT_ADMIN",
         "password": "61b249bf6d604d14120821f43625e84e",
         "avatar": "avatar_root_1766272534753.jpg",
         "createdAt": 1766271155991,
-        "lastLogin": 1767063655302
+        "lastLogin": 1767108828122
       },
       "TestUser": {
         "level": "USER",
@@ -501,8 +538,8 @@
     },
     "userControl.currentUser": "root",
     "system.lockscreenTimeComponent": true,
-    "system.lockscreenBackground": "/system/assets/start/bg3.jpg",
-    "system.lockscreenRandomBg": true,
+    "system.lockscreenBackground": "D:/cache/lockscreen/lockscreen_local_D__cache_random_anime_bg_1766148286160_jpg_random_anime_bg_1766148286160.jpg",
+    "system.lockscreenRandomBg": false,
     "system.lockscreenBackgrounds": [
       {
         "id": "lockscreen_local_D__cache_random_anime_bg_1765983395242_jpg",
@@ -511,6 +548,14 @@
         "description": "来自桌面背景: random_anime_bg_1765983395242.jpg",
         "source": "desktop_background",
         "originalBackgroundId": "local_D__cache_random_anime_bg_1765983395242_jpg"
+      },
+      {
+        "id": "lockscreen_local_D__cache_random_anime_bg_1766148286160_jpg",
+        "name": "random_anime_bg_1766148286160.jpg",
+        "path": "D:/cache/lockscreen/lockscreen_local_D__cache_random_anime_bg_1766148286160_jpg_random_anime_bg_1766148286160.jpg",
+        "description": "来自桌面背景: random_anime_bg_1766148286160.jpg",
+        "source": "desktop_background",
+        "originalBackgroundId": "local_D__cache_random_anime_bg_1766148286160_jpg"
       }
     ],
     "permissionControl.settings": {
@@ -524,6 +569,24 @@
     "permissionControl.whitelist": {
       "test": "escalate_attempt",
       "timestamp": 1766509735075
+    },
+    "userControl.groups": {
+      "admins": {
+        "type": "ADMIN_GROUP",
+        "members": [
+          "root"
+        ],
+        "createdAt": 1767091594465,
+        "description": "系统管理员组，包含所有管理员用户"
+      },
+      "users": {
+        "type": "USER_GROUP",
+        "members": [
+          "TestUser"
+        ],
+        "createdAt": 1767091594465,
+        "description": "普通用户组，包含所有普通用户"
+      }
     }
   },
   "programs": {}

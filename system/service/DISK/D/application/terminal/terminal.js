@@ -1677,7 +1677,7 @@ function escapeHtml(s){
             // 推荐使用事件监听：Terminal.on('command', handler)
             this.commandHandler = this._defaultHandler.bind(this);
             // 用于 Tab 补全的已知命令列表（可由外部修改）
-            this._completionCommands = ['clear','pwd','whoami','echo','demo','toggleview','cd','markdir','markfile','ls','tree','cat','write','rm','ps','kill','help','check','diskmanger','vim','rename','mv','copy','paste','power','exit','login','su','users'];
+            this._completionCommands = ['clear','pwd','whoami','echo','demo','toggleview','cd','markdir','markfile','ls','tree','cat','write','rm','ps','kill','help','check','diskmanger','vim','rename','mv','copy','paste','power','exit','login','su','users','groups','groupadd','groupdel','groupmod','groupinfo'];
             
             // CLI程序补全缓存（从ApplicationAssetManager获取）
             this._cliProgramsCache = null;
@@ -1700,7 +1700,7 @@ function escapeHtml(s){
                     if (typeof UserControl !== 'undefined') {
                         await UserControl.ensureInitialized();
                         const currentUser = UserControl.getCurrentUser();
-                        if (currentUser && currentUser !== this.env.user) {
+                        if (currentUser && currentUser !== this.env.user) { 
                             this.env.user = currentUser;
                             this.setUser(currentUser);
                         } else if (this.env.user && !currentUser) {
@@ -4567,7 +4567,9 @@ function escapeHtml(s){
                 'markfile',   // 创建文件（可能在系统盘创建）
                 'users',      // 查看用户列表（敏感信息）
                 'login',      // 切换用户（可能提权）
-                'su'          // 切换用户（可能提权）
+                'su',         // 切换用户（可能提权）
+                'groupadd',   // 创建用户组
+                'groupmod'    // 修改用户组
             ];
             
             // 检查命令是否需要管理员权限
@@ -4786,6 +4788,263 @@ function escapeHtml(s){
                         }
                     } catch (error) {
                         payload.write(`users: 错误: ${error.message}`);
+                    }
+                })();
+                break;
+            case 'groups':
+                // groups 命令：列出所有用户组
+                (async () => {
+                    try {
+                        if (typeof UserGroup === 'undefined') {
+                            payload.write('groups: UserGroup 未加载');
+                            return;
+                        }
+                        
+                        await UserGroup.ensureInitialized();
+                        const groups = await UserGroup.getAllGroups();
+                        
+                        if (groups.length === 0) {
+                            payload.write('groups: 没有用户组');
+                            return;
+                        }
+                        
+                        payload.write('用户组列表:');
+                        for (const group of groups) {
+                            const typeText = group.type === UserGroup.GROUP_TYPE.ADMIN_GROUP ? '管理员组' : '用户组';
+                            const memberCount = group.members.length;
+                            const desc = group.description ? ` - ${group.description}` : '';
+                            payload.write(`  ${group.name} (${typeText}, ${memberCount} 个成员)${desc}`);
+                        }
+                    } catch (error) {
+                        payload.write(`groups: 错误: ${error.message}`);
+                    }
+                })();
+                break;
+            case 'groupadd':
+                // groupadd 命令：创建用户组（需要管理员权限）
+                (async () => {
+                    try {
+                        // 检查权限
+                        if (typeof UserControl === 'undefined' || !UserControl.isAdmin()) {
+                            payload.write('groupadd: 需要管理员权限');
+                            return;
+                        }
+                        
+                        if (typeof UserGroup === 'undefined') {
+                            payload.write('groupadd: UserGroup 未加载');
+                            return;
+                        }
+                        
+                        if (payload.args.length < 2) {
+                            payload.write('groupadd: 用法: groupadd <组名> [类型] [描述]');
+                            payload.write('  类型: USER_GROUP (默认) 或 ADMIN_GROUP');
+                            payload.write('  描述: 可选的组描述');
+                            return;
+                        }
+                        
+                        const groupName = payload.args[1];
+                        let groupType = UserGroup.GROUP_TYPE.USER_GROUP;
+                        let description = null;
+                        
+                        // 解析类型参数
+                        if (payload.args.length >= 3) {
+                            const typeArg = payload.args[2].toUpperCase();
+                            if (typeArg === 'ADMIN_GROUP' || typeArg === 'ADMIN') {
+                                // 只有默认管理员可以创建管理员组
+                                if (!UserControl.isDefaultAdmin()) {
+                                    payload.write('groupadd: 只有默认管理员可以创建管理员组');
+                                    return;
+                                }
+                                groupType = UserGroup.GROUP_TYPE.ADMIN_GROUP;
+                            } else if (typeArg !== 'USER_GROUP' && typeArg !== 'USER') {
+                                // 如果不是类型参数，可能是描述
+                                description = payload.args.slice(2).join(' ');
+                            }
+                        }
+                        
+                        // 解析描述参数
+                        if (payload.args.length >= 4 && !description) {
+                            description = payload.args.slice(3).join(' ');
+                        } else if (payload.args.length === 3 && !description && 
+                                   payload.args[2].toUpperCase() !== 'ADMIN_GROUP' && 
+                                   payload.args[2].toUpperCase() !== 'ADMIN' &&
+                                   payload.args[2].toUpperCase() !== 'USER_GROUP' && 
+                                   payload.args[2].toUpperCase() !== 'USER') {
+                            description = payload.args[2];
+                        }
+                        
+                        await UserGroup.ensureInitialized();
+                        const success = await UserGroup.createGroup(groupName, groupType, description);
+                        
+                        if (success) {
+                            payload.write(`groupadd: 组 "${groupName}" 已创建`);
+                        } else {
+                            payload.write(`groupadd: 创建组失败，请检查组名是否已存在或权限是否足够`);
+                        }
+                    } catch (error) {
+                        payload.write(`groupadd: 错误: ${error.message}`);
+                    }
+                })();
+                break;
+            case 'groupdel':
+                // groupdel 命令：删除用户组（需要默认管理员权限）
+                (async () => {
+                    try {
+                        // 检查权限
+                        if (typeof UserControl === 'undefined' || !UserControl.isDefaultAdmin()) {
+                            payload.write('groupdel: 需要默认管理员权限');
+                            return;
+                        }
+                        
+                        if (typeof UserGroup === 'undefined') {
+                            payload.write('groupdel: UserGroup 未加载');
+                            return;
+                        }
+                        
+                        if (payload.args.length < 2) {
+                            payload.write('groupdel: 用法: groupdel <组名>');
+                            return;
+                        }
+                        
+                        const groupName = payload.args[1];
+                        
+                        // 检查是否为默认组（不能删除）
+                        if (groupName === 'admins' || groupName === 'users') {
+                            payload.write(`groupdel: 不能删除默认组 "${groupName}"`);
+                            return;
+                        }
+                        
+                        await UserGroup.ensureInitialized();
+                        const success = await UserGroup.deleteGroup(groupName);
+                        
+                        if (success) {
+                            payload.write(`groupdel: 组 "${groupName}" 已删除`);
+                        } else {
+                            payload.write(`groupdel: 删除组失败，组可能不存在`);
+                        }
+                    } catch (error) {
+                        payload.write(`groupdel: 错误: ${error.message}`);
+                    }
+                })();
+                break;
+            case 'groupmod':
+                // groupmod 命令：修改用户组（添加/删除成员，修改描述等）
+                (async () => {
+                    try {
+                        // 检查权限
+                        if (typeof UserControl === 'undefined' || !UserControl.isAdmin()) {
+                            payload.write('groupmod: 需要管理员权限');
+                            return;
+                        }
+                        
+                        if (typeof UserGroup === 'undefined') {
+                            payload.write('groupmod: UserGroup 未加载');
+                            return;
+                        }
+                        
+                        if (payload.args.length < 3) {
+                            payload.write('groupmod: 用法: groupmod <组名> <操作> [参数...]');
+                            payload.write('  操作:');
+                            payload.write('    -a <用户名>      : 添加成员到组');
+                            payload.write('    -d <用户名>      : 从组中移除成员');
+                            payload.write('    -m <描述>        : 修改组描述');
+                            return;
+                        }
+                        
+                        const groupName = payload.args[1];
+                        const operation = payload.args[2];
+                        
+                        await UserGroup.ensureInitialized();
+                        
+                        // 检查默认组是否可以修改
+                        if ((groupName === 'admins' || groupName === 'users') && (operation === '-a' || operation === '-d')) {
+                            payload.write(`groupmod: 不能直接修改默认组 "${groupName}" 的成员，请使用其他方式`);
+                            return;
+                        }
+                        
+                        let success = false;
+                        
+                        if (operation === '-a' && payload.args.length >= 4) {
+                            // 添加成员
+                            const username = payload.args[3];
+                            success = await UserGroup.addMember(groupName, username);
+                            if (success) {
+                                payload.write(`groupmod: 已将用户 "${username}" 添加到组 "${groupName}"`);
+                            } else {
+                                payload.write(`groupmod: 添加成员失败，用户或组可能不存在`);
+                            }
+                        } else if (operation === '-d' && payload.args.length >= 4) {
+                            // 删除成员
+                            const username = payload.args[3];
+                            success = await UserGroup.removeMember(groupName, username);
+                            if (success) {
+                                payload.write(`groupmod: 已将用户 "${username}" 从组 "${groupName}" 中移除`);
+                            } else {
+                                payload.write(`groupmod: 移除成员失败，用户或组可能不存在，或用户不在组中`);
+                            }
+                        } else if (operation === '-m' && payload.args.length >= 4) {
+                            // 修改描述
+                            const description = payload.args.slice(3).join(' ');
+                            success = await UserGroup.updateGroupDescription(groupName, description);
+                            if (success) {
+                                payload.write(`groupmod: 组 "${groupName}" 的描述已更新`);
+                            } else {
+                                payload.write(`groupmod: 更新描述失败，组可能不存在`);
+                            }
+                        } else {
+                            payload.write('groupmod: 无效的操作或参数不足');
+                        }
+                    } catch (error) {
+                        payload.write(`groupmod: 错误: ${error.message}`);
+                    }
+                })();
+                break;
+            case 'groupinfo':
+                // groupinfo 命令：显示用户组详细信息
+                (async () => {
+                    try {
+                        if (typeof UserGroup === 'undefined') {
+                            payload.write('groupinfo: UserGroup 未加载');
+                            return;
+                        }
+                        
+                        if (payload.args.length < 2) {
+                            payload.write('groupinfo: 用法: groupinfo <组名>');
+                            return;
+                        }
+                        
+                        const groupName = payload.args[1];
+                        
+                        await UserGroup.ensureInitialized();
+                        const group = await UserGroup.getGroup(groupName);
+                        
+                        if (!group) {
+                            payload.write(`groupinfo: 组 "${groupName}" 不存在`);
+                            return;
+                        }
+                        
+                        const typeText = group.type === UserGroup.GROUP_TYPE.ADMIN_GROUP ? '管理员组' : '用户组';
+                        payload.write(`组名: ${group.name}`);
+                        payload.write(`类型: ${typeText}`);
+                        payload.write(`成员数: ${group.members.length}`);
+                        if (group.description) {
+                            payload.write(`描述: ${group.description}`);
+                        }
+                        if (group.createdAt) {
+                            const date = new Date(group.createdAt);
+                            payload.write(`创建时间: ${date.toLocaleString('zh-CN')}`);
+                        }
+                        
+                        if (group.members.length > 0) {
+                            payload.write(`成员列表:`);
+                            for (const member of group.members) {
+                                payload.write(`  - ${member}`);
+                            }
+                        } else {
+                            payload.write('成员列表: (空)');
+                        }
+                    } catch (error) {
+                        payload.write(`groupinfo: 错误: ${error.message}`);
                     }
                 })();
                 break;
@@ -6871,6 +7130,11 @@ function escapeHtml(s){
                 payload.write(' - login <username>       : 切换用户登录');
                 payload.write(' - su <username>          : 切换用户（与 login 相同）');
                 payload.write(' - users                  : 列出所有用户及其级别');
+                payload.write(' - groups                 : 列出所有用户组');
+                payload.write(' - groupadd <name> [type] [desc]: 创建用户组（需管理员权限），类型: USER_GROUP/ADMIN_GROUP');
+                payload.write(' - groupdel <name>        : 删除用户组（需默认管理员权限）');
+                payload.write(' - groupmod <name> <op>   : 修改用户组（需管理员权限），操作: -a/-d/-m (添加/删除成员/修改描述)');
+                payload.write(' - groupinfo <name>       : 显示用户组详细信息');
                 payload.write(' - demo, toggleview       : 演示脚本 / 切换视图');
                 payload.write(' - power <action>         : 系统电源管理（reboot/shutdown/help）');
                 payload.write('Notes: 路径格式以盘符开头如 C:/path，或相对于当前工作目录使用 ../ 和 ./ 。');

@@ -22,6 +22,10 @@
         // 搜索关键词
         searchQuery: '',
         
+        // 用户管理页面状态（用于页面切换）
+        userManagementPage: 'list', // 'list' | 'create' | 'groups' | 'groupDetail' | 'userGroups'
+        userManagementPageData: {}, // 存储页面数据（如当前查看的用户名、组名等）
+        
         // 事件处理器ID（用于清理）
         eventHandlers: [],
         
@@ -96,6 +100,10 @@
             // 监听主题变更
             this._setupThemeListener();
             
+            // 初始化用户管理页面状态
+            this.userManagementPage = 'list';
+            this.userManagementPageData = {};
+            
             // 默认显示第一个分类
             if (this.categories.size > 0) {
                 const firstCategory = Array.from(this.categories.keys())[0];
@@ -161,8 +169,12 @@
                     PermissionManager.PERMISSION.EVENT_LISTENER,
                     PermissionManager.PERMISSION.SYSTEM_STORAGE_READ,
                     PermissionManager.PERMISSION.SYSTEM_STORAGE_WRITE,
+                    PermissionManager.PERMISSION.SYSTEM_STORAGE_READ_USER_CONTROL,
+                    PermissionManager.PERMISSION.SYSTEM_STORAGE_WRITE_USER_CONTROL,
                     PermissionManager.PERMISSION.THEME_READ,
-                    PermissionManager.PERMISSION.THEME_WRITE
+                    PermissionManager.PERMISSION.THEME_WRITE,
+                    PermissionManager.PERMISSION.KERNEL_DISK_READ,
+                    PermissionManager.PERMISSION.KERNEL_DISK_WRITE
                 ] : [],
                 metadata: {
                     allowMultipleInstances: false
@@ -561,6 +573,12 @@
             }
             
             this.currentCategory = categoryId;
+            
+            // 如果切换到非用户分类，重置用户管理页面状态
+            if (categoryId !== 'users') {
+                this.userManagementPage = 'list';
+                this.userManagementPageData = {};
+            }
             
             // 更新导航栏选中状态
             if (this.navList) {
@@ -1438,10 +1456,141 @@
                 return container;
             }
             
+            // 根据当前页面状态渲染不同的视图
+            if (this.userManagementPage === 'create') {
+                return this._renderCreateUserPage(container);
+            } else if (this.userManagementPage === 'createGroup') {
+                return this._renderCreateGroupPage(container);
+            } else if (this.userManagementPage === 'groups') {
+                return this._renderGroupsPage(container);
+            } else if (this.userManagementPage === 'groupDetail') {
+                return this._renderGroupDetailPage(container);
+            } else if (this.userManagementPage === 'userGroups') {
+                return this._renderUserGroupsPage(container);
+            } else {
+                // 默认显示用户列表
+                return this._renderUserListPage(container);
+            }
+        },
+        
+        /**
+         * 渲染用户列表页面
+         */
+        _renderUserListPage: function(container) {
+            // 检查UserControl是否可用
+            if (typeof UserControl === 'undefined') {
+                const errorMsg = document.createElement('div');
+                errorMsg.textContent = '用户控制系统未加载';
+                errorMsg.style.cssText = `
+                    padding: 24px;
+                    text-align: center;
+                    color: var(--theme-text-secondary, #b8c5c0);
+                `;
+                container.appendChild(errorMsg);
+                return container;
+            }
+            
             // 获取当前用户信息
             const currentUser = UserControl.getCurrentUser();
             const isAdmin = UserControl.isAdmin();
             const users = UserControl.listUsers();
+            
+            // 创建工具栏
+            const toolbar = document.createElement('div');
+            toolbar.className = 'settings-user-toolbar';
+            toolbar.style.cssText = `
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 24px;
+                padding-bottom: 16px;
+                border-bottom: 1px solid var(--theme-border, rgba(139, 92, 246, 0.25));
+            `;
+            
+            const toolbarLeft = document.createElement('div');
+            toolbarLeft.style.cssText = `display: flex; gap: 12px; align-items: center;`;
+            
+            const title = document.createElement('h2');
+            title.textContent = '用户账户';
+            title.style.cssText = `
+                font-size: 20px;
+                font-weight: 400;
+                color: var(--theme-text, #d7e0dd);
+                margin: 0;
+            `;
+            toolbarLeft.appendChild(title);
+            
+            toolbar.appendChild(toolbarLeft);
+            
+            // 工具栏右侧按钮
+            const toolbarRight = document.createElement('div');
+            toolbarRight.style.cssText = `display: flex; gap: 12px;`;
+            
+            // 管理组按钮（管理员）
+            if (isAdmin) {
+                const groupsBtn = document.createElement('button');
+                groupsBtn.textContent = '管理组';
+                groupsBtn.style.cssText = `
+                    padding: 8px 16px;
+                    border: 1px solid var(--theme-border, rgba(139, 92, 246, 0.25));
+                    border-radius: 4px;
+                    background: transparent;
+                    color: var(--theme-text, #d7e0dd);
+                    cursor: pointer;
+                    font-size: 14px;
+                    transition: background-color 0.2s;
+                `;
+                groupsBtn.addEventListener('mouseenter', () => {
+                    groupsBtn.style.background = 'var(--theme-background-tertiary, rgba(139, 92, 246, 0.1))';
+                });
+                groupsBtn.addEventListener('mouseleave', () => {
+                    groupsBtn.style.background = 'transparent';
+                });
+                groupsBtn.addEventListener('click', () => {
+                    this.userManagementPage = 'groups';
+                    this._switchCategory('users');
+                });
+                toolbarRight.appendChild(groupsBtn);
+            }
+            
+            // 创建用户按钮（管理员）
+            if (isAdmin) {
+                const createBtn = document.createElement('button');
+                createBtn.textContent = '+ 创建用户';
+                const primaryColor = typeof ThemeManager !== 'undefined' && ThemeManager.getCurrentTheme() 
+                    ? ThemeManager.getCurrentTheme().colors.primary || '#8b5cf6'
+                    : '#8b5cf6';
+                createBtn.style.cssText = `
+                    padding: 8px 16px;
+                    border: 1px solid ${primaryColor};
+                    border-radius: 4px;
+                    background: ${primaryColor};
+                    color: #ffffff;
+                    cursor: pointer;
+                    font-size: 14px;
+                    font-weight: 500;
+                    transition: background-color 0.2s, border-color 0.2s;
+                `;
+                createBtn.addEventListener('mouseenter', () => {
+                    const primaryDark = typeof ThemeManager !== 'undefined' && ThemeManager.getCurrentTheme() 
+                        ? ThemeManager.getCurrentTheme().colors.primaryDark || '#7c3aed'
+                        : '#7c3aed';
+                    createBtn.style.background = primaryDark;
+                    createBtn.style.borderColor = primaryDark;
+                });
+                createBtn.addEventListener('mouseleave', () => {
+                    createBtn.style.background = primaryColor;
+                    createBtn.style.borderColor = primaryColor;
+                });
+                createBtn.addEventListener('click', () => {
+                    this.userManagementPage = 'create';
+                    this._switchCategory('users');
+                });
+                toolbarRight.appendChild(createBtn);
+            }
+            
+            toolbar.appendChild(toolbarRight);
+            container.appendChild(toolbar);
             
             // 创建用户列表
             const userList = document.createElement('div');
@@ -1704,6 +1853,48 @@
                     this._handleSetPassword(user.username, isAdmin);
                 });
                 actions.appendChild(passwordBtn);
+            }
+            
+            // 管理组按钮（管理员）
+            if (isAdmin && typeof UserGroup !== 'undefined') {
+                const manageGroupsBtn = document.createElement('button');
+                manageGroupsBtn.textContent = '管理组';
+                manageGroupsBtn.className = 'settings-user-action-btn';
+                manageGroupsBtn.style.cssText = `
+                    padding: 6px 12px;
+                    border: 1px solid var(--theme-border, rgba(139, 92, 246, 0.25));
+                    border-radius: 4px;
+                    background: transparent;
+                    color: var(--theme-text, #d7e0dd);
+                    cursor: pointer;
+                    font-size: 13px;
+                `;
+                manageGroupsBtn.addEventListener('click', async () => {
+                    this.userManagementPage = 'userGroups';
+                    this.userManagementPageData = { username: user.username };
+                    this._switchCategory('users');
+                });
+                actions.appendChild(manageGroupsBtn);
+            }
+            
+            // 删除用户按钮（仅管理员，不能删除 root）
+            if (isAdmin && user.username !== 'root' && user.username !== currentUser) {
+                const deleteBtn = document.createElement('button');
+                deleteBtn.textContent = '删除';
+                deleteBtn.className = 'settings-user-action-btn';
+                deleteBtn.style.cssText = `
+                    padding: 6px 12px;
+                    border: 1px solid var(--theme-border, rgba(255, 0, 0, 0.3));
+                    border-radius: 4px;
+                    background: transparent;
+                    color: #ff6b6b;
+                    cursor: pointer;
+                    font-size: 13px;
+                `;
+                deleteBtn.addEventListener('click', async () => {
+                    await this._handleDeleteUser(user.username);
+                });
+                actions.appendChild(deleteBtn);
             }
             
             userInfo.appendChild(actions);
@@ -2040,6 +2231,1421 @@
                 }
                 if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
                     await GUIManager.showAlert(`设置密码失败: ${error.message}`, '错误', 'error');
+                }
+            }
+        },
+        
+        /**
+         * 渲染创建用户页面
+         */
+        _renderCreateUserPage: function(container) {
+            // 检查UserControl是否可用
+            if (typeof UserControl === 'undefined') {
+                const errorMsg = document.createElement('div');
+                errorMsg.textContent = '用户控制系统未加载';
+                errorMsg.style.cssText = `
+                    padding: 24px;
+                    text-align: center;
+                    color: var(--theme-text-secondary, #b8c5c0);
+                `;
+                container.appendChild(errorMsg);
+                return container;
+            }
+            
+            // 检查管理员权限
+            const isAdmin = UserControl.isAdmin();
+            if (!isAdmin) {
+                const errorMsg = document.createElement('div');
+                errorMsg.textContent = '只有管理员可以创建用户';
+                errorMsg.style.cssText = `
+                    padding: 24px;
+                    text-align: center;
+                    color: var(--theme-text-secondary, #b8c5c0);
+                `;
+                container.appendChild(errorMsg);
+                return container;
+            }
+            
+            // 创建返回按钮
+            const backBtn = document.createElement('button');
+            backBtn.textContent = '← 返回';
+            backBtn.style.cssText = `
+                padding: 8px 16px;
+                border: 1px solid var(--theme-border, rgba(139, 92, 246, 0.25));
+                border-radius: 4px;
+                background: transparent;
+                color: var(--theme-text, #d7e0dd);
+                cursor: pointer;
+                font-size: 14px;
+                margin-bottom: 24px;
+            `;
+            backBtn.addEventListener('click', () => {
+                this.userManagementPage = 'list';
+                this._switchCategory('users');
+            });
+            container.appendChild(backBtn);
+            
+            // 创建标题
+            const title = document.createElement('h2');
+            title.textContent = '创建新用户';
+            title.style.cssText = `
+                font-size: 24px;
+                font-weight: 300;
+                color: var(--theme-text, #d7e0dd);
+                margin: 0 0 32px 0;
+            `;
+            container.appendChild(title);
+            
+            // 创建表单
+            const form = document.createElement('div');
+            form.style.cssText = `
+                max-width: 500px;
+                display: flex;
+                flex-direction: column;
+                gap: 24px;
+            `;
+            
+            // 用户名输入
+            const usernameGroup = document.createElement('div');
+            usernameGroup.style.cssText = `display: flex; flex-direction: column; gap: 8px;`;
+            
+            const usernameLabel = document.createElement('label');
+            usernameLabel.textContent = '用户名';
+            usernameLabel.style.cssText = `
+                font-size: 14px;
+                font-weight: 500;
+                color: var(--theme-text, #d7e0dd);
+            `;
+            usernameGroup.appendChild(usernameLabel);
+            
+            const usernameInput = document.createElement('input');
+            usernameInput.type = 'text';
+            usernameInput.placeholder = '请输入用户名';
+            usernameInput.style.cssText = `
+                padding: 10px 12px;
+                border: 1px solid var(--theme-border, rgba(139, 92, 246, 0.25));
+                border-radius: 4px;
+                background: var(--theme-background-elevated, var(--theme-background-secondary, #252b35));
+                color: var(--theme-text, #d7e0dd);
+                font-size: 14px;
+                outline: none;
+            `;
+            usernameGroup.appendChild(usernameInput);
+            
+            form.appendChild(usernameGroup);
+            
+            // 用户级别选择
+            const levelGroup = document.createElement('div');
+            levelGroup.style.cssText = `display: flex; flex-direction: column; gap: 8px;`;
+            
+            const levelLabel = document.createElement('label');
+            levelLabel.textContent = '用户级别';
+            levelLabel.style.cssText = `
+                font-size: 14px;
+                font-weight: 500;
+                color: var(--theme-text, #d7e0dd);
+            `;
+            levelGroup.appendChild(levelLabel);
+            
+            const levelSelect = document.createElement('select');
+            const isDefaultAdmin = UserControl.isDefaultAdmin();
+            levelSelect.innerHTML = `
+                <option value="${UserControl.USER_LEVEL.USER}">普通用户</option>
+                ${isDefaultAdmin ? `<option value="${UserControl.USER_LEVEL.ADMIN}">管理员</option>` : ''}
+            `;
+            levelSelect.style.cssText = `
+                padding: 10px 12px;
+                border: 1px solid var(--theme-border, rgba(139, 92, 246, 0.25));
+                border-radius: 4px;
+                background: var(--theme-background-elevated, var(--theme-background-secondary, #252b35));
+                color: var(--theme-text, #d7e0dd);
+                font-size: 14px;
+                outline: none;
+                cursor: pointer;
+            `;
+            levelGroup.appendChild(levelSelect);
+            
+            form.appendChild(levelGroup);
+            
+            // 密码输入（可选）
+            const passwordGroup = document.createElement('div');
+            passwordGroup.style.cssText = `display: flex; flex-direction: column; gap: 8px;`;
+            
+            const passwordLabel = document.createElement('label');
+            passwordLabel.textContent = '密码（可选，留空表示无密码）';
+            passwordLabel.style.cssText = `
+                font-size: 14px;
+                font-weight: 500;
+                color: var(--theme-text, #d7e0dd);
+            `;
+            passwordGroup.appendChild(passwordLabel);
+            
+            const passwordInput = document.createElement('input');
+            passwordInput.type = 'password';
+            passwordInput.placeholder = '请输入密码（可选）';
+            passwordInput.style.cssText = `
+                padding: 10px 12px;
+                border: 1px solid var(--theme-border, rgba(139, 92, 246, 0.25));
+                border-radius: 4px;
+                background: var(--theme-background-elevated, var(--theme-background-secondary, #252b35));
+                color: var(--theme-text, #d7e0dd);
+                font-size: 14px;
+                outline: none;
+            `;
+            passwordGroup.appendChild(passwordInput);
+            
+            form.appendChild(passwordGroup);
+            
+            // 按钮组
+            const buttonGroup = document.createElement('div');
+            buttonGroup.style.cssText = `
+                display: flex;
+                gap: 12px;
+                margin-top: 8px;
+            `;
+            
+            const cancelBtn = document.createElement('button');
+            cancelBtn.textContent = '取消';
+            cancelBtn.style.cssText = `
+                padding: 10px 20px;
+                border: 1px solid var(--theme-border, rgba(139, 92, 246, 0.25));
+                border-radius: 4px;
+                background: transparent;
+                color: var(--theme-text, #d7e0dd);
+                cursor: pointer;
+                font-size: 14px;
+            `;
+            cancelBtn.addEventListener('click', () => {
+                this.userManagementPage = 'list';
+                this._switchCategory('users');
+            });
+            buttonGroup.appendChild(cancelBtn);
+            
+            const createBtn = document.createElement('button');
+            createBtn.textContent = '创建';
+            const primaryColor = typeof ThemeManager !== 'undefined' && ThemeManager.getCurrentTheme() 
+                ? ThemeManager.getCurrentTheme().colors.primary || '#8b5cf6'
+                : '#8b5cf6';
+            createBtn.style.cssText = `
+                padding: 10px 20px;
+                border: 1px solid ${primaryColor};
+                border-radius: 4px;
+                background: ${primaryColor};
+                color: #ffffff;
+                cursor: pointer;
+                font-size: 14px;
+                font-weight: 500;
+            `;
+            createBtn.addEventListener('click', async () => {
+                await this._handleCreateUser(usernameInput.value, levelSelect.value, passwordInput.value);
+            });
+            buttonGroup.appendChild(createBtn);
+            
+            form.appendChild(buttonGroup);
+            container.appendChild(form);
+            
+            return container;
+        },
+        
+        /**
+         * 处理创建用户
+         */
+        _handleCreateUser: async function(username, level, password) {
+            if (!username || username.trim() === '') {
+                if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
+                    await GUIManager.showAlert('用户名不能为空', '错误', 'error');
+                }
+                return;
+            }
+            
+            try {
+                const success = await UserControl.createUser(username.trim(), level);
+                if (success) {
+                    // 如果提供了密码，设置密码
+                    if (password && password.trim() !== '') {
+                        await UserControl.setPassword(username.trim(), password.trim());
+                    }
+                    
+                    if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
+                        await GUIManager.showAlert('用户创建成功', '成功', 'success');
+                    }
+                    
+                    // 返回用户列表
+                    this.userManagementPage = 'list';
+                    this._switchCategory('users');
+                } else {
+                    if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
+                        await GUIManager.showAlert('用户创建失败', '错误', 'error');
+                    }
+                }
+            } catch (error) {
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('SETTINGS', `创建用户失败: ${error.message}`, error);
+                }
+                if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
+                    await GUIManager.showAlert(`创建用户失败: ${error.message}`, '错误', 'error');
+                }
+            }
+        },
+        
+        /**
+         * 处理删除用户
+         */
+        _handleDeleteUser: async function(username) {
+            if (typeof GUIManager === 'undefined') {
+                return;
+            }
+            
+            // 确认删除
+            const confirmed = await GUIManager.showConfirm(
+                `确定要删除用户 "${username}" 吗？此操作无法撤销。`,
+                '删除用户',
+                'warning'
+            );
+            
+            if (!confirmed) {
+                return;
+            }
+            
+            try {
+                const success = await UserControl.deleteUser(username);
+                if (success) {
+                    if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
+                        await GUIManager.showAlert('用户已删除', '成功', 'success');
+                    }
+                    // 刷新用户列表
+                    this._switchCategory('users');
+                } else {
+                    if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
+                        await GUIManager.showAlert('删除用户失败', '错误', 'error');
+                    }
+                }
+            } catch (error) {
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('SETTINGS', `删除用户失败: ${error.message}`, error);
+                }
+                if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
+                    await GUIManager.showAlert(`删除用户失败: ${error.message}`, '错误', 'error');
+                }
+            }
+        },
+        
+        /**
+         * 渲染用户组管理页面
+         */
+        _renderUserGroupsPage: function(container) {
+            // 检查UserGroup是否可用
+            if (typeof UserGroup === 'undefined') {
+                const errorMsg = document.createElement('div');
+                errorMsg.textContent = '用户组管理系统未加载';
+                errorMsg.style.cssText = `
+                    padding: 24px;
+                    text-align: center;
+                    color: var(--theme-text-secondary, #b8c5c0);
+                `;
+                container.appendChild(errorMsg);
+                return container;
+            }
+            
+            const username = this.userManagementPageData.username;
+            if (!username) {
+                const errorMsg = document.createElement('div');
+                errorMsg.textContent = '无效的用户名';
+                errorMsg.style.cssText = `
+                    padding: 24px;
+                    text-align: center;
+                    color: var(--theme-text-secondary, #b8c5c0);
+                `;
+                container.appendChild(errorMsg);
+                return container;
+            }
+            
+            // 创建返回按钮
+            const backBtn = document.createElement('button');
+            backBtn.textContent = '← 返回';
+            backBtn.style.cssText = `
+                padding: 8px 16px;
+                border: 1px solid var(--theme-border, rgba(139, 92, 246, 0.25));
+                border-radius: 4px;
+                background: transparent;
+                color: var(--theme-text, #d7e0dd);
+                cursor: pointer;
+                font-size: 14px;
+                margin-bottom: 24px;
+            `;
+            backBtn.addEventListener('click', () => {
+                this.userManagementPage = 'list';
+                this._switchCategory('users');
+            });
+            container.appendChild(backBtn);
+            
+            // 创建标题
+            const title = document.createElement('h2');
+            title.textContent = `管理用户 "${username}" 的组成员`;
+            title.style.cssText = `
+                font-size: 24px;
+                font-weight: 300;
+                color: var(--theme-text, #d7e0dd);
+                margin: 0 0 32px 0;
+            `;
+            container.appendChild(title);
+            
+            // 异步加载用户所在的组和所有组
+            (async () => {
+                try {
+                    await UserGroup.ensureInitialized();
+                    
+                    const userGroups = await UserGroup.getUserGroups(username);
+                    const allGroups = await UserGroup.getAllGroups();
+                    
+                    // 创建组列表
+                    const groupsList = document.createElement('div');
+                    groupsList.style.cssText = `
+                        display: flex;
+                        flex-direction: column;
+                        gap: 12px;
+                        max-width: 600px;
+                    `;
+                    
+                    allGroups.forEach(group => {
+                        const isMember = userGroups.includes(group.name);
+                        const groupItem = this._createGroupCheckboxItem(group, username, isMember);
+                        groupsList.appendChild(groupItem);
+                    });
+                    
+                    container.appendChild(groupsList);
+                } catch (error) {
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.error('SETTINGS', `加载用户组信息失败: ${error.message}`, error);
+                    }
+                    const errorMsg = document.createElement('div');
+                    errorMsg.textContent = `加载失败: ${error.message}`;
+                    errorMsg.style.cssText = `
+                        padding: 24px;
+                        text-align: center;
+                        color: var(--theme-text-secondary, #b8c5c0);
+                    `;
+                    container.appendChild(errorMsg);
+                }
+            })();
+            
+            return container;
+        },
+        
+        /**
+         * 创建组复选框项
+         */
+        _createGroupCheckboxItem: function(group, username, isMember) {
+            const item = document.createElement('div');
+            item.style.cssText = `
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                padding: 16px;
+                background: var(--theme-background-elevated, var(--theme-background-secondary, #252b35));
+                border: 1px solid var(--theme-border, rgba(139, 92, 246, 0.25));
+                border-radius: 8px;
+            `;
+            
+            // 复选框
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.checked = isMember;
+            checkbox.disabled = group.name === 'admins' || group.name === 'users'; // 默认组不能手动管理
+            checkbox.style.cssText = `
+                width: 20px;
+                height: 20px;
+                cursor: ${checkbox.disabled ? 'not-allowed' : 'pointer'};
+            `;
+            
+            checkbox.addEventListener('change', async (e) => {
+                if (checkbox.disabled) {
+                    return;
+                }
+                
+                try {
+                    if (e.target.checked) {
+                        const success = await UserGroup.addMember(group.name, username);
+                        if (!success) {
+                            checkbox.checked = false;
+                            if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
+                                await GUIManager.showAlert(`将用户添加到组 "${group.name}" 失败`, '错误', 'error');
+                            }
+                        } else {
+                            if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
+                                await GUIManager.showAlert(`用户已添加到组 "${group.name}"`, '成功', 'success');
+                            }
+                        }
+                    } else {
+                        const success = await UserGroup.removeMember(group.name, username);
+                        if (!success) {
+                            checkbox.checked = true;
+                            if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
+                                await GUIManager.showAlert(`从组 "${group.name}" 移除用户失败`, '错误', 'error');
+                            }
+                        } else {
+                            if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
+                                await GUIManager.showAlert(`用户已从组 "${group.name}" 移除`, '成功', 'success');
+                            }
+                        }
+                    }
+                } catch (error) {
+                    checkbox.checked = !checkbox.checked;
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.error('SETTINGS', `管理组成员失败: ${error.message}`, error);
+                    }
+                    if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
+                        await GUIManager.showAlert(`操作失败: ${error.message}`, '错误', 'error');
+                    }
+                }
+            });
+            
+            item.appendChild(checkbox);
+            
+            // 组信息
+            const groupInfo = document.createElement('div');
+            groupInfo.style.cssText = `flex: 1; display: flex; flex-direction: column; gap: 4px;`;
+            
+            const groupName = document.createElement('div');
+            groupName.textContent = group.name;
+            groupName.style.cssText = `
+                font-size: 16px;
+                font-weight: 500;
+                color: var(--theme-text, #d7e0dd);
+            `;
+            groupInfo.appendChild(groupName);
+            
+            if (group.description) {
+                const groupDesc = document.createElement('div');
+                groupDesc.textContent = group.description;
+                groupDesc.style.cssText = `
+                    font-size: 13px;
+                    color: var(--theme-text-secondary, #b8c5c0);
+                `;
+                groupInfo.appendChild(groupDesc);
+            }
+            
+            // 组类型标签
+            const typeTag = document.createElement('span');
+            typeTag.textContent = group.type === 'ADMIN_GROUP' ? '管理员组' : '用户组';
+            typeTag.style.cssText = `
+                font-size: 12px;
+                padding: 2px 8px;
+                border-radius: 4px;
+                background: ${group.type === 'ADMIN_GROUP' ? 'rgba(139, 92, 246, 0.2)' : 'rgba(108, 117, 125, 0.2)'};
+                color: ${group.type === 'ADMIN_GROUP' ? '#8b5cf6' : '#6c757d'};
+                align-self: flex-start;
+                margin-top: 4px;
+            `;
+            groupInfo.appendChild(typeTag);
+            
+            item.appendChild(groupInfo);
+            
+            // 如果是默认组，显示提示
+            if (checkbox.disabled) {
+                const hint = document.createElement('span');
+                hint.textContent = '（默认组）';
+                hint.style.cssText = `
+                    font-size: 12px;
+                    color: var(--theme-text-secondary, #b8c5c0);
+                `;
+                item.appendChild(hint);
+            }
+            
+            return item;
+        },
+        
+        /**
+         * 渲染组管理页面
+         */
+        _renderGroupsPage: function(container) {
+            // 检查UserGroup是否可用
+            if (typeof UserGroup === 'undefined') {
+                const errorMsg = document.createElement('div');
+                errorMsg.textContent = '用户组管理系统未加载';
+                errorMsg.style.cssText = `
+                    padding: 24px;
+                    text-align: center;
+                    color: var(--theme-text-secondary, #b8c5c0);
+                `;
+                container.appendChild(errorMsg);
+                return container;
+            }
+            
+            // 检查管理员权限
+            const isAdmin = typeof UserControl !== 'undefined' ? UserControl.isAdmin() : false;
+            if (!isAdmin) {
+                const errorMsg = document.createElement('div');
+                errorMsg.textContent = '只有管理员可以管理组';
+                errorMsg.style.cssText = `
+                    padding: 24px;
+                    text-align: center;
+                    color: var(--theme-text-secondary, #b8c5c0);
+                `;
+                container.appendChild(errorMsg);
+                return container;
+            }
+            
+            // 创建返回按钮
+            const backBtn = document.createElement('button');
+            backBtn.textContent = '← 返回';
+            backBtn.style.cssText = `
+                padding: 8px 16px;
+                border: 1px solid var(--theme-border, rgba(139, 92, 246, 0.25));
+                border-radius: 4px;
+                background: transparent;
+                color: var(--theme-text, #d7e0dd);
+                cursor: pointer;
+                font-size: 14px;
+                margin-bottom: 24px;
+            `;
+            backBtn.addEventListener('click', () => {
+                this.userManagementPage = 'list';
+                this._switchCategory('users');
+            });
+            container.appendChild(backBtn);
+            
+            // 创建标题和工具栏
+            const header = document.createElement('div');
+            header.style.cssText = `
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 32px;
+            `;
+            
+            const title = document.createElement('h2');
+            title.textContent = '用户组管理';
+            title.style.cssText = `
+                font-size: 24px;
+                font-weight: 300;
+                color: var(--theme-text, #d7e0dd);
+                margin: 0;
+            `;
+            header.appendChild(title);
+            
+            // 创建组按钮
+            const createBtn = document.createElement('button');
+            createBtn.textContent = '+ 创建组';
+            const primaryColor = typeof ThemeManager !== 'undefined' && ThemeManager.getCurrentTheme() 
+                ? ThemeManager.getCurrentTheme().colors.primary || '#8b5cf6'
+                : '#8b5cf6';
+            createBtn.style.cssText = `
+                padding: 8px 16px;
+                border: 1px solid ${primaryColor};
+                border-radius: 4px;
+                background: ${primaryColor};
+                color: #ffffff;
+                cursor: pointer;
+                font-size: 14px;
+                font-weight: 500;
+            `;
+            createBtn.addEventListener('click', async () => {
+                await this._handleCreateGroup();
+            });
+            header.appendChild(createBtn);
+            
+            container.appendChild(header);
+            
+            // 异步加载所有组
+            (async () => {
+                try {
+                    await UserGroup.ensureInitialized();
+                    
+                    const groups = await UserGroup.getAllGroups();
+                    
+                    if (groups.length === 0) {
+                        const emptyMsg = document.createElement('div');
+                        emptyMsg.textContent = '暂无用户组';
+                        emptyMsg.style.cssText = `
+                            padding: 48px;
+                            text-align: center;
+                            color: var(--theme-text-secondary, #b8c5c0);
+                        `;
+                        container.appendChild(emptyMsg);
+                        return;
+                    }
+                    
+                    // 创建组列表
+                    const groupsList = document.createElement('div');
+                    groupsList.style.cssText = `
+                        display: flex;
+                        flex-direction: column;
+                        gap: 16px;
+                        max-width: 800px;
+                    `;
+                    
+                    groups.forEach(group => {
+                        const groupCard = this._createGroupCard(group);
+                        groupsList.appendChild(groupCard);
+                    });
+                    
+                    container.appendChild(groupsList);
+                } catch (error) {
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.error('SETTINGS', `加载用户组失败: ${error.message}`, error);
+                    }
+                    const errorMsg = document.createElement('div');
+                    errorMsg.textContent = `加载失败: ${error.message}`;
+                    errorMsg.style.cssText = `
+                        padding: 24px;
+                        text-align: center;
+                        color: var(--theme-text-secondary, #b8c5c0);
+                    `;
+                    container.appendChild(errorMsg);
+                }
+            })();
+            
+            return container;
+        },
+        
+        /**
+         * 创建组卡片
+         */
+        _createGroupCard: function(group) {
+            const card = document.createElement('div');
+            card.style.cssText = `
+                background: var(--theme-background-elevated, var(--theme-background-secondary, #252b35));
+                border: 1px solid var(--theme-border, rgba(139, 92, 246, 0.25));
+                border-radius: 8px;
+                padding: 20px;
+            `;
+            
+            // 组信息头部
+            const header = document.createElement('div');
+            header.style.cssText = `
+                display: flex;
+                justify-content: space-between;
+                align-items: flex-start;
+                margin-bottom: 16px;
+            `;
+            
+            const groupInfo = document.createElement('div');
+            groupInfo.style.cssText = `flex: 1;`;
+            
+            const groupName = document.createElement('div');
+            groupName.textContent = group.name;
+            groupName.style.cssText = `
+                font-size: 18px;
+                font-weight: 500;
+                color: var(--theme-text, #d7e0dd);
+                margin-bottom: 8px;
+            `;
+            groupInfo.appendChild(groupName);
+            
+            if (group.description) {
+                const groupDesc = document.createElement('div');
+                groupDesc.textContent = group.description;
+                groupDesc.style.cssText = `
+                    font-size: 14px;
+                    color: var(--theme-text-secondary, #b8c5c0);
+                    margin-bottom: 8px;
+                `;
+                groupInfo.appendChild(groupDesc);
+            }
+            
+            // 组类型和成员数
+            const metaInfo = document.createElement('div');
+            metaInfo.style.cssText = `display: flex; gap: 12px; align-items: center;`;
+            
+            const typeTag = document.createElement('span');
+            typeTag.textContent = group.type === 'ADMIN_GROUP' ? '管理员组' : '用户组';
+            typeTag.style.cssText = `
+                font-size: 12px;
+                padding: 4px 8px;
+                border-radius: 4px;
+                background: ${group.type === 'ADMIN_GROUP' ? 'rgba(139, 92, 246, 0.2)' : 'rgba(108, 117, 125, 0.2)'};
+                color: ${group.type === 'ADMIN_GROUP' ? '#8b5cf6' : '#6c757d'};
+            `;
+            metaInfo.appendChild(typeTag);
+            
+            const memberCount = document.createElement('span');
+            memberCount.textContent = `${group.members.length} 个成员`;
+            memberCount.style.cssText = `
+                font-size: 12px;
+                color: var(--theme-text-secondary, #b8c5c0);
+            `;
+            metaInfo.appendChild(memberCount);
+            
+            if (group.name === 'admins' || group.name === 'users') {
+                const defaultTag = document.createElement('span');
+                defaultTag.textContent = '默认组';
+                defaultTag.style.cssText = `
+                    font-size: 12px;
+                    padding: 4px 8px;
+                    border-radius: 4px;
+                    background: rgba(255, 193, 7, 0.2);
+                    color: #ffc107;
+                `;
+                metaInfo.appendChild(defaultTag);
+            }
+            
+            groupInfo.appendChild(metaInfo);
+            header.appendChild(groupInfo);
+            
+            // 操作按钮
+            const actions = document.createElement('div');
+            actions.style.cssText = `display: flex; gap: 8px;`;
+            
+            // 查看成员按钮
+            const viewBtn = document.createElement('button');
+            viewBtn.textContent = '查看成员';
+            viewBtn.style.cssText = `
+                padding: 6px 12px;
+                border: 1px solid var(--theme-border, rgba(139, 92, 246, 0.25));
+                border-radius: 4px;
+                background: transparent;
+                color: var(--theme-text, #d7e0dd);
+                cursor: pointer;
+                font-size: 13px;
+            `;
+            viewBtn.addEventListener('click', () => {
+                this.userManagementPage = 'groupDetail';
+                this.userManagementPageData = { groupName: group.name };
+                this._switchCategory('users');
+            });
+            actions.appendChild(viewBtn);
+            
+            // 删除按钮（非默认组）
+            if (group.name !== 'admins' && group.name !== 'users') {
+                const deleteBtn = document.createElement('button');
+                deleteBtn.textContent = '删除';
+                deleteBtn.style.cssText = `
+                    padding: 6px 12px;
+                    border: 1px solid var(--theme-border, rgba(255, 0, 0, 0.3));
+                    border-radius: 4px;
+                    background: transparent;
+                    color: #ff6b6b;
+                    cursor: pointer;
+                    font-size: 13px;
+                `;
+                deleteBtn.addEventListener('click', async () => {
+                    await this._handleDeleteGroup(group.name);
+                });
+                actions.appendChild(deleteBtn);
+            }
+            
+            header.appendChild(actions);
+            card.appendChild(header);
+            
+            // 成员列表预览（显示前5个）
+            if (group.members.length > 0) {
+                const membersPreview = document.createElement('div');
+                membersPreview.style.cssText = `
+                    display: flex;
+                    flex-wrap: wrap;
+                    gap: 8px;
+                    margin-top: 16px;
+                    padding-top: 16px;
+                    border-top: 1px solid var(--theme-border, rgba(139, 92, 246, 0.25));
+                `;
+                
+                const previewCount = Math.min(5, group.members.length);
+                for (let i = 0; i < previewCount; i++) {
+                    const memberTag = document.createElement('span');
+                    memberTag.textContent = group.members[i];
+                    memberTag.style.cssText = `
+                        font-size: 12px;
+                        padding: 4px 8px;
+                        border-radius: 4px;
+                        background: var(--theme-background-tertiary, #1a1f28);
+                        color: var(--theme-text, #d7e0dd);
+                    `;
+                    membersPreview.appendChild(memberTag);
+                }
+                
+                if (group.members.length > 5) {
+                    const moreTag = document.createElement('span');
+                    moreTag.textContent = `+${group.members.length - 5} 更多`;
+                    moreTag.style.cssText = `
+                        font-size: 12px;
+                        padding: 4px 8px;
+                        border-radius: 4px;
+                        background: var(--theme-background-tertiary, #1a1f28);
+                        color: var(--theme-text-secondary, #b8c5c0);
+                    `;
+                    membersPreview.appendChild(moreTag);
+                }
+                
+                card.appendChild(membersPreview);
+            }
+            
+            return card;
+        },
+        
+        /**
+         * 渲染组详情页面
+         */
+        _renderGroupDetailPage: function(container) {
+            // 检查UserGroup是否可用
+            if (typeof UserGroup === 'undefined') {
+                const errorMsg = document.createElement('div');
+                errorMsg.textContent = '用户组管理系统未加载';
+                errorMsg.style.cssText = `
+                    padding: 24px;
+                    text-align: center;
+                    color: var(--theme-text-secondary, #b8c5c0);
+                `;
+                container.appendChild(errorMsg);
+                return container;
+            }
+            
+            const groupName = this.userManagementPageData.groupName;
+            if (!groupName) {
+                const errorMsg = document.createElement('div');
+                errorMsg.textContent = '无效的组名';
+                errorMsg.style.cssText = `
+                    padding: 24px;
+                    text-align: center;
+                    color: var(--theme-text-secondary, #b8c5c0);
+                `;
+                container.appendChild(errorMsg);
+                return container;
+            }
+            
+            // 创建返回按钮
+            const backBtn = document.createElement('button');
+            backBtn.textContent = '← 返回';
+            backBtn.style.cssText = `
+                padding: 8px 16px;
+                border: 1px solid var(--theme-border, rgba(139, 92, 246, 0.25));
+                border-radius: 4px;
+                background: transparent;
+                color: var(--theme-text, #d7e0dd);
+                cursor: pointer;
+                font-size: 14px;
+                margin-bottom: 24px;
+            `;
+            backBtn.addEventListener('click', () => {
+                this.userManagementPage = 'groups';
+                this._switchCategory('users');
+            });
+            container.appendChild(backBtn);
+            
+            // 异步加载组信息
+            (async () => {
+                try {
+                    await UserGroup.ensureInitialized();
+                    
+                    const group = await UserGroup.getGroup(groupName);
+                    if (!group) {
+                        const errorMsg = document.createElement('div');
+                        errorMsg.textContent = '组不存在';
+                        errorMsg.style.cssText = `
+                            padding: 24px;
+                            text-align: center;
+                            color: var(--theme-text-secondary, #b8c5c0);
+                        `;
+                        container.appendChild(errorMsg);
+                        return;
+                    }
+                    
+                    // 创建标题
+                    const title = document.createElement('h2');
+                    title.textContent = `组 "${group.name}" 的成员`;
+                    title.style.cssText = `
+                        font-size: 24px;
+                        font-weight: 300;
+                        color: var(--theme-text, #d7e0dd);
+                        margin: 0 0 16px 0;
+                    `;
+                    container.appendChild(title);
+                    
+                    if (group.description) {
+                        const desc = document.createElement('div');
+                        desc.textContent = group.description;
+                        desc.style.cssText = `
+                            font-size: 14px;
+                            color: var(--theme-text-secondary, #b8c5c0);
+                            margin-bottom: 24px;
+                        `;
+                        container.appendChild(desc);
+                    }
+                    
+                    if (group.members.length === 0) {
+                        const emptyMsg = document.createElement('div');
+                        emptyMsg.textContent = '此组暂无成员';
+                        emptyMsg.style.cssText = `
+                            padding: 48px;
+                            text-align: center;
+                            color: var(--theme-text-secondary, #b8c5c0);
+                        `;
+                        container.appendChild(emptyMsg);
+                        return;
+                    }
+                    
+                    // 创建成员列表
+                    const membersList = document.createElement('div');
+                    membersList.style.cssText = `
+                        display: flex;
+                        flex-direction: column;
+                        gap: 12px;
+                        max-width: 600px;
+                    `;
+                    
+                    // 获取所有用户信息
+                    const allUsers = typeof UserControl !== 'undefined' ? UserControl.listUsers() : [];
+                    const userMap = new Map();
+                    allUsers.forEach(user => {
+                        userMap.set(user.username, user);
+                    });
+                    
+                    group.members.forEach(username => {
+                        const user = userMap.get(username);
+                        const memberItem = document.createElement('div');
+                        memberItem.style.cssText = `
+                            display: flex;
+                            align-items: center;
+                            justify-content: space-between;
+                            padding: 12px 16px;
+                            background: var(--theme-background-elevated, var(--theme-background-secondary, #252b35));
+                            border: 1px solid var(--theme-border, rgba(139, 92, 246, 0.25));
+                            border-radius: 8px;
+                        `;
+                        
+                        const usernameEl = document.createElement('div');
+                        usernameEl.textContent = username;
+                        usernameEl.style.cssText = `
+                            font-size: 14px;
+                            color: var(--theme-text, #d7e0dd);
+                        `;
+                        memberItem.appendChild(usernameEl);
+                        
+                        // 如果是默认组，不能移除成员
+                        const isDefaultGroup = groupName === 'admins' || groupName === 'users';
+                        if (!isDefaultGroup) {
+                            const removeBtn = document.createElement('button');
+                            removeBtn.textContent = '移除';
+                            removeBtn.style.cssText = `
+                                padding: 4px 12px;
+                                border: 1px solid var(--theme-border, rgba(255, 0, 0, 0.3));
+                                border-radius: 4px;
+                                background: transparent;
+                                color: #ff6b6b;
+                                cursor: pointer;
+                                font-size: 12px;
+                            `;
+                            removeBtn.addEventListener('click', async () => {
+                                await this._handleRemoveMemberFromGroup(groupName, username);
+                            });
+                            memberItem.appendChild(removeBtn);
+                        }
+                        
+                        membersList.appendChild(memberItem);
+                    });
+                    
+                    container.appendChild(membersList);
+                } catch (error) {
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.error('SETTINGS', `加载组详情失败: ${error.message}`, error);
+                    }
+                    const errorMsg = document.createElement('div');
+                    errorMsg.textContent = `加载失败: ${error.message}`;
+                    errorMsg.style.cssText = `
+                        padding: 24px;
+                        text-align: center;
+                        color: var(--theme-text-secondary, #b8c5c0);
+                    `;
+                    container.appendChild(errorMsg);
+                }
+            })();
+            
+            return container;
+        },
+        
+        /**
+         * 处理创建组（使用更友好的方式）
+         */
+        _handleCreateGroup: async function() {
+            // 直接切换到创建组页面（使用页面切换，而不是弹窗）
+            this.userManagementPage = 'createGroup';
+            this.userManagementPageData = {};
+            this._switchCategory('users');
+        },
+        
+        /**
+         * 渲染创建组页面
+         */
+        _renderCreateGroupPage: function(container) {
+            // 检查UserGroup是否可用
+            if (typeof UserGroup === 'undefined') {
+                const errorMsg = document.createElement('div');
+                errorMsg.textContent = '用户组管理系统未加载';
+                errorMsg.style.cssText = `
+                    padding: 24px;
+                    text-align: center;
+                    color: var(--theme-text-secondary, #b8c5c0);
+                `;
+                container.appendChild(errorMsg);
+                return container;
+            }
+            
+            // 检查管理员权限
+            const isAdmin = typeof UserControl !== 'undefined' ? UserControl.isAdmin() : false;
+            if (!isAdmin) {
+                const errorMsg = document.createElement('div');
+                errorMsg.textContent = '只有管理员可以创建组';
+                errorMsg.style.cssText = `
+                    padding: 24px;
+                    text-align: center;
+                    color: var(--theme-text-secondary, #b8c5c0);
+                `;
+                container.appendChild(errorMsg);
+                return container;
+            }
+            
+            // 创建返回按钮
+            const backBtn = document.createElement('button');
+            backBtn.textContent = '← 返回';
+            backBtn.style.cssText = `
+                padding: 8px 16px;
+                border: 1px solid var(--theme-border, rgba(139, 92, 246, 0.25));
+                border-radius: 4px;
+                background: transparent;
+                color: var(--theme-text, #d7e0dd);
+                cursor: pointer;
+                font-size: 14px;
+                margin-bottom: 24px;
+            `;
+            backBtn.addEventListener('click', () => {
+                this.userManagementPage = 'groups';
+                this._switchCategory('users');
+            });
+            container.appendChild(backBtn);
+            
+            // 创建标题
+            const title = document.createElement('h2');
+            title.textContent = '创建新组';
+            title.style.cssText = `
+                font-size: 24px;
+                font-weight: 300;
+                color: var(--theme-text, #d7e0dd);
+                margin: 0 0 32px 0;
+            `;
+            container.appendChild(title);
+            
+            // 创建表单
+            const form = document.createElement('div');
+            form.style.cssText = `
+                max-width: 500px;
+                display: flex;
+                flex-direction: column;
+                gap: 24px;
+            `;
+            
+            // 组名输入
+            const nameGroup = document.createElement('div');
+            nameGroup.style.cssText = `display: flex; flex-direction: column; gap: 8px;`;
+            
+            const nameLabel = document.createElement('label');
+            nameLabel.textContent = '组名';
+            nameLabel.style.cssText = `
+                font-size: 14px;
+                font-weight: 500;
+                color: var(--theme-text, #d7e0dd);
+            `;
+            nameGroup.appendChild(nameLabel);
+            
+            const nameInput = document.createElement('input');
+            nameInput.type = 'text';
+            nameInput.placeholder = '请输入组名';
+            nameInput.style.cssText = `
+                padding: 10px 12px;
+                border: 1px solid var(--theme-border, rgba(139, 92, 246, 0.25));
+                border-radius: 4px;
+                background: var(--theme-background-elevated, var(--theme-background-secondary, #252b35));
+                color: var(--theme-text, #d7e0dd);
+                font-size: 14px;
+                outline: none;
+            `;
+            nameGroup.appendChild(nameInput);
+            
+            form.appendChild(nameGroup);
+            
+            // 组类型选择
+            const typeGroup = document.createElement('div');
+            typeGroup.style.cssText = `display: flex; flex-direction: column; gap: 8px;`;
+            
+            const typeLabel = document.createElement('label');
+            typeLabel.textContent = '组类型';
+            typeLabel.style.cssText = `
+                font-size: 14px;
+                font-weight: 500;
+                color: var(--theme-text, #d7e0dd);
+            `;
+            typeGroup.appendChild(typeLabel);
+            
+            const typeSelect = document.createElement('select');
+            const isDefaultAdmin = typeof UserControl !== 'undefined' ? UserControl.isDefaultAdmin() : false;
+            // 确保 UserGroup 已定义
+            const userGroupType = typeof UserGroup !== 'undefined' ? UserGroup.GROUP_TYPE.USER_GROUP : 'USER_GROUP';
+            const adminGroupType = typeof UserGroup !== 'undefined' ? UserGroup.GROUP_TYPE.ADMIN_GROUP : 'ADMIN_GROUP';
+            typeSelect.innerHTML = `
+                <option value="${userGroupType}">普通用户组</option>
+                ${isDefaultAdmin ? `<option value="${adminGroupType}">管理员组</option>` : ''}
+            `;
+            typeSelect.style.cssText = `
+                padding: 10px 12px;
+                border: 1px solid var(--theme-border, rgba(139, 92, 246, 0.25));
+                border-radius: 4px;
+                background: var(--theme-background-elevated, var(--theme-background-secondary, #252b35));
+                color: var(--theme-text, #d7e0dd);
+                font-size: 14px;
+                outline: none;
+                cursor: pointer;
+            `;
+            typeGroup.appendChild(typeSelect);
+            
+            form.appendChild(typeGroup);
+            
+            // 组描述输入
+            const descGroup = document.createElement('div');
+            descGroup.style.cssText = `display: flex; flex-direction: column; gap: 8px;`;
+            
+            const descLabel = document.createElement('label');
+            descLabel.textContent = '组描述（可选）';
+            descLabel.style.cssText = `
+                font-size: 14px;
+                font-weight: 500;
+                color: var(--theme-text, #d7e0dd);
+            `;
+            descGroup.appendChild(descLabel);
+            
+            const descInput = document.createElement('input');
+            descInput.type = 'text';
+            descInput.placeholder = '请输入组描述';
+            descInput.style.cssText = `
+                padding: 10px 12px;
+                border: 1px solid var(--theme-border, rgba(139, 92, 246, 0.25));
+                border-radius: 4px;
+                background: var(--theme-background-elevated, var(--theme-background-secondary, #252b35));
+                color: var(--theme-text, #d7e0dd);
+                font-size: 14px;
+                outline: none;
+            `;
+            descGroup.appendChild(descInput);
+            
+            form.appendChild(descGroup);
+            
+            // 按钮组
+            const buttonGroup = document.createElement('div');
+            buttonGroup.style.cssText = `
+                display: flex;
+                gap: 12px;
+                margin-top: 8px;
+            `;
+            
+            const cancelBtn = document.createElement('button');
+            cancelBtn.type = 'button'; // 明确指定按钮类型，防止表单提交
+            cancelBtn.textContent = '取消';
+            cancelBtn.style.cssText = `
+                padding: 10px 20px;
+                border: 1px solid var(--theme-border, rgba(139, 92, 246, 0.25));
+                border-radius: 4px;
+                background: transparent;
+                color: var(--theme-text, #d7e0dd);
+                cursor: pointer;
+                font-size: 14px;
+            `;
+            // 直接使用 addEventListener，与创建用户页面的取消按钮保持一致
+            cancelBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                this.userManagementPage = 'groups';
+                this._switchCategory('users');
+            });
+            buttonGroup.appendChild(cancelBtn);
+            
+            const createBtn = document.createElement('button');
+            createBtn.type = 'button'; // 明确指定按钮类型，防止表单提交
+            createBtn.textContent = '创建';
+            const primaryColor = typeof ThemeManager !== 'undefined' && ThemeManager.getCurrentTheme() 
+                ? ThemeManager.getCurrentTheme().colors.primary || '#8b5cf6'
+                : '#8b5cf6';
+            createBtn.style.cssText = `
+                padding: 10px 20px;
+                border: 1px solid ${primaryColor};
+                border-radius: 4px;
+                background: ${primaryColor};
+                color: #ffffff;
+                cursor: pointer;
+                font-size: 14px;
+                font-weight: 500;
+            `;
+            // 直接使用 addEventListener，与创建用户页面的创建按钮保持一致
+            // 保存输入元素的引用（确保在事件处理函数中可以访问）
+            const nameInputRef = nameInput;
+            const typeSelectRef = typeSelect;
+            const descInputRef = descInput;
+            
+            createBtn.addEventListener('click', async (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.debug('SETTINGS', '创建组按钮被点击', { 
+                        groupName: nameInputRef.value, 
+                        groupType: typeSelectRef.value,
+                        description: descInputRef.value 
+                    });
+                }
+                await this._handleCreateGroupSubmit(nameInputRef.value, typeSelectRef.value, descInputRef.value);
+            });
+            
+            buttonGroup.appendChild(createBtn);
+            
+            form.appendChild(buttonGroup);
+            container.appendChild(form);
+            
+            return container;
+        },
+        
+        /**
+         * 处理创建组提交
+         */
+        _handleCreateGroupSubmit: async function(groupName, groupType, description) {
+            if (typeof KernelLogger !== 'undefined') {
+                KernelLogger.debug('SETTINGS', `开始创建组: ${groupName}, 类型: ${groupType}`);
+            }
+            
+            if (!groupName || groupName.trim() === '') {
+                if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
+                    await GUIManager.showAlert('组名不能为空', '错误', 'error');
+                }
+                return;
+            }
+            
+            // 检查 UserGroup 是否可用
+            if (typeof UserGroup === 'undefined') {
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('SETTINGS', 'UserGroup 未定义');
+                }
+                if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
+                    await GUIManager.showAlert('用户组管理系统未加载', '错误', 'error');
+                }
+                return;
+            }
+            
+            try {
+                // 确保 UserGroup 已初始化
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.debug('SETTINGS', '等待 UserGroup.ensureInitialized...');
+                }
+                await UserGroup.ensureInitialized();
+                
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.debug('SETTINGS', `UserGroup 已初始化，调用 UserGroup.createGroup: ${groupName.trim()}, ${groupType}, ${description || 'null'}`);
+                }
+                
+                const success = await UserGroup.createGroup(
+                    groupName.trim(),
+                    groupType,
+                    description && description.trim() !== '' ? description.trim() : null
+                );
+                
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.debug('SETTINGS', `UserGroup.createGroup 返回: ${success}`);
+                }
+                
+                if (success) {
+                    if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
+                        await GUIManager.showAlert('组创建成功', '成功', 'success');
+                    }
+                    // 返回组列表页面
+                    this.userManagementPage = 'groups';
+                    this._switchCategory('users');
+                    // 触发重新渲染以确保组列表更新
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.debug('SETTINGS', '返回组列表页面');
+                    }
+                } else {
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.warn('SETTINGS', '组创建失败，但未抛出异常');
+                    }
+                    if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
+                        await GUIManager.showAlert('组创建失败，请检查权限或组名是否已存在', '错误', 'error');
+                    }
+                }
+            } catch (error) {
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('SETTINGS', `创建组失败: ${error.message}`, error);
+                    KernelLogger.error('SETTINGS', `创建组失败堆栈: ${error.stack}`);
+                }
+                if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
+                    await GUIManager.showAlert(`创建组失败: ${error.message}`, '错误', 'error');
+                }
+            }
+        },
+        
+        /**
+         * 处理删除组
+         */
+        _handleDeleteGroup: async function(groupName) {
+            if (typeof GUIManager === 'undefined') {
+                return;
+            }
+            
+            // 确认删除
+            const confirmed = await GUIManager.showConfirm(
+                `确定要删除组 "${groupName}" 吗？此操作无法撤销。`,
+                '删除组',
+                'warning'
+            );
+            
+            if (!confirmed) {
+                return;
+            }
+            
+            try {
+                const success = await UserGroup.deleteGroup(groupName);
+                if (success) {
+                    if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
+                        await GUIManager.showAlert('组已删除', '成功', 'success');
+                    }
+                    // 刷新组列表
+                    this.userManagementPage = 'groups';
+                    this._switchCategory('users');
+                } else {
+                    if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
+                        await GUIManager.showAlert('删除组失败', '错误', 'error');
+                    }
+                }
+            } catch (error) {
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('SETTINGS', `删除组失败: ${error.message}`, error);
+                }
+                if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
+                    await GUIManager.showAlert(`删除组失败: ${error.message}`, '错误', 'error');
+                }
+            }
+        },
+        
+        /**
+         * 处理从组中移除成员
+         */
+        _handleRemoveMemberFromGroup: async function(groupName, username) {
+            if (typeof GUIManager === 'undefined') {
+                return;
+            }
+            
+            try {
+                const success = await UserGroup.removeMember(groupName, username);
+                if (success) {
+                    if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
+                        await GUIManager.showAlert(`用户已从组 "${groupName}" 移除`, '成功', 'success');
+                    }
+                    // 刷新组详情
+                    this._switchCategory('users');
+                } else {
+                    if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
+                        await GUIManager.showAlert('移除成员失败', '错误', 'error');
+                    }
+                }
+            } catch (error) {
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('SETTINGS', `移除成员失败: ${error.message}`, error);
+                }
+                if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
+                    await GUIManager.showAlert(`移除成员失败: ${error.message}`, '错误', 'error');
                 }
             }
         }

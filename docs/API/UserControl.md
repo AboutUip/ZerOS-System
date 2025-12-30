@@ -428,9 +428,11 @@ if (!canGrant) {
 5. **权限限制**: 普通用户无法授权高风险权限，只有管理员可以授权所有权限
 6. **初始化顺序**: 用户控制系统依赖 `LStorage`，确保 `LStorage` 已初始化后再使用
 7. **`userControl.users` 键保护**: `userControl.users` 键只能由 `UserControl` 内核模块写入，用户程序无法直接修改，即使获得相关权限也不行。这是为了防止权限提升攻击
+8. **用户组管理**: 可以使用 `UserGroup` 模块管理用户组，详见 [UserGroup API](./UserGroup.md)
 
 ## 相关文档
 
+- [UserGroup.md](./UserGroup.md) - 用户组管理系统 API
 - [LStorage.md](./LStorage.md) - 本地存储 API
 - [CryptDrive.md](./CryptDrive.md) - 加密驱动 API
 - [PermissionManager.md](./PermissionManager.md) - 权限管理 API

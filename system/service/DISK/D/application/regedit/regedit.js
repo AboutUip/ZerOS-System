@@ -553,90 +553,12 @@
                 return;
             }
             
-            let data = null;
+            // 使用统一的路径解析方法
+            let data = this._resolvePath(path);
             
-            if (path === null || path === '') {
-                // 根节点，显示system和programs
-                data = {
-                    system: this.storageData.system || {},
-                    programs: this.storageData.programs || {}
-                };
-            } else if (path === 'system') {
-                data = this.storageData.system || {};
-            } else if (path === 'programs') {
-                data = this.storageData.programs || {};
-            } else {
-                // 解析路径：注意键名本身可能包含点号（如 'system.style', 'desktop.icons'）
-                // 路径格式：'system.style' 表示在 system 对象中查找键 'system.style'
-                // 路径格式：'system.musicplayer.settings' 表示在 system 对象中查找键 'musicplayer.settings'
-                
-                const pathParts = path.split('.');
-                
-                // 从根开始解析
-                data = this.storageData;
-                
-                // 先解析到父对象（system 或 programs）
-                if (pathParts.length > 0 && pathParts[0] === 'system') {
-                    data = this.storageData.system || {};
-                    // 如果路径只有 'system'，已经完成
-                    if (pathParts.length === 1) {
-                        // data 已经是 system 对象
-                    } else {
-                        // 路径是 'system.xxx'，需要在 system 对象中查找键 'xxx'（可能包含点号）
-                        // 例如：'system.style' -> 在 system 中查找 'style'
-                        // 例如：'system.musicplayer.settings' -> 在 system 中查找 'musicplayer.settings'
-                        const keyInSystem = pathParts.slice(1).join('.');
-                        if (data && typeof data === 'object' && keyInSystem in data) {
-                            data = data[keyInSystem];
-                        } else {
-                            data = null;
-                        }
-                    }
-                } else if (pathParts.length > 0 && pathParts[0] === 'programs') {
-                    data = this.storageData.programs || {};
-                    // 如果路径只有 'programs'，已经完成
-                    if (pathParts.length === 1) {
-                        // data 已经是 programs 对象
-                    } else {
-                        // 路径是 'programs.xxx.yyy.zzz'，需要逐层解析
-                        // 第一层是程序名（如 'TaskbarManager'），后续层是嵌套的键
-                        // 例如：'programs.TaskbarManager.weather:晋城市.value.code'
-                        // 应该解析为：programs['TaskbarManager']['weather:晋城市']['value']['code']
-                        
-                        // 先获取程序名（第一层）
-                        const programName = pathParts[1];
-                        if (data && typeof data === 'object' && programName in data) {
-                            data = data[programName];
-                            
-                            // 如果有更多层级，继续解析
-                            if (pathParts.length > 2) {
-                                // 从第三层开始逐层解析（跳过 'programs' 和程序名）
-                                for (let i = 2; i < pathParts.length; i++) {
-                                    const part = pathParts[i];
-                                    if (data && typeof data === 'object' && part in data) {
-                                        data = data[part];
-                                    } else {
-                                        data = null;
-                                        break;
-                                    }
-                                }
-                            }
-                        } else {
-                            data = null;
-                        }
-                    }
-                } else {
-                    // 其他路径，尝试从根开始按层级解析
-                    for (let i = 0; i < pathParts.length; i++) {
-                        const part = pathParts[i];
-                        if (data && typeof data === 'object' && part in data) {
-                            data = data[part];
-                        } else {
-                            data = null;
-                            break;
-                        }
-                    }
-                }
+            // 调试信息
+            if (typeof KernelLogger !== 'undefined') {
+                KernelLogger.debug('RegEdit', `_renderValues: path="${path}", data=${data ? (typeof data === 'object' ? `object(${Object.keys(data).length} keys)` : String(data)) : 'null'}`);
             }
             
             if (data === null || data === undefined) {
@@ -1166,6 +1088,154 @@
         },
         
         /**
+         * 根据路径解析数据对象（与_renderValues使用相同的逻辑）
+         * @param {string} path 路径
+         * @returns {Object|null} 解析后的数据对象，如果路径不存在返回null
+         */
+        _resolvePath: function(path) {
+            if (!this.storageData || typeof this.storageData !== 'object') {
+                return null;
+            }
+            
+            if (path === null || path === '') {
+                // 根节点，返回包含system和programs的对象
+                return {
+                    system: this.storageData.system || {},
+                    programs: this.storageData.programs || {}
+                };
+            } else if (path === 'system') {
+                return this.storageData.system || {};
+            } else if (path === 'programs') {
+                return this.storageData.programs || {};
+            } else {
+                // 解析路径：注意键名本身可能包含点号
+                const pathParts = path.split('.');
+                
+                // 从根开始解析
+                let data = this.storageData;
+                
+                // 先解析到父对象（system 或 programs）
+                if (pathParts.length > 0 && pathParts[0] === 'system') {
+                    data = this.storageData.system || {};
+                    // 如果路径只有 'system'，已经完成
+                    if (pathParts.length === 1) {
+                        // data 已经是 system 对象
+                    } else {
+                        // 路径是 'system.xxx'，需要在 system 对象中查找键 'xxx'（可能包含点号）
+                        // 有两种情况：
+                        // 1. 键名包含点号，如 'permissionControl.settings' 存储在 system['permissionControl.settings']
+                        // 2. 嵌套对象，如 system['permissionControl']['settings']
+                        // 需要同时支持这两种情况
+                        const keyInSystem = pathParts.slice(1).join('.');
+                        
+                        // 首先尝试逐层解析（支持嵌套对象的情况）
+                        // 例如：system.permissionControl.settings -> system['permissionControl']['settings']
+                        let tempData = data;
+                        let foundByLayers = true;
+                        for (let i = 1; i < pathParts.length; i++) {
+                            const part = pathParts[i];
+                            if (tempData && typeof tempData === 'object' && part in tempData) {
+                                tempData = tempData[part];
+                            } else {
+                                foundByLayers = false;
+                                break;
+                            }
+                        }
+                        
+                        if (foundByLayers) {
+                            // 逐层解析成功
+                            data = tempData;
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.debug('RegEdit', `_resolvePath: 通过逐层解析找到路径 "${path}"`);
+                            }
+                        } else if (data && typeof data === 'object' && keyInSystem in data) {
+                            // 逐层解析失败，尝试完整键名（支持键名包含点号的情况）
+                            // 例如：system.permissionControl.settings -> system['permissionControl.settings']
+                            data = data[keyInSystem];
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.debug('RegEdit', `_resolvePath: 通过完整键名找到路径 "${path}" (key: "${keyInSystem}")`);
+                            }
+                        } else {
+                            // 两种方式都失败
+                            data = null;
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.debug('RegEdit', `_resolvePath: 未找到路径 "${path}", 尝试的层级: ${pathParts.slice(1).join(' -> ')}, 完整键名: "${keyInSystem}"`);
+                            }
+                        }
+                    }
+                } else if (pathParts.length > 0 && pathParts[0] === 'programs') {
+                    data = this.storageData.programs || {};
+                    // 如果路径只有 'programs'，已经完成
+                    if (pathParts.length === 1) {
+                        // data 已经是 programs 对象
+                    } else {
+                        // 路径是 'programs.xxx.yyy.zzz'，需要逐层解析
+                        // 第一层是程序名（如 'TaskbarManager'），后续层是嵌套的键
+                        const programName = pathParts[1];
+                        if (data && typeof data === 'object' && programName in data) {
+                            data = data[programName];
+                            
+                            // 如果有更多层级，继续解析
+                            if (pathParts.length > 2) {
+                                // 从第三层开始逐层解析（跳过 'programs' 和程序名）
+                                for (let i = 2; i < pathParts.length; i++) {
+                                    const part = pathParts[i];
+                                    if (data && typeof data === 'object' && part in data) {
+                                        data = data[part];
+                                    } else {
+                                        data = null;
+                                        break;
+                                    }
+                                }
+                            }
+                        } else {
+                            data = null;
+                        }
+                    }
+                } else {
+                    // 其他路径，可能是system下的键（键名包含点号，如 'permissionControl.whitelist'）
+                    // 首先尝试在system对象中查找完整路径作为键名
+                    const fullKeyInSystem = path;
+                    if (this.storageData.system && typeof this.storageData.system === 'object' && fullKeyInSystem in this.storageData.system) {
+                        // 找到了，直接返回
+                        data = this.storageData.system[fullKeyInSystem];
+                    } else {
+                        // 如果完整路径不在system中，尝试逐层解析
+                        // 先检查第一层是否在system中
+                        const firstPart = pathParts[0];
+                        if (this.storageData.system && typeof this.storageData.system === 'object' && firstPart in this.storageData.system) {
+                            // 第一层在system中，从system开始解析
+                            data = this.storageData.system[firstPart];
+                            // 继续解析后续层级
+                            for (let i = 1; i < pathParts.length; i++) {
+                                const part = pathParts[i];
+                                if (data && typeof data === 'object' && part in data) {
+                                    data = data[part];
+                                } else {
+                                    data = null;
+                                    break;
+                                }
+                            }
+                        } else {
+                            // 第一层不在system中，尝试从根开始按层级解析
+                            for (let i = 0; i < pathParts.length; i++) {
+                                const part = pathParts[i];
+                                if (data && typeof data === 'object' && part in data) {
+                                    data = data[part];
+                                } else {
+                                    data = null;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                return data;
+            }
+        },
+        
+        /**
          * 设置值
          */
         _setValue: async function(parentPath, key, value) {
@@ -1189,26 +1259,11 @@
                     this.storageData.programs = {};
                 }
                 
-                let target = this.storageData;
-                
-                if (parentPath === 'system') {
-                    target = this.storageData.system;
-                } else if (parentPath === 'programs') {
-                    target = this.storageData.programs;
-                } else if (parentPath) {
-                    const pathParts = parentPath.split('.');
-                    target = this.storageData;
-                    for (const part of pathParts) {
-                        if (target && typeof target === 'object' && part in target) {
-                            target = target[part];
-                        } else {
-                            throw new Error('路径不存在');
-                        }
-                    }
-                }
+                // 使用与_renderValues相同的逻辑解析路径
+                let target = this._resolvePath(parentPath);
                 
                 if (!target || typeof target !== 'object') {
-                    throw new Error('目标不是对象');
+                    throw new Error('路径不存在或目标不是对象');
                 }
                 
                 target[key] = value;
@@ -1232,15 +1287,18 @@
                             throw new Error('LStorage 不可用');
                         }
                         
-                if (parentPath === 'system' || (parentPath && parentPath.startsWith('system.'))) {
-                    await LStorage.setSystemStorage(key, value);
-                } else {
-                    // 需要手动保存整个数据
+                        // 判断是否需要使用setSystemStorage（仅当parentPath为'system'时）
+                        // 对于'system.xxx'这样的路径，应该保存整个数据，因为键名可能包含点号
+                        if (parentPath === 'system') {
+                            // 直接保存到system存储
+                            await LStorage.setSystemStorage(key, value);
+                        } else {
+                            // 需要手动保存整个数据（包括system.xxx和programs路径）
                             // 确保 LStorage._storageData 与 this.storageData 同步
                             if (LStorage._storageData !== this.storageData) {
                                 LStorage._storageData = this.storageData;
                             }
-                    await LStorage._saveStorageData();
+                            await LStorage._saveStorageData();
                         }
                     }
                 } catch (saveError) {
@@ -1997,7 +2055,7 @@
                     await this._loadRegistryData();
                     if (!this.storageData || typeof this.storageData !== 'object') {
                         throw new Error('无法加载存储数据，操作已取消');
-            }
+                    }
                 }
                 
                 // 确保 system 和 programs 存在
@@ -2008,26 +2066,11 @@
                     this.storageData.programs = {};
                 }
                 
-                let target = this.storageData;
-                
-                if (parentPath === 'system') {
-                    target = this.storageData.system;
-                } else if (parentPath === 'programs') {
-                    target = this.storageData.programs;
-                } else if (parentPath) {
-                    const pathParts = parentPath.split('.');
-                    target = this.storageData;
-                    for (const part of pathParts) {
-                        if (target && typeof target === 'object' && part in target) {
-                            target = target[part];
-                        } else {
-                            throw new Error('路径不存在');
-                        }
-                    }
-                }
+                // 使用与_renderValues和_setValue相同的逻辑解析路径
+                let target = this._resolvePath(parentPath);
                 
                 if (!target || typeof target !== 'object') {
-                    throw new Error('目标不是对象');
+                    throw new Error('路径不存在或目标不是对象');
                 }
                 
                 delete target[key];
@@ -2051,15 +2094,18 @@
                             throw new Error('LStorage 不可用');
                         }
                         
-                if (parentPath === 'system' || (parentPath && parentPath.startsWith('system.'))) {
-                    await LStorage.deleteSystemStorage(key);
-                } else {
-                    // 需要手动保存整个数据
+                        // 判断是否需要使用deleteSystemStorage（仅当parentPath为'system'时）
+                        // 对于'system.xxx'这样的路径，应该保存整个数据，因为键名可能包含点号
+                        if (parentPath === 'system') {
+                            // 直接删除system存储中的键
+                            await LStorage.deleteSystemStorage(key);
+                        } else {
+                            // 需要手动保存整个数据（包括system.xxx和programs路径）
                             // 确保 LStorage._storageData 与 this.storageData 同步
                             if (LStorage._storageData !== this.storageData) {
                                 LStorage._storageData = this.storageData;
                             }
-                    await LStorage._saveStorageData();
+                            await LStorage._saveStorageData();
                         }
                     }
                 } catch (saveError) {

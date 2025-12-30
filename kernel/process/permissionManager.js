@@ -175,10 +175,17 @@ class PermissionManager {
     // ==================== 内部状态 ====================
     
     /**
-     * 权限存储
+     * 权限存储（运行时，按PID索引）
      * Map<pid, Set<permission>>
      */
     static _permissions = new Map();
+    
+    /**
+     * 已保存的权限记录（按程序名称索引，用于持久化）
+     * Map<programName, Set<permission>>
+     * 注意：权限记录应该按程序名称保存，而不是PID，因为PID是随机分配的
+     */
+    static _savedPermissionsByProgramName = new Map();
     
     /**
      * 权限申请队列
@@ -332,6 +339,7 @@ class PermissionManager {
     
     /**
      * 从存储加载权限记录
+     * 注意：权限记录按程序名称保存，而不是PID，因为PID是随机分配的
      */
     static _loadPermissions() {
         if (typeof LStorage === 'undefined') {
@@ -342,16 +350,21 @@ class PermissionManager {
         try {
             const saved = LStorage.getSystemStorage('permissionManager.permissions');
             if (saved && typeof saved === 'object') {
-                // 恢复权限记录
+                // 恢复权限记录（按程序名称）
                 let loadedCount = 0;
-                for (const [pidStr, permissions] of Object.entries(saved)) {
-                    const pid = parseInt(pidStr);
-                    if (!isNaN(pid) && Array.isArray(permissions)) {
-                        PermissionManager._permissions.set(pid, new Set(permissions));
+                for (const [programName, permissions] of Object.entries(saved)) {
+                    // 兼容旧格式：如果键是数字（PID格式），跳过（旧数据）
+                    if (/^\d+$/.test(programName)) {
+                        KernelLogger.debug("PermissionManager", `跳过旧格式的权限记录（PID键）: ${programName}`);
+                        continue;
+                    }
+                    
+                    if (typeof programName === 'string' && programName.trim() !== '' && Array.isArray(permissions)) {
+                        PermissionManager._savedPermissionsByProgramName.set(programName, new Set(permissions));
                         loadedCount++;
                     }
                 }
-                KernelLogger.debug("PermissionManager", `已加载 ${loadedCount} 个程序的权限记录`);
+                KernelLogger.debug("PermissionManager", `已加载 ${loadedCount} 个程序的权限记录（按程序名称）`);
             } else {
                 KernelLogger.debug("PermissionManager", "没有保存的权限记录");
             }
@@ -363,6 +376,7 @@ class PermissionManager {
     
     /**
      * 保存权限记录到存储（异步，避免阻塞）
+     * 注意：权限记录按程序名称保存，而不是PID，因为PID是随机分配的
      */
     static _savePermissions() {
         if (typeof LStorage === 'undefined') {
@@ -373,14 +387,52 @@ class PermissionManager {
         // 使用异步保存，避免阻塞主线程
         Promise.resolve().then(() => {
             try {
+                // 从运行时权限表（按PID）转换为按程序名称保存
                 const serialized = {};
+                const programPermissionMap = new Map(); // 临时Map，用于合并同一程序的所有实例的权限
+                
+                // 遍历所有PID的权限，按程序名称分组
                 for (const [pid, permissions] of PermissionManager._permissions) {
                     if (permissions && permissions.size > 0) {
-                        serialized[pid] = Array.from(permissions);
+                        // 从ProcessManager获取程序名称
+                        let programName = null;
+                        if (typeof ProcessManager !== 'undefined') {
+                            const processInfo = ProcessManager.PROCESS_TABLE.get(pid);
+                            if (processInfo && processInfo.programName) {
+                                programName = processInfo.programName;
+                            }
+                        }
+                        
+                        // 如果无法获取程序名称，跳过（Exploit程序不需要保存权限）
+                        if (!programName) {
+                            // Exploit程序（PID 10000）不需要保存权限
+                            if (typeof ProcessManager !== 'undefined' && pid === ProcessManager.EXPLOIT_PID) {
+                                continue;
+                            }
+                            KernelLogger.warn("PermissionManager", `无法获取PID ${pid} 对应的程序名称，跳过权限保存`);
+                            continue;
+                        }
+                        
+                        // 合并同一程序的所有权限（如果有多个实例）
+                        if (!programPermissionMap.has(programName)) {
+                            programPermissionMap.set(programName, new Set());
+                        }
+                        const programPermissions = programPermissionMap.get(programName);
+                        for (const perm of permissions) {
+                            programPermissions.add(perm);
+                        }
                     }
                 }
+                
+                // 转换为序列化格式
+                for (const [programName, permissions] of programPermissionMap) {
+                    if (permissions.size > 0) {
+                        serialized[programName] = Array.from(permissions);
+                    }
+                }
+                
                 LStorage.setSystemStorage('permissionManager.permissions', serialized);
-                KernelLogger.debug("PermissionManager", `权限记录已保存 (${Object.keys(serialized).length} 个程序)`);
+                KernelLogger.debug("PermissionManager", `权限记录已保存 (${Object.keys(serialized).length} 个程序，按程序名称)`);
             } catch (e) {
                 KernelLogger.error("PermissionManager", `保存权限记录失败: ${e.message}`, e);
             }
@@ -400,6 +452,20 @@ class PermissionManager {
         // 确保已初始化
         await PermissionManager._ensureInitialized();
         
+        // 获取程序名称（用于权限持久化）
+        let programName = null;
+        if (typeof ProcessManager !== 'undefined') {
+            const processInfo = ProcessManager.PROCESS_TABLE.get(pid);
+            if (processInfo && processInfo.programName) {
+                programName = processInfo.programName;
+            }
+        }
+        
+        // 如果无法获取程序名称，尝试从programInfo中获取
+        if (!programName && programInfoOrPermissions && typeof programInfoOrPermissions === 'object' && !Array.isArray(programInfoOrPermissions)) {
+            programName = programInfoOrPermissions.name;
+        }
+        
         let permissions = [];
         
         // 兼容两种调用方式：直接传入权限数组，或传入程序信息对象
@@ -417,7 +483,17 @@ class PermissionManager {
         // 检查是否为管理员专用程序（通过 options.isAdminProgram 标志）
         const isAdminProgram = options.isAdminProgram === true;
         
+        // 先检查是否有已保存的权限记录（按程序名称）
         const permissionSet = PermissionManager._permissions.get(pid) || new Set();
+        if (programName && PermissionManager._savedPermissionsByProgramName.has(programName)) {
+            // 恢复已保存的权限
+            const savedPermissions = PermissionManager._savedPermissionsByProgramName.get(programName);
+            for (const perm of savedPermissions) {
+                permissionSet.add(perm);
+            }
+            KernelLogger.debug("PermissionManager", `程序 ${programName} (PID: ${pid}) 已恢复 ${savedPermissions.size} 个已保存的权限`);
+        }
+        
         let grantedCount = 0;
         let dangerousGrantedCount = 0;
         
@@ -425,6 +501,12 @@ class PermissionManager {
             // 验证权限是否有效
             if (!Object.values(PermissionManager.PERMISSION).includes(perm)) {
                 KernelLogger.warn("PermissionManager", `程序 ${pid} 声明了无效权限: ${perm}`);
+                continue;
+            }
+            
+            // 如果权限已存在（从已保存的记录中恢复），跳过
+            if (permissionSet.has(perm)) {
+                KernelLogger.debug("PermissionManager", `程序 ${pid} 的权限 ${perm} 已从保存的记录中恢复`);
                 continue;
             }
             
@@ -442,7 +524,8 @@ class PermissionManager {
                 dangerousGrantedCount++;
                 KernelLogger.info("PermissionManager", `程序 ${pid}（管理员专用程序）自动获得危险权限: ${perm}`);
             } else {
-                // 特殊权限或非管理员程序的危险权限：仅记录，等待使用时申请
+                // 特殊权限或非管理员程序的危险权限：等待使用时申请
+                // 注意：已保存的权限已在第488-494行恢复，这里只需处理未保存的权限
                 KernelLogger.debug("PermissionManager", `程序 ${pid} 声明了${level === PermissionManager.PERMISSION_LEVEL.DANGEROUS ? '危险' : '特殊'}权限: ${perm}（待申请）`);
             }
         }
@@ -451,9 +534,9 @@ class PermissionManager {
             PermissionManager._permissions.set(pid, permissionSet);
             PermissionManager._savePermissions();
             if (dangerousGrantedCount > 0) {
-                KernelLogger.info("PermissionManager", `程序 ${pid} 已注册 ${grantedCount} 个权限（包括 ${dangerousGrantedCount} 个危险权限）`);
+                KernelLogger.info("PermissionManager", `程序 ${programName || pid} (PID: ${pid}) 已注册 ${grantedCount} 个权限（包括 ${dangerousGrantedCount} 个危险权限）`);
             } else {
-                KernelLogger.info("PermissionManager", `程序 ${pid} 已注册 ${grantedCount} 个普通权限`);
+                KernelLogger.info("PermissionManager", `程序 ${programName || pid} (PID: ${pid}) 已注册 ${permissionSet.size} 个权限`);
             }
         }
     }
