@@ -113,10 +113,9 @@ NotificationManager.CONFIG = {
 **返回值**: `Promise<string>` - 通知 ID
 
 **权限检查**:
-- 创建通知需要 `SYSTEM_NOTIFICATION` 权限
-- 如果程序没有权限，会弹出权限请求对话框
-- 如果用户拒绝权限，方法会抛出错误
+- 创建通知需要 `SYSTEM_NOTIFICATION` 权限（普通权限，自动授予）
 - 程序必须在 `__info__` 中声明 `SYSTEM_NOTIFICATION` 权限
+- 如果程序没有权限，会根据"自动授予普通权限"设置决定是否自动授予
 
 **示例**:
 ```javascript
@@ -168,10 +167,9 @@ try {
 **返回值**: `Promise<boolean>` - 是否成功
 
 **权限检查**:
-- 移除通知需要 `SYSTEM_NOTIFICATION` 权限
-- 如果程序没有权限，会弹出权限请求对话框
-- 如果用户拒绝权限，方法会抛出错误
+- 移除通知需要 `SYSTEM_NOTIFICATION` 权限（普通权限，自动授予）
 - 程序必须在 `__info__` 中声明 `SYSTEM_NOTIFICATION` 权限
+- 如果程序没有权限，会根据"自动授予普通权限"设置决定是否自动授予
 
 **示例**:
 ```javascript

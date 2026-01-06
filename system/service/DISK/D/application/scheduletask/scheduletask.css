@@ -1,0 +1,208 @@
+/* ZerOS 计划任务管理程序 - 样式 */
+
+/* ========== 基础样式 ========== */
+.scheduletask-window {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen", "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    color: var(--theme-text, #d7e0dd);
+    background: var(--theme-background-elevated, rgba(15, 20, 30, 0.95));
+}
+
+/* ========== 工具栏 ========== */
+.scheduletask-toolbar {
+    user-select: none;
+    height: 48px !important;
+    min-height: 48px !important;
+    max-height: 48px !important;
+    box-sizing: border-box;
+    flex-shrink: 0;
+    overflow: hidden;
+}
+
+.scheduletask-btn {
+    padding: 8px 16px;
+    border: 1px solid var(--theme-border, rgba(139, 92, 246, 0.3));
+    background: var(--theme-background-elevated, rgba(139, 92, 246, 0.08));
+    color: var(--theme-text, #e8ecf0);
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.scheduletask-btn::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    border-radius: 50%;
+    background: var(--theme-primary, rgba(139, 92, 246, 0.2));
+    transform: translate(-50%, -50%);
+    transition: width 0.4s, height 0.4s;
+}
+
+.scheduletask-btn:hover {
+    background: var(--theme-primary, rgba(139, 92, 246, 0.2));
+    border-color: var(--theme-primary, rgba(139, 92, 246, 0.5));
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(139, 92, 246, 0.2);
+}
+
+.scheduletask-btn:hover::before {
+    width: 200px;
+    height: 200px;
+}
+
+.scheduletask-btn:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 4px rgba(139, 92, 246, 0.2);
+}
+
+.scheduletask-btn-primary {
+    background: var(--theme-primary, rgba(139, 92, 246, 0.3));
+    border-color: var(--theme-primary, rgba(139, 92, 246, 0.5));
+}
+
+.scheduletask-btn-primary:hover {
+    background: var(--theme-primary, rgba(139, 92, 246, 0.4));
+    border-color: var(--theme-primary, rgba(139, 92, 246, 0.6));
+}
+
+.scheduletask-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+/* ========== 任务列表 ========== */
+.scheduletask-list-container {
+    user-select: none;
+}
+
+.scheduletask-list {
+    scrollbar-width: thin;
+    scrollbar-color: var(--theme-primary, rgba(139, 92, 246, 0.3)) transparent;
+}
+
+.scheduletask-list::-webkit-scrollbar {
+    width: 8px;
+}
+
+.scheduletask-list::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.scheduletask-list::-webkit-scrollbar-thumb {
+    background: var(--theme-primary, rgba(139, 92, 246, 0.3));
+    border-radius: 4px;
+}
+
+.scheduletask-list::-webkit-scrollbar-thumb:hover {
+    background: var(--theme-primary, rgba(139, 92, 246, 0.5));
+}
+
+.scheduletask-list-item {
+    user-select: none;
+}
+
+.scheduletask-list-item.selected {
+    background: var(--theme-primary, rgba(139, 92, 246, 0.2)) !important;
+    border-left: 3px solid var(--theme-primary, rgba(139, 92, 246, 0.8));
+}
+
+/* ========== 详情面板 ========== */
+.scheduletask-detail-panel {
+    scrollbar-width: thin;
+    scrollbar-color: var(--theme-primary, rgba(139, 92, 246, 0.3)) transparent;
+}
+
+.scheduletask-detail-panel::-webkit-scrollbar {
+    width: 8px;
+}
+
+.scheduletask-detail-panel::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.scheduletask-detail-panel::-webkit-scrollbar-thumb {
+    background: var(--theme-primary, rgba(139, 92, 246, 0.3));
+    border-radius: 4px;
+}
+
+.scheduletask-detail-panel::-webkit-scrollbar-thumb:hover {
+    background: var(--theme-primary, rgba(139, 92, 246, 0.5));
+}
+
+.scheduletask-detail-section {
+    margin-bottom: 24px;
+}
+
+/* ========== 对话框 ========== */
+.scheduletask-dialog-overlay {
+    animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+.scheduletask-dialog {
+    animation: slideUp 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.scheduletask-dialog input[type="text"],
+.scheduletask-dialog input[type="time"],
+.scheduletask-dialog input[type="number"],
+.scheduletask-dialog select {
+    transition: all 0.2s;
+}
+
+.scheduletask-dialog input[type="text"]:focus,
+.scheduletask-dialog input[type="time"]:focus,
+.scheduletask-dialog input[type="number"]:focus,
+.scheduletask-dialog select:focus {
+    outline: none;
+    border-color: var(--theme-primary, rgba(139, 92, 246, 0.6));
+    box-shadow: 0 0 0 3px var(--theme-primary, rgba(139, 92, 246, 0.1));
+}
+
+.scheduletask-dialog input[type="checkbox"] {
+    accent-color: var(--theme-primary, rgba(139, 92, 246, 0.8));
+    cursor: pointer;
+}
+
+/* ========== 响应式设计 ========== */
+@media (max-width: 800px) {
+    .scheduletask-window {
+        width: 100% !important;
+        height: 100% !important;
+    }
+    
+    .scheduletask-list-container {
+        width: 250px !important;
+    }
+}
+

@@ -335,7 +335,7 @@ __info__: function() {
             PermissionManager.PERMISSION.KERNEL_DISK_CREATE,  // 创建文件/目录（特殊权限，需要用户确认）
             PermissionManager.PERMISSION.KERNEL_DISK_DELETE,  // 删除文件/目录（特殊权限，需要用户确认）
             PermissionManager.PERMISSION.KERNEL_DISK_LIST,    // 列出目录（普通权限，自动授予）
-            PermissionManager.PERMISSION.SYSTEM_NOTIFICATION, // 显示通知（特殊权限，需要用户确认）
+            PermissionManager.PERMISSION.SYSTEM_NOTIFICATION, // 显示通知（普通权限，自动授予）
             PermissionManager.PERMISSION.SYSTEM_STORAGE_READ, // 读取系统存储
             PermissionManager.PERMISSION.SYSTEM_STORAGE_WRITE, // 写入系统存储
             PermissionManager.PERMISSION.CRYPT_GENERATE_KEY,  // 生成密钥

@@ -734,7 +734,27 @@ class ProcessManager {
             programs: autoStartPrograms.map(p => ({ name: p.programName, priority: p.priority }))
         });
         
-        // 依次启动程序
+        // 检查当前用户是否为管理员
+        // 普通用户不应该自动启动 autoStart 程序
+        let isAdmin = false;
+        if (typeof UserControl !== 'undefined') {
+            try {
+                await UserControl.ensureInitialized();
+                isAdmin = UserControl.isAdmin();
+            } catch (e) {
+                ProcessManager._log(1, `检查用户权限失败: ${e.message}`);
+                KernelLogger.warn("ProcessManager", `检查用户权限失败: ${e.message}`, e);
+                isAdmin = false;
+            }
+        }
+        
+        if (!isAdmin) {
+            ProcessManager._log(2, "当前用户不是管理员，跳过自动启动程序（普通用户不应自动启动 autoStart 程序）");
+            KernelLogger.info("ProcessManager", "当前用户不是管理员，跳过自动启动程序（普通用户不应自动启动 autoStart 程序）");
+            return;
+        }
+        
+        // 依次启动程序（只有管理员才会执行到这里）
         for (const program of autoStartPrograms) {
             try {
                 ProcessManager._log(2, `自动启动程序: ${program.programName} (优先级: ${program.priority})`);
@@ -999,11 +1019,73 @@ class ProcessManager {
                 script: asset.script || asset.path || '',
                 styles: Array.isArray(asset.styles) ? asset.styles : [],
                 assets: assets,
+                icon: asset.icon || null,  // 支持图标
                 metadata: asset.metadata || {}
             };
         } else {
             throw new Error('Invalid asset format');
         }
+    }
+    
+    /**
+     * 验证 JS 文件是否符合 ZerOS 程序规范
+     * @param {string} fileContent JS 文件内容
+     * @param {string} fileName 文件名（用于错误提示）
+     * @returns {Object} { valid: boolean, errors: string[], warnings: string[] }
+     */
+    static validateProgramFile(fileContent, fileName = '') {
+        const errors = [];
+        const warnings = [];
+        
+        if (!fileContent || typeof fileContent !== 'string') {
+            errors.push('文件内容为空或无效');
+            return { valid: false, errors, warnings };
+        }
+        
+        // 检查必需的方法：__init__
+        const hasInitMethod = /__init__\s*[:=]\s*function|__init__\s*\(|function\s+__init__|__init__\s*:\s*async\s+function|__init__\s*:\s*function/.test(fileContent);
+        if (!hasInitMethod) {
+            errors.push('缺少必需的方法: __init__');
+        }
+        
+        // 检查必需的方法：__info__
+        const hasInfoMethod = /__info__\s*[:=]\s*function|__info__\s*\(|function\s+__info__|__info__\s*:\s*function/.test(fileContent);
+        if (!hasInfoMethod) {
+            errors.push('缺少必需的方法: __info__');
+        }
+        
+        // 检查必需的方法：__exit__
+        const hasExitMethod = /__exit__\s*[:=]\s*function|__exit__\s*\(|function\s+__exit__|__exit__\s*:\s*function/.test(fileContent);
+        if (!hasExitMethod) {
+            warnings.push('缺少推荐的方法: __exit__（程序可能无法正确清理资源）');
+        }
+        
+        // 检查程序对象导出（检查常见的导出模式）
+        const hasProgramObject = /const\s+\w+\s*=\s*\{|let\s+\w+\s*=\s*\{|var\s+\w+\s*=\s*\{|window\[\w+\]\s*=|globalThis\[\w+\]\s*=|POOL\.__ADD__/.test(fileContent);
+        if (!hasProgramObject) {
+            warnings.push('未检测到程序对象导出（可能使用非标准导出方式）');
+        }
+        
+        // 检查是否使用了立即执行函数（IIFE）模式（这是 ZerOS 推荐的方式）
+        const hasIIFE = /\(function\s*\(|\(function\s*\(window\)/.test(fileContent);
+        if (!hasIIFE) {
+            warnings.push('未使用立即执行函数（IIFE）模式（可能污染全局作用域）');
+        }
+        
+        // 检查是否禁止自动初始化
+        const hasAutoInit = /\(function\s*\(\)\s*\{[\s\S]*?__init__|\(function\s*\(window\)\s*\{[\s\S]*?__init__/.test(fileContent);
+        if (hasAutoInit && /__init__\s*\(/.test(fileContent.split('__init__')[1]?.split('__info__')[0] || '')) {
+            warnings.push('检测到可能的自动初始化调用（ZerOS 程序应禁止自动初始化）');
+        }
+        
+        // 检查是否有 pid 参数（__init__ 应该接受 pid 参数）
+        const initHasPid = /__init__\s*[:=]\s*.*?function\s*\([^)]*pid|__init__\s*:\s*.*?function\s*\([^)]*pid|function\s+__init__\s*\([^)]*pid/.test(fileContent);
+        if (!initHasPid) {
+            warnings.push('__init__ 方法可能未接受 pid 参数（ZerOS 程序规范要求）');
+        }
+        
+        const valid = errors.length === 0;
+        return { valid, errors, warnings };
     }
 
     /**
@@ -1069,59 +1151,69 @@ class ProcessManager {
     static async startProgram(programName, initArgs = {}) {
         ProcessManager._log(2, `[启动程序] 开始启动: ${programName}`, initArgs);
         
-        // 优先使用 ApplicationAssetManager 获取程序信息和元数据
+        // 检查是否提供了临时程序配置
         let asset = null;
         let programMetadata = null;
-        ProcessManager._log(2, `[启动程序] 查找程序资源: ${programName}`);
         
-        if (typeof ApplicationAssetManager !== 'undefined' && typeof ApplicationAssetManager.getProgramInfo === 'function') {
-            try {
-                const programInfo = ApplicationAssetManager.getProgramInfo(programName);
-                if (programInfo) {
-                    asset = {
-                        script: programInfo.script,
-                        styles: programInfo.styles || [],
-                        assets: programInfo.assets || [],
-                        metadata: programInfo.metadata || {}
-                    };
-                    programMetadata = programInfo.metadata || {};
-                    ProcessManager._log(2, `[启动程序] 从ApplicationAssetManager获取资源成功`, asset);
-                } else {
-                    ProcessManager._log(2, `[启动程序] ApplicationAssetManager未找到程序: ${programName}`);
-                }
-            } catch (e) {
-                ProcessManager._log(1, `从ApplicationAssetManager获取程序信息失败: ${e.message}`);
-            }
-        } else {
-            ProcessManager._log(2, `[启动程序] ApplicationAssetManager不可用，使用降级方案`);
-        }
-        
-        // 降级方案：直接从POOL获取
-        if (!asset) {
-            let applicationAssets = null;
-            if (typeof POOL !== 'undefined' && typeof POOL.__GET__ === 'function') {
-                try {
-                    applicationAssets = POOL.__GET__("KERNEL_GLOBAL_POOL", "APPLICATION_ASSETS");
-                } catch (e) {
-                    ProcessManager._log(1, `从POOL获取APPLICATION_ASSETS失败: ${e.message}`);
-                }
-            }
-            
-            if (!applicationAssets) {
-                ProcessManager._log(1, `应用程序资源映射不可用`);
-                throw new Error(`Application assets not available`);
-            }
-            
-            // 检查应用程序资源映射
-            if (!applicationAssets[programName]) {
-                ProcessManager._log(1, `程序 ${programName} 未在应用程序资源映射中找到`);
-                throw new Error(`Program ${programName} not found in application assets`);
-            }
-            
-            // 解析应用程序资源（支持简单格式和完整格式）
-            asset = ProcessManager._parseAsset(applicationAssets[programName]);
+        if (initArgs.tempAsset) {
+            // 使用临时程序配置
+            ProcessManager._log(2, `[启动程序] 使用临时程序配置: ${programName}`);
+            asset = ProcessManager._parseAsset(initArgs.tempAsset);
             programMetadata = asset.metadata || {};
-            ProcessManager._log(2, `[启动程序] 从POOL获取资源成功`, asset);
+            ProcessManager._log(2, `[启动程序] 临时程序配置解析成功`, asset);
+        } else {
+            // 优先使用 ApplicationAssetManager 获取程序信息和元数据
+            ProcessManager._log(2, `[启动程序] 查找程序资源: ${programName}`);
+            
+            if (typeof ApplicationAssetManager !== 'undefined' && typeof ApplicationAssetManager.getProgramInfo === 'function') {
+                try {
+                    const programInfo = ApplicationAssetManager.getProgramInfo(programName);
+                    if (programInfo) {
+                        asset = {
+                            script: programInfo.script,
+                            styles: programInfo.styles || [],
+                            assets: programInfo.assets || [],
+                            metadata: programInfo.metadata || {}
+                        };
+                        programMetadata = programInfo.metadata || {};
+                        ProcessManager._log(2, `[启动程序] 从ApplicationAssetManager获取资源成功`, asset);
+                    } else {
+                        ProcessManager._log(2, `[启动程序] ApplicationAssetManager未找到程序: ${programName}`);
+                    }
+                } catch (e) {
+                    ProcessManager._log(1, `从ApplicationAssetManager获取程序信息失败: ${e.message}`);
+                }
+            } else {
+                ProcessManager._log(2, `[启动程序] ApplicationAssetManager不可用，使用降级方案`);
+            }
+            
+            // 降级方案：直接从POOL获取
+            if (!asset) {
+                let applicationAssets = null;
+                if (typeof POOL !== 'undefined' && typeof POOL.__GET__ === 'function') {
+                    try {
+                        applicationAssets = POOL.__GET__("KERNEL_GLOBAL_POOL", "APPLICATION_ASSETS");
+                    } catch (e) {
+                        ProcessManager._log(1, `从POOL获取APPLICATION_ASSETS失败: ${e.message}`);
+                    }
+                }
+                
+                if (!applicationAssets) {
+                    ProcessManager._log(1, `应用程序资源映射不可用`);
+                    throw new Error(`Application assets not available`);
+                }
+                
+                // 检查应用程序资源映射
+                if (!applicationAssets[programName]) {
+                    ProcessManager._log(1, `程序 ${programName} 未在应用程序资源映射中找到`);
+                    throw new Error(`Program ${programName} not found in application assets`);
+                }
+                
+                // 解析应用程序资源（支持简单格式和完整格式）
+                asset = ProcessManager._parseAsset(applicationAssets[programName]);
+                programMetadata = asset.metadata || {};
+                ProcessManager._log(2, `[启动程序] 从POOL获取资源成功`, asset);
+            }
         }
         
         // 尝试从程序对象获取元数据（如果程序已加载）
@@ -1194,6 +1286,50 @@ class ProcessManager {
                 throw new Error(errorMsg);
             } else {
                 ProcessManager._log(2, `程序 ${programName} 管理员权限检查通过`);
+            }
+        }
+        
+        // 检查 autoStart 程序的用户权限限制
+        // 如果程序设置了 autoStart=true，且不是计划任务启动的，需要检查用户权限
+        // 普通用户不应该自动启动 autoStart 程序，但计划任务允许
+        if (programMetadata && programMetadata.autoStart === true && 
+            !initArgs.scheduledTask && !initArgs.autoStart) {
+            // 这是用户手动启动的 autoStart 程序，需要检查用户权限
+            let isAdmin = false;
+            if (typeof UserControl !== 'undefined') {
+                try {
+                    await UserControl.ensureInitialized();
+                    isAdmin = UserControl.isAdmin();
+                } catch (e) {
+                    ProcessManager._log(1, `检查用户权限失败: ${e.message}`);
+                    KernelLogger.warn("ProcessManager", `检查用户权限失败: ${e.message}`, e);
+                    isAdmin = false;
+                }
+            }
+            
+            if (!isAdmin) {
+                const errorMsg = `程序 ${programName} 设置为自动启动，只有管理员用户可以手动启动此程序。普通用户无法启动 autoStart 程序。`;
+                ProcessManager._log(1, errorMsg);
+                KernelLogger.warn("ProcessManager", errorMsg);
+                
+                // 显示错误通知
+                if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                    try {
+                        const exploitPid = ProcessManager.EXPLOIT_PID;
+                        await NotificationManager.createNotification(exploitPid, {
+                            title: '权限不足',
+                            content: `程序 "${programName}" 设置为自动启动，只有管理员用户可以手动启动此程序。`,
+                            type: 'snapshot',
+                            duration: 5000
+                        });
+                    } catch (e) {
+                        ProcessManager._log(1, `创建通知失败: ${e.message}`);
+                    }
+                }
+                
+                throw new Error(errorMsg);
+            } else {
+                ProcessManager._log(2, `程序 ${programName} autoStart 权限检查通过（管理员用户）`);
             }
         }
         
@@ -2242,7 +2378,10 @@ class ProcessManager {
         }
         
         // 权限检查（如果权限管理器已加载）- 这是强制性的安全检查
-        if (typeof PermissionManager !== 'undefined') {
+        // 注意：某些 API（如 ScheduleTask.create）需要在内部进行特殊权限检查，跳过默认检查
+        const skipDefaultPermissionCheck = apiName === 'ScheduleTask.create';
+        
+        if (typeof PermissionManager !== 'undefined' && !skipDefaultPermissionCheck) {
             const requiredPermission = ProcessManager._getRequiredPermission(apiName);
             if (requiredPermission) {
                 try {
@@ -2266,6 +2405,9 @@ class ProcessManager {
                 // 该API不需要权限，记录日志
                 ProcessManager._log(3, `API ${apiName} 不需要权限检查`);
             }
+        } else if (skipDefaultPermissionCheck) {
+            // 跳过默认权限检查，API内部会自己处理
+            ProcessManager._log(3, `API ${apiName} 使用内部权限检查`);
         } else {
             // 权限管理器未加载，记录警告但允许继续（向后兼容）
             ProcessManager._log(2, `警告: 权限管理器未加载，跳过权限检查: ${apiName}`);
@@ -2406,6 +2548,14 @@ class ProcessManager {
             'Speech.stopSession': PermissionManager.PERMISSION.SPEECH_RECOGNITION,
             'Speech.getSessionStatus': PermissionManager.PERMISSION.SPEECH_RECOGNITION,
             'Speech.getSessionResults': PermissionManager.PERMISSION.SPEECH_RECOGNITION,
+            
+            // 计划任务API
+            'ScheduleTask.create': PermissionManager.PERMISSION.SCHEDULE_TASK_CREATE,  // 注意：实际权限检查在API内部，因为需要区分普通任务和启动任务
+            'ScheduleTask.delete': PermissionManager.PERMISSION.SCHEDULE_TASK_MANAGE,
+            'ScheduleTask.update': PermissionManager.PERMISSION.SCHEDULE_TASK_MANAGE,
+            'ScheduleTask.get': null,  // 读取操作不需要权限
+            'ScheduleTask.getAll': null,  // 读取操作不需要权限
+            'ScheduleTask.setEnabled': PermissionManager.PERMISSION.SCHEDULE_TASK_MANAGE,
         };
         
         return apiPermissionMap[apiName] || null;
@@ -4577,6 +4727,137 @@ class ProcessManager {
                 return CryptDrive.shuffle(array);
             },
             
+            // 计划任务API
+            'ScheduleTask.create': async (pid, taskConfig, requiresStartupPermission = false) => {
+                if (typeof ScheduleTaskManager === 'undefined') {
+                    throw new Error('ScheduleTaskManager 模块未加载');
+                }
+                
+                if (!pid) {
+                    throw new Error('ScheduleTask.create: 需要 PID');
+                }
+                
+                // 参数验证
+                if (!taskConfig || typeof taskConfig !== 'object') {
+                    throw new Error('ScheduleTask.create: taskConfig 必须是对象');
+                }
+                
+                // 获取程序名称
+                const processInfo = ProcessManager.PROCESS_TABLE.get(pid);
+                if (!processInfo) {
+                    throw new Error(`Process ${pid} does not exist`);
+                }
+                
+                const createdBy = processInfo.programName || `pid_${pid}`;
+                
+                // 检查权限
+                if (requiresStartupPermission) {
+                    // 系统启动后的计划任务需要危险权限
+                    if (typeof PermissionManager !== 'undefined') {
+                        const hasPermission = await PermissionManager.checkAndRequestPermission(
+                            pid, 
+                            PermissionManager.PERMISSION.SCHEDULE_TASK_STARTUP
+                        );
+                        if (!hasPermission) {
+                            throw new Error('没有权限创建系统启动后的计划任务（需要 SCHEDULE_TASK_STARTUP 权限）');
+                        }
+                    }
+                } else {
+                    // 普通计划任务需要特殊权限
+                    if (typeof PermissionManager !== 'undefined') {
+                        const hasPermission = await PermissionManager.checkAndRequestPermission(
+                            pid, 
+                            PermissionManager.PERMISSION.SCHEDULE_TASK_CREATE
+                        );
+                        if (!hasPermission) {
+                            throw new Error('没有权限创建计划任务（需要 SCHEDULE_TASK_CREATE 权限）');
+                        }
+                    }
+                }
+                
+                return await ScheduleTaskManager.createTask(taskConfig, createdBy, requiresStartupPermission);
+            },
+            'ScheduleTask.delete': async (pid, taskId) => {
+                if (typeof ScheduleTaskManager === 'undefined') {
+                    throw new Error('ScheduleTaskManager 模块未加载');
+                }
+                
+                if (!pid) {
+                    throw new Error('ScheduleTask.delete: 需要 PID');
+                }
+                
+                // 检查权限
+                if (typeof PermissionManager !== 'undefined') {
+                    const hasPermission = await PermissionManager.checkAndRequestPermission(
+                        pid, 
+                        PermissionManager.PERMISSION.SCHEDULE_TASK_MANAGE
+                    );
+                    if (!hasPermission) {
+                        throw new Error('没有权限删除计划任务（需要 SCHEDULE_TASK_MANAGE 权限）');
+                    }
+                }
+                
+                return await ScheduleTaskManager.deleteTask(taskId);
+            },
+            'ScheduleTask.update': async (pid, taskId, updates) => {
+                if (typeof ScheduleTaskManager === 'undefined') {
+                    throw new Error('ScheduleTaskManager 模块未加载');
+                }
+                
+                if (!pid) {
+                    throw new Error('ScheduleTask.update: 需要 PID');
+                }
+                
+                // 检查权限
+                if (typeof PermissionManager !== 'undefined') {
+                    const hasPermission = await PermissionManager.checkAndRequestPermission(
+                        pid, 
+                        PermissionManager.PERMISSION.SCHEDULE_TASK_MANAGE
+                    );
+                    if (!hasPermission) {
+                        throw new Error('没有权限更新计划任务（需要 SCHEDULE_TASK_MANAGE 权限）');
+                    }
+                }
+                
+                return await ScheduleTaskManager.updateTask(taskId, updates);
+            },
+            'ScheduleTask.get': async (taskId) => {
+                if (typeof ScheduleTaskManager === 'undefined') {
+                    throw new Error('ScheduleTaskManager 模块未加载');
+                }
+                
+                return ScheduleTaskManager.getTask(taskId);
+            },
+            'ScheduleTask.getAll': async () => {
+                if (typeof ScheduleTaskManager === 'undefined') {
+                    throw new Error('ScheduleTaskManager 模块未加载');
+                }
+                
+                return ScheduleTaskManager.getAllTasks();
+            },
+            'ScheduleTask.setEnabled': async (pid, taskId, enabled) => {
+                if (typeof ScheduleTaskManager === 'undefined') {
+                    throw new Error('ScheduleTaskManager 模块未加载');
+                }
+                
+                if (!pid) {
+                    throw new Error('ScheduleTask.setEnabled: 需要 PID');
+                }
+                
+                // 检查权限
+                if (typeof PermissionManager !== 'undefined') {
+                    const hasPermission = await PermissionManager.checkAndRequestPermission(
+                        pid, 
+                        PermissionManager.PERMISSION.SCHEDULE_TASK_MANAGE
+                    );
+                    if (!hasPermission) {
+                        throw new Error('没有权限管理计划任务（需要 SCHEDULE_TASK_MANAGE 权限）');
+                    }
+                }
+                
+                return await ScheduleTaskManager.setTaskEnabled(taskId, enabled);
+            },
+            
             // 其他API可以在这里添加
         };
         
@@ -4597,7 +4878,11 @@ class ProcessManager {
                 apiName === 'Notification.remove' ||
                 apiName === 'Event.register' ||
                 apiName === 'Event.unregister' ||
-                apiName === 'Event.unregisterAll'
+                apiName === 'Event.unregisterAll' ||
+                apiName === 'ScheduleTask.create' ||
+                apiName === 'ScheduleTask.delete' ||
+                apiName === 'ScheduleTask.update' ||
+                apiName === 'ScheduleTask.setEnabled'
             )) {
                 // 这些 API 需要 pid 作为第一个参数
                 return await apiHandler(pid, ...args);

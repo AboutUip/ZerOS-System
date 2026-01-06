@@ -88,7 +88,12 @@ class PermissionManager {
         SPEECH_RECOGNITION: 'SPEECH_RECOGNITION',          // 语音识别
         
         // 媒体访问权限
-        MEDIA_ACCESS: 'MEDIA_ACCESS'                        // 访问摄像头和麦克风
+        MEDIA_ACCESS: 'MEDIA_ACCESS',                       // 访问摄像头和麦克风
+        
+        // 计划任务权限
+        SCHEDULE_TASK_CREATE: 'SCHEDULE_TASK_CREATE',       // 创建计划任务
+        SCHEDULE_TASK_MANAGE: 'SCHEDULE_TASK_MANAGE',       // 管理计划任务（更新、删除）
+        SCHEDULE_TASK_STARTUP: 'SCHEDULE_TASK_STARTUP'     // 创建系统启动后的计划任务（危险权限）
     };
     
     /**
@@ -110,9 +115,9 @@ class PermissionManager {
         [PermissionManager.PERMISSION.KERNEL_DISK_LIST]: PermissionManager.PERMISSION_LEVEL.NORMAL,
         [PermissionManager.PERMISSION.GUI_WINDOW_CREATE]: PermissionManager.PERMISSION_LEVEL.NORMAL,
         [PermissionManager.PERMISSION.THEME_READ]: PermissionManager.PERMISSION_LEVEL.NORMAL,
+        [PermissionManager.PERMISSION.SYSTEM_NOTIFICATION]: PermissionManager.PERMISSION_LEVEL.NORMAL, // 通知权限（普通权限，自动授予）
         
         // 特殊权限（需要用户确认）
-        [PermissionManager.PERMISSION.SYSTEM_NOTIFICATION]: PermissionManager.PERMISSION_LEVEL.SPECIAL, // 通知权限需要用户确认
         [PermissionManager.PERMISSION.KERNEL_DISK_WRITE]: PermissionManager.PERMISSION_LEVEL.SPECIAL,
         [PermissionManager.PERMISSION.KERNEL_DISK_CREATE]: PermissionManager.PERMISSION_LEVEL.SPECIAL,
         [PermissionManager.PERMISSION.KERNEL_DISK_DELETE]: PermissionManager.PERMISSION_LEVEL.SPECIAL,
@@ -163,8 +168,13 @@ class PermissionManager {
         // 媒体访问权限（特殊权限，需要用户确认）
         [PermissionManager.PERMISSION.MEDIA_ACCESS]: PermissionManager.PERMISSION_LEVEL.SPECIAL,
         
+        // 计划任务权限（特殊权限，需要用户确认）
+        [PermissionManager.PERMISSION.SCHEDULE_TASK_CREATE]: PermissionManager.PERMISSION_LEVEL.SPECIAL,
+        [PermissionManager.PERMISSION.SCHEDULE_TASK_MANAGE]: PermissionManager.PERMISSION_LEVEL.SPECIAL,
+        
         // 危险权限（需要明确授权）
         [PermissionManager.PERMISSION.PROCESS_MANAGE]: PermissionManager.PERMISSION_LEVEL.DANGEROUS,
+        [PermissionManager.PERMISSION.SCHEDULE_TASK_STARTUP]: PermissionManager.PERMISSION_LEVEL.DANGEROUS,  // 系统启动后的计划任务需要危险权限
         
         // 系统存储细粒度权限（危险权限，仅管理员可授予）
         [PermissionManager.PERMISSION.SYSTEM_STORAGE_WRITE_USER_CONTROL]: PermissionManager.PERMISSION_LEVEL.DANGEROUS,
@@ -224,6 +234,18 @@ class PermissionManager {
      * Map<`${pid}_${permission}`, Promise<boolean>>
      */
     static _pendingPermissionChecks = new Map();
+    
+    /**
+     * 权限拒绝次数记录（按程序名称和权限）
+     * Map<`${programName}_${permission}`, count>
+     * 如果某个程序对某个权限连续拒绝3次，则不再弹出权限申请对话框
+     */
+    static _permissionDenialCount = new Map();
+    
+    /**
+     * 最大拒绝次数（达到此次数后不再弹出权限申请）
+     */
+    static MAX_DENIAL_COUNT = 3;
     
     /**
      * 权限审计日志
@@ -315,6 +337,11 @@ class PermissionManager {
                 // 从存储加载权限记录（如果有）
                 PermissionManager._loadPermissions();
                 
+                // 从存储加载拒绝次数记录（如果有，异步加载，不阻塞初始化）
+                PermissionManager._loadDenialCounts().catch(e => {
+                    KernelLogger.warn("PermissionManager", `异步加载拒绝次数记录失败: ${e.message}`);
+                });
+                
                 KernelLogger.info("PermissionManager", "权限管理器初始化完成");
             } catch (e) {
                 KernelLogger.error("PermissionManager", `初始化失败: ${e.message}`, e);
@@ -371,6 +398,110 @@ class PermissionManager {
         } catch (e) {
             KernelLogger.error("PermissionManager", `加载权限记录失败: ${e.message}`, e);
             // 加载失败不影响系统运行，继续使用空权限记录
+        }
+    }
+    
+    /**
+     * 从存储加载拒绝次数记录
+     */
+    static async _loadDenialCounts() {
+        if (typeof LStorage === 'undefined') {
+            KernelLogger.debug("PermissionManager", "LStorage 未加载，跳过拒绝次数记录加载");
+            return;
+        }
+        
+        try {
+            const saved = await LStorage.getSystemStorage('permissionManager.denialCounts');
+            if (saved && typeof saved === 'object') {
+                let loadedCount = 0;
+                for (const [key, count] of Object.entries(saved)) {
+                    if (typeof count === 'number' && count > 0) {
+                        PermissionManager._permissionDenialCount.set(key, count);
+                        loadedCount++;
+                    }
+                }
+                KernelLogger.debug("PermissionManager", `已加载 ${loadedCount} 条拒绝次数记录`);
+            } else {
+                KernelLogger.debug("PermissionManager", "没有保存的拒绝次数记录");
+            }
+        } catch (e) {
+            KernelLogger.error("PermissionManager", `加载拒绝次数记录失败: ${e.message}`, e);
+            // 加载失败不影响系统运行，继续使用空拒绝次数记录
+        }
+    }
+    
+    /**
+     * 保存拒绝次数记录到存储（异步，避免阻塞）
+     */
+    static _saveDenialCounts() {
+        if (typeof LStorage === 'undefined') {
+            KernelLogger.debug("PermissionManager", "LStorage 未加载，跳过拒绝次数记录保存");
+            return;
+        }
+        
+        // 使用异步保存，避免阻塞主线程
+        Promise.resolve().then(() => {
+            try {
+                const denialCounts = {};
+                for (const [key, count] of PermissionManager._permissionDenialCount) {
+                    if (count > 0) {
+                        denialCounts[key] = count;
+                    }
+                }
+                LStorage.setSystemStorage('permissionManager.denialCounts', denialCounts);
+                KernelLogger.debug("PermissionManager", `已保存 ${Object.keys(denialCounts).length} 条拒绝次数记录`);
+            } catch (e) {
+                KernelLogger.error("PermissionManager", `保存拒绝次数记录失败: ${e.message}`, e);
+            }
+        });
+    }
+    
+    /**
+     * 获取拒绝次数键名
+     * @param {string} programName 程序名称
+     * @param {string} permission 权限名称
+     * @returns {string} 键名
+     */
+    static _getDenialCountKey(programName, permission) {
+        return `${programName}_${permission}`;
+    }
+    
+    /**
+     * 获取拒绝次数
+     * @param {string} programName 程序名称
+     * @param {string} permission 权限名称
+     * @returns {number} 拒绝次数
+     */
+    static _getDenialCount(programName, permission) {
+        const key = PermissionManager._getDenialCountKey(programName, permission);
+        return PermissionManager._permissionDenialCount.get(key) || 0;
+    }
+    
+    /**
+     * 增加拒绝次数
+     * @param {string} programName 程序名称
+     * @param {string} permission 权限名称
+     */
+    static _incrementDenialCount(programName, permission) {
+        const key = PermissionManager._getDenialCountKey(programName, permission);
+        const currentCount = PermissionManager._permissionDenialCount.get(key) || 0;
+        const newCount = currentCount + 1;
+        PermissionManager._permissionDenialCount.set(key, newCount);
+        PermissionManager._saveDenialCounts();
+        KernelLogger.debug("PermissionManager", `程序 ${programName} 对权限 ${permission} 的拒绝次数: ${newCount}`);
+    }
+    
+    /**
+     * 重置拒绝次数（权限被授予时调用）
+     * @param {string} programName 程序名称
+     * @param {string} permission 权限名称
+     */
+    static _resetDenialCount(programName, permission) {
+        const key = PermissionManager._getDenialCountKey(programName, permission);
+        if (PermissionManager._permissionDenialCount.has(key)) {
+            PermissionManager._permissionDenialCount.delete(key);
+            PermissionManager._saveDenialCounts();
+            KernelLogger.debug("PermissionManager", `程序 ${programName} 对权限 ${permission} 的拒绝次数已重置`);
         }
     }
     
@@ -896,6 +1027,19 @@ class PermissionManager {
         
         const programName = processInfo.programName || `PID ${pid}`;
         
+        // 检查拒绝次数：如果连续拒绝3次，不再弹出权限申请对话框
+        const denialCount = PermissionManager._getDenialCount(programName, permission);
+        if (denialCount >= PermissionManager.MAX_DENIAL_COUNT) {
+            KernelLogger.warn("PermissionManager", 
+                `程序 ${programName} 对权限 ${permission} 已连续拒绝 ${denialCount} 次，不再弹出权限申请对话框`);
+            PermissionManager._logAudit(pid, permission, 'deny', false, level, { 
+                reason: 'denial_count_exceeded',
+                denialCount: denialCount
+            });
+            PermissionManager._updatePermissionStats(permission, 'denied', true);
+            return false;
+        }
+        
         // 创建请求ID
         const requestId = `perm_${++PermissionManager._requestIdCounter}_${Date.now()}`;
         
@@ -1179,16 +1323,33 @@ class PermissionManager {
             setTimeout(() => overlay.remove(), 200);
         }
         
+        // 获取程序名称
+        const processInfo = typeof ProcessManager !== 'undefined' 
+            ? ProcessManager.PROCESS_TABLE.get(request.pid) 
+            : null;
+        const programName = processInfo?.programName || `PID ${request.pid}`;
+        
         // 处理响应
         if (granted) {
+            // 权限被授予，重置拒绝次数
+            PermissionManager._resetDenialCount(programName, request.permission);
+            
             PermissionManager._grantPermission(request.pid, request.permission);
             KernelLogger.info("PermissionManager", `用户授予程序 ${request.pid} 权限: ${request.permission}`);
             PermissionManager._logAudit(request.pid, request.permission, 'grant', true, request.level, { reason: 'user_granted' });
             PermissionManager._updatePermissionStats(request.permission, 'granted', true);
             request.resolve(true);
         } else {
-            KernelLogger.info("PermissionManager", `用户拒绝程序 ${request.pid} 权限: ${request.permission}`);
-            PermissionManager._logAudit(request.pid, request.permission, 'deny', false, request.level, { reason: 'user_denied' });
+            // 权限被拒绝，增加拒绝次数
+            PermissionManager._incrementDenialCount(programName, request.permission);
+            
+            const denialCount = PermissionManager._getDenialCount(programName, request.permission);
+            KernelLogger.info("PermissionManager", 
+                `用户拒绝程序 ${request.pid} 权限: ${request.permission} (拒绝次数: ${denialCount}/${PermissionManager.MAX_DENIAL_COUNT})`);
+            PermissionManager._logAudit(request.pid, request.permission, 'deny', false, request.level, { 
+                reason: 'user_denied',
+                denialCount: denialCount
+            });
             PermissionManager._updatePermissionStats(request.permission, 'denied', true);
             request.resolve(false);
         }

@@ -4541,6 +4541,25 @@
                             });
                         }
                     }
+                    // JS 文件：提供"作为程序执行"和"用 Vim 打开"选项
+                    else if (extension === 'js') {
+                        if (!isSelectorMode) {
+                            items.push({
+                                label: '作为程序执行',
+                                icon: '▶️',
+                                action: async () => {
+                                    await self._executeAsProgram(itemPath, itemName);
+                                }
+                            });
+                            items.push({
+                                label: '用 Vim 打开',
+                                icon: '✏️',
+                                action: () => {
+                                    self._openFileWithVim({ type: 'file', path: itemPath, name: itemName, fileType: fileType });
+                                }
+                            });
+                        }
+                    }
                     // 文本文件："打开"就是"用 Vim 打开"
                     else if (isTextFile) {
                         if (!isSelectorMode) {
@@ -6101,6 +6120,284 @@
                     this.forwardBtn.style.cursor = 'not-allowed';
                 }
             }
+        },
+        
+        /**
+         * 读取文件内容
+         * @param {string} filePath 文件路径
+         * @returns {Promise<string>} 文件内容
+         */
+        _readFileContent: async function(filePath) {
+            try {
+                // 解析路径：分离父目录路径和文件名
+                const pathParts = filePath.split('/');
+                const fileName = pathParts[pathParts.length - 1];
+                const parentPath = pathParts.slice(0, -1).join('/') || (filePath.split(':')[0] + ':');
+                
+                // 确保路径格式正确
+                let phpPath = parentPath;
+                if (/^[CD]:$/.test(phpPath)) {
+                    phpPath = phpPath + '/';
+                }
+                
+                // 从 PHP 服务读取文件
+                const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                    : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                        ? SystemInformation.getOrigin()
+                        : window.location.origin);
+                url.searchParams.set('action', 'read_file');
+                url.searchParams.set('path', phpPath);
+                url.searchParams.set('fileName', fileName);
+                
+                const response = await fetch(url.toString());
+                
+                if (!response.ok) {
+                    const errorResult = await response.json().catch(() => ({ message: response.statusText }));
+                    const errorMessage = errorResult.message || `HTTP ${response.status}`;
+                    throw new Error(errorMessage);
+                }
+                
+                const result = await response.json();
+                
+                if (result.status !== 'success' || !result.data || !result.data.content) {
+                    throw new Error(result.message || '文件读取失败');
+                }
+                
+                return result.data.content || '';
+            } catch (error) {
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('FileManager', `读取文件失败: ${filePath}`, error);
+                }
+                throw error;
+            }
+        },
+        
+        /**
+         * 作为程序执行 JS 文件
+         * @param {string} filePath 文件路径
+         * @param {string} fileName 文件名
+         */
+        _executeAsProgram: async function(filePath, fileName) {
+            try {
+                if (typeof ProcessManager === 'undefined') {
+                    throw new Error("ProcessManager 不可用");
+                }
+                
+                // 读取文件内容，进行完整的程序验证
+                const fileContent = await this._readFileContent(filePath);
+                if (!fileContent) {
+                    throw new Error("无法读取文件内容");
+                }
+                
+                // 使用 ProcessManager 的验证方法检查文件
+                if (typeof ProcessManager !== 'undefined' && typeof ProcessManager.validateProgramFile === 'function') {
+                    const validation = ProcessManager.validateProgramFile(fileContent, fileName);
+                    
+                    if (!validation.valid) {
+                        // 有错误，无法执行
+                        const errorMsg = `文件 "${fileName}" 不符合 ZerOS 程序规范：\n${validation.errors.join('\n')}`;
+                        await this._showNotification('无法执行', errorMsg, 'error');
+                        return;
+                    }
+                    
+                    // 有警告，显示警告信息
+                    if (validation.warnings.length > 0) {
+                        const warningMsg = `文件 "${fileName}" 存在以下警告：\n${validation.warnings.join('\n')}\n\n程序将继续执行。`;
+                        await this._showNotification('程序警告', warningMsg, 'warning');
+                    }
+                } else {
+                    // 降级方案：简单检查
+                    const hasInitMethod = /__init__\s*[:=]\s*function|__init__\s*\(|function\s+__init__/.test(fileContent);
+                    if (!hasInitMethod) {
+                        await this._showNotification('无法执行', `文件 "${fileName}" 不包含 __init__ 方法，无法作为程序执行。`, 'error');
+                        return;
+                    }
+                }
+                
+                // 从文件名提取程序名称（去掉扩展名）
+                const programName = fileName.replace(/\.js$/i, '').toLowerCase();
+                
+                // 尝试使用 ProcessManager 启动程序
+                try {
+                    // 首先尝试作为已注册的程序启动
+                    const pid = await ProcessManager.startProgram(programName, {
+                        args: [filePath]
+                    });
+                    
+                    if (pid) {
+                        await this._showNotification('执行成功', `程序 "${fileName}" 已启动 (PID: ${pid})`, 'info');
+                        return;
+                    }
+                } catch (e) {
+                    // 如果程序未注册，使用临时程序配置启动
+                    if (e.message && (e.message.includes('未找到') || e.message.includes('not found') || e.message.includes('not found in application assets'))) {
+                        // 创建临时程序配置
+                        const tempAsset = {
+                            script: filePath,
+                            styles: [],  // 无样式表
+                            icon: "D:/application/terminal/terminal.svg",  // 共用终端程序图标
+                            metadata: {
+                                autoStart: false,
+                                priority: 100,
+                                description: `临时程序: ${fileName}`,
+                                version: "1.0.0",
+                                type: "GUI",
+                                alwaysShowInTaskbar: false,
+                                allowMultipleInstances: true,
+                                supportsPreview: false,
+                                category: "other",
+                                isTemporary: true  // 标记为临时程序
+                            }
+                        };
+                        
+                        // 使用临时程序配置启动
+                        try {
+                            const pid = await ProcessManager.startProgram(programName, {
+                                args: [filePath],
+                                tempAsset: tempAsset
+                            });
+                            
+                            if (pid) {
+                                await this._showNotification('执行成功', `程序 "${fileName}" 已作为临时程序启动 (PID: ${pid})`, 'info');
+                                return;
+                            }
+                        } catch (tempError) {
+                            // 临时程序启动失败，显示错误
+                            await this._showNotification('执行失败', `无法启动临时程序 "${fileName}": ${tempError.message}`, 'error');
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.error('FileManager', `临时程序启动失败: ${filePath}`, tempError);
+                            }
+                            return;
+                        }
+                    } else {
+                        throw e;
+                    }
+                }
+            } catch (error) {
+                const errorMessage = error.message || String(error);
+                await this._showNotification('执行失败', `无法执行文件 "${fileName}": ${errorMessage}`, 'error');
+                
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('FileManager', `执行程序失败: ${filePath}`, error);
+                }
+            }
+        },
+        
+        /**
+         * 动态加载并执行脚本
+         * @param {string} filePath 文件路径
+         * @param {string} fileName 文件名
+         * @param {string} programName 程序名称
+         */
+        _executeDynamicScript: async function(filePath, fileName, programName) {
+            try {
+                // 加载脚本
+                const actualUrl = ProcessManager.convertVirtualPathToUrl(filePath);
+                const script = document.createElement('script');
+                script.src = actualUrl;
+                script.async = true;
+                
+                await new Promise((resolve, reject) => {
+                    script.onload = resolve;
+                    script.onerror = () => reject(new Error('脚本加载失败'));
+                    document.head.appendChild(script);
+                });
+                
+                // 等待脚本加载完成并查找程序对象
+                // 尝试多种可能的程序对象名称
+                const possibleNames = [
+                    programName.toUpperCase().replace(/[^A-Z0-9]/g, ''),
+                    programName.replace(/[^a-zA-Z0-9]/g, '').toUpperCase(),
+                    fileName.replace(/\.js$/i, '').replace(/[^a-zA-Z0-9]/g, '').toUpperCase()
+                ];
+                
+                let programClass = null;
+                let foundName = null;
+                
+                // 等待一段时间让脚本执行
+                for (let i = 0; i < 20; i++) {
+                    await new Promise(resolve => setTimeout(resolve, 50));
+                    
+                    // 检查 window 和 globalThis
+                    for (const name of possibleNames) {
+                        if (typeof window !== 'undefined' && window[name]) {
+                            programClass = window[name];
+                            foundName = name;
+                            break;
+                        } else if (typeof globalThis !== 'undefined' && globalThis[name]) {
+                            programClass = globalThis[name];
+                            foundName = name;
+                            break;
+                        } else if (typeof POOL !== 'undefined' && typeof POOL.__GET__ === 'function') {
+                            try {
+                                const poolObj = POOL.__GET__("APPLICATION_POOL", name);
+                                if (poolObj) {
+                                    programClass = poolObj;
+                                    foundName = name;
+                                    break;
+                                }
+                            } catch (e) {
+                                // 忽略错误
+                            }
+                        }
+                    }
+                    
+                    if (programClass) {
+                        break;
+                    }
+                }
+                
+                // 检查是否有 __init__ 方法
+                if (!programClass || typeof programClass.__init__ !== 'function') {
+                    await this._showNotification('无法执行', `文件 "${fileName}" 加载后未找到有效的程序对象或 __init__ 方法。\n\n提示：程序对象名称应为 "${possibleNames[0]}" 或类似格式。`, 'error');
+                    return;
+                }
+                
+                // 使用 ProcessManager 的 callKernelAPI 来启动程序
+                // 但 ProcessManager.startProgram 需要程序在 ApplicationAssets 中注册
+                // 所以我们直接调用程序对象的 __init__ 方法，但这需要手动管理进程
+                // 更安全的方式是提示用户该文件需要注册为程序
+                await this._showNotification('无法执行', `文件 "${fileName}" 已加载，但需要先在系统中注册为程序才能执行。\n\n程序对象 "${foundName}" 已找到，但 ProcessManager 需要程序在 ApplicationAssets 中注册。`, 'error');
+                
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.warn('FileManager', `动态加载的程序 "${fileName}" 需要注册: ${filePath}`);
+                }
+            } catch (error) {
+                const errorMessage = error.message || String(error);
+                await this._showNotification('执行失败', `动态执行文件 "${fileName}" 失败: ${errorMessage}`, 'error');
+                
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('FileManager', `动态执行程序失败: ${filePath}`, error);
+                }
+            }
+        },
+        
+        /**
+         * 显示通知
+         * @param {string} title 标题
+         * @param {string} message 消息
+         * @param {string} type 类型：'info', 'error', 'warning'
+         */
+        _showNotification: async function(title, message, type = 'info') {
+            if (typeof NotificationManager !== 'undefined') {
+                try {
+                    await NotificationManager.createNotification(this.pid, {
+                        title: title,
+                        content: message,
+                        type: 'snapshot',
+                        duration: type === 'error' ? 5000 : 3000
+                    });
+                } catch (e) {
+                    // 如果通知失败，使用 GUIManager 的对话框
+                    if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
+                        await GUIManager.showAlert(message, title, type);
+                    }
+                }
+            } else if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
+                await GUIManager.showAlert(message, title, type);
+            }
+            // 如果都没有，静默失败（不显示弹窗）
         },
         
         /**

@@ -395,6 +395,7 @@ PermissionManager.clearAuditLog(true);
 - `KERNEL_DISK_LIST` - 列出目录
 - `GUI_WINDOW_CREATE` - 创建窗口
 - `THEME_READ` - 读取主题
+- `SYSTEM_NOTIFICATION` - 系统通知
 - `EVENT_LISTENER` - 事件监听
 - `CACHE_READ` - 读取缓存
 - `CACHE_WRITE` - 写入缓存
@@ -407,8 +408,6 @@ PermissionManager.clearAuditLog(true);
 ### 特殊权限（需要用户确认）
 
 特殊权限首次使用时需要用户确认，用户允许后会被持久化保存。
-
-- `SYSTEM_NOTIFICATION` - 系统通知
 - `KERNEL_DISK_WRITE` - 写入文件
 - `KERNEL_DISK_CREATE` - 创建文件/目录
 - `KERNEL_DISK_DELETE` - 删除文件

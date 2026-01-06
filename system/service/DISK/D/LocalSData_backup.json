@@ -1,16 +1,12 @@
 {
   "system": {
     "permissionManager.permissions": {
-      "themeanimator": [
+      "filemanager": [
         "GUI_WINDOW_CREATE",
-        "THEME_READ",
-        "EVENT_LISTENER",
-        "CACHE_READ",
-        "CACHE_WRITE",
         "KERNEL_DISK_READ",
         "KERNEL_DISK_LIST",
-        "SYSTEM_STORAGE_READ",
-        "SYSTEM_STORAGE_WRITE"
+        "SYSTEM_NOTIFICATION",
+        "EVENT_LISTENER"
       ]
     },
     "system.style": "macos",
@@ -534,7 +530,7 @@
         "password": "61b249bf6d604d14120821f43625e84e",
         "avatar": "avatar_root_1766272534753.jpg",
         "createdAt": 1766271155991,
-        "lastLogin": 1767723050031
+        "lastLogin": 1767730747768
       },
       "TestUser": {
         "level": "USER",
@@ -551,7 +547,7 @@
         "lastLogin": 1767723166469
       }
     },
-    "userControl.currentUser": "TestUser",
+    "userControl.currentUser": "root",
     "system.lockscreenTimeComponent": true,
     "system.lockscreenBackground": "D:/cache/lockscreen/lockscreen_local_D__cache_random_anime_bg_1766148286160_jpg_random_anime_bg_1766148286160.jpg",
     "system.lockscreenRandomBg": false,
@@ -604,7 +600,8 @@
       }
     },
     "desktop.iconSize": "medium",
-    "system.taskbarWeatherEnabled": false
+    "system.taskbarWeatherEnabled": false,
+    "scheduleTaskManager.tasks": []
   },
   "programs": {}
 }

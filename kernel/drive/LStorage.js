@@ -961,7 +961,7 @@ class LStorage {
         const currentPid = LStorage._getCurrentPid();
         
         // 调试日志：记录调用信息（对敏感键或无法获取PID的情况）
-        const isSensitiveKeyCheck = key.startsWith('userControl.') || key.startsWith('permissionControl.') || key === 'permissionManager.permissions';
+        const isSensitiveKeyCheck = key.startsWith('userControl.') || key.startsWith('permissionControl.') || key === 'permissionManager.permissions' || key === 'permissionManager.denialCounts';
         if (isSensitiveKeyCheck || !isKernelModuleCall || !currentPid) {
             KernelLogger.debug("LStorage", `调用检测 - 键: ${key}, 内核模块: ${isKernelModuleCall}, PID: ${currentPid || 'null'}`);
         }
@@ -998,7 +998,7 @@ class LStorage {
         if (isSensitiveKey) {
             // 对于敏感键，即使是内核模块调用，也要进行严格验证
             const isUserControlKey = key.startsWith('userControl.');
-            const isPermissionControlKey = key.startsWith('permissionControl.') || key === 'permissionManager.permissions';
+            const isPermissionControlKey = key.startsWith('permissionControl.') || key === 'permissionManager.permissions' || key === 'permissionManager.denialCounts';
             
             KernelLogger.debug("LStorage", `敏感键检查 - 键: ${key}, isUserControlKey: ${isUserControlKey}, isPermissionControlKey: ${isPermissionControlKey}, isSystemLoading: ${isSystemLoading}`);
             
@@ -1022,22 +1022,23 @@ class LStorage {
                 // 检查 PermissionManager 模块（独立检查，不依赖 allowedInSystemLoading）
                 if (isPermissionControlKey) {
                     // 更宽松的匹配：检查调用栈中是否包含 permissionManager 相关的标识
-                    // 包括：permissionManager.js, permissionManager, _loadPermissions 等
+                    // 包括：permissionManager.js, permissionManager, _loadPermissions, _loadDenialCounts 等
                     const hasPermissionManagerPath = /kernel[\/\\]process[\/\\].*permissionManager/i.test(fullCallStack);
                     const hasPermissionManagerName = /permissionManager/i.test(fullCallStack);
                     const hasLoadPermissions = /_loadPermissions/i.test(fullCallStack);
+                    const hasLoadDenialCounts = /_loadDenialCounts/i.test(fullCallStack);
                     const hasPermissionManagerFile = /permissionManager\.js/i.test(fullCallStack);
                     
-                    KernelLogger.debug("LStorage", `系统加载中（POOL标志位），PermissionManager 检查 - hasPath: ${hasPermissionManagerPath}, hasName: ${hasPermissionManagerName}, hasLoadPermissions: ${hasLoadPermissions}, hasFile: ${hasPermissionManagerFile}`);
+                    KernelLogger.debug("LStorage", `系统加载中（POOL标志位），PermissionManager 检查 - hasPath: ${hasPermissionManagerPath}, hasName: ${hasPermissionManagerName}, hasLoadPermissions: ${hasLoadPermissions}, hasLoadDenialCounts: ${hasLoadDenialCounts}, hasFile: ${hasPermissionManagerFile}`);
                     
-                    // 在系统加载期间，如果键是 permissionManager.permissions，且调用栈检查失败
+                    // 在系统加载期间，如果键是 permissionManager.permissions 或 permissionManager.denialCounts，且调用栈检查失败
                     // 我们仍然允许访问（因为这是系统初始化必需的，调用栈可能被截断）
-                    if (key === 'permissionManager.permissions') {
-                        if (hasPermissionManagerPath || hasPermissionManagerName || hasLoadPermissions || hasPermissionManagerFile) {
+                    if (key === 'permissionManager.permissions' || key === 'permissionManager.denialCounts') {
+                        if (hasPermissionManagerPath || hasPermissionManagerName || hasLoadPermissions || hasLoadDenialCounts || hasPermissionManagerFile) {
                             allowedInSystemLoading = true;
                             KernelLogger.debug("LStorage", `系统加载中（POOL标志位），检测到 PermissionManager 调用，允许读取 ${key}`);
                         } else {
-                            // 系统加载期间，permissionManager.permissions 应该允许访问（系统初始化需要）
+                            // 系统加载期间，permissionManager 相关键应该允许访问（系统初始化需要）
                             // 即使调用栈检查失败，也允许（因为调用栈可能被截断）
                             allowedInSystemLoading = true;
                             // 这是系统初始化时的正常情况，使用 debug 级别而不是 warn
@@ -1046,7 +1047,7 @@ class LStorage {
                         }
                     } else {
                         // 其他 permissionControl 键，需要严格匹配
-                        if (hasPermissionManagerPath || hasPermissionManagerName || hasLoadPermissions || hasPermissionManagerFile) {
+                        if (hasPermissionManagerPath || hasPermissionManagerName || hasLoadPermissions || hasLoadDenialCounts || hasPermissionManagerFile) {
                             allowedInSystemLoading = true;
                             KernelLogger.debug("LStorage", `系统加载中（POOL标志位），检测到 PermissionManager 调用，允许读取 ${key}`);
                         } else {
@@ -1089,8 +1090,8 @@ class LStorage {
                     // 检查调用栈中是否包含内核模块标识
                     if (/kernel[\/\\]process[\/\\].*permissionManager/i.test(fullStack) || 
                         /permissionManager/i.test(fullStack)) {
-                        // 如果调用栈中包含 permissionManager，且是敏感键 permissionManager.permissions，允许通过
-                        if (isPermissionControlKey && key === 'permissionManager.permissions') {
+                        // 如果调用栈中包含 permissionManager，且是 permissionManager 相关键，允许通过
+                        if (isPermissionControlKey && (key === 'permissionManager.permissions' || key === 'permissionManager.denialCounts')) {
                             KernelLogger.debug("LStorage", `检测到 PermissionManager 调用（二次检查），允许读取 ${key}`);
                             isKernelModuleCall = true; // 标记为内核模块调用，继续后续验证
                         }

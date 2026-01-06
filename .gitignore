@@ -27,18 +27,11 @@ logs/
 *.temp
 *.bak
 *.backup
-*.cache
 
 # 依赖文件（如果有）
 node_modules/
 package-lock.json
 yarn.lock
-
-# 构建文件
-dist/
-build/
-*.min.js.map
-*.min.css.map
 
 # 环境变量文件
 .env

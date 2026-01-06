@@ -45,6 +45,7 @@
 - [SpeechDrive.md](./SpeechDrive.md) - 语音识别驱动（基于 Web Speech API） ✅
 - [CryptDrive.md](./CryptDrive.md) - 加密驱动 ✅
 - [MultithreadingDrive.md](./MultithreadingDrive.md) - 多线程驱动 ✅
+- [ScheduleTaskManager.md](./ScheduleTaskManager.md) - 计划任务管理器 ✅
 
 ### 后端服务
 - [FSDirve.md](./FSDirve.md) - 文件系统驱动服务（支持 PHP 和 SpringBoot 后端） ✅
@@ -115,6 +116,7 @@
 - SpeechDrive
 - CryptDrive
 - MultithreadingDrive
+- ScheduleTaskManager
 - FSDirve (后端服务，支持 PHP 和 SpringBoot)
 - SystemInformation (系统信息和后端服务管理)
 

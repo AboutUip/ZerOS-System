@@ -39,6 +39,8 @@ ProcessManager.EXPLOIT_PID = 10000;  // Exploit 程序固定 PID
   - `terminal` (Object): 终端实例（CLI 程序，可选）
   - `metadata` (Object): 元数据
   - `autoStart` (boolean): 是否自动启动（内部使用）
+  - `scheduledTask` (boolean): 是否由计划任务启动（内部使用，计划任务启动时传递此标志）
+  - `taskId` (string): 计划任务ID（内部使用，计划任务启动时传递）
   - `forCLI` (boolean): 是否为 CLI 程序专用终端（内部使用）
   - `cliProgramName` (string): 关联的 CLI 程序名称（内部使用）
   - `cliProgramPid` (number): 关联的 CLI 程序 PID（内部使用）
@@ -76,6 +78,17 @@ const pid = await ProcessManager.startProgram('vim', {
 9. 调用程序的 `__init__` 方法
 10. 标记程序创建的 DOM 元素
 11. 更新进程状态为 `running`
+
+**autoStart 程序权限限制**:
+- 如果程序设置了 `autoStart=true`，普通用户无法手动启动该程序
+- 只有管理员用户可以手动启动 `autoStart=true` 的程序
+- 系统启动时，只有管理员才会自动启动 `autoStart=true` 的程序
+- 计划任务可以启动 `autoStart=true` 的程序（通过传递 `scheduledTask: true` 标志绕过权限检查）
+
+**计划任务兼容性**:
+- 计划任务启动程序时，会传递 `scheduledTask: true` 和 `taskId` 参数
+- 计划任务启动的程序可以绕过 `autoStart` 权限检查
+- 计划任务可以启动任何程序，包括设置了 `autoStart=true` 的程序
 
 ### 程序终止
 
@@ -490,6 +503,12 @@ const allProcesses = ProcessManager.getProcessInfo();
 - `Speech.stopSession` - 停止语音识别会话（需要 `SPEECH_RECOGNITION` 权限）
 - `Speech.getSessionStatus` - 获取会话状态（需要 `SPEECH_RECOGNITION` 权限）
 - `Speech.getSessionResults` - 获取识别结果（需要 `SPEECH_RECOGNITION` 权限）
+- `ScheduleTask.create` - 创建计划任务（需要 `SCHEDULE_TASK_CREATE` 或 `SCHEDULE_TASK_STARTUP` 权限）
+- `ScheduleTask.delete` - 删除计划任务（需要 `SCHEDULE_TASK_MANAGE` 权限）
+- `ScheduleTask.update` - 更新计划任务（需要 `SCHEDULE_TASK_MANAGE` 权限）
+- `ScheduleTask.get` - 获取计划任务信息（无需权限）
+- `ScheduleTask.getAll` - 获取所有计划任务（无需权限）
+- `ScheduleTask.setEnabled` - 启用/禁用计划任务（需要 `SCHEDULE_TASK_MANAGE` 权限）
 
 **示例**:
 ```javascript

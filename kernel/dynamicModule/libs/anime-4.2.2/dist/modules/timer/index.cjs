@@ -1,0 +1,15 @@
+/**
+ * Anime.js - timer - CJS
+ * @version v4.2.2
+ * @license MIT
+ * @copyright 2025 - Julian Garnier
+ */
+
+'use strict';
+
+var timer = require('./timer.cjs');
+
+
+
+exports.Timer = timer.Timer;
+exports.createTimer = timer.createTimer;

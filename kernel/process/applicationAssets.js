@@ -508,6 +508,23 @@ const APPLICATION_ASSETS = {
         }
     },
     
+    "scheduletask": {
+        script: "D:/application/scheduletask/scheduletask.js",
+        styles: ["D:/application/scheduletask/scheduletask.css"],
+        icon: "D:/application/scheduletask/scheduletask.svg",
+        metadata: {
+            autoStart: false,
+            priority: 4,
+            description: "计划任务管理",
+            version: "1.0.0",
+            type: "GUI",
+            alwaysShowInTaskbar: false,
+            allowMultipleInstances: true,
+            supportsPreview: true,
+            category: "system"
+        }
+    },
+    
     "permissioncontrol": {
         script: "D:/application/permissioncontrol/permissioncontrol.js",
         styles: ["D:/application/permissioncontrol/permissioncontrol.css"],

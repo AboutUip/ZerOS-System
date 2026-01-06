@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="scheduleGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#8b5cf6;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#6366f1;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- 背景圆形 -->
+  <circle cx="32" cy="32" r="30" fill="url(#scheduleGradient)" opacity="0.2"/>
+  
+  <!-- 时钟外圈 -->
+  <circle cx="32" cy="32" r="24" fill="none" stroke="url(#scheduleGradient)" stroke-width="2"/>
+  
+  <!-- 时钟刻度 -->
+  <line x1="32" y1="8" x2="32" y2="12" stroke="url(#scheduleGradient)" stroke-width="2" stroke-linecap="round"/>
+  <line x1="32" y1="52" x2="32" y2="56" stroke="url(#scheduleGradient)" stroke-width="2" stroke-linecap="round"/>
+  <line x1="8" y1="32" x2="12" y2="32" stroke="url(#scheduleGradient)" stroke-width="2" stroke-linecap="round"/>
+  <line x1="52" y1="32" x2="56" y2="32" stroke="url(#scheduleGradient)" stroke-width="2" stroke-linecap="round"/>
+  
+  <!-- 时针 -->
+  <line x1="32" y1="32" x2="32" y2="20" stroke="url(#scheduleGradient)" stroke-width="3" stroke-linecap="round"/>
+  
+  <!-- 分针 -->
+  <line x1="32" y1="32" x2="40" y2="32" stroke="url(#scheduleGradient)" stroke-width="2" stroke-linecap="round"/>
+  
+  <!-- 中心点 -->
+  <circle cx="32" cy="32" r="3" fill="url(#scheduleGradient)"/>
+  
+  <!-- 任务标记点 -->
+  <circle cx="32" cy="12" r="2" fill="url(#scheduleGradient)"/>
+  <circle cx="44" cy="20" r="2" fill="url(#scheduleGradient)"/>
+  <circle cx="52" cy="32" r="2" fill="url(#scheduleGradient)"/>
+</svg>
+

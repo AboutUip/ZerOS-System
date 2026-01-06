@@ -136,6 +136,12 @@
         // 第十二层：语音识别驱动器（依赖进程管理器，用于进程退出时清理会话）
         "../kernel/drive/speechDrive.js": [
             "../kernel/process/processManager.js"
+        ],     
+        // 第十二层：计划任务管理器（依赖进程管理器、本地存储管理器和应用程序资源管理器）
+        "../kernel/drive/scheduleTaskManager.js": [
+            "../kernel/process/processManager.js",
+            "../kernel/drive/LStorage.js",
+            "../kernel/process/applicationAssetManager.js"
         ],
     };
     
