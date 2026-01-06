@@ -856,7 +856,9 @@
                 }
                 
                 // 构建代理 URL
-                const proxyBaseUrl = '/system/service/audio-proxy.php';
+                const proxyBaseUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.getAudioProxyPath) 
+                    ? SystemInformation.getAudioProxyPath()
+                    : '/system/service/audio-proxy.php';
                 const encodedUrl = encodeURIComponent(originalUrl);
                 return `${proxyBaseUrl}?url=${encodedUrl}`;
             } catch (error) {

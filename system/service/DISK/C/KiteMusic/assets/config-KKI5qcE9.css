@@ -1,0 +1,193 @@
+[data-v-6073acd5]::-webkit-scrollbar {
+  width: 6px;
+  height: 8px;
+}
+[data-v-6073acd5]::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  visibility: visible;
+}
+[data-v-6073acd5]:hover::-webkit-scrollbar-thumb {
+  visibility: visible;
+}
+[data-v-6073acd5]::-webkit-scrollbar-thumb {
+  visibility: hidden;
+}
+/* 字体定义规范 */
+.bgSetting[data-v-6073acd5] {
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+.v-field.v-field--center-affix[data-v-6073acd5] {
+  border-radius: 8px;
+}
+.y-player-container[data-v-6073acd5]::-webkit-scrollbar-thumb {
+  display: none;
+}
+.icon[data-v-6073acd5] {
+  width: 1em;
+  height: 1em;
+  vertical-align: -0.15em;
+  fill: currentColor;
+  overflow: hidden;
+}
+.el-loading-mask[data-v-6073acd5] {
+  background: transparent;
+}
+#box[data-v-6073acd5] {
+  display: flex;
+  height: calc(100%);
+}
+.main[data-v-6073acd5] {
+  height: 100%;
+  width: calc(100% - 230px);
+  z-index: auto;
+  position: relative;
+}
+.body[data-v-6073acd5] {
+  height: calc(100% - 60px);
+  padding-bottom: 130px;
+  overflow: hidden;
+  overflow-y: auto;
+  width: 100%;
+  display: flex;
+  align-content: baseline;
+  flex-direction: column;
+}
+.body .top[data-v-6073acd5] {
+  margin-bottom: 20px;
+}
+.body .padding-container[data-v-6073acd5] {
+  padding: 0 32px;
+  padding-bottom: 32px;
+}
+[data-v-6073acd5] {
+  margin: 0;
+  box-sizing: border-box;
+}
+body.bold[data-v-6073acd5] {
+  font-weight: 600;
+}
+html[data-v-6073acd5],
+body[data-v-6073acd5],
+#app[data-v-6073acd5] {
+  height: 100%;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  color: #d2d2d2;
+  overflow: hidden;
+  background-color: #13131a;
+}
+img[data-v-6073acd5] {
+  user-select: none;
+}
+#app[data-v-6073acd5] {
+  position: relative;
+}
+.window-container[data-v-6073acd5] {
+  -webkit-app-region: drag;
+}
+.no-drag[data-v-6073acd5] {
+  -webkit-app-region: no-drag !important;
+}
+.v-input--horizontal .v-input__append[data-v-6073acd5] {
+  margin-inline-start: 6px;
+}
+.list-info[data-v-6073acd5] {
+  display: flex;
+  padding: 0 35px;
+}
+.list-info .left[data-v-6073acd5] {
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  width: 220px;
+  height: 220px;
+  border-radius: 10px;
+  position: relative;
+}
+.list-info .left .count[data-v-6073acd5] {
+  color: white;
+  position: absolute;
+  right: 10px;
+  top: 8px;
+  font-size: 15px;
+}
+.list-info .text-info-desc[data-v-6073acd5] {
+  font-size: 12px;
+  margin-bottom: 5px;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+.list-info .right[data-v-6073acd5] {
+  margin-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.list-info .right > div[data-v-6073acd5] {
+  display: flex;
+  align-items: center;
+  color: #d2d2d2;
+}
+.list-info .right .song-name .name[data-v-6073acd5] {
+  color: white;
+  font-size: 25px;
+  margin-left: 10px;
+}
+.list-info .right .song-name .tag[data-v-6073acd5] {
+  font-size: 13px;
+  border-radius: 3px;
+  padding: 0 5px;
+  color: #ec4141;
+  border: 1px solid #ec4141;
+}
+.list-info .right .song-name .tag + .list-info .right .song-name .tag[data-v-6073acd5] {
+  margin-left: 5px;
+}
+.list-info .right .song-info[data-v-6073acd5] {
+  font-size: 12px;
+}
+.list-info .right .song-info[data-v-6073acd5] * + * {
+  margin-left: 8px;
+}
+.list-info .right .song-info .avatar[data-v-6073acd5] {
+  border-radius: 50%;
+  width: 25px;
+  height: 25px;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  cursor: pointer;
+}
+.list-info .right .song-info .nickname[data-v-6073acd5] {
+  color: #85b9e6;
+  cursor: pointer;
+}
+.list-info .right .song-info .nickname[data-v-6073acd5]:hover {
+  color: #96c8e6;
+}
+.list-info .right .song-info .create-timer[data-v-6073acd5] {
+  color: #969696;
+}
+.list-info .right .song-handle[data-v-6073acd5] {
+  display: flex;
+  gap: 10px;
+  font-size: 14px;
+}
+.list-info .right .song-count[data-v-6073acd5] {
+  font-size: 13px;
+}
+.list-info .right .song-count .p1[data-v-6073acd5] {
+  margin-right: 13px;
+}
+.list-info .right .song-count > div > span[data-v-6073acd5] {
+  color: #969696;
+}
+.list-info .right .song-count > div[data-v-6073acd5] > :first-child {
+  color: #d2d2d2;
+}

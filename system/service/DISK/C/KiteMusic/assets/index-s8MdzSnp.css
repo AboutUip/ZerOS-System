@@ -1,0 +1,139 @@
+[data-v-717fe7a7]::-webkit-scrollbar {
+  width: 6px;
+  height: 8px;
+}
+[data-v-717fe7a7]::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  visibility: visible;
+}
+[data-v-717fe7a7]:hover::-webkit-scrollbar-thumb {
+  visibility: visible;
+}
+[data-v-717fe7a7]::-webkit-scrollbar-thumb {
+  visibility: hidden;
+}
+/* 字体定义规范 */
+.bgSetting[data-v-717fe7a7] {
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+.v-field.v-field--center-affix[data-v-717fe7a7] {
+  border-radius: 8px;
+}
+.y-player-container[data-v-717fe7a7]::-webkit-scrollbar-thumb {
+  display: none;
+}
+.icon[data-v-717fe7a7] {
+  width: 1em;
+  height: 1em;
+  vertical-align: -0.15em;
+  fill: currentColor;
+  overflow: hidden;
+}
+.el-loading-mask[data-v-717fe7a7] {
+  background: transparent;
+}
+#box[data-v-717fe7a7] {
+  display: flex;
+  height: calc(100%);
+}
+.main[data-v-717fe7a7] {
+  height: 100%;
+  width: calc(100% - 230px);
+  z-index: auto;
+  position: relative;
+}
+.body[data-v-717fe7a7] {
+  height: calc(100% - 60px);
+  padding-bottom: 130px;
+  overflow: hidden;
+  overflow-y: auto;
+  width: 100%;
+  display: flex;
+  align-content: baseline;
+  flex-direction: column;
+}
+.body .top[data-v-717fe7a7] {
+  margin-bottom: 20px;
+}
+.body .padding-container[data-v-717fe7a7] {
+  padding: 0 32px;
+  padding-bottom: 32px;
+}
+[data-v-717fe7a7] {
+  margin: 0;
+  box-sizing: border-box;
+}
+body.bold[data-v-717fe7a7] {
+  font-weight: 600;
+}
+html[data-v-717fe7a7],
+body[data-v-717fe7a7],
+#app[data-v-717fe7a7] {
+  height: 100%;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  color: #d2d2d2;
+  overflow: hidden;
+  background-color: #13131a;
+}
+img[data-v-717fe7a7] {
+  user-select: none;
+}
+#app[data-v-717fe7a7] {
+  position: relative;
+}
+.window-container[data-v-717fe7a7] {
+  -webkit-app-region: drag;
+}
+.no-drag[data-v-717fe7a7] {
+  -webkit-app-region: no-drag !important;
+}
+.v-input--horizontal .v-input__append[data-v-717fe7a7] {
+  margin-inline-start: 6px;
+}
+.song-list-container[data-v-717fe7a7] {
+  padding-top: 0;
+  padding-left: 15px;
+}
+.padding-container[data-v-717fe7a7] {
+  padding-bottom: 10px !important;
+}
+.keyword[data-v-717fe7a7] {
+  color: #d2d2d2;
+  font-size: 21px;
+}
+.keyword .keyword-text[data-v-717fe7a7] {
+  font-size: 14px;
+  margin-left: 10px;
+  color: rgba(150, 150, 150, 0.6);
+}
+.card[data-v-717fe7a7] {
+  cursor: pointer;
+  border-radius: 10px;
+  position: relative;
+  margin-bottom: 20px;
+}
+.card .img-box[data-v-717fe7a7] {
+  position: relative;
+}
+.card .img-box .img[data-v-717fe7a7] {
+  width: 200px;
+  height: 200px;
+  border-radius: 10px;
+}
+.card .img-box .count[data-v-717fe7a7] {
+  position: absolute;
+  right: 10px;
+  top: 5px;
+  color: white;
+}
+.card .name[data-v-717fe7a7] {
+  font-weight: 400;
+  font-size: 16px;
+}
+.card + .card[data-v-717fe7a7] {
+  margin-left: 20px;
+}

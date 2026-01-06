@@ -1,0 +1,144 @@
+[data-v-a7bf1b50]::-webkit-scrollbar {
+  width: 6px;
+  height: 8px;
+}
+[data-v-a7bf1b50]::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  visibility: visible;
+}
+[data-v-a7bf1b50]:hover::-webkit-scrollbar-thumb {
+  visibility: visible;
+}
+[data-v-a7bf1b50]::-webkit-scrollbar-thumb {
+  visibility: hidden;
+}
+/* 字体定义规范 */
+.bgSetting[data-v-a7bf1b50] {
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+.v-field.v-field--center-affix[data-v-a7bf1b50] {
+  border-radius: 8px;
+}
+.y-player-container[data-v-a7bf1b50]::-webkit-scrollbar-thumb {
+  display: none;
+}
+.icon[data-v-a7bf1b50] {
+  width: 1em;
+  height: 1em;
+  vertical-align: -0.15em;
+  fill: currentColor;
+  overflow: hidden;
+}
+.el-loading-mask[data-v-a7bf1b50] {
+  background: transparent;
+}
+#box[data-v-a7bf1b50] {
+  display: flex;
+  height: calc(100%);
+}
+.main[data-v-a7bf1b50] {
+  height: 100%;
+  width: calc(100% - 230px);
+  z-index: auto;
+  position: relative;
+}
+.body[data-v-a7bf1b50] {
+  height: calc(100% - 60px);
+  padding-bottom: 130px;
+  overflow: hidden;
+  overflow-y: auto;
+  width: 100%;
+  display: flex;
+  align-content: baseline;
+  flex-direction: column;
+}
+.body .top[data-v-a7bf1b50] {
+  margin-bottom: 20px;
+}
+.body .padding-container[data-v-a7bf1b50] {
+  padding: 0 32px;
+  padding-bottom: 32px;
+}
+[data-v-a7bf1b50] {
+  margin: 0;
+  box-sizing: border-box;
+}
+body.bold[data-v-a7bf1b50] {
+  font-weight: 600;
+}
+html[data-v-a7bf1b50],
+body[data-v-a7bf1b50],
+#app[data-v-a7bf1b50] {
+  height: 100%;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  color: #d2d2d2;
+  overflow: hidden;
+  background-color: #13131a;
+}
+img[data-v-a7bf1b50] {
+  user-select: none;
+}
+#app[data-v-a7bf1b50] {
+  position: relative;
+}
+.window-container[data-v-a7bf1b50] {
+  -webkit-app-region: drag;
+}
+.no-drag[data-v-a7bf1b50] {
+  -webkit-app-region: no-drag !important;
+}
+.v-input--horizontal .v-input__append[data-v-a7bf1b50] {
+  margin-inline-start: 6px;
+}
+.area-box[data-v-a7bf1b50] {
+  margin-top: 20px;
+  position: relative;
+}
+.area-box .head[data-v-a7bf1b50] {
+  display: flex;
+  align-items: center;
+  margin-bottom: 20px;
+}
+.area-box .head .title[data-v-a7bf1b50] {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 18px;
+}
+.area-box .head .title .move-container[data-v-a7bf1b50] {
+  display: flex;
+  gap: 10px;
+}
+.area-box .head .title .move-container .move[data-v-a7bf1b50] {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  transition: color 0.5s;
+  border-radius: 50%;
+  color: rgba(255, 255, 255, 0.5);
+  background-color: rgba(255, 255, 255, 0.1);
+  padding: 3px;
+}
+.area-box .head .title .move-container .move[data-v-a7bf1b50]:hover {
+  color: #d2d2d2;
+}
+.area-box .head .title .move-container .move.disabled[data-v-a7bf1b50] {
+  cursor: auto;
+  color: rgba(255, 255, 255, 0.1);
+}
+.area-box .head .title .move-container .left[data-v-a7bf1b50] {
+  left: -45px;
+}
+.area-box .head .title .move-container .right[data-v-a7bf1b50] {
+  right: -45px;
+}
+.area-box .content[data-v-a7bf1b50] {
+  display: flex;
+  overflow: hidden;
+  column-gap: 20px;
+}

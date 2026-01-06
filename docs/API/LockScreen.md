@@ -99,7 +99,7 @@ LockScreen._setRandomBackground();
 
 **功能说明**:
 - 优先读取缓存：`Cache.get('system.dailyQuote')`
-- 如果缓存不存在，从API获取：`https://api-v1.cenguigui.cn/api/yiyan2/`
+- 如果缓存不存在，从API获取：`https://v.api.aa1.cn/api/yiyan/index.php`
 - 显示后自动预加载下一句每日一言到缓存
 - 使用后删除缓存中的每日一言
 
@@ -246,7 +246,7 @@ await LockScreen._switchUser('TestUser');
 锁屏界面支持显示每日一言，提供每日励志语句。
 
 **功能特性**：
-- 自动从API获取每日一言：`https://api-v1.cenguigui.cn/api/yiyan2/`
+- 自动从API获取每日一言：`https://v.api.aa1.cn/api/yiyan/index.php`
 - 智能缓存管理：
   - 系统启动时自动预加载下一句每日一言到缓存
   - 显示时优先使用缓存，使用后删除缓存

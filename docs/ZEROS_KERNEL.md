@@ -63,13 +63,14 @@ ZerOS/
 │   │   ├── logLevel.js   # 日志级别枚举
 │   │   ├── addressType.js # 地址类型枚举
 │   │   └── enumManager.js # 枚举管理器
-│   └── SystemInformation.js # 系统信息
+│   └── SystemInformation.js # 系统信息（支持后端服务切换）
 ├── system/                # 系统目录
-│   ├── service/           # 服务端 (PHP 文件系统驱动)
-│   │   ├── FSDirve.php    # 文件系统驱动服务
-│   │   ├── CompressionDirve.php # 压缩驱动服务
-│   │   ├── ImageProxy.php # 图片代理服务
-│   │   ├── module-proxy.php # 模块代理服务
+│   ├── service/           # 服务端（支持 PHP 和 SpringBoot 两种后端）
+│   │   ├── FSDirve.php    # 文件系统驱动服务（PHP 后端）
+│   │   ├── CompressionDirve.php # 压缩驱动服务（PHP 后端）
+│   │   ├── ImageProxy.php # 图片代理服务（PHP 后端）
+│   │   ├── module-proxy.php # 模块代理服务（PHP 后端）
+│   │   # 注意：SpringBoot 后端提供相同的服务接口，路径无 .php 后缀
 │   │   └── DISK/          # 虚拟磁盘存储
 │   │       ├── C/         # C: 盘
 │   │       └── D/         # D: 盘
@@ -220,7 +221,9 @@ console.log('程序启动');
 - 自动保存到 localStorage
 - 启动时自动恢复
 - 每个磁盘分区独立存储
-- **PHP 后端支持**：所有文件操作通过 `FSDirve.php` 服务进行，文件实际存储在 `system/service/DISK/C/` 和 `system/service/DISK/D/` 目录下
+- **多后端支持**：支持 PHP 和 SpringBoot 两种后端服务
+  - **PHP 后端**：所有文件操作通过 `FSDirve.php` 服务进行，文件实际存储在 `system/service/DISK/C/` 和 `system/service/DISK/D/` 目录下
+  - **SpringBoot 后端**：提供与 PHP 后端相同的功能接口，路径无 `.php` 后缀，可通过 `SystemInformation` 切换
 
 详细 API 文档请参考 [Disk API](API/Disk.md) 和 [NodeTree API](API/NodeTree.md)
 
@@ -622,7 +625,9 @@ POOL.__GET__("KERNEL_GLOBAL_POOL", "WORK_SPACE");
 - 存储键格式：`filesystem_<盘符>`（如 `filesystem_C:`）
 - 自动序列化和反序列化
 - 启动时自动恢复
-- **PHP 后端支持**：所有文件操作通过 `FSDirve.php` 服务进行，文件实际存储在 `system/service/DISK/C/` 和 `system/service/DISK/D/` 目录下
+- **多后端支持**：支持 PHP 和 SpringBoot 两种后端服务
+  - **PHP 后端**：所有文件操作通过 `FSDirve.php` 服务进行，文件实际存储在 `system/service/DISK/C/` 和 `system/service/DISK/D/` 目录下
+  - **SpringBoot 后端**：提供与 PHP 后端相同的功能接口，路径无 `.php` 后缀，可通过 `SystemInformation` 切换
 
 **内存数据管理**：
 - 所有终端数据和临时数据存储在 Exploit 程序（PID 10000）的内存中
@@ -692,7 +697,7 @@ console.log('程序启动');
     - 系统启动时自动预加载下一句每日一言到缓存
     - 显示时优先使用缓存，使用后删除缓存
     - 自动预加载下一句，确保每次显示都有内容
-    - API：`https://api-v1.cenguigui.cn/api/yiyan2/`
+    - API：`https://v.api.aa1.cn/api/yiyan/index.php`
 
 - ✅ **主题管理器程序增强**：
   - **锁屏页面**：
@@ -873,7 +878,9 @@ console.log('程序启动');
 - ✅ **通知栏面板**：点击任务栏图标打开，支持水滴展开动画
 - ✅ **任务栏通知徽章**：实时显示通知数量
 - ✅ **权限管理系统**：完整的内核操作权限管理，确保系统安全
-- ✅ **PHP 文件系统驱动**：所有文件操作通过 PHP 服务进行，文件实际存储在服务端
+- ✅ **多后端支持**：支持 PHP 和 SpringBoot 两种后端服务，可通过 `SystemInformation` 动态切换
+  - **PHP 后端**：所有文件操作通过 PHP 服务进行，文件实际存储在服务端
+  - **SpringBoot 后端**：提供与 PHP 后端相同的功能接口
 - ✅ **加密驱动系统**：完整的加密功能支持，包括 RSA 加密/解密、MD5 哈希、随机数生成，支持密钥生命周期管理和有效期跟踪
 
 ### 版本历史记录
@@ -915,7 +922,7 @@ console.log('程序启动');
 - 上下文菜单系统
 - 通知管理系统
 - 权限管理系统
-- PHP 文件系统驱动
+- 多后端支持（PHP 和 SpringBoot）
 - 加密驱动系统
 
 ---

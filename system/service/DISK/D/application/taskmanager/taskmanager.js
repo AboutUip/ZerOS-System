@@ -2132,7 +2132,11 @@
             
             const disk = diskName.replace(':', ''); // 移除冒号，得到 C 或 D
             try {
-                const url = new URL('/system/service/FSDirve.php', window.location.origin);
+                const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                    : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                        ? SystemInformation.getOrigin()
+                        : window.location.origin);
                 url.searchParams.set('action', 'get_disk_info');
                 url.searchParams.set('disk', disk);
                 

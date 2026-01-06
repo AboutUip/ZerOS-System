@@ -2357,7 +2357,11 @@ function escapeHtml(s){
                                 }
                                 
                                 // 从 PHP 服务获取目录列表
-                                const url = new URL('/system/service/FSDirve.php', window.location.origin);
+                                const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                                    : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                                        ? SystemInformation.getOrigin()
+                                        : window.location.origin);
                                 url.searchParams.set('action', 'list_dir');
                                 url.searchParams.set('path', phpPath);
                                 
@@ -2665,7 +2669,11 @@ function escapeHtml(s){
                                         phpPath = phpPath + '/';
                                     }
                                     
-                                    const url = new URL('/system/service/FSDirve.php', window.location.origin);
+                                    const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                                    : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                                        ? SystemInformation.getOrigin()
+                                        : window.location.origin);
                                     url.searchParams.set('action', 'list_dir');
                                     url.searchParams.set('path', phpPath);
                                     
@@ -5147,7 +5155,11 @@ function escapeHtml(s){
                             }
                             
                             // 从 PHP 服务检查目录是否存在
-                            const url = new URL('/system/service/FSDirve.php', window.location.origin);
+                            const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                                ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                                : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                                    ? SystemInformation.getOrigin()
+                                    : window.location.origin);
                             url.searchParams.set('action', 'exists');
                             url.searchParams.set('path', phpPath);
                             
@@ -5316,7 +5328,11 @@ function escapeHtml(s){
                             if (/^[CD]:$/.test(phpPath)) {
                                 phpPath = phpPath + '/';
                             }
-                            const url = new URL('/system/service/FSDirve.php', window.location.origin);
+                            const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                                ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                                : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                                    ? SystemInformation.getOrigin()
+                                    : window.location.origin);
                             url.searchParams.set('action', 'list_dir');
                             url.searchParams.set('path', phpPath);
                             
@@ -5482,7 +5498,11 @@ function escapeHtml(s){
                         }
                         
                         // 从 PHP 服务读取文件
-                        const url = new URL('/system/service/FSDirve.php', window.location.origin);
+                        const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                            ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                            : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                                ? SystemInformation.getOrigin()
+                                : window.location.origin);
                         url.searchParams.set('action', 'read_file');
                         url.searchParams.set('path', phpPath);
                         url.searchParams.set('fileName', fname);
@@ -6234,7 +6254,11 @@ function escapeHtml(s){
                                 if (/^[CD]:$/.test(phpPath)) {
                                     phpPath = phpPath + '/';
                                 }
-                                const url = new URL('/system/service/FSDirve.php', window.location.origin);
+                                const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                                    : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                                        ? SystemInformation.getOrigin()
+                                        : window.location.origin);
                                 url.searchParams.set('action', 'list_dir');
                                 url.searchParams.set('path', phpPath);
                                 
@@ -7217,7 +7241,11 @@ function escapeHtml(s){
                             const getRealDiskInfo = async (diskName) => {
                                 const disk = diskName.replace(':', ''); // 移除冒号，得到 C 或 D
                                 try {
-                                    const url = new URL('/system/service/FSDirve.php', window.location.origin);
+                                    const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                                    : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                                        ? SystemInformation.getOrigin()
+                                        : window.location.origin);
                                     url.searchParams.set('action', 'get_disk_info');
                                     url.searchParams.set('disk', disk);
                                     
@@ -7296,7 +7324,11 @@ function escapeHtml(s){
                                 }
                                 
                                 try {
-                                    const url = new URL('/system/service/FSDirve.php', window.location.origin);
+                                    const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                                    : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                                        ? SystemInformation.getOrigin()
+                                        : window.location.origin);
                                     url.searchParams.set('action', 'list_dir');
                                     url.searchParams.set('path', phpPath);
                                     
@@ -7336,7 +7368,11 @@ function escapeHtml(s){
                                 }
                                 
                                 try {
-                                    const url = new URL('/system/service/FSDirve.php', window.location.origin);
+                                    const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                                    : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                                        ? SystemInformation.getOrigin()
+                                        : window.location.origin);
                                     url.searchParams.set('action', 'list_dir');
                                     url.searchParams.set('path', phpPath);
                                     
@@ -7386,7 +7422,11 @@ function escapeHtml(s){
                                 let usedSize = 0;
                                 
                                 try {
-                                    const url = new URL('/system/service/FSDirve.php', window.location.origin);
+                                    const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                                    : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                                        ? SystemInformation.getOrigin()
+                                        : window.location.origin);
                                     url.searchParams.set('action', 'get_disk_info');
                                     url.searchParams.set('disk', disk);
                                     

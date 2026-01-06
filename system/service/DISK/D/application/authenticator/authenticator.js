@@ -1289,7 +1289,11 @@
                             const fileName = `key_${keyId}_${Date.now()}.json`;
 
                             // 保存文件
-                            const url = new URL('/system/service/FSDirve.php', window.location.origin);
+                            const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                            ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                            : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                                ? SystemInformation.getOrigin()
+                                : window.location.origin);
                             url.searchParams.set('action', 'write_file');
                             url.searchParams.set('path', folderPath);
                             url.searchParams.set('fileName', fileName);

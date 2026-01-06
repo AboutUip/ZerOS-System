@@ -27,6 +27,11 @@ class SystemInformation {
             name: '萱崽Aa'
         },
         {
+            organization: 'KitePromiss 工作室',
+            role: '后端开发者',
+            name: 'yan'
+        },
+        {
             organization: '个人开发者',
             role: '内核开发',
             name: '默默'
@@ -40,6 +45,243 @@ class SystemInformation {
     
     // 系统 Logo 路径（相对于 test/index.html）
     static LOGO_PATH = 'zeros-logo.svg';
+    
+    // ==================== 系统服务地址配置 ====================
+    
+    // 后端类型枚举
+    static BACKEND_TYPE = {
+        PHP: 'PHP',
+        SPRINGBOOT: 'SPRINGBOOT'
+    };
+    
+    // 后端配置（可通过 LStorage 或环境变量配置）
+    static _backendConfig = {
+        type: SystemInformation.BACKEND_TYPE.PHP,
+        phpPort: 8089,                              // PHP 默认端口
+        springBootPort: 8080                        // SpringBoot 默认端口
+    };
+    
+    // 服务名称常量（不含后缀，根据后端类型自动添加）
+    static SERVICE_NAMES = {
+        FSDIRVE: 'FSDirve',
+        COMPRESSION_DIRVE: 'CompressionDirve',
+        IMAGE_PROXY: 'ImageProxy',
+        AUDIO_PROXY: 'audio-proxy',
+        MODULE_PROXY: 'module-proxy'
+    };
+    
+    // 服务基础路径
+    static SERVICE_BASE_PATH = '/system/service';
+    
+    /**
+     * 初始化后端配置（从 LStorage 或环境变量读取）
+     */
+    static _initBackendConfig() {
+        try {
+            // 尝试从 LStorage 读取配置
+            if (typeof LStorage !== 'undefined') {
+                const config = LStorage.getSystemStorage('system.backendConfig');
+                if (config) {
+                    SystemInformation._backendConfig = {
+                        ...SystemInformation._backendConfig,
+                        ...config
+                    };
+                }
+            }
+            
+            // 尝试从环境变量或 URL 参数读取
+            if (typeof window !== 'undefined' && window.location) {
+                const urlParams = new URLSearchParams(window.location.search);
+                const backendType = urlParams.get('backend') || urlParams.get('backendType');
+                if (backendType && Object.values(SystemInformation.BACKEND_TYPE).includes(backendType.toUpperCase())) {
+                    SystemInformation._backendConfig.type = backendType.toUpperCase();
+                }
+            }
+        } catch (e) {
+            KernelLogger.warn("SystemInformation", `初始化后端配置失败: ${e.message}`);
+        }
+    }
+    
+    /**
+     * 获取当前后端类型
+     * @returns {string} 后端类型（PHP 或 SPRINGBOOT）
+     */
+    static getBackendType() {
+        return SystemInformation._backendConfig.type;
+    }
+    
+    /**
+     * 设置后端类型
+     * @param {string} type 后端类型（PHP 或 SPRINGBOOT）
+     */
+    static setBackendType(type) {
+        if (Object.values(SystemInformation.BACKEND_TYPE).includes(type)) {
+            SystemInformation._backendConfig.type = type;
+            // 保存到 LStorage
+            if (typeof LStorage !== 'undefined') {
+                LStorage.setSystemStorage('system.backendConfig', SystemInformation._backendConfig);
+            }
+        }
+    }
+    
+    /**
+     * 获取服务路径后缀（根据后端类型）
+     * @returns {string} 后缀（.php 或空字符串）
+     */
+    static _getServiceSuffix() {
+        return SystemInformation._backendConfig.type === SystemInformation.BACKEND_TYPE.PHP ? '.php' : '';
+    }
+    
+    /**
+     * 获取服务完整路径（根据后端类型自动添加后缀）
+     * @param {string} serviceName 服务名称（如 'FSDirve'）
+     * @returns {string} 完整服务路径（如 '/system/service/FSDirve.php' 或 '/system/service/FSDirve'）
+     */
+    static getServicePath(serviceName) {
+        const suffix = SystemInformation._getServiceSuffix();
+        return `${SystemInformation.SERVICE_BASE_PATH}/${serviceName}${suffix}`;
+    }
+
+    /**
+     * 获取源地址(基于location.origin,但是移除端口号)
+     * @returns {string} 源地址
+     */
+    static getOriginURL() {
+        const origin = window.location.origin;
+        return origin.replace(/:\d+$/, '');
+    }
+    
+    /**
+     * 获取系统基础URL（origin）
+     * 根据后端类型自动选择端口
+     * 注意：当后端类型为SpringBoot时，强制使用SpringBoot端口，确保请求发送到正确的后端服务
+     * @returns {string} 系统基础URL
+     */
+    static getOrigin() {
+        // 根据后端类型选择端口
+        const port = SystemInformation._backendConfig.type === SystemInformation.BACKEND_TYPE.PHP
+            ? SystemInformation._backendConfig.phpPort
+            : SystemInformation._backendConfig.springBootPort;
+        
+        
+        // 降级：使用默认PHP端口
+        return `${SystemInformation.getOriginURL()}:${port}`;
+    }
+    
+    /**
+     * 获取文件系统服务路径
+     * @returns {string} 服务路径（不含 origin）
+     */
+    static getFSDirvePath() {
+        return SystemInformation.getServicePath(SystemInformation.SERVICE_NAMES.FSDIRVE);
+    }
+    
+    /**
+     * 获取文件系统服务URL
+     * @returns {string} 完整的文件系统服务URL
+     */
+    static getFSDirveUrl() {
+        return new URL(SystemInformation.getFSDirvePath(), SystemInformation.getOrigin()).toString();
+    }
+    
+    /**
+     * 获取压缩服务路径
+     * @returns {string} 服务路径（不含 origin）
+     */
+    static getCompressionDirvePath() {
+        return SystemInformation.getServicePath(SystemInformation.SERVICE_NAMES.COMPRESSION_DIRVE);
+    }
+    
+    /**
+     * 获取压缩服务URL
+     * @returns {string} 完整的压缩服务URL
+     */
+    static getCompressionDirveUrl() {
+        return new URL(SystemInformation.getCompressionDirvePath(), SystemInformation.getOrigin()).toString();
+    }
+    
+    /**
+     * 获取图片代理服务路径
+     * @returns {string} 服务路径（不含 origin）
+     */
+    static getImageProxyPath() {
+        return SystemInformation.getServicePath(SystemInformation.SERVICE_NAMES.IMAGE_PROXY);
+    }
+    
+    /**
+     * 获取图片代理服务URL
+     * @returns {string} 完整的图片代理服务URL
+     */
+    static getImageProxyUrl() {
+        return new URL(SystemInformation.getImageProxyPath(), SystemInformation.getOrigin()).toString();
+    }
+    
+    /**
+     * 获取音频代理服务路径
+     * @returns {string} 服务路径（不含 origin）
+     */
+    static getAudioProxyPath() {
+        return SystemInformation.getServicePath(SystemInformation.SERVICE_NAMES.AUDIO_PROXY);
+    }
+    
+    /**
+     * 获取音频代理服务URL
+     * @returns {string} 完整的音频代理服务URL
+     */
+    static getAudioProxyUrl() {
+        return new URL(SystemInformation.getAudioProxyPath(), SystemInformation.getOrigin()).toString();
+    }
+    
+    /**
+     * 获取模块代理服务路径
+     * @returns {string} 服务路径（不含 origin）
+     */
+    static getModuleProxyPath() {
+        return SystemInformation.getServicePath(SystemInformation.SERVICE_NAMES.MODULE_PROXY);
+    }
+    
+    /**
+     * 获取模块代理服务URL
+     * @returns {string} 完整的模块代理服务URL
+     */
+    static getModuleProxyUrl() {
+        return new URL(SystemInformation.getModuleProxyPath(), SystemInformation.getOrigin()).toString();
+    }
+    
+    /**
+     * 构建完整的服务URL
+     * @param {string} serviceName 服务名称（如 'FSDirve'）或完整路径
+     * @param {Object} params 查询参数对象（可选）
+     * @returns {string} 完整的服务URL
+     */
+    static buildServiceUrl(serviceName, params = null) {
+        // 如果已经是完整路径，直接使用；否则根据服务名称构建
+        let servicePath = serviceName.startsWith('/') 
+            ? serviceName 
+            : SystemInformation.getServicePath(serviceName);
+        
+        const url = new URL(servicePath, SystemInformation.getOrigin());
+        if (params && typeof params === 'object') {
+            Object.keys(params).forEach(key => {
+                url.searchParams.set(key, params[key]);
+            });
+        }
+        return url.toString();
+    }
+    
+    /**
+     * 构建URL对象（用于需要修改查询参数的场景）
+     * @param {string} serviceName 服务名称（如 'FSDirve'）或完整路径
+     * @returns {URL} URL对象
+     */
+    static buildServiceUrlObject(serviceName) {
+        // 如果已经是完整路径，直接使用；否则根据服务名称构建
+        const servicePath = serviceName.startsWith('/') 
+            ? serviceName 
+            : SystemInformation.getServicePath(serviceName);
+        
+        return new URL(servicePath, SystemInformation.getOrigin());
+    }
     
     /**
      * 获取系统版本
@@ -204,7 +446,8 @@ class SystemInformation {
     }
 }
 
-// 初始化：注册到 POOL
+// 初始化：初始化后端配置并注册到 POOL
+SystemInformation._initBackendConfig();
 SystemInformation._registerToPool();
 
 // 导出到全局（如果 POOL 不可用）

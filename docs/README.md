@@ -54,6 +54,7 @@
 |------|------|--------|
 | [项目 README](../README.md) | 项目概览、快速开始、系统架构 | ⭐⭐⭐⭐⭐ |
 | [开发者指南](./DEVELOPER_GUIDE.md) | 完整的程序开发指南，从入门到精通 | ⭐⭐⭐⭐⭐ |
+| [内核开发指南](./KERNEL_DEVELOPER_GUIDE.md) | 内核模块开发指南，从入门到精通 | ⭐⭐⭐⭐⭐ |
 | [内核文档](./ZEROS_KERNEL.md) | 深入理解 ZerOS 内核架构和设计原理 | ⭐⭐⭐⭐ |
 | [系统流程文档](./SYSTEM_FLOW.md) | 系统启动、程序启动/结束、内核交互、权限控制等核心流程详解 | ⭐⭐⭐⭐⭐ |
 
@@ -85,7 +86,8 @@
 | API | 描述 | 状态 |
 |-----|------|------|
 | [FileFramework](./API/FileFramework.md) | 文件操作基础 API | ✅ |
-| [FSDirve](./API/FSDirve.md) | PHP 服务端文件操作 | ✅ |
+| [FSDirve](./API/FSDirve.md) | 后端服务文件操作（支持 PHP 和 SpringBoot） | ✅ |
+| [SystemInformation](./API/SystemInformation.md) | 系统信息和后端服务管理 | ✅ |
 | [Disk](./API/Disk.md) | 虚拟磁盘管理 | ✅ |
 | [NodeTree](./API/NodeTree.md) | 内存文件系统结构 | ✅ |
 
@@ -129,7 +131,8 @@
 
 | API | 描述 | 状态 |
 |-----|------|------|
-| [CompressionDrive](./API/CompressionDrive.md) | ZIP/RAR 压缩解压缩 | ✅ |
+| [CompressionDrive](./API/CompressionDrive.md) | ZIP/RAR 压缩解压缩（支持 PHP 和 SpringBoot 后端） | ✅ |
+| [SystemInformation](./API/SystemInformation.md) | 系统信息和后端服务管理 | ✅ |
 | [DragDrive](./API/DragDrive.md) | 文件拖拽处理 | ✅ |
 | [GeographyDrive](./API/GeographyDrive.md) | 地理位置相关功能 | ✅ |
 | [SpeechDrive](./API/SpeechDrive.md) | 语音识别驱动（基于 Web Speech API） | ✅ |
@@ -151,7 +154,7 @@
 | 开发场景 | 推荐阅读 |
 |---------|---------|
 | **GUI 程序开发** | [GUIManager](./API/GUIManager.md) + [EventManager](./API/EventManager.md) |
-| **文件操作** | [FileFramework](./API/FileFramework.md) + [FSDirve](./API/FSDirve.md) |
+| **文件操作** | [FileFramework](./API/FileFramework.md) + [FSDirve](./API/FSDirve.md) + [SystemInformation](./API/SystemInformation.md) |
 | **数据存储** | [LStorage](./API/LStorage.md) + [CacheDrive](./API/CacheDrive.md) |
 | **权限管理** | [PermissionManager](./API/PermissionManager.md) |
 

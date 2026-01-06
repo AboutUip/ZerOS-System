@@ -109,6 +109,24 @@ function getRealPath($virtualPath) {
 }
 
 /**
+ * 规范化路径，去掉末尾的斜杠（除非是根路径如 "D:" 或 "C:"）
+ * 用于避免响应路径拼接时出现双斜杠
+ * @param string $path 路径（如 "D:/" 或 "D:/cache/"）
+ * @return string 规范化后的路径（如 "D:" 或 "D:/cache"）
+ */
+function normalizePath($path) {
+    if (empty($path)) {
+        return $path;
+    }
+    // 如果路径是 "D:" 或 "C:" 这种格式，保持不变
+    if (preg_match('/^[CD]:$/', $path)) {
+        return $path;
+    }
+    // 去掉末尾的斜杠
+    return rtrim($path, '/');
+}
+
+/**
  * 获取目录路径（用于目录操作）
  */
 function getDirPath($virtualPath) {
@@ -161,7 +179,7 @@ function createDirectory($path, $name) {
     if (is_dir($newDirPath)) {
         // 目录已存在，返回成功（而不是 409 错误）
         sendResponse(true, '目录已存在', [
-            'path' => $path . '/' . $name,
+            'path' => normalizePath($path) . '/' . $name,
             'name' => $name,
             'existed' => true
         ]);
@@ -171,7 +189,7 @@ function createDirectory($path, $name) {
     // 创建目录
     if (mkdir($newDirPath, 0755, true)) {
         sendResponse(true, '目录创建成功', [
-            'path' => $path . '/' . $name,
+            'path' => normalizePath($path) . '/' . $name,
             'name' => $name,
             'existed' => false
         ]);
@@ -202,7 +220,7 @@ function deleteDirectory($path) {
     
     // 删除目录
     if (rmdir($dirPath)) {
-        sendResponse(true, '目录删除成功', ['path' => $path]);
+        sendResponse(true, '目录删除成功', ['path' => normalizePath($path)]);
     } else {
         sendResponse(false, '目录删除失败', null, 500);
     }
@@ -236,7 +254,7 @@ function listDirectory($path) {
         $item = [
             'name' => $file,
             'type' => $isDir ? 'directory' : 'file',
-            'path' => $path . '/' . $file
+            'path' => normalizePath($path) . '/' . $file
         ];
         
         if ($isDir) {
@@ -261,7 +279,7 @@ function listDirectory($path) {
     });
     
     sendResponse(true, '目录列表获取成功', [
-        'path' => $path,
+        'path' => normalizePath($path),
         'items' => $items,
         'count' => count($items)
     ]);
@@ -296,7 +314,7 @@ function createFile($path, $fileName, $content = '') {
     // 创建文件
     if (file_put_contents($filePath, $content) !== false) {
         sendResponse(true, '文件创建成功', [
-            'path' => $path . '/' . $fileName,
+            'path' => normalizePath($path) . '/' . $fileName,
             'fileName' => $fileName,
             'size' => strlen($content)
         ]);
@@ -345,7 +363,7 @@ function readFileContent($path, $fileName, $asBase64 = false) {
     }
     
     $fileInfo = [
-        'path' => $path . '/' . $fileName,
+        'path' => normalizePath($path) . '/' . $fileName,
         'fileName' => $fileName,
         'size' => filesize($filePath),
         'content' => $content,
@@ -403,7 +421,7 @@ function writeFile($path, $fileName, $content, $writeMod = 'overwrite', $isBase6
     // 写入文件（使用二进制模式）
     if (file_put_contents($filePath, $content, LOCK_EX) !== false) {
         sendResponse(true, '文件写入成功', [
-            'path' => $path . '/' . $fileName,
+            'path' => normalizePath($path) . '/' . $fileName,
             'fileName' => $fileName,
             'size' => strlen($content),
             'writeMod' => $writeMod,
@@ -438,7 +456,7 @@ function deleteFile($path, $fileName) {
     // 删除文件
     if (unlink($filePath)) {
         sendResponse(true, '文件删除成功', [
-            'path' => $path . '/' . $fileName,
+            'path' => normalizePath($path) . '/' . $fileName,
             'fileName' => $fileName
         ]);
     } else {
@@ -481,7 +499,7 @@ function renameFile($path, $oldFileName, $newFileName) {
     // 重命名文件
     if (rename($oldFilePath, $newFilePath)) {
         sendResponse(true, '文件重命名成功', [
-            'path' => $path,
+            'path' => normalizePath($path) . '/' . $newFileName,
             'oldFileName' => $oldFileName,
             'newFileName' => $newFileName
         ]);
@@ -532,8 +550,8 @@ function moveFile($sourcePath, $sourceFileName, $targetPath, $targetFileName = n
     // 移动文件
     if (rename($sourceFilePath, $targetFilePath)) {
         sendResponse(true, '文件移动成功', [
-            'sourcePath' => $sourcePath . '/' . $sourceFileName,
-            'targetPath' => $targetPath . '/' . $targetFileName,
+            'sourcePath' => normalizePath($sourcePath) . '/' . $sourceFileName,
+            'targetPath' => normalizePath($targetPath) . '/' . $targetFileName,
             'sourceFileName' => $sourceFileName,
             'targetFileName' => $targetFileName
         ]);
@@ -584,8 +602,8 @@ function copyFile($sourcePath, $sourceFileName, $targetPath, $targetFileName = n
     // 复制文件
     if (copy($sourceFilePath, $targetFilePath)) {
         sendResponse(true, '文件复制成功', [
-            'sourcePath' => $sourcePath . '/' . $sourceFileName,
-            'targetPath' => $targetPath . '/' . $targetFileName,
+            'sourcePath' => normalizePath($sourcePath) . '/' . $sourceFileName,
+            'targetPath' => normalizePath($targetPath) . '/' . $targetFileName,
             'sourceFileName' => $sourceFileName,
             'targetFileName' => $targetFileName
         ]);
@@ -612,7 +630,7 @@ function getFileInfo($path, $fileName) {
     
     $isDir = is_dir($filePath);
     $info = [
-        'path' => $path . '/' . $fileName,
+        'path' => normalizePath($path) . '/' . $fileName,
         'name' => $fileName,
         'type' => $isDir ? 'directory' : 'file',
         'size' => $isDir ? 0 : filesize($filePath),
@@ -662,7 +680,7 @@ function renameDirectory($path, $oldName, $newName) {
     // 重命名目录
     if (rename($oldDirPath, $newDirPath)) {
         sendResponse(true, '目录重命名成功', [
-            'path' => $path,
+            'path' => normalizePath($path) . '/' . $newName,
             'oldName' => $oldName,
             'newName' => $newName
         ]);
@@ -703,8 +721,8 @@ function moveDirectory($sourcePath, $targetPath) {
     // 移动目录
     if (rename($sourceDirPath, $targetDirPath)) {
         sendResponse(true, '目录移动成功', [
-            'sourcePath' => $sourcePath,
-            'targetPath' => $targetPath
+            'sourcePath' => normalizePath($sourcePath),
+            'targetPath' => normalizePath($targetPath)
         ]);
     } else {
         sendResponse(false, '目录移动失败', null, 500);
@@ -743,8 +761,8 @@ function copyDirectory($sourcePath, $targetPath) {
     // 递归复制目录
     if (copyDirectoryRecursive($sourceDirPath, $targetDirPath)) {
         sendResponse(true, '目录复制成功', [
-            'sourcePath' => $sourcePath,
-            'targetPath' => $targetPath
+            'sourcePath' => normalizePath($sourcePath),
+            'targetPath' => normalizePath($targetPath)
         ]);
     } else {
         sendResponse(false, '目录复制失败', null, 500);
@@ -801,7 +819,7 @@ function deleteDirectoryRecursive($path) {
     
     // 递归删除目录
     if (deleteDirectoryRecursiveInternal($dirPath)) {
-        sendResponse(true, '目录删除成功', ['path' => $path]);
+        sendResponse(true, '目录删除成功', ['path' => normalizePath($path)]);
     } else {
         sendResponse(false, '目录删除失败', null, 500);
     }
@@ -848,7 +866,7 @@ function checkPathExists($path) {
     $isFile = $exists && is_file($realPath);
     
     $info = [
-        'path' => $path,
+        'path' => normalizePath($path),
         'exists' => $exists,
         'type' => $isDir ? 'directory' : ($isFile ? 'file' : null)
     ];

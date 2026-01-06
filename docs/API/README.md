@@ -46,9 +46,10 @@
 - [CryptDrive.md](./CryptDrive.md) - 加密驱动 ✅
 - [MultithreadingDrive.md](./MultithreadingDrive.md) - 多线程驱动 ✅
 
-### PHP 服务
-- [FSDirve.md](./FSDirve.md) - 文件系统驱动服务（PHP 后端） ✅
-- [CompressionDrive.md](./CompressionDrive.md) - 压缩驱动服务（ZIP/RAR 压缩解压缩） ✅
+### 后端服务
+- [FSDirve.md](./FSDirve.md) - 文件系统驱动服务（支持 PHP 和 SpringBoot 后端） ✅
+- [CompressionDrive.md](./CompressionDrive.md) - 压缩驱动服务（ZIP/RAR 压缩解压缩，支持 PHP 和 SpringBoot 后端） ✅
+- [SystemInformation.md](./SystemInformation.md) - 系统信息和后端服务管理 ✅
 
 ### 信号系统
 - [Pool.md](./Pool.md) - 全局对象池 ✅
@@ -114,7 +115,8 @@
 - SpeechDrive
 - CryptDrive
 - MultithreadingDrive
-- FSDirve (PHP 服务)
+- FSDirve (后端服务，支持 PHP 和 SpringBoot)
+- SystemInformation (系统信息和后端服务管理)
 
 **基础设施**
 - Pool

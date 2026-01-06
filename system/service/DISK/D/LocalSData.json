@@ -1,10 +1,6 @@
 {
   "system": {
-    "permissionManager.permissions": {
-      "musicplayer": [
-        "SYSTEM_NOTIFICATION"
-      ]
-    },
+    "permissionManager.permissions": {},
     "system.style": "macos",
     "desktop.icons": [
       {
@@ -44,6 +40,15 @@
         "createdAt": 1765486941047
       },
       {
+        "id": 5,
+        "programName": "paint",
+        "name": "画板",
+        "icon": "D:/application/paint/paint.svg",
+        "description": "画板",
+        "position": null,
+        "createdAt": 1766307135134
+      },
+      {
         "id": 14,
         "programName": "sparkai",
         "name": "讯飞星火AI",
@@ -60,15 +65,6 @@
         "description": "贪吃蛇",
         "position": null,
         "createdAt": 1765924910097
-      },
-      {
-        "id": 5,
-        "programName": "paint",
-        "name": "画板",
-        "icon": "D:/application/paint/paint.svg",
-        "description": "画板",
-        "position": null,
-        "createdAt": 1766307135134
       }
     ],
     "musicplayer.settings": {
@@ -519,24 +515,31 @@
       },
       "defaultKeyId": null
     },
-    "snake.highScore": 190,
+    "snake.highScore": 40,
     "userControl.users": {
       "root": {
         "level": "DEFAULT_ADMIN",
         "password": "61b249bf6d604d14120821f43625e84e",
         "avatar": "avatar_root_1766272534753.jpg",
         "createdAt": 1766271155991,
-        "lastLogin": 1767108828122
+        "lastLogin": 1767723050031
       },
       "TestUser": {
         "level": "USER",
         "password": null,
         "avatar": null,
         "createdAt": 1766271155991,
-        "lastLogin": 1766513648506
+        "lastLogin": 1767723187058
+      },
+      "yan": {
+        "level": "ADMIN",
+        "password": "1ac7e344f2f49b5ea3bcc1395ee691ec",
+        "avatar": "avatar_yan_1767723146257.png",
+        "createdAt": 1767723085768,
+        "lastLogin": 1767723166469
       }
     },
-    "userControl.currentUser": "root",
+    "userControl.currentUser": "TestUser",
     "system.lockscreenTimeComponent": true,
     "system.lockscreenBackground": "D:/cache/lockscreen/lockscreen_local_D__cache_random_anime_bg_1766148286160_jpg_random_anime_bg_1766148286160.jpg",
     "system.lockscreenRandomBg": false,
@@ -587,7 +590,9 @@
         "createdAt": 1767091594465,
         "description": "普通用户组，包含所有普通用户"
       }
-    }
+    },
+    "desktop.iconSize": "medium",
+    "system.taskbarWeatherEnabled": false
   },
   "programs": {}
 }

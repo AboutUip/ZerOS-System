@@ -460,8 +460,16 @@ class NodeTreeCollection {
             const serialized = this._serialize();
             
             // 使用 PHP 服务保存文件
-            const phpServiceUrl = "/system/service/FSDirve.php";
-            const url = new URL(phpServiceUrl, window.location.origin);
+            const phpServiceUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.getFSDirvePath) 
+                ? SystemInformation.getFSDirvePath()
+                : (typeof SystemInformation !== 'undefined' && SystemInformation.getFSDirvePath) 
+                    ? SystemInformation.getFSDirvePath()
+                    : "/system/service/FSDirve.php";
+            const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                ? SystemInformation.buildServiceUrlObject(phpServiceUrl)
+                : new URL(phpServiceUrl, (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                    ? SystemInformation.getOrigin()
+                    : window.location.origin);
             url.searchParams.set('action', 'write_file');
             url.searchParams.set('path', filePath);
             url.searchParams.set('fileName', fileName);
@@ -515,8 +523,16 @@ class NodeTreeCollection {
             const filePath = `${this.separateName}/`;
             
             // 先检查文件是否存在，避免 404 错误
-            const phpServiceUrl = "/system/service/FSDirve.php";
-            const checkUrl = new URL(phpServiceUrl, window.location.origin);
+            const phpServiceUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.getFSDirvePath) 
+                ? SystemInformation.getFSDirvePath()
+                : (typeof SystemInformation !== 'undefined' && SystemInformation.getFSDirvePath) 
+                    ? SystemInformation.getFSDirvePath()
+                    : "/system/service/FSDirve.php";
+            const checkUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                ? SystemInformation.buildServiceUrlObject(phpServiceUrl)
+                : new URL(phpServiceUrl, (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                    ? SystemInformation.getOrigin()
+                    : window.location.origin);
             checkUrl.searchParams.set('action', 'exists');
             checkUrl.searchParams.set('path', `${filePath}${fileName}`);
             
@@ -546,7 +562,11 @@ class NodeTreeCollection {
             }
             
             // 文件存在，读取文件内容
-            const readUrl = new URL(phpServiceUrl, window.location.origin);
+            const readUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                ? SystemInformation.buildServiceUrlObject(phpServiceUrl)
+                : new URL(phpServiceUrl, (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                    ? SystemInformation.getOrigin()
+                    : window.location.origin);
             readUrl.searchParams.set('action', 'read_file');
             readUrl.searchParams.set('path', filePath);
             readUrl.searchParams.set('fileName', fileName);
@@ -588,8 +608,16 @@ class NodeTreeCollection {
     // 通过 PHP 服务创建真实目录
     async _createRealDirectoryInPHP(virtualPath, dirName) {
         try {
-            const phpServiceUrl = "/system/service/FSDirve.php";
-            const url = new URL(phpServiceUrl, window.location.origin);
+            const phpServiceUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.getFSDirvePath) 
+                ? SystemInformation.getFSDirvePath()
+                : (typeof SystemInformation !== 'undefined' && SystemInformation.getFSDirvePath) 
+                    ? SystemInformation.getFSDirvePath()
+                    : "/system/service/FSDirve.php";
+            const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                ? SystemInformation.buildServiceUrlObject(phpServiceUrl)
+                : new URL(phpServiceUrl, (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                    ? SystemInformation.getOrigin()
+                    : window.location.origin);
             url.searchParams.set('action', 'create_dir');
             url.searchParams.set('path', virtualPath);
             url.searchParams.set('name', dirName);
@@ -642,8 +670,16 @@ class NodeTreeCollection {
     // 通过 PHP 服务创建真实文件
     async _createRealFileInPHP(virtualPath, fileName, content = '') {
         try {
-            const phpServiceUrl = "/system/service/FSDirve.php";
-            const url = new URL(phpServiceUrl, window.location.origin);
+            const phpServiceUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.getFSDirvePath) 
+                ? SystemInformation.getFSDirvePath()
+                : (typeof SystemInformation !== 'undefined' && SystemInformation.getFSDirvePath) 
+                    ? SystemInformation.getFSDirvePath()
+                    : "/system/service/FSDirve.php";
+            const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                ? SystemInformation.buildServiceUrlObject(phpServiceUrl)
+                : new URL(phpServiceUrl, (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                    ? SystemInformation.getOrigin()
+                    : window.location.origin);
             url.searchParams.set('action', 'create_file');
             url.searchParams.set('path', virtualPath);
             url.searchParams.set('fileName', fileName);
@@ -697,8 +733,16 @@ class NodeTreeCollection {
     // 通过 PHP 服务写入真实文件
     async _writeRealFileInPHP(virtualPath, fileName, content, writeMod = 'overwrite') {
         try {
-            const phpServiceUrl = "/system/service/FSDirve.php";
-            const url = new URL(phpServiceUrl, window.location.origin);
+            const phpServiceUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.getFSDirvePath) 
+                ? SystemInformation.getFSDirvePath()
+                : (typeof SystemInformation !== 'undefined' && SystemInformation.getFSDirvePath) 
+                    ? SystemInformation.getFSDirvePath()
+                    : "/system/service/FSDirve.php";
+            const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                ? SystemInformation.buildServiceUrlObject(phpServiceUrl)
+                : new URL(phpServiceUrl, (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                    ? SystemInformation.getOrigin()
+                    : window.location.origin);
             url.searchParams.set('action', 'write_file');
             url.searchParams.set('path', virtualPath);
             url.searchParams.set('fileName', fileName);
@@ -745,8 +789,16 @@ class NodeTreeCollection {
     // 通过 PHP 服务删除真实文件
     async _deleteRealFileInPHP(virtualPath, fileName) {
         try {
-            const phpServiceUrl = "/system/service/FSDirve.php";
-            const url = new URL(phpServiceUrl, window.location.origin);
+            const phpServiceUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.getFSDirvePath) 
+                ? SystemInformation.getFSDirvePath()
+                : (typeof SystemInformation !== 'undefined' && SystemInformation.getFSDirvePath) 
+                    ? SystemInformation.getFSDirvePath()
+                    : "/system/service/FSDirve.php";
+            const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                ? SystemInformation.buildServiceUrlObject(phpServiceUrl)
+                : new URL(phpServiceUrl, (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                    ? SystemInformation.getOrigin()
+                    : window.location.origin);
             url.searchParams.set('action', 'delete_file');
             url.searchParams.set('path', virtualPath);
             url.searchParams.set('fileName', fileName);
@@ -799,8 +851,16 @@ class NodeTreeCollection {
     // 通过 PHP 服务删除真实目录
     async _deleteRealDirectoryInPHP(virtualPath) {
         try {
-            const phpServiceUrl = "/system/service/FSDirve.php";
-            const url = new URL(phpServiceUrl, window.location.origin);
+            const phpServiceUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.getFSDirvePath) 
+                ? SystemInformation.getFSDirvePath()
+                : (typeof SystemInformation !== 'undefined' && SystemInformation.getFSDirvePath) 
+                    ? SystemInformation.getFSDirvePath()
+                    : "/system/service/FSDirve.php";
+            const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                ? SystemInformation.buildServiceUrlObject(phpServiceUrl)
+                : new URL(phpServiceUrl, (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                    ? SystemInformation.getOrigin()
+                    : window.location.origin);
             url.searchParams.set('action', 'delete_dir');
             url.searchParams.set('path', virtualPath);
             
@@ -1081,8 +1141,16 @@ class NodeTreeCollection {
     // 递归从 PHP 服务构建目录结构
     async _rebuildDirectoryFromPHP(dirPath, parentPath) {
         try {
-            const phpServiceUrl = "/system/service/FSDirve.php";
-            const url = new URL(phpServiceUrl, window.location.origin);
+            const phpServiceUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.getFSDirvePath) 
+                ? SystemInformation.getFSDirvePath()
+                : (typeof SystemInformation !== 'undefined' && SystemInformation.getFSDirvePath) 
+                    ? SystemInformation.getFSDirvePath()
+                    : "/system/service/FSDirve.php";
+            const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                ? SystemInformation.buildServiceUrlObject(phpServiceUrl)
+                : new URL(phpServiceUrl, (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                    ? SystemInformation.getOrigin()
+                    : window.location.origin);
             url.searchParams.set('action', 'list_dir');
             url.searchParams.set('path', dirPath);
             

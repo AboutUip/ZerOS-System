@@ -1315,7 +1315,11 @@
             // 规范化路径
             path = this._normalizePath(path);
             
-            const url = new URL('/system/service/FSDirve.php', window.location.origin);
+            const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                    ? SystemInformation.getOrigin()
+                    : window.location.origin);
             url.searchParams.set('action', 'list_dir'); // 注意：FSDirve.php 使用 'list_dir' 而不是 'list_directory'
             url.searchParams.set('path', path);
             
@@ -1859,7 +1863,11 @@
                 phpPath = phpPath + '/';
             }
             
-            const url = new URL('/system/service/FSDirve.php', window.location.origin);
+            const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                    ? SystemInformation.getOrigin()
+                    : window.location.origin);
             url.searchParams.set('action', 'read_file');
             url.searchParams.set('path', phpPath);
             url.searchParams.set('fileName', fileName);
@@ -2096,7 +2104,11 @@
                 phpPath = phpPath + '/';
             }
             
-            const url = new URL('/system/service/FSDirve.php', window.location.origin);
+            const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                    ? SystemInformation.getOrigin()
+                    : window.location.origin);
             url.searchParams.set('action', 'write_file');
             url.searchParams.set('path', phpPath);
             url.searchParams.set('fileName', fileName);
@@ -2937,7 +2949,11 @@
                 // 规范化路径
                 dirPath = this._normalizePath(dirPath);
                 
-                const url = new URL('/system/service/FSDirve.php', window.location.origin);
+                const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                    ? SystemInformation.getOrigin()
+                    : window.location.origin);
                 url.searchParams.set('action', 'create_file');
                 url.searchParams.set('path', dirPath);
                 url.searchParams.set('fileName', fileName);
@@ -2986,7 +3002,11 @@
                 // 规范化路径
                 dirPath = this._normalizePath(dirPath);
                 
-                const url = new URL('/system/service/FSDirve.php', window.location.origin);
+                const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                    ? SystemInformation.getOrigin()
+                    : window.location.origin);
                 url.searchParams.set('action', 'create_dir');
                 url.searchParams.set('path', dirPath);
                 url.searchParams.set('name', folderName);
@@ -3020,7 +3040,11 @@
                 // 规范化路径
                 itemPath = this._normalizePath(itemPath);
                 
-                const url = new URL('/system/service/FSDirve.php', window.location.origin);
+                const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                    ? SystemInformation.getOrigin()
+                    : window.location.origin);
                 
                 if (itemType === 'directory') {
                     url.searchParams.set('action', 'delete_dir');
@@ -3087,7 +3111,11 @@
                     phpPath = phpPath + '/';
                 }
                 
-                const url = new URL('/system/service/FSDirve.php', window.location.origin);
+                const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                    ? SystemInformation.getOrigin()
+                    : window.location.origin);
                 
                 if (itemType === 'directory') {
                     url.searchParams.set('action', 'rename_dir');

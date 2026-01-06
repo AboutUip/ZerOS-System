@@ -16,6 +16,24 @@ class CacheDrive {
     // PHP 服务地址
     static PHP_SERVICE_URL = "/system/service/FSDirve.php";
     
+    /**
+     * 规范化路径，去掉末尾的斜杠（除非是根路径如 "D:" 或 "C:"）
+     * 用于避免 SpringBoot 后端路径拼接时出现双斜杠
+     * @param {string} path 路径（如 "D:/" 或 "D:/cache/"）
+     * @returns {string} 规范化后的路径（如 "D:" 或 "D:/cache"）
+     */
+    static _normalizePath(path) {
+        if (!path || typeof path !== 'string') {
+            return path;
+        }
+        // 如果路径是 "D:" 或 "C:" 这种格式，保持不变
+        if (/^[CD]:$/.test(path)) {
+            return path;
+        }
+        // 去掉末尾的斜杠
+        return path.replace(/\/+$/, '');
+    }
+    
     // 缓存元数据结构
     // {
     //     system: {
@@ -174,9 +192,13 @@ class CacheDrive {
      */
     static async _readFileFromPHP(path, fileName) {
         try {
-            const url = new URL(CacheDrive.PHP_SERVICE_URL, window.location.origin);
+            const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                : new URL(CacheDrive.PHP_SERVICE_URL, (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                    ? SystemInformation.getOrigin()
+                    : window.location.origin);
             url.searchParams.set('action', 'read_file');
-            url.searchParams.set('path', path);
+            url.searchParams.set('path', CacheDrive._normalizePath(path));
             url.searchParams.set('fileName', fileName);
             
             const response = await fetch(url.toString(), {
@@ -264,9 +286,13 @@ class CacheDrive {
      */
     static async _writeFileToPHP(path, fileName, content) {
         try {
-            const url = new URL(CacheDrive.PHP_SERVICE_URL, window.location.origin);
+            const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                : new URL(CacheDrive.PHP_SERVICE_URL, (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                    ? SystemInformation.getOrigin()
+                    : window.location.origin);
             url.searchParams.set('action', 'write_file');
-            url.searchParams.set('path', path);
+            url.searchParams.set('path', CacheDrive._normalizePath(path));
             url.searchParams.set('fileName', fileName);
             url.searchParams.set('writeMod', 'overwrite');
             

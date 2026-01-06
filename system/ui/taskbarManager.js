@@ -48,6 +48,12 @@ class TaskbarManager {
     // 正在进行的天气数据加载请求（用于防止并发重复请求）
     static _pendingWeatherRequest = null;
     
+    // 天气API失败计数器（连续失败次数）
+    static _weatherApiFailureCount = 0;
+    
+    // 天气API最大失败次数（超过此次数后不再请求API）
+    static WEATHER_API_MAX_FAILURES = 3;
+    
     // 自定义任务栏图标管理
     static _customIcons = new Map(); // Map<iconId, CustomIconData>
     static _customIconIdCounter = 0; // 自定义图标ID计数器
@@ -1048,9 +1054,12 @@ class TaskbarManager {
         const batteryDisplay = TaskbarManager._createBatteryDisplay();
         rightContainer.appendChild(batteryDisplay);
         
-        // 添加天气组件（在时间之前）
-        const weatherDisplay = TaskbarManager._createWeatherDisplay();
-        rightContainer.appendChild(weatherDisplay);
+        // 添加天气组件（在时间之前，根据设置决定是否显示）
+        const weatherEnabled = await TaskbarManager._isWeatherComponentEnabled();
+        if (weatherEnabled) {
+            const weatherDisplay = TaskbarManager._createWeatherDisplay();
+            rightContainer.appendChild(weatherDisplay);
+        }
         
         const timeDisplay = TaskbarManager._createTimeDisplay();
         rightContainer.appendChild(timeDisplay);
@@ -1526,7 +1535,11 @@ class TaskbarManager {
             if (avatarFileName) {
                 // 使用FSDirve读取本地文件并转换为base64 data URL
                 try {
-                    const url = new URL('/system/service/FSDirve.php', window.location.origin);
+                    const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                        ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                        : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                            ? SystemInformation.getOrigin()
+                            : window.location.origin);
                     url.searchParams.set('action', 'read_file');
                     url.searchParams.set('path', 'D:/cache/');
                     url.searchParams.set('fileName', avatarFileName);
@@ -4563,6 +4576,27 @@ class TaskbarManager {
     }
     
     /**
+     * 检查天气组件是否启用
+     * @returns {Promise<boolean>} 是否启用
+     */
+    static async _isWeatherComponentEnabled() {
+        if (typeof LStorage === 'undefined') {
+            // 如果 LStorage 不可用，默认启用
+            return true;
+        }
+        
+        try {
+            const enabled = await LStorage.getSystemStorage('system.taskbarWeatherEnabled');
+            // 如果未设置，默认为 true（启用）
+            return enabled !== false;
+        } catch (error) {
+            KernelLogger.debug("TaskbarManager", `检查天气组件设置失败: ${error.message}，默认启用`);
+            // 出错时默认启用
+            return true;
+        }
+    }
+    
+    /**
      * 创建天气显示组件
      * @returns {HTMLElement} 天气显示元素
      */
@@ -4885,6 +4919,90 @@ class TaskbarManager {
     }
     
     /**
+     * 获取过期的天气缓存（用于API失败时的降级方案）
+     * @param {string} cacheKey - 缓存键
+     * @returns {Promise<any|null>} 过期缓存数据，如果不存在则返回null
+     */
+    static async _getExpiredWeatherCache(cacheKey) {
+        if (typeof CacheDrive === 'undefined') {
+            return null;
+        }
+        
+        try {
+            await CacheDrive.init();
+            
+            // 先尝试正常读取（如果缓存未过期，直接返回）
+            const cache = await CacheDrive.get(cacheKey, null, { 
+                programName: 'TaskbarManager'
+            });
+            
+            if (cache) {
+                return cache;
+            }
+            
+            // 如果正常读取返回null（可能是已过期），尝试从元数据中直接读取（即使过期）
+            // 注意：这里访问CacheDrive的私有属性，因为我们需要读取过期缓存
+            // 由于CacheDrive的get方法会自动删除过期缓存，我们需要在删除前读取
+            
+            // 首先检查CacheDrive的缓存元数据是否已加载
+            let cacheEntry = null;
+            if (CacheDrive._cacheMetadata && 
+                CacheDrive._cacheMetadata.programs && 
+                CacheDrive._cacheMetadata.programs['TaskbarManager'] &&
+                CacheDrive._cacheMetadata.programs['TaskbarManager'][cacheKey]) {
+                cacheEntry = CacheDrive._cacheMetadata.programs['TaskbarManager'][cacheKey];
+            }
+            
+            // 如果元数据未加载或未找到，尝试加载
+            // 注意：_loadCacheMetadata 会调用 _cleanExpiredCache，这会同步删除过期缓存
+            // 所以我们需要在加载前先尝试读取，或者确保在清理前读取
+            if (!cacheEntry && typeof CacheDrive._loadCacheMetadata === 'function') {
+                try {
+                    // 在加载前，先尝试从请求缓存中读取（如果存在）
+                    // 如果请求缓存中有元数据，直接使用
+                    if (CacheDrive._requestCache && 
+                        CacheDrive._requestCache.metadata &&
+                        CacheDrive._requestCache.metadata.programs &&
+                        CacheDrive._requestCache.metadata.programs['TaskbarManager'] &&
+                        CacheDrive._requestCache.metadata.programs['TaskbarManager'][cacheKey]) {
+                        cacheEntry = CacheDrive._requestCache.metadata.programs['TaskbarManager'][cacheKey];
+                    }
+                    
+                    // 如果请求缓存中也没有，需要加载元数据
+                    // 但注意：加载后会立即清理过期缓存，所以我们可能无法读取到过期缓存
+                    // 这是设计上的限制，因为CacheDrive会在加载时清理过期缓存
+                    if (!cacheEntry) {
+                        // 加载元数据（这会触发清理，过期缓存会被删除）
+                        await CacheDrive._loadCacheMetadata(true);
+                        
+                        // 加载后检查（虽然过期缓存可能已被清理，但我们可以尝试）
+                        if (CacheDrive._cacheMetadata && 
+                            CacheDrive._cacheMetadata.programs && 
+                            CacheDrive._cacheMetadata.programs['TaskbarManager'] &&
+                            CacheDrive._cacheMetadata.programs['TaskbarManager'][cacheKey]) {
+                            cacheEntry = CacheDrive._cacheMetadata.programs['TaskbarManager'][cacheKey];
+                        }
+                    }
+                } catch (loadError) {
+                    KernelLogger.debug("TaskbarManager", `加载缓存元数据失败: ${loadError.message}`);
+                }
+            }
+            
+            // 如果找到缓存条目（即使过期），返回其值
+            if (cacheEntry && cacheEntry.value) {
+                KernelLogger.debug("TaskbarManager", `从缓存元数据读取过期缓存: ${cacheKey}`);
+                // 注意：这里不删除过期缓存，因为可能还有其他地方需要使用
+                return cacheEntry.value;
+            }
+            
+            return null;
+        } catch (error) {
+            KernelLogger.debug("TaskbarManager", `读取过期缓存失败: ${error.message}`);
+            return null;
+        }
+    }
+    
+    /**
      * 加载天气数据
      * 工作流程：
      * 1. 实时获取地理位置（不缓存）
@@ -4914,11 +5032,68 @@ class TaskbarManager {
                     } catch (error) {
                         // 如果之前的请求失败，继续执行新的请求
                         KernelLogger.debug("TaskbarManager", "之前的天气数据请求失败，继续执行新请求");
+                        // 清除pending状态，允许新的请求
+                        TaskbarManager._pendingWeatherRequest = null;
                     }
                 }
                 
-                    // 创建新的请求 Promise
-                    const requestPromise = (async () => {
+                // 在创建请求Promise之前，先检查失败次数（防止并发请求都创建Promise）
+                // 如果失败次数已达到阈值且非强制刷新，直接尝试使用过期缓存
+                if (!forceRefresh && TaskbarManager._weatherApiFailureCount >= TaskbarManager.WEATHER_API_MAX_FAILURES) {
+                    KernelLogger.warn("TaskbarManager", `天气API连续失败 ${TaskbarManager._weatherApiFailureCount} 次，跳过API请求，仅使用缓存数据`);
+                    
+                    // 先获取城市名称（使用默认城市作为后备）
+                    let requestCityName = '晋城'; // 默认城市
+                    try {
+                        // 尝试快速获取城市名称（不等待，使用默认值作为后备）
+                        if (typeof GeographyDrive !== 'undefined') {
+                            try {
+                                const location = await Promise.race([
+                                    GeographyDrive.getCurrentPosition({ enableHighAccuracy: false }),
+                                    new Promise((_, reject) => setTimeout(() => reject(new Error('超时')), 2000))
+                                ]);
+                                if (location && location.name) {
+                                    requestCityName = location.name;
+                                }
+                            } catch (e) {
+                                // 超时或失败，使用默认城市
+                            }
+                        }
+                    } catch (e) {
+                        // 获取城市名称失败，使用默认城市
+                    }
+                    
+                    const cacheKey = `${TaskbarManager.WEATHER_CACHE_PREFIX}${requestCityName}`;
+                    const expiredCache = await TaskbarManager._getExpiredWeatherCache(cacheKey);
+                    if (expiredCache) {
+                        KernelLogger.debug("TaskbarManager", `使用过期缓存数据: ${requestCityName}（API已禁用）`);
+                        // 写入进程内短期缓存
+                        TaskbarManager._weatherMemoryCache.set(cacheKey, {
+                            data: expiredCache,
+                            city: requestCityName,
+                            expiresAt: Date.now() + 5 * 60 * 1000
+                        });
+                        TaskbarManager._updateWeatherUI(container, tempText, descText, iconElement, expiredCache);
+                        return;
+                    }
+                    
+                    // 如果缓存也不存在，显示错误信息
+                    if (tempText) {
+                        tempText.textContent = '--℃';
+                    }
+                    if (descText) {
+                        descText.textContent = 'API已禁用';
+                    }
+                    if (iconElement) {
+                        iconElement.textContent = '☁️';
+                    }
+                    container._weatherData = null;
+                    return;
+                }
+                
+                // 创建新的请求 Promise
+                // 注意：在创建Promise之前，失败次数检查已完成，这里直接创建
+                const requestPromise = (async () => {
                 // 1. 实时获取地理位置（不缓存）
                 KernelLogger.debug("TaskbarManager", "实时获取地理位置");
                         
@@ -5056,13 +5231,15 @@ class TaskbarManager {
                     }
                 }
                 
-                // 3. 缓存不存在或过期，实时请求天气
-                KernelLogger.debug("TaskbarManager", `从API获取天气数据: ${requestCityName}`);
+                // 3. 缓存不存在或过期，实时请求天气API
+                // 注意：失败次数检查已在外部完成，这里直接请求API
+                KernelLogger.debug("TaskbarManager", `从API获取天气数据: ${requestCityName}（失败次数: ${TaskbarManager._weatherApiFailureCount}/${TaskbarManager.WEATHER_API_MAX_FAILURES}）`);
                 
-                        const weatherResponse = await fetch(`https://api-v1.cenguigui.cn/api/WeatherInfo/?city=${encodeURIComponent(requestCityName)}`);
-                        if (!weatherResponse.ok) {
-                            throw new Error(`获取天气信息失败: ${weatherResponse.status}`);
-                        }
+                try {
+                    const weatherResponse = await fetch(`https://api-v1.cenguigui.cn/api/WeatherInfo/?city=${encodeURIComponent(requestCityName)}`);
+                    if (!weatherResponse.ok) {
+                        throw new Error(`获取天气信息失败: ${weatherResponse.status}`);
+                    }
                         
                 // 先读取文本内容（避免响应流被重复读取）
                 const weatherText = await weatherResponse.text();
@@ -5087,34 +5264,77 @@ class TaskbarManager {
                     throw new Error(`天气 API 返回了非 JSON 响应 (可能是服务器错误)`);
                 }
                 
-                        if (!requestWeatherData || requestWeatherData.code !== 200 || !requestWeatherData.data) {
-                            throw new Error('天气数据无效');
-                        }
-                        
-                // 4. 将天气响应加入缓存（12小时生命周期）
-                if (typeof CacheDrive !== 'undefined') {
-                    try {
-                        await CacheDrive.set(cacheKey, requestWeatherData, {
-                            programName: 'TaskbarManager',
-                            ttl: TaskbarManager.WEATHER_CACHE_TTL
-                        });
-                        KernelLogger.debug("TaskbarManager", `天气数据已缓存: ${requestCityName}，生命周期12小时`);
-                    } catch (cacheError) {
-                        KernelLogger.warn("TaskbarManager", `保存天气缓存失败: ${cacheError.message}`);
+                    if (!requestWeatherData || requestWeatherData.code !== 200 || !requestWeatherData.data) {
+                        throw new Error('天气数据无效');
                     }
+                    
+                    // API请求成功，重置失败计数器
+                    TaskbarManager._weatherApiFailureCount = 0;
+                    KernelLogger.debug("TaskbarManager", `天气API请求成功，重置失败计数器`);
+                    
+                    // 4. 将天气响应加入缓存（12小时生命周期）
+                    if (typeof CacheDrive !== 'undefined') {
+                        try {
+                            await CacheDrive.set(cacheKey, requestWeatherData, {
+                                programName: 'TaskbarManager',
+                                ttl: TaskbarManager.WEATHER_CACHE_TTL
+                            });
+                            KernelLogger.debug("TaskbarManager", `天气数据已缓存: ${requestCityName}，生命周期12小时`);
+                        } catch (cacheError) {
+                            KernelLogger.warn("TaskbarManager", `保存天气缓存失败: ${cacheError.message}`);
+                        }
+                    }
+                    
+                    // 写入进程内短期缓存（5 分钟）
+                    TaskbarManager._weatherMemoryCache.set(cacheKey, {
+                        data: requestWeatherData,
+                        city: requestCityName,
+                        expiresAt: Date.now() + 5 * 60 * 1000
+                    });
+                    
+                    return { weatherData: requestWeatherData, cityName: requestCityName };
+                } catch (apiError) {
+                    // API请求失败，增加失败计数器
+                    TaskbarManager._weatherApiFailureCount++;
+                    KernelLogger.warn("TaskbarManager", `天气API请求失败 (${TaskbarManager._weatherApiFailureCount}/${TaskbarManager.WEATHER_API_MAX_FAILURES}): ${apiError.message}`);
+                    
+                    // 尝试使用过期缓存作为降级方案
+                    const expiredCache = await TaskbarManager._getExpiredWeatherCache(cacheKey);
+                    if (expiredCache) {
+                        KernelLogger.debug("TaskbarManager", `API失败，使用过期缓存数据: ${requestCityName}`);
+                        // 写入进程内短期缓存
+                        TaskbarManager._weatherMemoryCache.set(cacheKey, {
+                            data: expiredCache,
+                            city: requestCityName,
+                            expiresAt: nowTs + 5 * 60 * 1000
+                        });
+                        // 注意：这里不重置失败计数器，因为API确实失败了
+                        return { weatherData: expiredCache, cityName: requestCityName };
+                    }
+                    
+                    // 如果失败次数达到阈值，记录警告
+                    if (TaskbarManager._weatherApiFailureCount >= TaskbarManager.WEATHER_API_MAX_FAILURES) {
+                        KernelLogger.warn("TaskbarManager", `天气API连续失败 ${TaskbarManager._weatherApiFailureCount} 次，将不再请求API，仅使用缓存数据`);
+                    }
+                    
+                    // 所有尝试都失败，抛出错误
+                    throw apiError;
                 }
-                
-                // 写入进程内短期缓存（5 分钟）
-                TaskbarManager._weatherMemoryCache.set(cacheKey, {
-                    data: requestWeatherData,
-                    city: requestCityName,
-                    expiresAt: Date.now() + 5 * 60 * 1000
-                });
-                        
-                        return { weatherData: requestWeatherData, cityName: requestCityName };
                     })();
                     
                     // 保存请求 Promise，以便并发调用可以等待
+                    // 注意：在设置之前再次检查，防止并发请求都创建了Promise
+                    if (TaskbarManager._pendingWeatherRequest && TaskbarManager._pendingWeatherRequest !== requestPromise) {
+                        // 如果已经有其他请求设置了pending，等待它而不是创建新的
+                        KernelLogger.debug("TaskbarManager", "检测到其他请求已创建Promise，等待其完成");
+                        try {
+                            const result = await TaskbarManager._pendingWeatherRequest;
+                            return result;
+                        } catch (error) {
+                            // 如果其他请求失败，继续使用当前请求
+                            KernelLogger.debug("TaskbarManager", "其他请求失败，使用当前请求");
+                        }
+                    }
                     TaskbarManager._pendingWeatherRequest = requestPromise;
             
             let weatherData;

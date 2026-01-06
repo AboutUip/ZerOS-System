@@ -1892,15 +1892,17 @@ document.addEventListener('mouseup', () => {
 
 ### Q: 如何读取和写入文件？
 
-A: 使用 Disk API 或 FSDirve.php 服务：
+A: 使用 Disk API 或后端服务（推荐使用 SystemInformation 构建URL）：
 
 ```javascript
 // 使用 Disk API（推荐）
 const content = await Disk.readFile('D:/data.txt');
 await Disk.writeFile('D:/data.txt', '新内容');
 
-// 使用 FSDirve.php 服务
-const url = new URL('/system/service/FSDirve.php', window.location.origin);
+// 使用 SystemInformation 构建服务URL（推荐，自动适配后端类型）
+const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+    : new URL('/system/service/FSDirve.php', window.location.origin);
 url.searchParams.set('action', 'read_file');
 url.searchParams.set('path', 'D:/');
 url.searchParams.set('fileName', 'data.txt');
@@ -1943,10 +1945,12 @@ console.log(`包含 ${list.fileCount} 个文件`);
 
 ### Q: 如何检查文件是否存在？
 
-A: 使用 FSDirve.php 的 `check_path_exists` 操作：
+A: 使用后端服务的 `check_path_exists` 操作（推荐使用 SystemInformation）：
 
 ```javascript
-const url = new URL('/system/service/FSDirve.php', window.location.origin);
+const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+    : new URL('/system/service/FSDirve.php', window.location.origin);
 url.searchParams.set('action', 'check_path_exists');
 url.searchParams.set('path', 'D:/data.txt');
 
@@ -1959,11 +1963,13 @@ if (result.status === 'success' && result.data.exists) {
 
 ### Q: 如何创建和删除目录？
 
-A: 使用 FSDirve.php 服务：
+A: 使用后端服务（推荐使用 SystemInformation）：
 
 ```javascript
 // 创建目录
-const url = new URL('/system/service/FSDirve.php', window.location.origin);
+const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+    : new URL('/system/service/FSDirve.php', window.location.origin);
 url.searchParams.set('action', 'create_dir');
 url.searchParams.set('path', 'D:/newdir');
 
@@ -1977,10 +1983,12 @@ await fetch(url.toString());
 
 ### Q: 如何列出目录内容？
 
-A: 使用 FSDirve.php 的 `list_dir` 操作：
+A: 使用后端服务的 `list_dir` 操作（推荐使用 SystemInformation）：
 
 ```javascript
-const url = new URL('/system/service/FSDirve.php', window.location.origin);
+const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+    : new URL('/system/service/FSDirve.php', window.location.origin);
 url.searchParams.set('action', 'list_dir');
 url.searchParams.set('path', 'D:/application');
 

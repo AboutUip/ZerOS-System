@@ -9,6 +9,24 @@ class ProcessManager {
     
     // 日志级别
     static logLevel = (typeof LogLevel !== 'undefined' && LogLevel.LEVEL.DEBUG) ? LogLevel.LEVEL.DEBUG : 3;
+    
+    /**
+     * 规范化路径，去掉末尾的斜杠（除非是根路径如 "D:" 或 "C:"）
+     * 用于避免 SpringBoot 后端路径拼接时出现双斜杠
+     * @param {string} path 路径（如 "D:/" 或 "D:/cache/"）
+     * @returns {string} 规范化后的路径（如 "D:" 或 "D:/cache"）
+     */
+    static _normalizePath(path) {
+        if (!path || typeof path !== 'string') {
+            return path;
+        }
+        // 如果路径是 "D:" 或 "C:" 这种格式，保持不变
+        if (/^[CD]:$/.test(path)) {
+            return path;
+        }
+        // 去掉末尾的斜杠
+        return path.replace(/\/+$/, '');
+    }
 
     static setLogLevel(lvl) {
         this.logLevel = lvl;
@@ -1559,8 +1577,47 @@ class ProcessManager {
                         }, 100);
                     }
                 } catch (e) {
+                    // 初始化失败，记录错误并清理资源
                     processInfo.status = 'exited';
                     processInfo.exitTime = Date.now();
+                    processInfo.error = {
+                        message: e.message,
+                        stack: e.stack,
+                        timestamp: Date.now()
+                    };
+                    
+                    // 尝试清理已创建的资源
+                    try {
+                        // 清理 GUI 元素
+                        if (typeof GUIManager !== 'undefined' && typeof GUIManager.getWindowsByPid === 'function') {
+                            const windows = GUIManager.getWindowsByPid(pid);
+                            for (const window of windows) {
+                                try {
+                                    if (window.windowId) {
+                                        GUIManager.unregisterWindow(window.windowId);
+                                    }
+                                } catch (cleanupError) {
+                                    ProcessManager._log(1, `清理失败窗口失败: ${cleanupError.message}`);
+                                }
+                            }
+                        }
+                        
+                        // 清理事件监听器
+                        if (typeof EventManager !== 'undefined' && typeof EventManager.unregisterAllHandlersForPid === 'function') {
+                            EventManager.unregisterAllHandlersForPid(pid);
+                        }
+                        
+                        // 释放内存
+                        if (typeof MemoryManager !== 'undefined') {
+                            try {
+                                MemoryManager.freeMemory(pid);
+                            } catch (memError) {
+                                ProcessManager._log(1, `释放内存失败: ${memError.message}`);
+                            }
+                        }
+                    } catch (cleanupError) {
+                        ProcessManager._log(1, `清理资源时发生错误: ${cleanupError.message}`);
+                    }
                     
                     // 保存进程表（状态已更新为 exited）
                     // 使用原始表进行保存（绕过保护）
@@ -1575,7 +1632,26 @@ class ProcessManager {
                     // 清除已使用PID缓存（进程状态已更新）
                     ProcessManager._invalidateUsedPidsCache();
                     
-                    ProcessManager._log(1, `程序 ${programName} (PID: ${pid}) 初始化失败: ${e.message}`);
+                    // 记录错误日志
+                    ProcessManager._log(1, `程序 ${programName} (PID: ${pid}) 初始化失败: ${e.message}`, {
+                        error: e.message,
+                        stack: e.stack
+                    });
+                    
+                    // 显示用户友好的错误提示
+                    if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                        try {
+                            await NotificationManager.createNotification({
+                                title: '程序启动失败',
+                                message: `${programName} 启动失败: ${e.message}`,
+                                type: 'error',
+                                duration: 5000
+                            });
+                        } catch (notifError) {
+                            // 忽略通知创建失败
+                        }
+                    }
+                    
                     throw e;
                 }
             } else {
@@ -1675,9 +1751,25 @@ class ProcessManager {
                         processInfo.status = 'exiting';
                         await programClass.__exit__(pid, force);
                     } catch (e) {
-                        ProcessManager._log(1, `程序 ${processInfo.programName} 的 __exit__ 方法执行失败: ${e.message}`);
+                        // 记录错误信息
+                        processInfo.error = {
+                            message: e.message,
+                            stack: e.stack,
+                            timestamp: Date.now(),
+                            phase: 'exit'
+                        };
+                        
+                        ProcessManager._log(1, `程序 ${processInfo.programName} 的 __exit__ 方法执行失败: ${e.message}`, {
+                            error: e.message,
+                            stack: e.stack
+                        });
+                        
                         if (!force) {
-                            throw e;
+                            // 非强制模式，记录错误但继续清理资源
+                            ProcessManager._log(2, `程序 ${processInfo.programName} 退出方法失败，但继续清理资源（非强制模式）`);
+                        } else {
+                            // 强制模式，继续执行清理
+                            ProcessManager._log(2, `程序 ${processInfo.programName} 退出方法失败，强制清理资源`);
                         }
                     }
                 } else {
@@ -2419,10 +2511,22 @@ class ProcessManager {
                     // 读取文件
                     // 如果 nodeTree 仍然不存在或未初始化，直接从 PHP 服务读取
                     if (!nodeTree || !nodeTree.initialized) {
+                        // 如果 dirPath 是根目录（如 "D:"），使用 separateName 作为路径
+                        let actualDirPath = dirPath;
+                        if (dirPath === diskName) {
+                            // 对于根目录，使用 "D:" 格式（不带斜杠）
+                            actualDirPath = diskName;
+                        }
+                        
                         // 从 PHP 服务直接读取文件
-                        const url = new URL('/system/service/FSDirve.php', window.location.origin);
+                        const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                            ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                            : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                                ? SystemInformation.getOrigin()
+                                : window.location.origin);
                         url.searchParams.set('action', 'read_file');
-                        url.searchParams.set('path', path);
+                        url.searchParams.set('path', ProcessManager._normalizePath(actualDirPath));
+                        url.searchParams.set('fileName', fileName);
                         
                         const response = await fetch(url.toString());
                         if (!response.ok) {
@@ -2542,10 +2646,21 @@ class ProcessManager {
                     
                     // 如果 nodeTree 仍然不存在或未初始化，直接通过 PHP 服务写入
                     if (!nodeTree || !nodeTree.initialized) {
+                        // 如果 dirPath 是根目录（如 "D:"），使用 "D:" 格式（不带斜杠）
+                        let actualDirPath = dirPath;
+                        if (dirPath === diskName) {
+                            actualDirPath = diskName;
+                        }
+                        
                         // 通过 PHP 服务直接写入文件
-                        const url = new URL('/system/service/FSDirve.php', window.location.origin);
+                        const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                            ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                            : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                                ? SystemInformation.getOrigin()
+                                : window.location.origin);
                         url.searchParams.set('action', 'write_file');
-                        url.searchParams.set('path', path);
+                        url.searchParams.set('path', ProcessManager._normalizePath(actualDirPath));
+                        url.searchParams.set('fileName', fileName);
                         url.searchParams.set('content', content);
                         url.searchParams.set('writeMod', writeMode);
                         
@@ -2620,7 +2735,11 @@ class ProcessManager {
                                     } else {
                                         // 如果 create_dir 不可用，通过 PHP 服务创建
                                         const phpPath = currentPath === basePath ? diskName : currentPath;
-                                        const url = new URL('/system/service/FSDirve.php', window.location.origin);
+                                        const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                            ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                            : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                                ? SystemInformation.getOrigin()
+                                : window.location.origin);
                                         url.searchParams.set('action', 'create_dir');
                                         url.searchParams.set('path', phpPath);
                                         url.searchParams.set('name', dirName);
@@ -2681,9 +2800,13 @@ class ProcessManager {
                             KernelLogger.warn('ProcessManager', `FileSystem.write: 无法找到目录节点: ${actualDirPath}，将通过 PHP 服务直接写入`);
                         }
                         // 通过 PHP 服务直接写入文件
-                        const url = new URL('/system/service/FSDirve.php', window.location.origin);
+                        const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                            ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                            : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                                ? SystemInformation.getOrigin()
+                                : window.location.origin);
                         url.searchParams.set('action', 'write_file');
-                        url.searchParams.set('path', dirPath);
+                        url.searchParams.set('path', ProcessManager._normalizePath(dirPath));
                         url.searchParams.set('fileName', fileName);
                         url.searchParams.set('writeMod', writeMode.toLowerCase());
                         
@@ -2891,14 +3014,20 @@ class ProcessManager {
                         }
                     }
                     
-                    // 规范化路径
+                    // 规范化路径：去掉末尾斜杠，避免 SpringBoot 后端路径拼接时出现双斜杠
                     let phpPath = parentPath;
-                    if (/^[CD]:$/.test(phpPath)) {
-                        phpPath = phpPath + '/';
+                    // 如果路径以斜杠结尾（除了根路径 "D:" 或 "C:"），去掉末尾斜杠
+                    if (phpPath && phpPath.endsWith('/') && !/^[CD]:\/$/.test(phpPath)) {
+                        phpPath = phpPath.replace(/\/+$/, '');
                     }
+                    // 如果路径是根路径 "D:" 或 "C:"，保持原样（SpringBoot 会正确拼接）
                     
                     // 使用 PHP 服务创建
-                    const url = new URL('/system/service/FSDirve.php', window.location.origin);
+                    const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                        ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                        : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                            ? SystemInformation.getOrigin()
+                            : window.location.origin);
                     if (type === 'directory') {
                         url.searchParams.set('action', 'create_dir');
                         url.searchParams.set('path', phpPath);
@@ -3138,11 +3267,19 @@ class ProcessManager {
                     }
                     
                     // 使用 PHP 服务删除
-                    const url = new URL('/system/service/FSDirve.php', window.location.origin);
+                    const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                        ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                        : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                            ? SystemInformation.getOrigin()
+                            : window.location.origin);
                     
                     // 先检查是文件还是目录（通过尝试列出目录）
                     try {
-                        const checkUrl = new URL('/system/service/FSDirve.php', window.location.origin);
+                        const checkUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                            ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                            : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                                ? SystemInformation.getOrigin()
+                                : window.location.origin);
                         checkUrl.searchParams.set('action', 'list_dir');
                         checkUrl.searchParams.set('path', phpPath);
                         
@@ -3237,10 +3374,20 @@ class ProcessManager {
                         }
                         
                         try {
-                            const phpServiceUrl = "/system/service/FSDirve.php";
-                            const listUrl = new URL(phpServiceUrl, window.location.origin);
+                            const phpServiceUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.getFSDirvePath) 
+                                ? SystemInformation.getFSDirvePath()
+                                : (typeof SystemInformation !== 'undefined' && SystemInformation.getFSDirvePath) 
+                                    ? SystemInformation.getFSDirvePath()
+                                    : (typeof SystemInformation !== 'undefined' && SystemInformation.getFSDirvePath) 
+                                        ? SystemInformation.getFSDirvePath()
+                                        : "/system/service/FSDirve.php";
+                            const listUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                                ? SystemInformation.buildServiceUrlObject(phpServiceUrl)
+                                : new URL(phpServiceUrl, (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                                    ? SystemInformation.getOrigin()
+                                    : window.location.origin);
                             listUrl.searchParams.set('action', 'list_dir');
-                            listUrl.searchParams.set('path', dirPath);
+                            listUrl.searchParams.set('path', ProcessManager._normalizePath(dirPath));
                             
                             const response = await fetch(listUrl.toString(), {
                                 method: 'GET',
@@ -3348,8 +3495,14 @@ class ProcessManager {
                     // 如果 nodeTree 仍然不存在或未初始化，直接从 PHP 服务获取列表
                     if (!nodeTree || !nodeTree.initialized) {
                         // 从 PHP 服务直接获取目录列表
-                        const phpServiceUrl = "/system/service/FSDirve.php";
-                        const listUrl = new URL(phpServiceUrl, window.location.origin);
+                        const phpServiceUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.getFSDirvePath) 
+                            ? SystemInformation.getFSDirvePath()
+                            : "/system/service/FSDirve.php";
+                        const listUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                            ? SystemInformation.buildServiceUrlObject(phpServiceUrl)
+                            : new URL(phpServiceUrl, (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                                ? SystemInformation.getOrigin()
+                                : window.location.origin);
                         listUrl.searchParams.set('action', 'list_dir');
                         listUrl.searchParams.set('path', dirPath);
                         
@@ -3399,10 +3552,20 @@ class ProcessManager {
                         }
                         
                         try {
-                            const phpServiceUrl = "/system/service/FSDirve.php";
-                            const listUrl = new URL(phpServiceUrl, window.location.origin);
+                            const phpServiceUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.getFSDirvePath) 
+                                ? SystemInformation.getFSDirvePath()
+                                : (typeof SystemInformation !== 'undefined' && SystemInformation.getFSDirvePath) 
+                                    ? SystemInformation.getFSDirvePath()
+                                    : (typeof SystemInformation !== 'undefined' && SystemInformation.getFSDirvePath) 
+                                        ? SystemInformation.getFSDirvePath()
+                                        : "/system/service/FSDirve.php";
+                            const listUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                                ? SystemInformation.buildServiceUrlObject(phpServiceUrl)
+                                : new URL(phpServiceUrl, (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                                    ? SystemInformation.getOrigin()
+                                    : window.location.origin);
                             listUrl.searchParams.set('action', 'list_dir');
-                            listUrl.searchParams.set('path', dirPath);
+                            listUrl.searchParams.set('path', ProcessManager._normalizePath(dirPath));
                             
                             const response = await fetch(listUrl.toString(), {
                                 method: 'GET',
@@ -3489,10 +3652,20 @@ class ProcessManager {
                         }
                         
                         try {
-                            const phpServiceUrl = "/system/service/FSDirve.php";
-                            const listUrl = new URL(phpServiceUrl, window.location.origin);
+                            const phpServiceUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.getFSDirvePath) 
+                                ? SystemInformation.getFSDirvePath()
+                                : (typeof SystemInformation !== 'undefined' && SystemInformation.getFSDirvePath) 
+                                    ? SystemInformation.getFSDirvePath()
+                                    : (typeof SystemInformation !== 'undefined' && SystemInformation.getFSDirvePath) 
+                                        ? SystemInformation.getFSDirvePath()
+                                        : "/system/service/FSDirve.php";
+                            const listUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                                ? SystemInformation.buildServiceUrlObject(phpServiceUrl)
+                                : new URL(phpServiceUrl, (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                                    ? SystemInformation.getOrigin()
+                                    : window.location.origin);
                             listUrl.searchParams.set('action', 'list_dir');
-                            listUrl.searchParams.set('path', dirPath);
+                            listUrl.searchParams.set('path', ProcessManager._normalizePath(dirPath));
                             
                             const response = await fetch(listUrl.toString(), {
                                 method: 'GET',

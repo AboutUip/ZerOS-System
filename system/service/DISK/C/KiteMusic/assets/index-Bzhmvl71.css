@@ -1,0 +1,224 @@
+[data-v-7a6e97a9]::-webkit-scrollbar {
+  width: 6px;
+  height: 8px;
+}
+[data-v-7a6e97a9]::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  visibility: visible;
+}
+[data-v-7a6e97a9]:hover::-webkit-scrollbar-thumb {
+  visibility: visible;
+}
+[data-v-7a6e97a9]::-webkit-scrollbar-thumb {
+  visibility: hidden;
+}
+/* 字体定义规范 */
+.bgSetting[data-v-7a6e97a9] {
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+.v-field.v-field--center-affix[data-v-7a6e97a9] {
+  border-radius: 8px;
+}
+.y-player-container[data-v-7a6e97a9]::-webkit-scrollbar-thumb {
+  display: none;
+}
+.icon[data-v-7a6e97a9] {
+  width: 1em;
+  height: 1em;
+  vertical-align: -0.15em;
+  fill: currentColor;
+  overflow: hidden;
+}
+.el-loading-mask[data-v-7a6e97a9] {
+  background: transparent;
+}
+#box[data-v-7a6e97a9] {
+  display: flex;
+  height: calc(100%);
+}
+.main[data-v-7a6e97a9] {
+  height: 100%;
+  width: calc(100% - 230px);
+  z-index: auto;
+  position: relative;
+}
+.body[data-v-7a6e97a9] {
+  height: calc(100% - 60px);
+  padding-bottom: 130px;
+  overflow: hidden;
+  overflow-y: auto;
+  width: 100%;
+  display: flex;
+  align-content: baseline;
+  flex-direction: column;
+}
+.body .top[data-v-7a6e97a9] {
+  margin-bottom: 20px;
+}
+.body .padding-container[data-v-7a6e97a9] {
+  padding: 0 32px;
+  padding-bottom: 32px;
+}
+[data-v-7a6e97a9] {
+  margin: 0;
+  box-sizing: border-box;
+}
+body.bold[data-v-7a6e97a9] {
+  font-weight: 600;
+}
+html[data-v-7a6e97a9],
+body[data-v-7a6e97a9],
+#app[data-v-7a6e97a9] {
+  height: 100%;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  color: #d2d2d2;
+  overflow: hidden;
+  background-color: #13131a;
+}
+img[data-v-7a6e97a9] {
+  user-select: none;
+}
+#app[data-v-7a6e97a9] {
+  position: relative;
+}
+.window-container[data-v-7a6e97a9] {
+  -webkit-app-region: drag;
+}
+.no-drag[data-v-7a6e97a9] {
+  -webkit-app-region: no-drag !important;
+}
+.v-input--horizontal .v-input__append[data-v-7a6e97a9] {
+  margin-inline-start: 6px;
+}
+[data-v-7a6e97a9] .el-tab-pane,[data-v-7a6e97a9] .el-tabs__content,[data-v-7a6e97a9] .el-tabs {
+  height: 100%;
+}
+.comment[data-v-7a6e97a9] {
+  height: 100%;
+  width: 100%;
+}
+.comment .comment-box[data-v-7a6e97a9] {
+  padding: 0 0 0 35px;
+  display: flex;
+  flex-wrap: wrap;
+  flex-direction: column;
+  flex-flow: column;
+  height: 100%;
+}
+.comment .comment-box .info[data-v-7a6e97a9] {
+  display: flex;
+  margin-bottom: 30px;
+}
+.comment .comment-box .info .song-info[data-v-7a6e97a9] {
+  display: flex;
+  flex-direction: column;
+  font-size: 13px;
+}
+.comment .comment-box .info .song-info .song-name[data-v-7a6e97a9] {
+  font-size: 30px;
+  margin-bottom: 20px;
+}
+.comment .comment-box .info .song-info .singers[data-v-7a6e97a9] {
+  display: flex;
+  align-items: center;
+}
+.comment .comment-box .info .song-info .singers .singer-info[data-v-7a6e97a9] {
+  display: flex;
+  align-items: center;
+  margin-right: 20px;
+}
+.comment .comment-box .info .bg-img[data-v-7a6e97a9] {
+  transition: 1s background;
+  width: 130px;
+  height: 130px;
+  border-radius: 10px;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  margin-right: 20px;
+}
+.comment .comment-box .comment-content[data-v-7a6e97a9] .el-tabs__item {
+  margin-right: 30px;
+}
+.comment .comment-box .comment-content .comment-content-box[data-v-7a6e97a9] {
+  height: 100%;
+  margin-bottom: 150px;
+}
+.comment .comment-box .comment-content .comment-content-box .title[data-v-7a6e97a9] {
+  font-size: 18px;
+  margin-bottom: 5px;
+}
+.comment .comment-box .comment-content .comment-content-box .content[data-v-7a6e97a9] {
+  padding-right: 35px;
+}
+.comment .comment-box .comment-content .comment-content-box .content .content-line[data-v-7a6e97a9] {
+  display: flex;
+  align-items: center;
+  position: relative;
+  padding-bottom: 25px;
+  width: 100%;
+  padding-top: 25px;
+}
+.comment .comment-box .comment-content .comment-content-box .content .content-line .line[data-v-7a6e97a9] {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 1px;
+  width: 100%;
+  background-color: rgba(255, 255, 255, 0.08);
+}
+.comment .comment-box .comment-content .comment-content-box .content .content-line .photo[data-v-7a6e97a9] {
+  cursor: pointer;
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  min-height: 40px;
+  border-radius: 50%;
+  background-color: #42b983;
+  margin-right: 20px;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+.comment .comment-box .comment-content .comment-content-box .content .content-line .right-box[data-v-7a6e97a9] {
+  display: flex;
+  flex-direction: column;
+  align-content: space-around;
+  width: 100%;
+}
+.comment .comment-box .comment-content .comment-content-box .content .content-line .right-box .comment-text[data-v-7a6e97a9] {
+  display: flex;
+  font-size: 13px;
+  margin-bottom: 6px;
+}
+.comment .comment-box .comment-content .comment-content-box .content .content-line .right-box .comment-text .name[data-v-7a6e97a9] {
+  color: #0086b3;
+  cursor: pointer;
+  margin-right: 5px;
+}
+.comment .comment-box .comment-content .comment-content-box .content .content-line .right-box .handle-box[data-v-7a6e97a9] {
+  display: flex;
+  justify-content: space-between;
+}
+.comment .comment-box .comment-content .comment-content-box .content .content-line .right-box .handle-box .time[data-v-7a6e97a9] {
+  font-size: 13px;
+}
+.comment .comment-box .comment-content .comment-content-box .content .content-line .right-box .handle-box .operation[data-v-7a6e97a9] {
+  position: relative;
+  top: 4px;
+  display: flex;
+  align-items: center;
+}
+.comment .comment-box .comment-content .comment-content-box .content .content-line .right-box .handle-box .operation .operator-line[data-v-7a6e97a9] {
+  width: 1.5px;
+  height: 15px;
+  background-color: rgba(255, 255, 255, 0.05);
+  margin: 0 10px;
+}
+.comment .comment-box .comment-content .comment-content-box .content .content-line .right-box .handle-box .operation .el-icon[data-v-7a6e97a9] {
+  cursor: pointer;
+}

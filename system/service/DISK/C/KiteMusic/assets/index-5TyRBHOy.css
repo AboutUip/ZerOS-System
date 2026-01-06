@@ -1,0 +1,100 @@
+[data-v-faa254de]::-webkit-scrollbar {
+  width: 6px;
+  height: 8px;
+}
+[data-v-faa254de]::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  visibility: visible;
+}
+[data-v-faa254de]:hover::-webkit-scrollbar-thumb {
+  visibility: visible;
+}
+[data-v-faa254de]::-webkit-scrollbar-thumb {
+  visibility: hidden;
+}
+/* 字体定义规范 */
+.bgSetting[data-v-faa254de] {
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+.v-field.v-field--center-affix[data-v-faa254de] {
+  border-radius: 8px;
+}
+.y-player-container[data-v-faa254de]::-webkit-scrollbar-thumb {
+  display: none;
+}
+.icon[data-v-faa254de] {
+  width: 1em;
+  height: 1em;
+  vertical-align: -0.15em;
+  fill: currentColor;
+  overflow: hidden;
+}
+.el-loading-mask[data-v-faa254de] {
+  background: transparent;
+}
+#box[data-v-faa254de] {
+  display: flex;
+  height: calc(100%);
+}
+.main[data-v-faa254de] {
+  height: 100%;
+  width: calc(100% - 230px);
+  z-index: auto;
+  position: relative;
+}
+.body[data-v-faa254de] {
+  height: calc(100% - 60px);
+  padding-bottom: 130px;
+  overflow: hidden;
+  overflow-y: auto;
+  width: 100%;
+  display: flex;
+  align-content: baseline;
+  flex-direction: column;
+}
+.body .top[data-v-faa254de] {
+  margin-bottom: 20px;
+}
+.body .padding-container[data-v-faa254de] {
+  padding: 0 32px;
+  padding-bottom: 32px;
+}
+[data-v-faa254de] {
+  margin: 0;
+  box-sizing: border-box;
+}
+body.bold[data-v-faa254de] {
+  font-weight: 600;
+}
+html[data-v-faa254de],
+body[data-v-faa254de],
+#app[data-v-faa254de] {
+  height: 100%;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  color: #d2d2d2;
+  overflow: hidden;
+  background-color: #13131a;
+}
+img[data-v-faa254de] {
+  user-select: none;
+}
+#app[data-v-faa254de] {
+  position: relative;
+}
+.window-container[data-v-faa254de] {
+  -webkit-app-region: drag;
+}
+.no-drag[data-v-faa254de] {
+  -webkit-app-region: no-drag !important;
+}
+.v-input--horizontal .v-input__append[data-v-faa254de] {
+  margin-inline-start: 6px;
+}
+.padding-container[data-v-faa254de] {
+  display: grid;
+  gap: 10px;
+}

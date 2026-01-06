@@ -1,0 +1,99 @@
+[data-v-c0fd58ac]::-webkit-scrollbar {
+  width: 6px;
+  height: 8px;
+}
+[data-v-c0fd58ac]::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  visibility: visible;
+}
+[data-v-c0fd58ac]:hover::-webkit-scrollbar-thumb {
+  visibility: visible;
+}
+[data-v-c0fd58ac]::-webkit-scrollbar-thumb {
+  visibility: hidden;
+}
+/* 字体定义规范 */
+.bgSetting[data-v-c0fd58ac] {
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+.v-field.v-field--center-affix[data-v-c0fd58ac] {
+  border-radius: 8px;
+}
+.y-player-container[data-v-c0fd58ac]::-webkit-scrollbar-thumb {
+  display: none;
+}
+.icon[data-v-c0fd58ac] {
+  width: 1em;
+  height: 1em;
+  vertical-align: -0.15em;
+  fill: currentColor;
+  overflow: hidden;
+}
+.el-loading-mask[data-v-c0fd58ac] {
+  background: transparent;
+}
+#box[data-v-c0fd58ac] {
+  display: flex;
+  height: calc(100%);
+}
+.main[data-v-c0fd58ac] {
+  height: 100%;
+  width: calc(100% - 230px);
+  z-index: auto;
+  position: relative;
+}
+.body[data-v-c0fd58ac] {
+  height: calc(100% - 60px);
+  padding-bottom: 130px;
+  overflow: hidden;
+  overflow-y: auto;
+  width: 100%;
+  display: flex;
+  align-content: baseline;
+  flex-direction: column;
+}
+.body .top[data-v-c0fd58ac] {
+  margin-bottom: 20px;
+}
+.body .padding-container[data-v-c0fd58ac] {
+  padding: 0 32px;
+  padding-bottom: 32px;
+}
+[data-v-c0fd58ac] {
+  margin: 0;
+  box-sizing: border-box;
+}
+body.bold[data-v-c0fd58ac] {
+  font-weight: 600;
+}
+html[data-v-c0fd58ac],
+body[data-v-c0fd58ac],
+#app[data-v-c0fd58ac] {
+  height: 100%;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  color: #d2d2d2;
+  overflow: hidden;
+  background-color: #13131a;
+}
+img[data-v-c0fd58ac] {
+  user-select: none;
+}
+#app[data-v-c0fd58ac] {
+  position: relative;
+}
+.window-container[data-v-c0fd58ac] {
+  -webkit-app-region: drag;
+}
+.no-drag[data-v-c0fd58ac] {
+  -webkit-app-region: no-drag !important;
+}
+.v-input--horizontal .v-input__append[data-v-c0fd58ac] {
+  margin-inline-start: 6px;
+}
+.record-song[data-v-c0fd58ac] {
+  padding: 0 35px;
+}

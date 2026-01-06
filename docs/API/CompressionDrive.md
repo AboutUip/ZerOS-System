@@ -2,24 +2,48 @@
 
 ## 概述
 
-`CompressionDirve.php` 是 ZerOS 内核的压缩驱动服务，提供基于 PHP 的 ZIP 和 RAR 格式压缩与解压缩操作接口。支持文件或目录的压缩、解压缩、列表查看等功能。
+`CompressionDirve` 是 ZerOS 内核的压缩驱动服务，提供 ZIP 和 RAR 格式压缩与解压缩操作接口。系统支持 **PHP** 和 **SpringBoot** 两种后端实现，可通过 `SystemInformation` 动态切换。
+
+支持文件或目录的压缩、解压缩、列表查看等功能。
+
+## 后端服务支持
+
+- **PHP 后端**（默认）：服务路径为 `/system/service/CompressionDirve.php`，默认端口 **8089**
+- **SpringBoot 后端**：服务路径为 `/system/service/CompressionDirve`（无 `.php` 后缀），默认端口 **8080**
+
+两种后端提供相同的功能接口，可根据需要选择。
 
 ## 服务地址
 
+**推荐使用 `SystemInformation` 构建服务URL**：
+
+```javascript
+// 使用 SystemInformation 构建URL（推荐，自动适配后端类型）
+const url = SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.COMPRESSION_DIRVE);
+
+// 或直接获取URL
+const serviceUrl = SystemInformation.getCompressionDirveUrl();
 ```
-http://localhost:8089/system/service/CompressionDirve.php
-```
+
+**手动构建URL**：
+
+- PHP 后端：`http://localhost:8089/system/service/CompressionDirve.php`
+- SpringBoot 后端：`http://localhost:8080/system/service/CompressionDirve`
+
+详细说明请参考 [SystemInformation API 文档](./SystemInformation.md)。
 
 ## 请求格式
 
 所有请求通过 GET 或 POST 方法发送，使用 `action` 参数指定操作类型：
 
 ```
-GET /system/service/CompressionDirve.php?action=<操作名>&<参数1>=<值1>&<参数2>=<值2>
-POST /system/service/CompressionDirve.php?action=<操作名>&<参数1>=<值1>
+GET /system/service/CompressionDirve[.php]?action=<操作名>&<参数1>=<值1>&<参数2>=<值2>
+POST /system/service/CompressionDirve[.php]?action=<操作名>&<参数1>=<值1>
 Content-Type: application/json
 Body: { "options": { ... } }
 ```
+
+**注意**：`[.php]` 表示 PHP 后端需要 `.php` 后缀，SpringBoot 后端不需要。
 
 ## 响应格式
 

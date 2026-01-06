@@ -2101,7 +2101,11 @@ class DesktopManager {
             }
             
             // 使用 FSDirve.php 获取文件信息
-            const url = new URL('/system/service/FSDirve.php', window.location.origin);
+            const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                    ? SystemInformation.getOrigin()
+                    : window.location.origin);
             url.searchParams.set('action', 'get_file_info');
             url.searchParams.set('path', dirPath);
             url.searchParams.set('fileName', fileName); // 注意：PHP 期望的是 fileName，不是 name

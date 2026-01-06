@@ -1,11 +1,11 @@
 {
   "system": {
     "system.dailyQuote": {
-      "value": "其实，得到了幸福，却被欲望掩盖。",
+      "value": "<p>灵气也是气，怨气也是气，怨气为何不能为人所用啊？——魔道祖师</p>",
       "expiresAt": 0,
-      "createdAt": 1767108822066,
-      "updatedAt": 1767108822066,
-      "size": 50
+      "createdAt": 1767723183419,
+      "updatedAt": 1767723183419,
+      "size": 99
     }
   },
   "programs": {
@@ -45,142 +45,6 @@
         "createdAt": 1766148289293,
         "updatedAt": 1766148289293,
         "size": 161
-      }
-    },
-    "TaskbarManager": {
-      "weather:晋城市": {
-        "value": {
-          "code": 200,
-          "msg": "请求成功",
-          "data": {
-            "city": "晋城市",
-            "ip": "219.147.46.241",
-            "tips": "明天有雪，天气阴冷，穿暖和点吧！",
-            "low_temperature": -1,
-            "moji_city_id": 1945,
-            "night_condition": "雨夹雪",
-            "quality_level": "轻度",
-            "tomorrow_aqi": 105,
-            "tomorrow_condition": "中雪转小雪",
-            "tomorrow_high_temperature": 0,
-            "tomorrow_low_temperature": -5,
-            "tomorrow_quality_level": "轻度",
-            "tomorrow_weather_icon_id": "15",
-            "update_time": "2025-12-30 22:58:19",
-            "today": {
-              "current_temp": "2℃",
-              "current_cond": "霾",
-              "night_condition": "雨夹雪",
-              "tomorrow_condition": "中雪转小雪",
-              "low": "-1℃",
-              "quality": "轻度",
-              "alert": "暂无预警信息",
-              "update_time": "2025-12-30 21:57:03"
-            },
-            "seven_day": [
-              {
-                "date": "2025-12-29",
-                "cond": "晴",
-                "high": "10℃",
-                "low": "-3℃"
-              },
-              {
-                "date": "2025-12-30",
-                "cond": "晴转雨夹雪",
-                "high": "8℃",
-                "low": "-1℃"
-              },
-              {
-                "date": "2025-12-31",
-                "cond": "中雪转小雪",
-                "high": "0℃",
-                "low": "-5℃"
-              },
-              {
-                "date": "2026-01-01",
-                "cond": "晴",
-                "high": "1℃",
-                "low": "-9℃"
-              },
-              {
-                "date": "2026-01-02",
-                "cond": "晴",
-                "high": "1℃",
-                "low": "-10℃"
-              },
-              {
-                "date": "2026-01-03",
-                "cond": "多云转晴",
-                "high": "5℃",
-                "low": "-10℃"
-              },
-              {
-                "date": "2026-01-04",
-                "cond": "晴",
-                "high": "6℃",
-                "low": "-7℃"
-              },
-              {
-                "date": "2026-01-05",
-                "cond": "晴",
-                "high": "4℃",
-                "low": "-8℃"
-              },
-              {
-                "date": "2026-01-06",
-                "cond": "晴",
-                "high": "6℃",
-                "low": "-8℃"
-              },
-              {
-                "date": "2026-01-07",
-                "cond": "晴",
-                "high": "4℃",
-                "low": "-4℃"
-              },
-              {
-                "date": "2026-01-08",
-                "cond": "晴",
-                "high": "5℃",
-                "low": "-4℃"
-              },
-              {
-                "date": "2026-01-09",
-                "cond": "多云",
-                "high": "4℃",
-                "low": "-7℃"
-              },
-              {
-                "date": "2026-01-10",
-                "cond": "多云",
-                "high": "4℃",
-                "low": "-7℃"
-              },
-              {
-                "date": "2026-01-11",
-                "cond": "多云",
-                "high": "4℃",
-                "low": "-7℃"
-              },
-              {
-                "date": "2026-01-12",
-                "cond": "多云",
-                "high": "4℃",
-                "low": "-7℃"
-              },
-              {
-                "date": "2026-01-13",
-                "cond": "多云",
-                "high": "4℃",
-                "low": "-7℃"
-              }
-            ]
-          }
-        },
-        "expiresAt": 1767149749856,
-        "createdAt": 1767106549856,
-        "updatedAt": 1767106549856,
-        "size": 1750
       }
     }
   }

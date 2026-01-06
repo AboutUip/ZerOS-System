@@ -29,6 +29,7 @@ KernelLogger.info("LockScreen", "模块初始化");
         static _togglePasswordButton = null; // 密码可见性切换按钮
         static _clickHandler = null; // 容器点击事件处理器引用（用于移除监听器）
         static _userSwitchKeydownHandler = null; // 用户切换快捷键处理器引用（用于移除监听器）
+        static _keyPressed = false; // 是否已按下任意键（用于首次按键显示登录界面）
         
         /**
          * 初始化锁屏界面
@@ -195,7 +196,7 @@ KernelLogger.info("LockScreen", "模块初始化");
                     if (typeof KernelLogger !== 'undefined') {
                         KernelLogger.debug('LockScreen', '从缓存读取每日一言成功');
                     }
-                    quoteText.textContent = quote.trim();
+                    quoteText.innerHTML = quote.trim();
                     
                     // 使用后删除缓存
                     if (typeof ProcessManager !== 'undefined') {
@@ -224,7 +225,7 @@ KernelLogger.info("LockScreen", "模块初始化");
                     if (typeof KernelLogger !== 'undefined') {
                         KernelLogger.debug('LockScreen', '缓存不存在，从API获取每日一言');
                     }
-                    const response = await fetch('https://api-v1.cenguigui.cn/api/yiyan2/');
+                    const response = await fetch('https://v.api.aa1.cn/api/yiyan/index.php');
                     if (!response.ok) {
                         throw new Error(`HTTP ${response.status}`);
                     }
@@ -234,7 +235,7 @@ KernelLogger.info("LockScreen", "模块初始化");
                         if (typeof KernelLogger !== 'undefined') {
                             KernelLogger.debug('LockScreen', '从API获取每日一言成功');
                         }
-                        quoteText.textContent = apiQuote.trim();
+                        quoteText.innerHTML = apiQuote.trim();
                     } else {
                         if (typeof KernelLogger !== 'undefined') {
                             KernelLogger.debug('LockScreen', 'API返回空内容，使用默认文本');
@@ -296,7 +297,7 @@ KernelLogger.info("LockScreen", "模块初始化");
                 }
                 
                 // 从API获取下一次的每日一言并缓存
-                const response = await fetch('https://api-v1.cenguigui.cn/api/yiyan2/');
+                const response = await fetch('https://v.api.aa1.cn/api/yiyan/index.php');
                 if (!response.ok) {
                     throw new Error(`HTTP ${response.status}`);
                 }
@@ -854,7 +855,11 @@ KernelLogger.info("LockScreen", "模块初始化");
             if (avatarFileName) {
                 // 使用FSDirve读取本地文件并转换为base64 data URL
                 try {
-                    const url = new URL('/system/service/FSDirve.php', window.location.origin);
+                    const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                        ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                        : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                            ? SystemInformation.getOrigin()
+                            : window.location.origin);
                     url.searchParams.set('action', 'read_file');
                     url.searchParams.set('path', 'D:/cache/');
                     url.searchParams.set('fileName', avatarFileName);
@@ -972,7 +977,11 @@ KernelLogger.info("LockScreen", "模块初始化");
                     // 异步加载头像
                     (async () => {
                         try {
-                            const url = new URL('/system/service/FSDirve.php', window.location.origin);
+                            const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                        ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                        : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                            ? SystemInformation.getOrigin()
+                            : window.location.origin);
                             url.searchParams.set('action', 'read_file');
                             url.searchParams.set('path', 'D:/cache/');
                             url.searchParams.set('fileName', avatarFileName);
@@ -1186,6 +1195,12 @@ KernelLogger.info("LockScreen", "模块初始化");
                         <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                     </svg>
                 `;
+                LockScreen._togglePasswordButton.style.display = 'none';
+            }
+            
+            // 隐藏登录按钮（切换用户后需要重新触发显示）
+            if (LockScreen.loginButton) {
+                LockScreen.loginButton.style.display = 'none';
             }
             
             // 重置选中索引
@@ -1209,6 +1224,9 @@ KernelLogger.info("LockScreen", "模块初始化");
             
             // 更新快捷键提示
             LockScreen._updateShortcutHint();
+            
+            // 重置按键状态，确保切换用户后键盘事件能正常工作
+            LockScreen._keyPressed = false;
         }
         
         /**
@@ -1751,7 +1769,8 @@ KernelLogger.info("LockScreen", "模块初始化");
                 LockScreen._keydownHandler = null;
             }
             
-            let keyPressed = false;
+            // 重置按键状态
+            LockScreen._keyPressed = false;
             
             // 检查锁屏是否可见，如果不可见则不处理事件
             const handleKeydown = (e) => {
@@ -1959,7 +1978,7 @@ KernelLogger.info("LockScreen", "模块初始化");
                 }
                 
                 // 首次按键，显示登录界面
-                if (!keyPressed) {
+                if (!LockScreen._keyPressed) {
                     // 忽略功能键和修饰键
                     if (e.key === 'Shift' || e.key === 'Control' || e.key === 'Alt' || 
                         e.key === 'Meta' || e.key === 'Tab' || e.key === 'CapsLock' ||
@@ -1967,7 +1986,7 @@ KernelLogger.info("LockScreen", "模块初始化");
                         return;
                     }
                     
-                    keyPressed = true;
+                    LockScreen._keyPressed = true;
                     LockScreen._showPasswordInput();
                     
                     // 如果是可打印字符且是密码模式，直接输入
@@ -2021,8 +2040,8 @@ KernelLogger.info("LockScreen", "模块初始化");
                     LockScreen._selectedUserIndex = -1;
                 }
                 
-                if (!keyPressed) {
-                    keyPressed = true;
+                if (!LockScreen._keyPressed) {
+                    LockScreen._keyPressed = true;
                     LockScreen._showPasswordInput();
                 } else if (LockScreen.passwordInput && LockScreen.passwordInput.style.display !== 'none') {
                     // 如果密码输入框已显示，点击时聚焦

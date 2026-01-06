@@ -41,8 +41,33 @@
         // 历史记录导航标志（防止在前进/后退时重复添加历史记录）
         _isNavigatingHistory: false,
         
+        // 只读模式标志（普通用户为只读模式）
+        _isReadOnlyMode: false,
+        
         __init__: async function(pid, initArgs) {
             this.pid = pid;
+            
+            // 检查用户级别，普通用户为只读模式
+            if (typeof UserControl !== 'undefined') {
+                try {
+                    await UserControl.ensureInitialized();
+                    const userLevel = UserControl.getCurrentUserLevel();
+                    // 只有管理员和默认管理员可以修改文件
+                    this._isReadOnlyMode = userLevel === UserControl.USER_LEVEL.USER;
+                    if (this._isReadOnlyMode && typeof KernelLogger !== 'undefined') {
+                        KernelLogger.info('FileManager', '普通用户模式：文件管理器已设置为只读模式');
+                    }
+                } catch (e) {
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.warn('FileManager', `检查用户级别失败: ${e.message}，默认允许所有操作`);
+                    }
+                    // 如果检查失败，默认允许所有操作（向后兼容）
+                    this._isReadOnlyMode = false;
+                }
+            } else {
+                // 如果 UserControl 不可用，默认允许所有操作（向后兼容）
+                this._isReadOnlyMode = false;
+            }
             
             // 检查是否是文件选择器模式
             this._isFileSelectorMode = initArgs && initArgs.mode === 'file-selector';
@@ -312,9 +337,12 @@
             
             // 初始化拖拽功能（延迟执行，确保进程已完全启动）
             // 使用 setTimeout 确保进程状态已变为 'running'
-            setTimeout(() => {
-                this._initDragAndDrop();
-            }, 100);
+            // 只读模式下不启用拖拽上传功能
+            if (!this._isReadOnlyMode) {
+                setTimeout(() => {
+                    this._initDragAndDrop();
+                }, 100);
+            }
             
             // 监听来自桌面的显示属性事件
             this.window.addEventListener('show-file-properties', (e) => {
@@ -425,16 +453,28 @@
             
             // 在选择器模式下隐藏文件操作按钮
             if (!this._isFolderSelectorMode && !this._isFileSelectorMode) {
-                // 新建文件按钮
+                // 新建文件按钮（只读模式下禁用）
                 const newFileBtn = this._createToolbarButton('+ 文件', '新建文件', () => {
                     this._createNewFile();
                 }, true);
+                if (this._isReadOnlyMode) {
+                    newFileBtn.style.opacity = '0.5';
+                    newFileBtn.style.cursor = 'not-allowed';
+                    newFileBtn.disabled = true;
+                    newFileBtn.title = '新建文件（只读模式：普通用户无法创建文件）';
+                }
                 toolbar.appendChild(newFileBtn);
                 
-                // 新建目录按钮
+                // 新建目录按钮（只读模式下禁用）
                 const newDirBtn = this._createToolbarButton('+ 目录', '新建目录', () => {
                     this._createNewDirectory();
                 }, true);
+                if (this._isReadOnlyMode) {
+                    newDirBtn.style.opacity = '0.5';
+                    newDirBtn.style.cursor = 'not-allowed';
+                    newDirBtn.disabled = true;
+                    newDirBtn.title = '新建目录（只读模式：普通用户无法创建目录）';
+                }
                 toolbar.appendChild(newDirBtn);
                 
                 // 分隔符
@@ -442,21 +482,29 @@
                 separator3.style.cssText = separator1.style.cssText;
                 toolbar.appendChild(separator3);
                 
-                // 复制按钮
+                // 复制按钮（只读模式下禁用）
                 const copyBtn = this._createToolbarButton('📋 复制', '复制 (Ctrl+C)', () => {
                     this._copySelectedItems();
                 }, true);
                 copyBtn.style.opacity = '0.5';
                 copyBtn.style.cursor = 'not-allowed';
+                if (this._isReadOnlyMode) {
+                    copyBtn.disabled = true;
+                    copyBtn.title = '复制（只读模式：普通用户无法复制文件）';
+                }
                 this.copyBtn = copyBtn;  // 保存引用以便更新状态
                 toolbar.appendChild(copyBtn);
                 
-                // 剪切按钮
+                // 剪切按钮（只读模式下禁用）
                 const cutBtn = this._createToolbarButton('✂️ 剪切', '剪切 (Ctrl+X)', () => {
                     this._cutSelectedItems();
                 }, true);
                 cutBtn.style.opacity = '0.5';
                 cutBtn.style.cursor = 'not-allowed';
+                if (this._isReadOnlyMode) {
+                    cutBtn.disabled = true;
+                    cutBtn.title = '剪切（只读模式：普通用户无法剪切文件）';
+                }
                 this.cutBtn = cutBtn;  // 保存引用以便更新状态
                 toolbar.appendChild(cutBtn);
                 
@@ -1729,7 +1777,11 @@
                     }
                     
                     try {
-                        const listUrl = new URL('/system/service/FSDirve.php', window.location.origin);
+                        const listUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                            ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                            : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                                ? SystemInformation.getOrigin()
+                                : window.location.origin);
                         listUrl.searchParams.set('action', 'list_dir');
                         listUrl.searchParams.set('path', phpPath);
                         
@@ -1802,7 +1854,11 @@
                 }
                 
                 // 使用 FSDirve.php 获取文件信息
-                const url = new URL('/system/service/FSDirve.php', window.location.origin);
+                const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                    : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                        ? SystemInformation.getOrigin()
+                        : window.location.origin);
                 url.searchParams.set('action', 'get_file_info');
                 url.searchParams.set('path', dirPath);
                 url.searchParams.set('fileName', fileName); // 注意：PHP 期望的是 fileName，不是 name
@@ -2084,7 +2140,11 @@
                 }
                 
                 // 从 PHP 服务获取目录列表
-                const url = new URL('/system/service/FSDirve.php', window.location.origin);
+                const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                    : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                        ? SystemInformation.getOrigin()
+                        : window.location.origin);
                 url.searchParams.set('action', 'list_dir');
                 url.searchParams.set('path', phpPath);
                 
@@ -3303,7 +3363,11 @@
                 }
                 
                 // 从 PHP 服务读取文件
-                const url = new URL('/system/service/FSDirve.php', window.location.origin);
+                const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                    : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                        ? SystemInformation.getOrigin()
+                        : window.location.origin);
                 url.searchParams.set('action', 'read_file');
                 url.searchParams.set('path', phpPath);
                 url.searchParams.set('fileName', fileName);
@@ -3390,7 +3454,11 @@
                 }
                 
                 // 使用 PHP 服务写入文件
-                const url = new URL('/system/service/FSDirve.php', window.location.origin);
+                const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                    : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                        ? SystemInformation.getOrigin()
+                        : window.location.origin);
                 url.searchParams.set('action', 'write_file');
                 url.searchParams.set('path', phpPath);
                 url.searchParams.set('fileName', fileName);
@@ -3722,7 +3790,11 @@
                 }
                 
                 // 使用 PHP 服务创建文件
-                const url = new URL('/system/service/FSDirve.php', window.location.origin);
+                const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                    : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                        ? SystemInformation.getOrigin()
+                        : window.location.origin);
                 url.searchParams.set('action', 'create_file');
                 url.searchParams.set('path', phpPath);
                 url.searchParams.set('fileName', fileName);
@@ -3771,6 +3843,25 @@
          * 创建新目录
          */
         _createNewDirectory: async function() {
+            // 只读模式检查
+            if (this._isReadOnlyMode) {
+                if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                    try {
+                        await NotificationManager.createNotification(this.pid, {
+                            type: 'snapshot',
+                            title: '文件管理器',
+                            content: '普通用户无法创建目录（只读模式）',
+                            duration: 3000
+                        });
+                    } catch (e) {
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('FileManager', `创建通知失败: ${e.message}`);
+                        }
+                    }
+                }
+                return;
+            }
+            
             if (typeof GUIManager !== 'undefined' && typeof GUIManager.showPrompt === 'function') {
                 const dirName = await GUIManager.showPrompt('请输入目录名:', '新建目录', 'newdir');
                 if (dirName) {
@@ -3847,7 +3938,11 @@
                 
                 // 使用 PHP 服务创建目录
                 // 注意：FSDirve.php 需要参数 'name' 而不是 'dirName'
-                const url = new URL('/system/service/FSDirve.php', window.location.origin);
+                const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                    : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                        ? SystemInformation.getOrigin()
+                        : window.location.origin);
                 url.searchParams.set('action', 'create_dir');
                 url.searchParams.set('path', phpPath);
                 url.searchParams.set('name', dirName);
@@ -4262,35 +4357,38 @@
                                 }
                             }
                             });
-                            items.push({ type: 'separator' });
-                            items.push({
-                                label: '新建文件',
-                            icon: '📄',
-                            action: async () => {
-                                // 临时切换到该目录，创建文件，然后切换回来
-                                const currentPath = self._getCurrentPath();
-                                await self._loadDirectory(itemPath);
-                                await self._createNewFile();
-                                // 如果之前不在该目录，切换回去
-                                if (currentPath !== itemPath) {
-                                    await self._loadDirectory(currentPath);
+                            // 只读模式下不显示新建选项
+                            if (!self._isReadOnlyMode) {
+                                items.push({ type: 'separator' });
+                                items.push({
+                                    label: '新建文件',
+                                icon: '📄',
+                                action: async () => {
+                                    // 临时切换到该目录，创建文件，然后切换回来
+                                    const currentPath = self._getCurrentPath();
+                                    await self._loadDirectory(itemPath);
+                                    await self._createNewFile();
+                                    // 如果之前不在该目录，切换回去
+                                    if (currentPath !== itemPath) {
+                                        await self._loadDirectory(currentPath);
+                                    }
                                 }
-                            }
-                            });
-                            items.push({
-                                label: '新建文件夹',
-                            icon: '📁',
-                            action: async () => {
-                                // 临时切换到该目录，创建文件夹，然后切换回来
-                                const currentPath = self._getCurrentPath();
-                                await self._loadDirectory(itemPath);
-                                await self._createNewDirectory();
-                                // 如果之前不在该目录，切换回去
-                                if (currentPath !== itemPath) {
-                                    await self._loadDirectory(currentPath);
+                                });
+                                items.push({
+                                    label: '新建文件夹',
+                                icon: '📁',
+                                action: async () => {
+                                    // 临时切换到该目录，创建文件夹，然后切换回来
+                                    const currentPath = self._getCurrentPath();
+                                    await self._loadDirectory(itemPath);
+                                    await self._createNewDirectory();
+                                    // 如果之前不在该目录，切换回去
+                                    if (currentPath !== itemPath) {
+                                        await self._loadDirectory(currentPath);
+                                    }
                                 }
+                                });
                             }
-                            });
                         }
                     } else {
                         // 获取文件类型（从保存的对象引用中获取）
@@ -4480,9 +4578,11 @@
                     if (!isSelectorMode) {
                         items.push({ type: 'separator' });
                         
-                        // 复制选项
-                        items.push({
-                            label: '复制',
+                        // 只读模式下不显示复制、剪切、粘贴、重命名、删除选项
+                        if (!self._isReadOnlyMode) {
+                            // 复制选项
+                            items.push({
+                                label: '复制',
                             icon: '📋',
                             action: () => {
                                 // 设置选中项（如果还没有选中）
@@ -4553,15 +4653,16 @@
                             }
                         });
                         
-                        items.push({
-                            label: '删除',
-                            icon: '🗑️',
-                            danger: true,
-                            action: async () => {
-                                // 直接执行删除，不显示确认弹窗
-                                await self._deleteItem(itemPath, itemType);
-                            }
-                        });
+                            items.push({
+                                label: '删除',
+                                icon: '🗑️',
+                                danger: true,
+                                action: async () => {
+                                    // 直接执行删除，不显示确认弹窗
+                                    await self._deleteItem(itemPath, itemType);
+                                }
+                            });
+                        }
                         
                         items.push({ type: 'separator' });
                         
@@ -4863,34 +4964,37 @@
                     
                     const items = [];
                     
-                    // 新建文件
-                    items.push({
-                        label: '新建文件',
-                        icon: '📄',
-                        action: async () => {
-                            await self._createNewFile();
-                        }
-                    });
-                    
-                    // 新建文件夹
-                    items.push({
-                        label: '新建文件夹',
-                        icon: '📁',
-                        action: async () => {
-                            await self._createNewDirectory();
-                        }
-                    });
-                    
-                    // 粘贴选项（如果有剪贴板内容）
-                    if (self._clipboard && self._clipboard.items && self._clipboard.items.length > 0) {
-                        items.push({ type: 'separator' });
+                    // 只读模式下不显示新建和粘贴选项
+                    if (!self._isReadOnlyMode) {
+                        // 新建文件
                         items.push({
-                            label: '粘贴',
+                            label: '新建文件',
                             icon: '📄',
                             action: async () => {
-                                await self._pasteItems();
+                                await self._createNewFile();
                             }
                         });
+                        
+                        // 新建文件夹
+                        items.push({
+                            label: '新建文件夹',
+                            icon: '📁',
+                            action: async () => {
+                                await self._createNewDirectory();
+                            }
+                        });
+                        
+                        // 粘贴选项（如果有剪贴板内容）
+                        if (self._clipboard && self._clipboard.items && self._clipboard.items.length > 0) {
+                            items.push({ type: 'separator' });
+                            items.push({
+                                label: '粘贴',
+                                icon: '📄',
+                                action: async () => {
+                                    await self._pasteItems();
+                                }
+                            });
+                        }
                     }
                     
                     items.push({ type: 'separator' });
@@ -4918,6 +5022,25 @@
          * 重命名项目
          */
         _renameItem: async function(oldPath, newName) {
+            // 只读模式检查
+            if (this._isReadOnlyMode) {
+                if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                    try {
+                        await NotificationManager.createNotification(this.pid, {
+                            type: 'snapshot',
+                            title: '文件管理器',
+                            content: '普通用户无法重命名文件/目录（只读模式）',
+                            duration: 3000
+                        });
+                    } catch (e) {
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('FileManager', `创建通知失败: ${e.message}`);
+                        }
+                    }
+                }
+                return;
+            }
+            
             try {
                 // 解析路径
                 const parts = oldPath.split('/');
@@ -4931,7 +5054,11 @@
                 }
                 
                 // 检查是文件还是目录（通过 PHP 服务）
-                const checkUrl = new URL('/system/service/FSDirve.php', window.location.origin);
+                const checkUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                    : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                        ? SystemInformation.getOrigin()
+                        : window.location.origin);
                 checkUrl.searchParams.set('action', 'exists');
                 checkUrl.searchParams.set('path', oldPath);
                 
@@ -4950,7 +5077,11 @@
                 // 使用 PHP 的 rename 功能（更高效）
                 if (isDirectory) {
                     // 目录：使用 rename_dir
-                    const renameUrl = new URL('/system/service/FSDirve.php', window.location.origin);
+                    const renameUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                        ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                        : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                        ? SystemInformation.getOrigin()
+                        : window.location.origin);
                     renameUrl.searchParams.set('action', 'rename_dir');
                     renameUrl.searchParams.set('path', phpPath);
                     renameUrl.searchParams.set('oldName', oldName);
@@ -4968,7 +5099,11 @@
                     }
                 } else {
                     // 文件：使用 rename_file
-                    const renameUrl = new URL('/system/service/FSDirve.php', window.location.origin);
+                    const renameUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                        ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                        : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                        ? SystemInformation.getOrigin()
+                        : window.location.origin);
                     renameUrl.searchParams.set('action', 'rename_file');
                     renameUrl.searchParams.set('path', phpPath);
                     renameUrl.searchParams.set('oldFileName', oldName);
@@ -5020,6 +5155,25 @@
          * 删除项目
          */
         _deleteItem: async function(itemPath, itemType) {
+            // 只读模式检查
+            if (this._isReadOnlyMode) {
+                if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                    try {
+                        await NotificationManager.createNotification(this.pid, {
+                            type: 'snapshot',
+                            title: '文件管理器',
+                            content: '普通用户无法删除文件/目录（只读模式）',
+                            duration: 3000
+                        });
+                    } catch (e) {
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('FileManager', `创建通知失败: ${e.message}`);
+                        }
+                    }
+                }
+                return;
+            }
+            
             try {
                 // 解析路径：分离父目录路径和项目名称
                 const pathParts = itemPath.split('/');
@@ -5032,7 +5186,11 @@
                     phpPath = phpPath + '/';
                 }
                 
-                const url = new URL('/system/service/FSDirve.php', window.location.origin);
+                const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                    : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                        ? SystemInformation.getOrigin()
+                        : window.location.origin);
                 
                 if (itemType === 'directory') {
                     // 删除目录（使用递归删除，支持非空目录）
@@ -5079,6 +5237,25 @@
          * 复制选中的项目
          */
         _copySelectedItems: function() {
+            // 只读模式检查
+            if (this._isReadOnlyMode) {
+                if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                    try {
+                        NotificationManager.createNotification(this.pid, {
+                            type: 'snapshot',
+                            title: '文件管理器',
+                            content: '普通用户无法复制文件（只读模式）',
+                            duration: 3000
+                        }).catch(() => {});
+                    } catch (e) {
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('FileManager', `创建通知失败: ${e.message}`);
+                        }
+                    }
+                }
+                return;
+            }
+            
             const selectedItem = this._getSelectedItem();
             if (!selectedItem) {
                 // 请先选择一个文件或目录，使用通知提示（不打断用户）
@@ -5125,6 +5302,25 @@
          * 剪切选中的项目
          */
         _cutSelectedItems: function() {
+            // 只读模式检查
+            if (this._isReadOnlyMode) {
+                if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                    try {
+                        NotificationManager.createNotification(this.pid, {
+                            type: 'snapshot',
+                            title: '文件管理器',
+                            content: '普通用户无法剪切文件（只读模式）',
+                            duration: 3000
+                        }).catch(() => {});
+                    } catch (e) {
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('FileManager', `创建通知失败: ${e.message}`);
+                        }
+                    }
+                }
+                return;
+            }
+            
             const selectedItem = this._getSelectedItem();
             if (!selectedItem) {
                 // 请先选择一个文件或目录，使用通知提示（不打断用户）
@@ -5171,6 +5367,25 @@
          * 粘贴项目
          */
         _pasteItems: async function() {
+            // 只读模式检查
+            if (this._isReadOnlyMode) {
+                if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                    try {
+                        await NotificationManager.createNotification(this.pid, {
+                            type: 'snapshot',
+                            title: '文件管理器',
+                            content: '普通用户无法粘贴文件（只读模式）',
+                            duration: 3000
+                        });
+                    } catch (e) {
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('FileManager', `创建通知失败: ${e.message}`);
+                        }
+                    }
+                }
+                return;
+            }
+            
             if (!this._clipboard || !this._clipboard.items || this._clipboard.items.length === 0) {
                 // 剪贴板为空，使用通知提示（不打断用户）
                 if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
@@ -5233,7 +5448,11 @@
                         // 复制操作
                         if (item.type === 'directory') {
                             // 复制目录
-                            const copyUrl = new URL('/system/service/FSDirve.php', window.location.origin);
+                            const copyUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                                ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                                : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                                ? SystemInformation.getOrigin()
+                                : window.location.origin);
                             copyUrl.searchParams.set('action', 'copy_dir');
                             copyUrl.searchParams.set('sourcePath', item.path);
                             copyUrl.searchParams.set('targetPath', targetPath + '/' + sourceName);
@@ -5250,7 +5469,11 @@
                             }
                         } else {
                             // 复制文件
-                            const copyUrl = new URL('/system/service/FSDirve.php', window.location.origin);
+                            const copyUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                                ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                                : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                                ? SystemInformation.getOrigin()
+                                : window.location.origin);
                             copyUrl.searchParams.set('action', 'copy_file');
                             copyUrl.searchParams.set('sourcePath', sourcePath);
                             copyUrl.searchParams.set('sourceFileName', sourceName);
@@ -5272,7 +5495,11 @@
                         // 剪切操作（移动）
                         if (item.type === 'directory') {
                             // 移动目录
-                            const moveUrl = new URL('/system/service/FSDirve.php', window.location.origin);
+                            const moveUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                                ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                                : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                                ? SystemInformation.getOrigin()
+                                : window.location.origin);
                             moveUrl.searchParams.set('action', 'move_dir');
                             moveUrl.searchParams.set('sourcePath', item.path);
                             moveUrl.searchParams.set('targetPath', targetPath + '/' + sourceName);
@@ -5289,7 +5516,11 @@
                             }
                         } else {
                             // 移动文件
-                            const moveUrl = new URL('/system/service/FSDirve.php', window.location.origin);
+                            const moveUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                                ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                                : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                                ? SystemInformation.getOrigin()
+                                : window.location.origin);
                             moveUrl.searchParams.set('action', 'move_file');
                             moveUrl.searchParams.set('sourcePath', sourcePath);
                             moveUrl.searchParams.set('sourceFileName', sourceName);

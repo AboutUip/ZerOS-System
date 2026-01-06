@@ -113,9 +113,14 @@ async function cleanupExpiredCache() {
         const now = Date.now();
         
         // 列出 D:/cache/ 目录下的所有文件
-        const listUrl = new URL('/system/service/FSDirve.php', window.location.origin);
+        const listUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+            ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+            : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                ? SystemInformation.getOrigin()
+                : window.location.origin);
         listUrl.searchParams.set('action', 'list_dir');
-        listUrl.searchParams.set('path', 'D:/cache/');
+        // 规范化路径，去掉末尾斜杠，避免 SpringBoot 后端路径拼接时出现双斜杠
+        listUrl.searchParams.set('path', 'D:/cache');
         
         const listResponse = await fetch(listUrl.toString());
         if (!listResponse.ok) {
@@ -148,7 +153,11 @@ async function cleanupExpiredCache() {
         let deletedCount = 0;
         for (const file of expiredFiles) {
             try {
-                const deleteUrl = new URL('/system/service/FSDirve.php', window.location.origin);
+                const deleteUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                    : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                ? SystemInformation.getOrigin()
+                : window.location.origin);
                 deleteUrl.searchParams.set('action', 'delete_file');
                 deleteUrl.searchParams.set('path', 'D:/cache/');
                 deleteUrl.searchParams.set('fileName', file.name);

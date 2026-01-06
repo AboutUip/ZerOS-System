@@ -96,7 +96,7 @@ ZerOS 系统用于教学目的的浏览器虚拟内核开发项目，仅供学�
 
 ### 🗂️ 文件系统
 - **虚拟磁盘分区**：支持多磁盘分区（C:、D: 等），完整的目录树结构
-- **PHP 后端存储**：使用 PHP 服务端实现文件持久化存储
+- **多后端支持**：支持 PHP 和 SpringBoot 两种后端服务，可通过 `SystemInformation` 动态切换
 - **文件操作 API**：完整的文件读写、目录管理、路径操作 API
 - **ZIP 文件支持**：自动识别 ZIP 文件，支持压缩/解压缩操作
 
@@ -169,21 +169,32 @@ ZerOS 系统用于教学目的的浏览器虚拟内核开发项目，仅供学�
    cd ZerOS
    ```
 
-2. **配置服务器**
-   - 将 `ZerOS/` 整个文件夹设置为网站根目录
-   - 确保 PHP 服务正常运行（PHP 7.0+）
-   - **重要**：PHP 服务端口必须使用 **8898**
-   - **重要**：Web 服务端口应该为 **8089**
+2. **选择后端服务**
+   - **PHP 后端**（默认）：
+     - 确保 PHP 7.0+ 正常运行
+     - PHP 服务端口：**8089**（默认）
+     - 访问：`http://localhost:8089/test/index.html`
+   - **SpringBoot 后端**：
+     - 确保 SpringBoot 服务正常运行
+     - SpringBoot 服务端口：**8080**（默认）
+     - 访问：`http://localhost:8080/test/index.html?backend=SPRINGBOOT`
+     - 或通过 `SystemInformation.setBackendType('SPRINGBOOT')` 切换
 
-3. **访问系统**
-   - 使用浏览器访问：`http://localhost:8089/test/index.html`
+3. **配置服务器**
+   - 将 `ZerOS/` 整个文件夹设置为网站根目录
+   - 确保选择的后端服务正常运行
+   - **注意**：PHP 和 SpringBoot 后端提供相同的功能接口，可根据需要选择
+
+4. **访问系统**
+   - PHP 后端：`http://localhost:8089/test/index.html`
+   - SpringBoot 后端：`http://localhost:8080/test/index.html?backend=SPRINGBOOT`
    - 首次加载可能需要几秒钟来初始化内核
 
-4. **验证安装**
+5. **验证安装**
    - 打开浏览器控制台（F12），检查是否有错误
    - 系统启动后，应该能看到桌面和任务栏
 
-5. **登录系统**
+6. **登录系统**
    - 管理员账号:root
    - 管理员密码(默认):200714
    - 测试用户账号:TestUser
@@ -194,7 +205,8 @@ ZerOS 系统用于教学目的的浏览器虚拟内核开发项目，仅供学�
 - 浏览器应该支持 localStorage API（非必须，但推荐）
 - 建议使用 Chrome 浏览器以获得最佳体验
 - 如果遇到问题，请检查浏览器控制台的错误信息
-- 确保 PHP 服务正常运行，文件系统功能依赖 PHP 后端
+- 确保选择的后端服务（PHP 或 SpringBoot）正常运行，文件系统功能依赖后端服务
+- 后端切换：可通过 `SystemInformation.setBackendType()` 动态切换，或使用 URL 参数 `?backend=PHP` 或 `?backend=SPRINGBOOT`
 
 ---
 
@@ -234,7 +246,9 @@ ZerOS Kernel 采用模块化架构，主要包含以下核心模块：
 - **多线程驱动**：`MultithreadingDrive` - 多线程支持
 
 ### 服务层
-- **PHP 服务**：`FSDirve.php`（文件系统驱动）、`CompressionDirve.php`（压缩驱动）
+- **后端服务**：支持 PHP 和 SpringBoot 两种后端实现
+  - **PHP 服务**：`FSDirve.php`（文件系统驱动）、`CompressionDirve.php`（压缩驱动）
+  - **SpringBoot 服务**：提供与 PHP 服务相同的功能接口，可通过 `SystemInformation` 切换
 
 详细架构说明请参考 [内核架构文档](docs/ZEROS_KERNEL.md)
 
@@ -243,11 +257,17 @@ ZerOS Kernel 采用模块化架构，主要包含以下核心模块：
 ## 📚 文档导航
 
 ### 开发者文档
-- **[开发者指南](docs/DEVELOPER_GUIDE.md)** - 完整的开发指南，包括：
+- **[开发者指南](docs/DEVELOPER_GUIDE.md)** - 完整的程序开发指南，包括：
   - 开发思维和核心概念
   - 快速开始教程
   - 程序结构说明
   - GUI/CLI 程序开发
+  - 最佳实践和常见问题
+- **[内核开发指南](docs/KERNEL_DEVELOPER_GUIDE.md)** - 完整的内核模块开发指南，包括：
+  - 内核开发思维和核心概念
+  - 快速开始教程
+  - 内核模块结构说明
+  - 依赖管理和 POOL 注册
   - 最佳实践和常见问题
 
 ### 架构文档
@@ -278,11 +298,11 @@ ZerOS Kernel 采用模块化架构，主要包含以下核心模块：
 - **分辨率**：推荐最小 800x600，最佳 1920x1080
 
 ### 服务端要求
-- **PHP**：PHP 7.0+（必须，用于文件系统持久化）
+- **后端服务**：支持 PHP 或 SpringBoot 两种后端实现
+  - **PHP 后端**：PHP 7.0+，端口 **8089**（默认）
+  - **SpringBoot 后端**：SpringBoot 2.x+，端口 **8080**（默认）
 - **Web 服务器**：Apache2（推荐）或 Nginx
-- **端口配置**：
-  - PHP 服务端口：**8898**（必须）
-  - Web 服务端口：**8089**（推荐）
+- **后端切换**：通过 `SystemInformation.setBackendType()` 或 URL 参数 `?backend=PHP` 或 `?backend=SPRINGBOOT` 切换
 
 ### 存储要求
 - **浏览器 localStorage**：用于系统配置和缓存（非必须，但推荐）
@@ -501,7 +521,7 @@ GNU GENERAL PUBLIC LICENSE VERSION 2.0
 
 ## 📢 声明
 
-1. 本系统内所有的音乐 API 均由笒鬼鬼提供，由此涉及的所有问题，与 ZerOS 开发组和笒鬼鬼无关，如有侵权，请联系删除
+1. 本系统由 **AxtTeam** 提供赞助支持
 2. 本系统的开发由 Gemini 3 Pro 提供支持，仅供学习参考
 3. 本系统不与其他项目进行对标，请勿恶意评价
 4. 本系统涉及的 SVG 矢量图均由 Gemini 3 Pro 生成，非互联网采集而来

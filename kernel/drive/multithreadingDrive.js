@@ -139,41 +139,93 @@ class MultithreadingDrive {
      * @returns {string} 线程ID
      */
     static createThread(pid) {
+        // 权限检查：检查是否有 MULTITHREADING_CREATE 权限
+        if (typeof PermissionManager !== 'undefined') {
+            // 同步检查权限（createThread 是同步方法）
+            const hasPermission = PermissionManager.hasPermission(
+                pid,
+                PermissionManager.PERMISSION.MULTITHREADING_CREATE
+            );
+            if (!hasPermission) {
+                throw new Error('创建线程需要 MULTITHREADING_CREATE 权限');
+            }
+        }
+        
         const threadId = `thread_${++MultithreadingDrive._threadIdCounter}`;
         
         try {
-            // 创建 Worker（使用内联脚本）
+            // 创建 Worker（使用内联脚本，实现沙箱隔离）
             const workerScript = `
-                // Worker 脚本
-                self.onmessage = function(e) {
-                    const { taskId, script, args } = e.data;
+                // Worker 脚本 - 沙箱隔离环境
+                (function() {
+                    // 创建受限的全局对象环境
+                    const sandbox = {
+                        // 允许的基础对象
+                        Math: Math,
+                        Date: Date,
+                        JSON: JSON,
+                        Array: Array,
+                        Object: Object,
+                        String: String,
+                        Number: Number,
+                        Boolean: Boolean,
+                        RegExp: RegExp,
+                        Error: Error,
+                        TypeError: TypeError,
+                        RangeError: RangeError,
+                        console: {
+                            log: function() { /* 禁用日志输出 */ },
+                            warn: function() { /* 禁用警告输出 */ },
+                            error: function() { /* 禁用错误输出 */ }
+                        }
+                    };
                     
-                    try {
-                        // 在 Worker 中执行脚本
-                        // script 应该是一个函数字符串，例如: "(function(a, b) { return a + b; })"
-                        let func;
-                        if (typeof script === 'string') {
-                            // 尝试解析函数字符串
-                            try {
-                                func = eval('(' + script + ')');
-                            } catch (e1) {
-                                // 如果失败，尝试直接执行
-                                try {
-                                    func = new Function('return ' + script)();
-                                } catch (e2) {
-                                    throw new Error('无法解析脚本: ' + e2.message);
-                                }
+                    // 创建受限的执行上下文（完全移除 eval，只使用 Function 构造函数）
+                    const createSandboxedFunction = function(script) {
+                        // 验证脚本格式（必须是函数表达式或函数声明）
+                        const functionPattern = /^\\s*(?:function\\s*\\w*\\s*\\([^)]*\\)|\\s*\\([^)]*\\)\\s*=>|\\s*\\([^)]*\\)\\s*\\{)/;
+                        if (!functionPattern.test(script.trim())) {
+                            throw new Error('脚本必须是函数表达式或函数声明');
+                        }
+                        
+                        // 使用 Function 构造函数创建函数，严格限制作用域
+                        // 只允许访问 sandbox 中定义的安全对象
+                        try {
+                            const funcString = script.trim();
+                            
+                            // 构建沙箱参数列表
+                            const sandboxKeys = Object.keys(sandbox);
+                            const sandboxValues = sandboxKeys.map(key => sandbox[key]);
+                            
+                            // 使用 Function 构造函数，将 sandbox 对象作为参数传入
+                            // 这样函数内部只能访问传入的参数，无法访问全局对象
+                            const funcFactory = new Function(
+                                ...sandboxKeys,
+                                '"use strict"; return (' + funcString + ');'
+                            );
+                            
+                            // 在严格模式下执行，传入沙箱对象
+                            const func = funcFactory.apply(null, sandboxValues);
+                            
+                            if (typeof func !== 'function') {
+                                throw new Error('脚本必须是一个函数');
                             }
-                        } else {
-                            throw new Error('脚本必须是字符串');
+                            
+                            return func;
+                        } catch (error) {
+                            throw new Error('脚本解析失败: ' + error.message);
                         }
+                    };
+                    
+                    self.onmessage = function(e) {
+                        const { taskId, script, args } = e.data;
                         
-                        if (typeof func !== 'function') {
-                            throw new Error('脚本必须是一个函数');
-                        }
-                        
-                        // 执行函数
-                        const result = func.apply(null, args || []);
+                        try {
+                            // 在沙箱环境中解析和执行脚本
+                            const func = createSandboxedFunction(script);
+                            
+                            // 在受限环境中执行函数
+                            const result = func.apply(null, args || []);
                         
                         // 如果结果是 Promise，等待它完成
                         if (result && typeof result.then === 'function') {
@@ -224,17 +276,24 @@ class MultithreadingDrive {
                                 });
                             }
                         }
-                    } catch (error) {
-                        self.postMessage({
-                            taskId: taskId,
-                            success: false,
-                            error: {
-                                message: error.message || '未知错误',
-                                stack: error.stack || ''
-                            }
-                        });
-                    }
-                };
+                        } catch (error) {
+                            // 限制错误信息，避免泄露敏感信息
+                            const errorMessage = error.message || '未知错误';
+                            const safeErrorMessage = errorMessage.length > 200 
+                                ? errorMessage.substring(0, 200) + '...' 
+                                : errorMessage;
+                            
+                            self.postMessage({
+                                taskId: taskId,
+                                success: false,
+                                error: {
+                                    message: safeErrorMessage,
+                                    stack: '' // 不传递堆栈信息，避免泄露
+                                }
+                            });
+                        }
+                    };
+                })();
             `;
             
             const blob = new Blob([workerScript], { type: 'application/javascript' });
@@ -418,6 +477,55 @@ class MultithreadingDrive {
     // ==================== 任务管理 ====================
     
     /**
+     * 验证脚本内容安全性
+     * @param {string} script 脚本字符串
+     * @returns {boolean} 是否安全
+     */
+    static _validateScriptSafety(script) {
+        if (!script || typeof script !== 'string') {
+            return false;
+        }
+        
+        // 危险代码模式列表
+        const dangerousPatterns = [
+            /eval\s*\(/i,                    // eval(
+            /Function\s*\(/i,                 // new Function(
+            /setTimeout\s*\(/i,               // setTimeout(
+            /setInterval\s*\(/i,             // setInterval(
+            /importScripts\s*\(/i,           // importScripts(
+            /XMLHttpRequest/i,                // XMLHttpRequest
+            /fetch\s*\(/i,                    // fetch(
+            /Worker\s*\(/i,                   // new Worker(
+            /SharedWorker\s*\(/i,             // new SharedWorker(
+            /postMessage\s*\(/i,             // postMessage (在Worker中应该使用self.postMessage)
+            /close\s*\(/i,                    // close() (关闭Worker)
+            /import\s+/i,                     // import
+            /require\s*\(/i,                  // require(
+            /process\./i,                     // process.
+            /global\s*\./i,                   // global.
+            /window\s*\./i,                   // window.
+            /document\s*\./i,                 // document.
+            /localStorage/i,                  // localStorage
+            /sessionStorage/i,                // sessionStorage
+            /indexedDB/i,                     // indexedDB
+            /WebSocket/i,                     // WebSocket
+            /Blob\s*\(/i,                     // new Blob(
+            /FileReader/i,                    // FileReader
+            /FileWriter/i,                    // FileWriter
+        ];
+        
+        // 检查是否包含危险模式
+        for (const pattern of dangerousPatterns) {
+            if (pattern.test(script)) {
+                KernelLogger.warn("MultithreadingDrive", `检测到危险的脚本模式: ${pattern}`);
+                return false;
+            }
+        }
+        
+        return true;
+    }
+    
+    /**
      * 执行任务
      * @param {number} pid 进程ID
      * @param {string|Function} script 要执行的脚本（函数字符串或函数对象）
@@ -425,6 +533,17 @@ class MultithreadingDrive {
      * @returns {Promise<any>} 任务结果
      */
     static async executeTask(pid, script, args = []) {
+        // 权限检查：检查是否有 MULTITHREADING_EXECUTE 权限
+        if (typeof PermissionManager !== 'undefined') {
+            const hasPermission = await PermissionManager.checkAndRequestPermission(
+                pid,
+                PermissionManager.PERMISSION.MULTITHREADING_EXECUTE
+            );
+            if (!hasPermission) {
+                throw new Error('执行多线程任务需要 MULTITHREADING_EXECUTE 权限');
+            }
+        }
+        
         const taskId = `task_${++MultithreadingDrive._taskIdCounter}`;
         
         // 将函数转换为字符串
@@ -436,6 +555,11 @@ class MultithreadingDrive {
             scriptString = script;
         } else {
             throw new Error('script 必须是函数或函数字符串');
+        }
+        
+        // 验证脚本安全性
+        if (!MultithreadingDrive._validateScriptSafety(scriptString)) {
+            throw new Error('脚本包含危险的代码模式，执行被拒绝');
         }
         
         // 验证参数是否可序列化

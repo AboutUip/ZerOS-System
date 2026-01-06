@@ -10,7 +10,7 @@ class LStorage {
     static STORAGE_FILE_PATH = "D:/";
     static STORAGE_FILE_NAME = "LocalSData.json";
     
-    // PHP 服务地址
+    // PHP 服务地址（已废弃，使用 SystemInformation.getFSDirvePath() 替代）
     static PHP_SERVICE_URL = "/system/service/FSDirve.php";
     
     // 存储数据结构
@@ -35,6 +35,23 @@ class LStorage {
         readCacheTime: 0,
         cacheTTL: 1000 // 1秒缓存
     };
+    
+    /**
+     * 规范化路径（移除末尾斜杠，除非是根路径如 "D:"）
+     * @param {string} path 路径
+     * @returns {string} 规范化后的路径
+     */
+    static _normalizePath(path) {
+        if (!path || typeof path !== 'string') {
+            return path;
+        }
+        // 如果路径是 "D:" 或 "C:" 这种格式，保持不变
+        if (/^[CD]:$/.test(path)) {
+            return path;
+        }
+        // 去掉末尾的斜杠
+        return path.replace(/\/+$/, '');
+    }
     
     /**
      * 初始化本地存储管理器
@@ -72,9 +89,13 @@ class LStorage {
      */
     static async _readFileFromPHP(path, fileName) {
         try {
-            const url = new URL(LStorage.PHP_SERVICE_URL, window.location.origin);
+            const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                : new URL(LStorage.PHP_SERVICE_URL, (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                    ? SystemInformation.getOrigin()
+                    : window.location.origin);
             url.searchParams.set('action', 'read_file');
-            url.searchParams.set('path', path);
+            url.searchParams.set('path', LStorage._normalizePath(path));
             url.searchParams.set('fileName', fileName);
             
             const response = await fetch(url.toString(), {
@@ -158,9 +179,13 @@ class LStorage {
      */
     static async _writeFileToPHP(path, fileName, content, writeMod = 'overwrite') {
         try {
-            const url = new URL(LStorage.PHP_SERVICE_URL, window.location.origin);
+            const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                : new URL(LStorage.PHP_SERVICE_URL, (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                    ? SystemInformation.getOrigin()
+                    : window.location.origin);
             url.searchParams.set('action', 'write_file');
-            url.searchParams.set('path', path);
+            url.searchParams.set('path', LStorage._normalizePath(path));
             url.searchParams.set('fileName', fileName);
             url.searchParams.set('writeMod', writeMod);
             
@@ -238,9 +263,15 @@ class LStorage {
      */
     static async _fileExistsInPHP(path, fileName) {
         try {
-            const url = new URL(LStorage.PHP_SERVICE_URL, window.location.origin);
+            const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                : new URL(LStorage.PHP_SERVICE_URL, (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                    ? SystemInformation.getOrigin()
+                    : window.location.origin);
             url.searchParams.set('action', 'exists');
-            url.searchParams.set('path', `${path}/${fileName}`);
+            // 规范化路径，避免双斜杠
+            const normalizedPath = LStorage._normalizePath(path);
+            url.searchParams.set('path', `${normalizedPath}/${fileName}`);
             
             const response = await fetch(url.toString(), {
                 method: 'GET',
@@ -283,9 +314,13 @@ class LStorage {
      */
     static async _createFileInPHP(path, fileName, content = '') {
         try {
-            const url = new URL(LStorage.PHP_SERVICE_URL, window.location.origin);
+            const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                : new URL(LStorage.PHP_SERVICE_URL, (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                    ? SystemInformation.getOrigin()
+                    : window.location.origin);
             url.searchParams.set('action', 'create_file');
-            url.searchParams.set('path', path);
+            url.searchParams.set('path', LStorage._normalizePath(path));
             url.searchParams.set('fileName', fileName);
             
             const response = await fetch(url.toString(), {

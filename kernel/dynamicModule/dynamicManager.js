@@ -518,7 +518,9 @@ class DynamicManager {
                         } else {
                             // 其他相对路径，尝试使用 new URL() 解析
                             try {
-                                const baseUrl = typeof window !== 'undefined' ? window.location.origin + '/' : 'http://localhost/';
+                                const baseUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                                    ? SystemInformation.getOrigin() + '/'
+                                    : (typeof window !== 'undefined' && window.location ? window.location.origin + '/' : SystemInformation.DEFAULT_ORIGIN + '/');
                                 const resolvedUrl = new URL(moduleUrl, baseUrl);
                                 moduleUrl = resolvedUrl.pathname;
                             } catch (urlError) {
@@ -535,7 +537,9 @@ class DynamicManager {
                     if (moduleUrl.startsWith('http')) {
                         fullUrl = moduleUrl;
                     } else {
-                        const origin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8089';
+                        const origin = (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                            ? SystemInformation.getOrigin()
+                            : (typeof window !== 'undefined' && window.location ? window.location.origin : (typeof SystemInformation !== 'undefined' ? SystemInformation.DEFAULT_ORIGIN : 'http://localhost:8089'));
                         // ES 模块直接使用原始路径，确保相对导入能正确解析
                         // 服务器应该已经配置了正确的 MIME 类型（通过 .htaccess 或 router.php）
                         fullUrl = `${origin}${moduleUrl.startsWith('/') ? '' : '/'}${moduleUrl}`;
@@ -622,10 +626,14 @@ class DynamicManager {
                             
                             // 构建完整 URL
                             if (typeof window !== 'undefined') {
-                                const origin = window.location.origin;
+                                const origin = (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                                    ? SystemInformation.getOrigin()
+                                    : (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8089');
                                 scriptUrl = origin + scriptUrl;
                             } else {
-                                scriptUrl = 'http://localhost:8089' + scriptUrl;
+                                scriptUrl = ((typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                                    ? SystemInformation.getOrigin()
+                                    : (typeof window !== 'undefined' && window.location ? window.location.origin : (typeof SystemInformation !== 'undefined' ? SystemInformation.DEFAULT_ORIGIN : 'http://localhost:8089'))) + scriptUrl;
                             }
                         }
                         

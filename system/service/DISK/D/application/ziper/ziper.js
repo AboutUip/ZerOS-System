@@ -1227,7 +1227,11 @@
             buttonElement.style.cursor = 'not-allowed';
             
             try {
-                const url = new URL('/system/service/CompressionDirve.php', window.location.origin);
+                const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.COMPRESSION_DIRVE)
+                    : new URL(SystemInformation.getCompressionDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                        ? SystemInformation.getOrigin()
+                        : window.location.origin);
                 url.searchParams.set('action', 'compress_zip');
                 url.searchParams.set('targetPath', targetPath);
                 
@@ -1304,7 +1308,11 @@
                 // 依次解压每个 ZIP 文件
                 for (const zipPath of paths) {
                     try {
-                        const url = new URL('/system/service/CompressionDirve.php', window.location.origin);
+                        const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.COMPRESSION_DIRVE)
+                    : new URL(SystemInformation.getCompressionDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                        ? SystemInformation.getOrigin()
+                        : window.location.origin);
                         url.searchParams.set('action', 'extract_zip');
                         url.searchParams.set('sourcePath', zipPath);
                         url.searchParams.set('targetPath', targetPath);
@@ -1372,7 +1380,11 @@
             buttonElement.style.cursor = 'not-allowed';
             
             try {
-                const url = new URL('/system/service/CompressionDirve.php', window.location.origin);
+                const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.COMPRESSION_DIRVE)
+                    : new URL(SystemInformation.getCompressionDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                        ? SystemInformation.getOrigin()
+                        : window.location.origin);
                 url.searchParams.set('action', 'list_zip');
                 url.searchParams.set('sourcePath', zipPath);
                 

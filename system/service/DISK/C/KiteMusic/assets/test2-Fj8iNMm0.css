@@ -1,0 +1,99 @@
+[data-v-4794c317]::-webkit-scrollbar {
+  width: 6px;
+  height: 8px;
+}
+[data-v-4794c317]::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  visibility: visible;
+}
+[data-v-4794c317]:hover::-webkit-scrollbar-thumb {
+  visibility: visible;
+}
+[data-v-4794c317]::-webkit-scrollbar-thumb {
+  visibility: hidden;
+}
+/* 字体定义规范 */
+.bgSetting[data-v-4794c317] {
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+.v-field.v-field--center-affix[data-v-4794c317] {
+  border-radius: 8px;
+}
+.y-player-container[data-v-4794c317]::-webkit-scrollbar-thumb {
+  display: none;
+}
+.icon[data-v-4794c317] {
+  width: 1em;
+  height: 1em;
+  vertical-align: -0.15em;
+  fill: currentColor;
+  overflow: hidden;
+}
+.el-loading-mask[data-v-4794c317] {
+  background: transparent;
+}
+#box[data-v-4794c317] {
+  display: flex;
+  height: calc(100%);
+}
+.main[data-v-4794c317] {
+  height: 100%;
+  width: calc(100% - 230px);
+  z-index: auto;
+  position: relative;
+}
+.body[data-v-4794c317] {
+  height: calc(100% - 60px);
+  padding-bottom: 130px;
+  overflow: hidden;
+  overflow-y: auto;
+  width: 100%;
+  display: flex;
+  align-content: baseline;
+  flex-direction: column;
+}
+.body .top[data-v-4794c317] {
+  margin-bottom: 20px;
+}
+.body .padding-container[data-v-4794c317] {
+  padding: 0 32px;
+  padding-bottom: 32px;
+}
+[data-v-4794c317] {
+  margin: 0;
+  box-sizing: border-box;
+}
+body.bold[data-v-4794c317] {
+  font-weight: 600;
+}
+html[data-v-4794c317],
+body[data-v-4794c317],
+#app[data-v-4794c317] {
+  height: 100%;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  color: #d2d2d2;
+  overflow: hidden;
+  background-color: #13131a;
+}
+img[data-v-4794c317] {
+  user-select: none;
+}
+#app[data-v-4794c317] {
+  position: relative;
+}
+.window-container[data-v-4794c317] {
+  -webkit-app-region: drag;
+}
+.no-drag[data-v-4794c317] {
+  -webkit-app-region: no-drag !important;
+}
+.v-input--horizontal .v-input__append[data-v-4794c317] {
+  margin-inline-start: 6px;
+}
+.test[data-v-4794c317] > * + * {
+  margin-top: 10px;
+}

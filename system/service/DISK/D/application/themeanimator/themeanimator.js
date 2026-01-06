@@ -712,7 +712,11 @@
                 const base64Data = base64.split(',')[1] || base64;
                 
                 // 保存文件
-                const url = new URL('/system/service/FSDirve.php', window.location.origin);
+                const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                    : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                        ? SystemInformation.getOrigin()
+                        : window.location.origin);
                 url.searchParams.set('action', 'write_file');
                 url.searchParams.set('path', 'D:/cache/');
                 url.searchParams.set('fileName', fileName);
@@ -2535,7 +2539,11 @@
                 }
                 
                 // 使用 PHP 服务检查文件是否存在
-                const url = new URL('/system/service/FSDirve.php', window.location.origin);
+                const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                    : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                        ? SystemInformation.getOrigin()
+                        : window.location.origin);
                 url.searchParams.set('action', 'exists');
                 url.searchParams.set('path', phpPath);
                 
@@ -3011,7 +3019,11 @@
                 }
                 
                 // 读取文件
-                const readUrl = new URL('/system/service/FSDirve.php', window.location.origin);
+                const readUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                    : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                        ? SystemInformation.getOrigin()
+                        : window.location.origin);
                 readUrl.searchParams.set('action', 'read_file');
                 readUrl.searchParams.set('path', dirPath);
                 readUrl.searchParams.set('fileName', fileName);
@@ -3031,7 +3043,11 @@
                 isBase64 = readResult.data.isBase64 || false;
                 
                 // 确保锁屏缓存目录存在
-                const createDirUrl = new URL('/system/service/FSDirve.php', window.location.origin);
+                const createDirUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                    : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                        ? SystemInformation.getOrigin()
+                        : window.location.origin);
                 createDirUrl.searchParams.set('action', 'create_dir');
                 createDirUrl.searchParams.set('path', 'D:/cache/');
                 createDirUrl.searchParams.set('name', 'lockscreen');
@@ -3053,7 +3069,11 @@
                 }
                 
                 // 保存到锁屏缓存目录
-                const saveUrl = new URL('/system/service/FSDirve.php', window.location.origin);
+                const saveUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                    : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                        ? SystemInformation.getOrigin()
+                        : window.location.origin);
                 saveUrl.searchParams.set('action', 'write_file');
                 saveUrl.searchParams.set('path', 'D:/cache/lockscreen/');
                 saveUrl.searchParams.set('fileName', lockscreenFileName);
@@ -3766,8 +3786,12 @@
             
             try {
                 // 通过 PHP 代理请求随机二次元背景图片（避免 CORS 问题）
-                const proxyUrl = new URL('/system/service/ImageProxy.php', window.location.origin);
-                proxyUrl.searchParams.set('url', 'https://api-v1.cenguigui.cn/api/pic/');
+                const proxyUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.IMAGE_PROXY)
+                    : new URL(SystemInformation.getImageProxyPath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                        ? SystemInformation.getOrigin()
+                        : window.location.origin);
+                proxyUrl.searchParams.set('url', 'https://uapis.cn/api/v1/random/image?category=acg&type=pc');
                 const response = await fetch(proxyUrl.toString());
                 
                 if (!response.ok) {
@@ -3801,7 +3825,11 @@
                 const filePath = `D:/cache/${fileName}`;
                 
                 // 确保目录存在（直接尝试创建，409 表示已存在，忽略即可）
-                const createDirUrl = new URL('/system/service/FSDirve.php', window.location.origin);
+                const createDirUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                    : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                        ? SystemInformation.getOrigin()
+                        : window.location.origin);
                 createDirUrl.searchParams.set('action', 'create_dir');
                 createDirUrl.searchParams.set('path', 'D:/');
                 createDirUrl.searchParams.set('name', 'cache');
@@ -3842,7 +3870,11 @@
                 const base64Data = base64.split(',')[1] || base64;
                 
                 // 使用 FileSystem.write 保存图片文件（通过 PHP 服务，支持 base64）
-                const url = new URL('/system/service/FSDirve.php', window.location.origin);
+                const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                    : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                        ? SystemInformation.getOrigin()
+                        : window.location.origin);
                 url.searchParams.set('action', 'write_file');
                 url.searchParams.set('path', 'D:/cache/');
                 url.searchParams.set('fileName', fileName);
@@ -3874,7 +3906,7 @@
                     filePath: filePath,
                     fileName: fileName,
                     timestamp: timestamp,
-                    source: 'api-v1.cenguigui.cn'
+                    source: 'uapis.cn'
                 };
                 
                 try {
@@ -3915,7 +3947,7 @@
                             this._updateCurrentBackgroundDisplay({
                                 id: currentBackground.id,
                                 name: '随机二次元背景',
-                                description: '来自 api-v1.cenguigui.cn 的随机二次元图片'
+                                description: '来自 uapis.cn 的随机二次元图片'
                             });
                         }
                         
@@ -4360,7 +4392,11 @@
                             phpPath = phpPath + '/';
                         }
                         
-                        const url = new URL('/system/service/FSDirve.php', window.location.origin);
+                        const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                    : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                        ? SystemInformation.getOrigin()
+                        : window.location.origin);
                         url.searchParams.set('action', 'delete_file');
                         url.searchParams.set('path', phpPath);
                         url.searchParams.set('fileName', fileName);

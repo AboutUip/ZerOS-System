@@ -2689,7 +2689,11 @@ class ThemeManager {
             }
             
             // 使用 PHP 服务检查文件是否存在
-            const url = new URL('/system/service/FSDirve.php', window.location.origin);
+            const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                    ? SystemInformation.getOrigin()
+                    : window.location.origin);
             url.searchParams.set('action', 'exists');
             url.searchParams.set('path', phpPath);
             
@@ -3074,9 +3078,13 @@ class ThemeManager {
                 iconUrl = '/' + iconUrl;
             } else if (!iconUrl.startsWith('http://') && !iconUrl.startsWith('https://')) {
                 // 已经是绝对路径（以 / 开头），直接使用
-                // 如果需要，可以基于 window.location.origin 构建完整 URL
-                if (typeof window !== 'undefined' && window.location) {
-                    iconUrl = new URL(iconUrl, window.location.origin).toString();
+                // 如果需要，可以基于 SystemInformation 构建完整 URL
+                if (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) {
+                    iconUrl = SystemInformation.buildServiceUrlObject(iconUrl).toString();
+                } else if (typeof window !== 'undefined' && window.location) {
+                    iconUrl = new URL(iconUrl, (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                        ? SystemInformation.getOrigin()
+                        : window.location.origin).toString();
                 }
             }
             

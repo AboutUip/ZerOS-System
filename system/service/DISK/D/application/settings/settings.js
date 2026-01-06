@@ -1410,6 +1410,9 @@
                 description: '系统相关设置'
             });
             
+            // 注册天气组件开关设置项
+            this._registerWeatherComponentSetting();
+            
             // 注册用户管理分类
             this.registerCategory('users', {
                 name: '用户',
@@ -1427,6 +1430,62 @@
                 type: 'custom',
                 onRender: (setting, control) => {
                     return this._renderUserManagement(setting, control);
+                }
+            });
+        },
+        
+        /**
+         * 注册天气组件开关设置项
+         */
+        _registerWeatherComponentSetting: async function() {
+            // 从 LStorage 读取当前值（默认为 true，启用）
+            let currentValue = true;
+            if (typeof LStorage !== 'undefined') {
+                try {
+                    const savedValue = await LStorage.getSystemStorage('system.taskbarWeatherEnabled');
+                    if (savedValue !== undefined && savedValue !== null) {
+                        currentValue = savedValue !== false; // 默认为 true
+                    }
+                } catch (e) {
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.debug('SETTINGS', `读取天气组件设置失败: ${e.message}`);
+                    }
+                }
+            }
+            
+            // 注册设置项
+            this.registerSetting('system', 'taskbar_weather_enabled', {
+                name: '任务栏天气组件',
+                description: '启用或禁用任务栏右侧的天气显示组件',
+                type: 'toggle',
+                value: currentValue,
+                onChange: async (newValue, setting) => {
+                    // 保存到 LStorage
+                    if (typeof LStorage !== 'undefined') {
+                        try {
+                            await LStorage.setSystemStorage('system.taskbarWeatherEnabled', newValue);
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.info('SETTINGS', `天气组件设置已更新: ${newValue ? '启用' : '禁用'}`);
+                            }
+                            
+                            // 通知任务栏管理器更新（如果已加载）
+                            if (typeof TaskbarManager !== 'undefined') {
+                                // 触发任务栏重新渲染
+                                const taskbar = document.getElementById('taskbar');
+                                if (taskbar) {
+                                    TaskbarManager._renderTaskbar(taskbar).catch(e => {
+                                        if (typeof KernelLogger !== 'undefined') {
+                                            KernelLogger.error('SETTINGS', `更新任务栏失败: ${e.message}`, e);
+                                        }
+                                    });
+                                }
+                            }
+                        } catch (e) {
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.error('SETTINGS', `保存天气组件设置失败: ${e.message}`, e);
+                            }
+                        }
+                    }
                 }
             });
         },
@@ -1680,7 +1739,11 @@
                 // 使用FSDirve读取本地文件并转换为base64 data URL
                 (async () => {
                     try {
-                        const url = new URL('/system/service/FSDirve.php', window.location.origin);
+                        const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                            ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                            : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                                ? SystemInformation.getOrigin()
+                                : window.location.origin);
                         url.searchParams.set('action', 'read_file');
                         url.searchParams.set('path', 'D:/cache/');
                         url.searchParams.set('fileName', avatarFileName);
@@ -1936,7 +1999,11 @@
                             }
                             
                             // 读取文件内容（图片文件会自动使用base64编码）
-                            const url = new URL('/system/service/FSDirve.php', window.location.origin);
+                            const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                            ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                            : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                                ? SystemInformation.getOrigin()
+                                : window.location.origin);
                             url.searchParams.set('action', 'read_file');
                             
                             // 解析文件路径
@@ -1999,7 +2066,11 @@
                             const newFileName = `avatar_${username}_${timestamp}.${fileExt}`;
                             
                             // 保存到cache目录
-                            const saveUrl = new URL('/system/service/FSDirve.php', window.location.origin);
+                            const saveUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                                ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                                : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                                ? SystemInformation.getOrigin()
+                                : window.location.origin);
                             saveUrl.searchParams.set('action', 'write_file');
                             saveUrl.searchParams.set('path', 'D:/cache/');
                             saveUrl.searchParams.set('fileName', newFileName);

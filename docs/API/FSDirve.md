@@ -2,24 +2,48 @@
 
 ## 概述
 
-`FSDirve.php` 是 ZerOS 内核的文件系统驱动服务，提供基于 PHP 的文件和目录操作接口。所有文件实际存储在 `system/service/DISK/C/` 和 `system/service/DISK/D/` 目录下，与 `kernel/filesystem/` 协同工作。
+`FSDirve` 是 ZerOS 内核的文件系统驱动服务，提供文件和目录操作接口。系统支持 **PHP** 和 **SpringBoot** 两种后端实现，可通过 `SystemInformation` 动态切换。
+
+所有文件实际存储在 `system/service/DISK/C/` 和 `system/service/DISK/D/` 目录下，与 `kernel/filesystem/` 协同工作。
+
+## 后端服务支持
+
+- **PHP 后端**（默认）：服务路径为 `/system/service/FSDirve.php`，默认端口 **8089**
+- **SpringBoot 后端**：服务路径为 `/system/service/FSDirve`（无 `.php` 后缀），默认端口 **8080**
+
+两种后端提供相同的功能接口，可根据需要选择。
 
 ## 服务地址
 
+**推荐使用 `SystemInformation` 构建服务URL**：
+
+```javascript
+// 使用 SystemInformation 构建URL（推荐，自动适配后端类型）
+const url = SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE);
+
+// 或直接获取URL
+const serviceUrl = SystemInformation.getFSDirveUrl();
 ```
-http://localhost:8089/system/service/FSDirve.php
-```
+
+**手动构建URL**：
+
+- PHP 后端：`http://localhost:8089/system/service/FSDirve.php`
+- SpringBoot 后端：`http://localhost:8080/system/service/FSDirve`
+
+详细说明请参考 [SystemInformation API 文档](./SystemInformation.md)。
 
 ## 请求格式
 
 所有请求通过 GET 或 POST 方法发送，使用 `action` 参数指定操作类型：
 
 ```
-GET /system/service/FSDirve.php?action=<操作名>&<参数1>=<值1>&<参数2>=<值2>
-POST /system/service/FSDirve.php?action=<操作名>&<参数1>=<值1>
+GET /system/service/FSDirve[.php]?action=<操作名>&<参数1>=<值1>&<参数2>=<值2>
+POST /system/service/FSDirve[.php]?action=<操作名>&<参数1>=<值1>
 Content-Type: application/json
 Body: { "content": "..." }
 ```
+
+**注意**：`[.php]` 表示 PHP 后端需要 `.php` 后缀，SpringBoot 后端不需要。
 
 ## 响应格式
 

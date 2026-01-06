@@ -440,7 +440,11 @@
                 
                 // 从 PHP 服务读取文件
                 try {
-                    const url = new URL('/system/service/FSDirve.php', window.location.origin);
+                    const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                        ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                        : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                            ? SystemInformation.getOrigin()
+                            : window.location.origin);
                     url.searchParams.set('action', 'read_file');
                     url.searchParams.set('path', phpPath);
                     url.searchParams.set('fileName', fileName);
@@ -700,7 +704,11 @@
                 // 检查文件是否存在（从 PHP 服务）
                 let fileExists = false;
                 try {
-                    const checkUrl = new URL('/system/service/FSDirve.php', window.location.origin);
+                    const checkUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                        ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                        : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                            ? SystemInformation.getOrigin()
+                            : window.location.origin);
                     checkUrl.searchParams.set('action', 'exists');
                     checkUrl.searchParams.set('path', phpPath + '/' + fileName);
                     
@@ -719,7 +727,11 @@
                 if (!fileExists) {
                     // 通过 PHP 服务创建文件
                     try {
-                        const createUrl = new URL('/system/service/FSDirve.php', window.location.origin);
+                        const createUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                            ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                            : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                            ? SystemInformation.getOrigin()
+                            : window.location.origin);
                         createUrl.searchParams.set('action', 'create_file');
                         createUrl.searchParams.set('path', phpPath);
                         createUrl.searchParams.set('fileName', fileName);
@@ -739,7 +751,11 @@
 
                 // 写入文件（通过 PHP 服务）
                 try {
-                    const writeUrl = new URL('/system/service/FSDirve.php', window.location.origin);
+                    const writeUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                        ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                        : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                            ? SystemInformation.getOrigin()
+                            : window.location.origin);
                     writeUrl.searchParams.set('action', 'write_file');
                     writeUrl.searchParams.set('path', phpPath);
                     writeUrl.searchParams.set('fileName', fileName);

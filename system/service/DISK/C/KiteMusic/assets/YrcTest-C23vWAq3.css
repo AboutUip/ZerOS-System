@@ -1,0 +1,100 @@
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 8px;
+}
+*::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  visibility: visible;
+}
+:hover::-webkit-scrollbar-thumb {
+  visibility: visible;
+}
+::-webkit-scrollbar-thumb {
+  visibility: hidden;
+}
+/* 字体定义规范 */
+.bgSetting {
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+.v-field.v-field--center-affix {
+  border-radius: 8px;
+}
+.y-player-container::-webkit-scrollbar-thumb {
+  display: none;
+}
+.icon {
+  width: 1em;
+  height: 1em;
+  vertical-align: -0.15em;
+  fill: currentColor;
+  overflow: hidden;
+}
+.el-loading-mask {
+  background: transparent;
+}
+#box {
+  display: flex;
+  height: calc(100%);
+}
+.main {
+  height: 100%;
+  width: calc(100% - 230px);
+  z-index: auto;
+  position: relative;
+}
+.body {
+  height: calc(100% - 60px);
+  padding-bottom: 130px;
+  overflow: hidden;
+  overflow-y: auto;
+  width: 100%;
+  display: flex;
+  align-content: baseline;
+  flex-direction: column;
+}
+.body .top {
+  margin-bottom: 20px;
+}
+.body .padding-container {
+  padding: 0 32px;
+  padding-bottom: 32px;
+}
+* {
+  margin: 0;
+  box-sizing: border-box;
+}
+body.bold {
+  font-weight: 600;
+}
+html,
+body,
+#app {
+  height: 100%;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  color: #d2d2d2;
+  overflow: hidden;
+  background-color: #13131a;
+}
+img {
+  user-select: none;
+}
+#app {
+  position: relative;
+}
+.window-container {
+  -webkit-app-region: drag;
+}
+.no-drag {
+  -webkit-app-region: no-drag !important;
+}
+.v-input--horizontal .v-input__append {
+  margin-inline-start: 6px;
+}
+.test123 {
+  height: 80%;
+  width: 100%;
+}
