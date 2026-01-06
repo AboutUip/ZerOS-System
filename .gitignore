@@ -35,7 +35,6 @@ package-lock.json
 yarn.lock
 
 # 构建文件
-dist/
 build/
 *.min.js.map
 *.min.css.map
@@ -52,4 +51,8 @@ coverage/
 # 其他
 *.orig
 *.rej
+
+#backend
+**/target/
+
 
