@@ -13,13 +13,13 @@ import java.nio.file.Paths;
 @PropertySource("classpath:application.yml")
 public class DiskConfig {
     
-    @Value("${disk.base-path:../system/service/DISK}")
+    @Value("${disk.base-path:../DISK}")
     private String basePath;
     
-    @Value("${disk.c-path:${disk.base-path}/C}")
+    @Value("${disk.c-path:../DISK/C}")
     private String cPath;
     
-    @Value("${disk.d-path:${disk.base-path}/D}")
+    @Value("${disk.d-path:../DISK/D}")
     private String dPath;
     
     private Path diskBasePath;
