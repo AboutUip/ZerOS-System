@@ -1,12 +1,8 @@
 {
   "system": {
     "permissionManager.permissions": {
-      "filemanager": [
-        "GUI_WINDOW_CREATE",
-        "KERNEL_DISK_READ",
-        "KERNEL_DISK_LIST",
-        "SYSTEM_NOTIFICATION",
-        "EVENT_LISTENER"
+      "scheduletask": [
+        "SYSTEM_NOTIFICATION"
       ]
     },
     "system.style": "macos",
@@ -530,7 +526,7 @@
         "password": "61b249bf6d604d14120821f43625e84e",
         "avatar": "avatar_root_1766272534753.jpg",
         "createdAt": 1766271155991,
-        "lastLogin": 1767730747768
+        "lastLogin": 1767731016826
       },
       "TestUser": {
         "level": "USER",
