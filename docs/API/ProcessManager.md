@@ -68,16 +68,28 @@ const pid = await ProcessManager.startProgram('vim', {
 
 **程序启动流程**:
 1. 分配 PID
-2. 从 ApplicationAssetManager 获取程序资源
+2. 从 ApplicationAssetManager 获取程序资源（或使用 `tempAsset`）
 3. 加载样式表
 4. 加载资源文件
-5. 加载程序脚本
+5. 加载程序脚本（如果 `tempAsset.script` 是文件内容，直接执行；如果是路径，从路径加载）
 6. 等待程序对象出现
 7. 检查程序类型（CLI/GUI）
 8. 如果是 CLI 程序且没有终端，自动启动终端
 9. 调用程序的 `__init__` 方法
 10. 标记程序创建的 DOM 元素
 11. 更新进程状态为 `running`
+
+**临时程序资产（tempAsset）**:
+- 当使用 `tempAsset` 参数时，`ProcessManager` 会使用临时程序配置而不是从 `ApplicationAssetManager` 查找
+- `tempAsset` 对象包含：
+  - `script` (string): 程序脚本内容（文件内容）或路径
+  - `styles` (Array): 样式表路径列表（可选）
+  - `icon` (string|null): 图标路径（可选，为 `null` 时使用默认图标）
+  - `metadata` (Object): 程序元数据
+    - `name` (string): 程序名称
+    - `type` (string): 程序类型（'CLI' 或 'GUI'）
+    - `allowMultipleInstances` (boolean): 是否允许多实例
+- 如果 `script` 是文件内容（包含换行符或长度超过 500 字符），会直接执行；如果是路径，会从路径加载
 
 **autoStart 程序权限限制**:
 - 如果程序设置了 `autoStart=true`，普通用户无法手动启动该程序
@@ -441,9 +453,9 @@ const allProcesses = ProcessManager.getProcessInfo();
 - `Theme.read` - 读取主题（需要 `THEME_READ` 权限）
 - `Theme.write` - 修改主题（需要 `THEME_WRITE` 权限）
 - `Desktop.manage` - 管理桌面（需要 `DESKTOP_MANAGE` 权限）
-- `Desktop.addShortcut` - 添加桌面快捷方式（需要 `DESKTOP_MANAGE` 权限）
+- `Desktop.addShortcut` - 添加桌面快捷方式（需要 `DESKTOP_SHORTCUT` 权限，普通权限）
 - `Desktop.addFileOrFolderIcon` - 添加文件/文件夹图标到桌面（需要 `DESKTOP_MANAGE` 权限）
-- `Desktop.removeShortcut` - 移除桌面快捷方式（需要 `DESKTOP_MANAGE` 权限）
+- `Desktop.removeShortcut` - 移除桌面快捷方式（需要 `DESKTOP_SHORTCUT` 权限，普通权限）
 - `Desktop.getIcons` - 获取桌面图标列表（无需权限）
 - `Desktop.getConfig` - 获取桌面配置（无需权限）
 - `Desktop.setArrangementMode` - 设置排列模式（需要 `DESKTOP_MANAGE` 权限）

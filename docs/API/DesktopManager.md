@@ -61,7 +61,7 @@ const iconId = await ProcessManager.callKernelAPI(pid, 'Desktop.addShortcut', [{
 }]);
 ```
 
-**权限要求**: 需要 `DESKTOP_MANAGE` 权限
+**权限要求**: 需要 `DESKTOP_SHORTCUT` 权限（普通权限，自动授予）
 
 #### `removeShortcut(iconId)`
 
@@ -79,7 +79,7 @@ DesktopManager.removeShortcut(iconId);
 await ProcessManager.callKernelAPI(pid, 'Desktop.removeShortcut', [iconId]);
 ```
 
-**权限要求**: 需要 `DESKTOP_MANAGE` 权限
+**权限要求**: 需要 `DESKTOP_SHORTCUT` 权限（普通权限，自动授予）
 
 #### `addFileOrFolderIcon(options)`
 
@@ -115,7 +115,7 @@ const iconId = await ProcessManager.callKernelAPI(pid, 'Desktop.addFileOrFolderI
 }]);
 ```
 
-**权限要求**: 需要 `DESKTOP_MANAGE` 权限
+**权限要求**: 需要 `DESKTOP_SHORTCUT` 权限（普通权限，自动授予）
 
 #### `getIcons()`
 
@@ -201,7 +201,7 @@ DesktopManager.setArrangementMode('grid');
 await ProcessManager.callKernelAPI(pid, 'Desktop.setArrangementMode', ['grid']);
 ```
 
-**权限要求**: 需要 `DESKTOP_MANAGE` 权限
+**权限要求**: 需要 `DESKTOP_SHORTCUT` 权限（普通权限，自动授予）
 
 #### `setIconSize(size)`
 
@@ -219,7 +219,7 @@ DesktopManager.setIconSize('large');
 await ProcessManager.callKernelAPI(pid, 'Desktop.setIconSize', ['large']);
 ```
 
-**权限要求**: 需要 `DESKTOP_MANAGE` 权限
+**权限要求**: 需要 `DESKTOP_SHORTCUT` 权限（普通权限，自动授予）
 
 #### `setAutoArrange(autoArrange)`
 
@@ -237,7 +237,7 @@ DesktopManager.setAutoArrange(true);
 await ProcessManager.callKernelAPI(pid, 'Desktop.setAutoArrange', [true]);
 ```
 
-**权限要求**: 需要 `DESKTOP_MANAGE` 权限
+**权限要求**: 需要 `DESKTOP_SHORTCUT` 权限（普通权限，自动授予）
 
 ### 桌面组件管理
 
@@ -359,7 +359,7 @@ DesktopManager.refresh();
 await ProcessManager.callKernelAPI(pid, 'Desktop.refresh', []);
 ```
 
-**权限要求**: 需要 `DESKTOP_MANAGE` 权限
+**权限要求**: 需要 `DESKTOP_SHORTCUT` 权限（普通权限，自动授予）
 
 ## 通过 ProcessManager 调用
 
@@ -401,9 +401,9 @@ await ProcessManager.callKernelAPI(pid, 'Desktop.refresh', []);
 ```
 
 **权限要求**:
-- `Desktop.addShortcut`: 需要 `DESKTOP_MANAGE` 权限
+- `Desktop.addShortcut`: 需要 `DESKTOP_SHORTCUT` 权限（普通权限，自动授予）
 - `Desktop.addFileOrFolderIcon`: 需要 `DESKTOP_MANAGE` 权限
-- `Desktop.removeShortcut`: 需要 `DESKTOP_MANAGE` 权限
+- `Desktop.removeShortcut`: 需要 `DESKTOP_SHORTCUT` 权限（普通权限，自动授予）
 - `Desktop.getIcons`: 不需要权限（读取操作）
 - `Desktop.getConfig`: 不需要权限（读取操作）
 - `Desktop.setArrangementMode`: 需要 `DESKTOP_MANAGE` 权限

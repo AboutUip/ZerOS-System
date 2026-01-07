@@ -3003,6 +3003,10 @@
                 else if (fileType === 'IMAGE') {
                     await this._openFileWithImageViewer(item);
                 } 
+                // HTML 文件默认用 WebViewer 打开
+                else if (extension === 'html' || extension === 'htm') {
+                    await this._openFileWithWebViewer(item);
+                }
                 // 所有文本文件类型（TEXT、CODE、MARKDOWN）默认用 vim 打开
                 else if (fileType === 'TEXT' || fileType === 'CODE' || fileType === 'MARKDOWN') {
                     await this._openFileWithVim(item);
@@ -3175,6 +3179,86 @@
                             type: 'snapshot',
                             title: '文件管理器',
                             content: `启动音频播放器失败: ${error.message}`,
+                            duration: 4000
+                        });
+                    } catch (e) {
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('FileManager', `创建通知失败: ${e.message}`);
+                        }
+                    }
+                }
+            }
+        },
+        
+        /**
+         * 使用 WebViewer 打开文件
+         */
+        _openFileWithWebViewer: async function(item) {
+            try {
+                if (typeof ProcessManager === 'undefined') {
+                    // ProcessManager 不可用，使用通知提示（不打断用户）
+                    if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                        try {
+                            await NotificationManager.createNotification(this.pid, {
+                                type: 'snapshot',
+                                title: '文件管理器',
+                                content: 'ProcessManager 不可用',
+                                duration: 3000
+                            });
+                        } catch (e) {
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.error('FileManager', `ProcessManager 不可用，且创建通知失败: ${e.message}`);
+                            }
+                        }
+                    } else {
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.error('FileManager', 'ProcessManager 不可用');
+                        }
+                    }
+                    return;
+                }
+                
+                // 确保item.path存在且有效
+                if (!item || !item.path) {
+                    // 文件路径无效，使用通知提示（不打断用户）
+                    if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                        try {
+                            await NotificationManager.createNotification(this.pid, {
+                                type: 'snapshot',
+                                title: '文件管理器',
+                                content: '文件路径无效',
+                                duration: 3000
+                            });
+                        } catch (e) {
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.warn('FileManager', `创建通知失败: ${e.message}`);
+                            }
+                        }
+                    }
+                    return;
+                }
+                
+                // 获取当前路径（用于cwd）
+                const currentPath = this._getCurrentPath();
+                const cwd = currentPath || 'C:';
+                
+                // 启动 WebViewer 程序，传递文件路径
+                await ProcessManager.startProgram('webviewer', {
+                    args: [item.path],
+                    cwd: cwd
+                });
+                
+            } catch (error) {
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('FileManager', '启动 WebViewer 失败', error);
+                }
+                // 启动 WebViewer 失败，使用通知提示（不打断用户）
+                if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                    try {
+                        await NotificationManager.createNotification(this.pid, {
+                            type: 'snapshot',
+                            title: '文件管理器',
+                            content: `启动 WebViewer 失败: ${error.message}`,
                             duration: 4000
                         });
                     } catch (e) {
@@ -4541,6 +4625,35 @@
                             });
                         }
                     }
+                    // HTML 文件：提供"打开"（默认用 WebViewer）和"用 WebViewer 打开"、"用 Vim 打开"选项
+                    else if (extension === 'html' || extension === 'htm') {
+                        if (!isSelectorMode) {
+                            items.push({
+                                label: '打开',
+                                icon: '🌐',
+                                action: () => {
+                                    self._openFileWithWebViewer({ type: 'file', path: itemPath, name: itemName, fileType: fileType });
+                                }
+                            });
+                            items.push({
+                                label: '用 WebViewer 打开',
+                                icon: '🌐',
+                                action: () => {
+                                    self._openFileWithWebViewer({ type: 'file', path: itemPath, name: itemName, fileType: fileType });
+                                }
+                            });
+                            items.push({
+                                type: 'separator'
+                            });
+                            items.push({
+                                label: '用 Vim 打开',
+                                icon: '✏️',
+                                action: () => {
+                                    self._openFileWithVim({ type: 'file', path: itemPath, name: itemName, fileType: fileType });
+                                }
+                            });
+                        }
+                    }
                     // JS 文件：提供"作为程序执行"和"用 Vim 打开"选项
                     else if (extension === 'js') {
                         if (!isSelectorMode) {
@@ -4572,7 +4685,7 @@
                             });
                         }
                     }
-                    // 其他类型文件：提供"打开"选项（会提示用户）
+                    // 其他类型文件：提供"打开"选项（会提示用户）和"用 WebViewer 打开"选项
                     else {
                         if (!isSelectorMode) {
                             items.push({
@@ -4580,6 +4693,13 @@
                                 icon: '📄',
                                 action: () => {
                                     self._openItem({ type: 'file', path: itemPath, name: itemName, fileType: fileType });
+                                }
+                            });
+                            items.push({
+                                label: '用 WebViewer 打开',
+                                icon: '🌐',
+                                action: () => {
+                                    self._openFileWithWebViewer({ type: 'file', path: itemPath, name: itemName, fileType: fileType });
                                 }
                             });
                             items.push({

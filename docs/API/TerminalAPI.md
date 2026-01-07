@@ -124,25 +124,30 @@ TerminalAPI.setHost('myhost');
 
 #### `getEnv()`
 
-获取环境变量。
+获取环境变量（终端本地环境变量，不是系统环境变量）。
 
 **返回值**: `Object|null` - 环境变量对象（副本），如果终端不可用则返回 `null`
+
+**注意**: 此方法返回的是终端程序内部的环境变量（如 `cwd`, `user`, `host` 等），不是系统环境变量。要访问系统环境变量，请使用 `LStorage` 的环境变量 API。
 
 **示例**:
 ```javascript
 const env = TerminalAPI.getEnv();
 if (env) {
-    console.log('PATH:', env.PATH);
-    console.log('HOME:', env.HOME);
+    console.log('CWD:', env.cwd);
+    console.log('USER:', env.user);
+    console.log('HOST:', env.host);
 }
 ```
 
 #### `setEnv(env)`
 
-设置环境变量。
+设置环境变量（终端本地环境变量，不是系统环境变量）。
 
 **参数**:
 - `env` (Object): 环境变量对象（键值对）
+
+**注意**: 此方法设置的是终端程序内部的环境变量，不是系统环境变量。要设置系统环境变量，请使用终端命令 `setenv` 或 `export`，或使用 `LStorage` 的环境变量 API。
 
 **示例**:
 ```javascript
@@ -402,9 +407,40 @@ if (TerminalAPI) {
 
 6. **样式支持**：`write()` 方法的样式选项（颜色、加粗等）取决于终端的实现。某些终端可能不支持所有样式。
 
+## 终端命令
+
+终端支持多种内置命令，包括文件系统操作、进程管理、用户管理、环境变量管理等。详细命令列表请参考 [终端命令参考](../TERMINAL_COMMANDS.md)。
+
+### 命令处理优先级
+
+终端按以下优先级查找和执行命令：
+
+1. **内置命令** - 终端内置的命令（如 `ls`, `cd`, `clear` 等）
+2. **D:/bin/ 目录** - 查找 `D:/bin/<命令名>.js` 文件，如果存在则作为程序执行
+3. **程序注册表** - 从 `ApplicationAssetManager` 查找已注册的程序
+4. **环境变量** - 从环境变量中查找命令名，如果找到则执行其值（可以是程序名或文件路径）
+
+### 环境变量命令
+
+终端提供了以下环境变量管理命令：
+
+- `env` - 列出所有系统环境变量
+- `setenv <name> <value>` - 设置系统环境变量（需要管理员权限）
+- `export <name>=<value>` - 设置系统环境变量（需要管理员权限，支持两种格式）
+- `unsetenv <name>` - 删除系统环境变量（需要管理员权限）
+- `unset <name>` - 删除系统环境变量（需要管理员权限）
+- `getenv <name>` - 获取系统环境变量值
+
+**注意**: 
+- 系统环境变量存储在 `LStorage` 的注册表中（`system.registry.environment`）
+- 普通用户只能读取环境变量，只有管理员可以设置、修改和删除环境变量
+- 环境变量可以作为命令别名使用（设置为程序名或文件路径）
+
 ## 相关文档
 
+- [终端命令参考](../TERMINAL_COMMANDS.md) - 完整的终端命令列表和使用说明
 - [ProcessManager API](./ProcessManager.md) - 进程管理，包括 CLI 程序启动
+- [LStorage API](./LStorage.md) - 本地存储，包括环境变量 API
 - [DEVELOPER_GUIDE.md](../DEVELOPER_GUIDE.md) - 开发者指南，包含 CLI 程序开发示例
 - [Pool API](./Pool.md) - 共享空间（POOL）使用说明
 

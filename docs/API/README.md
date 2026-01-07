@@ -130,6 +130,10 @@
 
 - ✅ 所有 API 文档已创建完成
 
+## 其他文档
+
+- [TERMINAL_COMMANDS.md](../TERMINAL_COMMANDS.md) - 终端命令参考（完整的命令列表和使用说明）
+
 ## 相关文档
 
 - [ZEROS_KERNEL.md](../ZEROS_KERNEL.md) - 内核概述

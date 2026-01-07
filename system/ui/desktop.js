@@ -1713,10 +1713,32 @@ class DesktopManager {
                 KernelLogger.info("DesktopManager", `打开文件夹: ${iconData.targetPath}`);
             } else if (iconData.type === 'file') {
                 // 文件：根据文件类型选择对应程序打开
-                const fileName = iconData.targetPath.split('/').pop() || iconData.targetPath;
-                const extension = fileName.split('.').pop()?.toLowerCase() || '';
+                const fileName = iconData.targetPath.split('/').pop() || iconData.targetPath.split('\\').pop() || iconData.targetPath;
+                // 改进扩展名提取：获取最后一个点后的内容
+                let extension = '';
+                const lastDotIndex = fileName.lastIndexOf('.');
+                if (lastDotIndex > 0 && lastDotIndex < fileName.length - 1) {
+                    extension = fileName.substring(lastDotIndex + 1).toLowerCase();
+                }
                 
-                // 获取文件类型
+                // 调试日志
+                KernelLogger.debug("DesktopManager", `打开文件: ${iconData.targetPath}, 文件名: ${fileName}, 扩展名: ${extension}`);
+                
+                // HTML 文件优先使用 WebViewer 打开（必须在文件类型判断之前，优先级最高）
+                // 检查方式：1. 扩展名检查 2. 文件名后缀检查（作为备用，防止扩展名提取失败）
+                const isHtmlByExtension = extension === 'html' || extension === 'htm';
+                const isHtmlByFileName = fileName.toLowerCase().endsWith('.html') || fileName.toLowerCase().endsWith('.htm');
+                
+                if (isHtmlByExtension || isHtmlByFileName) {
+                    KernelLogger.info("DesktopManager", `检测到 HTML 文件（扩展名: ${extension}, 文件名: ${fileName}），使用 WebViewer 打开: ${iconData.targetPath}`);
+                    await ProcessManager.startProgram('webviewer', {
+                        args: [iconData.targetPath]
+                    });
+                    KernelLogger.info("DesktopManager", `打开文件: ${iconData.targetPath} (使用程序: webviewer)`);
+                    return;  // 直接返回，不继续执行后续的文件类型判断
+                }
+                
+                // 获取文件类型（HTML 文件检查之后）
                 let fileType = 'UNKNOWN';
                 if (typeof ApplicationAssetManager !== 'undefined' && typeof ApplicationAssetManager._getFileTypeFromExtension === 'function') {
                     // 尝试从 ApplicationAssetManager 获取文件类型判断方法
@@ -1724,6 +1746,17 @@ class DesktopManager {
                     fileType = DesktopManager._getFileTypeFromExtension(extension);
                 } else {
                     fileType = DesktopManager._getFileTypeFromExtension(extension);
+                }
+                
+                // 如果文件类型是 CODE，再次检查是否是 HTML 文件（双重保险，防止扩展名提取失败）
+                // 注意：这里检查文件名，因为如果扩展名提取失败，extension 可能为空，但文件名仍然包含 .html
+                if (fileType === 'CODE' && (isHtmlByFileName || fileName.toLowerCase().includes('.html') || fileName.toLowerCase().includes('.htm'))) {
+                    KernelLogger.info("DesktopManager", `检测到 HTML 文件（通过文件类型 CODE 和文件名检查），使用 WebViewer 打开: ${iconData.targetPath}`);
+                    await ProcessManager.startProgram('webviewer', {
+                        args: [iconData.targetPath]
+                    });
+                    KernelLogger.info("DesktopManager", `打开文件: ${iconData.targetPath} (使用程序: webviewer)`);
+                    return;  // 直接返回，不继续执行后续的 CODE 类型处理
                 }
                 
                 // 根据文件类型选择程序

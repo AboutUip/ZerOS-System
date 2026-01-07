@@ -1392,14 +1392,21 @@ class ProcessManager {
         const pid = ProcessManager._allocatePid();
         const programNameUpper = programName.toUpperCase();
         
-        ProcessManager._log(2, `[启动程序] 分配PID: ${pid}, 脚本路径: ${scriptPath}`);
+        // 判断 scriptPath 是文件路径还是文件内容
+        // 如果是文件内容（包含换行符或很长，且不是路径格式），则直接执行
+        const isScriptContent = typeof scriptPath === 'string' && 
+                                 (scriptPath.includes('\n') || 
+                                  scriptPath.length > 500 || 
+                                  (!scriptPath.includes('/') && !scriptPath.includes('\\') && !scriptPath.endsWith('.js')));
+        
+        ProcessManager._log(2, `[启动程序] 分配PID: ${pid}, 脚本: ${isScriptContent ? '内容（直接执行）' : `路径: ${scriptPath}`}`);
         
         // 创建进程信息
         const processInfo = {
             pid: pid,
             programName: programName,
             programNameUpper: programNameUpper,
-            scriptPath: scriptPath,
+            scriptPath: isScriptContent ? `temp://${programName}.js` : scriptPath,  // 临时脚本使用虚拟路径
             styles: styles,
             assets: assets,  // 存储资源文件列表
             metadata: metadata,
@@ -1467,10 +1474,52 @@ class ProcessManager {
                 }
             }
             
-            // 异步加载程序脚本
-            ProcessManager._log(2, `[启动程序] 加载程序脚本: ${scriptPath}`);
-            await ProcessManager._loadScript(scriptPath);
-            ProcessManager._log(2, `[启动程序] 脚本加载完成，等待程序对象出现: ${programNameUpper}`);
+            // 加载或执行程序脚本
+            if (isScriptContent) {
+                // 直接执行脚本内容（使用 script 标签）
+                ProcessManager._log(2, `[启动程序] 直接执行脚本内容（长度: ${scriptPath.length} 字符）`);
+                try {
+                    // 创建 script 标签并设置内容
+                    const script = document.createElement('script');
+                    script.textContent = scriptPath;
+                    script.type = 'text/javascript';
+                    
+                    // 使用 Promise 等待脚本执行完成
+                    await new Promise((resolve, reject) => {
+                        script.onload = () => {
+                            ProcessManager._log(2, `[启动程序] 脚本内容执行完成`);
+                            resolve();
+                        };
+                        script.onerror = (e) => {
+                            ProcessManager._log(1, `[启动程序] 脚本内容执行失败`);
+                            reject(new Error('脚本执行失败'));
+                        };
+                        
+                        // 添加到文档头部
+                        document.head.appendChild(script);
+                        
+                        // 对于内联脚本，onload 可能不会触发，使用 setTimeout 作为备用
+                        // 增加延迟以确保程序对象有足够时间注册到 window 和 POOL
+                        setTimeout(() => {
+                            if (script.parentNode) {
+                                // 脚本已执行，移除 script 标签
+                                script.parentNode.removeChild(script);
+                                resolve();
+                            }
+                        }, 150);  // 增加到 150ms，确保程序对象注册完成
+                    });
+                } catch (e) {
+                    ProcessManager._log(1, `[启动程序] 脚本内容执行失败: ${e.message}`);
+                    throw e;
+                }
+            } else {
+                // 异步加载程序脚本（从路径）
+                ProcessManager._log(2, `[启动程序] 加载程序脚本: ${scriptPath}`);
+                await ProcessManager._loadScript(scriptPath);
+                ProcessManager._log(2, `[启动程序] 脚本加载完成`);
+            }
+            
+            ProcessManager._log(2, `[启动程序] 等待程序对象出现: ${programNameUpper}`);
             
             // 等待程序通过依赖管理器注册加载完成
             // 程序应该调用 DependencyConfig.publishSignal() 来通知加载完成
@@ -1497,18 +1546,34 @@ class ProcessManager {
                         break;
                     }
                     
-                    // 也检查 POOL 中的 APPLICATION_POOL
+                    // 也检查 POOL 中的 APPLICATION_SHARED_POOL 和 APPLICATION_POOL
                     if (typeof POOL !== 'undefined' && typeof POOL.__GET__ === 'function') {
                         try {
-                            const poolObj = POOL.__GET__("APPLICATION_POOL", programNameUpper);
-                            if (poolObj && poolObj !== undefined) {
-                                programLoaded = true;
-                                ProcessManager._log(2, `[启动程序] 在POOL中找到程序对象: ${programNameUpper}`);
-                                // 同时设置到 window 以便后续访问
-                                if (typeof window !== 'undefined') {
-                                    window[programNameUpper] = poolObj;
+                            // 先检查 APPLICATION_SHARED_POOL（D:/bin/ 程序通常注册在这里）
+                            if (POOL.__HAS__("APPLICATION_SHARED_POOL")) {
+                                const sharedPoolObj = POOL.__GET__("APPLICATION_SHARED_POOL", programNameUpper);
+                                if (sharedPoolObj && sharedPoolObj !== undefined) {
+                                    programLoaded = true;
+                                    ProcessManager._log(2, `[启动程序] 在 APPLICATION_SHARED_POOL 中找到程序对象: ${programNameUpper}`);
+                                    // 同时设置到 window 以便后续访问
+                                    if (typeof window !== 'undefined') {
+                                        window[programNameUpper] = sharedPoolObj;
+                                    }
+                                    break;
                                 }
-                                break;
+                            }
+                            // 再检查 APPLICATION_POOL
+                            if (POOL.__HAS__("APPLICATION_POOL")) {
+                                const poolObj = POOL.__GET__("APPLICATION_POOL", programNameUpper);
+                                if (poolObj && poolObj !== undefined) {
+                                    programLoaded = true;
+                                    ProcessManager._log(2, `[启动程序] 在 APPLICATION_POOL 中找到程序对象: ${programNameUpper}`);
+                                    // 同时设置到 window 以便后续访问
+                                    if (typeof window !== 'undefined') {
+                                        window[programNameUpper] = poolObj;
+                                    }
+                                    break;
+                                }
                             }
                         } catch (e) {
                             // 忽略 POOL 访问错误，继续检查
@@ -1532,8 +1597,42 @@ class ProcessManager {
             ProcessManager._log(2, `[启动程序] 程序 ${programName} 加载完成，调用 __init__`);
             
             // 调用程序的 __init__ 方法
-            const programClass = (typeof window !== 'undefined' && window[programNameUpper]) || 
-                                (typeof globalThis !== 'undefined' && globalThis[programNameUpper]);
+            let programClass = null;
+            if (typeof window !== 'undefined' && window[programNameUpper]) {
+                programClass = window[programNameUpper];
+            } else if (typeof globalThis !== 'undefined' && globalThis[programNameUpper]) {
+                programClass = globalThis[programNameUpper];
+            }
+            
+            // 如果找不到，尝试从 POOL 获取（支持从 D:/bin/ 启动的程序）
+            if (!programClass && typeof POOL !== 'undefined' && typeof POOL.__GET__ === 'function') {
+                try {
+                    // 先尝试 APPLICATION_SHARED_POOL（D:/bin/ 程序通常注册在这里）
+                    if (POOL.__HAS__("APPLICATION_SHARED_POOL")) {
+                        programClass = POOL.__GET__("APPLICATION_SHARED_POOL", programNameUpper);
+                        if (programClass) {
+                            ProcessManager._log(2, `[启动程序] 从 APPLICATION_SHARED_POOL 获取程序对象: ${programNameUpper}`);
+                            // 同时设置到 window 以便后续访问
+                            if (typeof window !== 'undefined') {
+                                window[programNameUpper] = programClass;
+                            }
+                        }
+                    }
+                    // 如果还是找不到，尝试 APPLICATION_POOL
+                    if (!programClass && POOL.__HAS__("APPLICATION_POOL")) {
+                        programClass = POOL.__GET__("APPLICATION_POOL", programNameUpper);
+                        if (programClass) {
+                            ProcessManager._log(2, `[启动程序] 从 APPLICATION_POOL 获取程序对象: ${programNameUpper}`);
+                            // 同时设置到 window 以便后续访问
+                            if (typeof window !== 'undefined') {
+                                window[programNameUpper] = programClass;
+                            }
+                        }
+                    }
+                } catch (e) {
+                    ProcessManager._log(1, `从 POOL 获取程序对象失败: ${e.message}`);
+                }
+            }
             
             if (!programClass) {
                 ProcessManager._log(1, `程序对象 ${programNameUpper} 不存在`);
@@ -1777,10 +1876,12 @@ class ProcessManager {
                     // 显示用户友好的错误提示
                     if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
                         try {
-                            await NotificationManager.createNotification({
+                            // 使用 exploit PID 来显示系统通知（因为程序启动失败，无法使用程序自己的 PID）
+                            const exploitPid = ProcessManager.EXPLOIT_PID;
+                            await NotificationManager.createNotification(exploitPid, {
                                 title: '程序启动失败',
-                                message: `${programName} 启动失败: ${e.message}`,
-                                type: 'error',
+                                content: `${programName} 启动失败: ${e.message}`,
+                                type: 'snapshot',
                                 duration: 5000
                             });
                         } catch (notifError) {
@@ -1875,14 +1976,53 @@ class ProcessManager {
         
         try {
             // 调用程序的 __exit__ 方法（仅在程序未退出时）
+            // 对于 loading 状态的程序，也尝试调用 __exit__，因为程序可能已经初始化但状态未更新
             if (processInfo.status !== 'exited') {
                 const programNameUpper = processInfo.programNameUpper;
-                const programClass = (typeof window !== 'undefined' && window[programNameUpper]) || 
-                                    (typeof globalThis !== 'undefined' && globalThis[programNameUpper]);
+                let programClass = null;
                 
+                // 优先从 window 或 globalThis 获取
+                if (typeof window !== 'undefined' && window[programNameUpper]) {
+                    programClass = window[programNameUpper];
+                } else if (typeof globalThis !== 'undefined' && globalThis[programNameUpper]) {
+                    programClass = globalThis[programNameUpper];
+                }
+                
+                // 如果找不到，尝试从 POOL 获取（支持从 D:/bin/ 启动的程序）
+                if (!programClass && typeof POOL !== 'undefined' && typeof POOL.__GET__ === 'function') {
+                    try {
+                        // 先尝试 APPLICATION_SHARED_POOL（D:/bin/ 程序通常注册在这里）
+                        if (POOL.__HAS__("APPLICATION_SHARED_POOL")) {
+                            programClass = POOL.__GET__("APPLICATION_SHARED_POOL", programNameUpper);
+                            if (programClass) {
+                                ProcessManager._log(2, `从 APPLICATION_SHARED_POOL 获取程序对象: ${programNameUpper}`);
+                                // 同时设置到 window 以便后续访问
+                                if (typeof window !== 'undefined') {
+                                    window[programNameUpper] = programClass;
+                                }
+                            }
+                        }
+                        // 如果还是找不到，尝试 APPLICATION_POOL
+                        if (!programClass && POOL.__HAS__("APPLICATION_POOL")) {
+                            programClass = POOL.__GET__("APPLICATION_POOL", programNameUpper);
+                            if (programClass) {
+                                ProcessManager._log(2, `从 APPLICATION_POOL 获取程序对象: ${programNameUpper}`);
+                                // 同时设置到 window 以便后续访问
+                                if (typeof window !== 'undefined') {
+                                    window[programNameUpper] = programClass;
+                                }
+                            }
+                        }
+                    } catch (e) {
+                        ProcessManager._log(1, `从 POOL 获取程序对象失败: ${e.message}`);
+                    }
+                }
+                
+                // 如果程序对象存在，尝试调用 __exit__
+                // 对于 loading 状态的程序，如果找不到程序对象，直接标记为 exiting 并继续清理
                 if (programClass && typeof programClass.__exit__ === 'function') {
                     try {
-                        ProcessManager._log(2, `调用程序 ${processInfo.programName} 的 __exit__ 方法`);
+                        ProcessManager._log(2, `调用程序 ${processInfo.programName} 的 __exit__ 方法 (状态: ${processInfo.status})`);
                         // 标记进程状态为 exiting，防止 __exit__ 中再次调用 killProgram
                         processInfo.status = 'exiting';
                         await programClass.__exit__(pid, force);
@@ -1909,7 +2049,18 @@ class ProcessManager {
                         }
                     }
                 } else {
-                    ProcessManager._log(2, `程序 ${processInfo.programName} 没有 __exit__ 方法，跳过退出处理`);
+                    // 如果程序对象不存在或没有 __exit__ 方法
+                    if (!programClass) {
+                        // 对于 loading 状态的程序，如果找不到程序对象，直接标记为 exiting 并继续清理
+                        if (processInfo.status === 'loading') {
+                            ProcessManager._log(2, `程序 ${processInfo.programName} (${programNameUpper}) 处于 loading 状态且对象未找到，直接标记为 exiting 并清理`);
+                            processInfo.status = 'exiting';
+                        } else {
+                            ProcessManager._log(1, `程序 ${processInfo.programName} (${programNameUpper}) 对象未找到，无法调用 __exit__ 方法`);
+                        }
+                    } else {
+                        ProcessManager._log(2, `程序 ${processInfo.programName} 没有 __exit__ 方法，跳过退出处理`);
+                    }
                 }
             } else {
                 ProcessManager._log(2, `程序 ${processInfo.programName} 已退出，跳过 __exit__ 调用，直接清理资源`);
@@ -2151,6 +2302,161 @@ class ProcessManager {
     }
 
     /**
+     * 请求程序自终止（由程序自己调用）
+     * 这是一个特殊的 API，程序执行完成后可以调用此方法请求强制关闭
+     * 无论程序处于什么状态（loading、running、exiting），都会强制关闭
+     * @param {number} pid 进程 ID
+     * @returns {Promise<boolean>} 是否成功终止
+     */
+    static async requestSelfTermination(pid) {
+        ProcessManager._log(2, `程序 PID ${pid} 请求自终止`);
+        
+        const processInfo = ProcessManager.PROCESS_TABLE.get(pid);
+        if (!processInfo) {
+            ProcessManager._log(1, `程序 PID ${pid} 不存在`);
+            return false;
+        }
+        
+        // 标记为 exiting，防止重复调用
+        if (processInfo.status === 'exiting' || processInfo.status === 'exited') {
+            ProcessManager._log(2, `程序 PID ${pid} 已经在退出或已退出`);
+            return true;
+        }
+        
+        processInfo.status = 'exiting';
+        
+        try {
+            // 跳过 __exit__ 调用，直接清理资源（因为程序自己请求关闭）
+            
+            // 清理程序注册的上下文菜单
+            if (typeof ContextMenuManager !== 'undefined' && typeof ContextMenuManager.unregisterContextMenu === 'function') {
+                try {
+                    ContextMenuManager.unregisterContextMenu(pid);
+                } catch (e) {
+                    ProcessManager._log(1, `清理程序 PID ${pid} 的上下文菜单失败: ${e.message}`);
+                }
+            }
+            
+            // 清理程序创建的桌面组件
+            if (typeof DesktopManager !== 'undefined' && typeof DesktopManager.cleanupProgramComponents === 'function') {
+                try {
+                    DesktopManager.cleanupProgramComponents(pid);
+                } catch (e) {
+                    ProcessManager._log(1, `清理程序 PID ${pid} 的桌面组件失败: ${e.message}`);
+                }
+            }
+            
+            // 清理程序创建的任务栏自定义图标
+            if (typeof TaskbarManager !== 'undefined' && typeof TaskbarManager.cleanupCustomIconsByPid === 'function') {
+                try {
+                    await TaskbarManager.cleanupCustomIconsByPid(pid);
+                } catch (e) {
+                    ProcessManager._log(1, `清理程序 PID ${pid} 的任务栏自定义图标失败: ${e.message}`);
+                }
+            }
+            
+            // 清理程序创建的拖拽会话
+            if (typeof DragDrive !== 'undefined' && typeof DragDrive.cleanupProcessDrags === 'function') {
+                try {
+                    DragDrive.cleanupProcessDrags(pid);
+                } catch (e) {
+                    ProcessManager._log(1, `清理程序 PID ${pid} 的拖拽会话失败: ${e.message}`);
+                }
+            }
+            
+            // 清理事件监听器
+            if (typeof EventManager !== 'undefined' && typeof EventManager.unregisterAllHandlersForPid === 'function') {
+                EventManager.unregisterAllHandlersForPid(pid);
+            }
+            
+            // 释放内存
+            if (typeof MemoryManager !== 'undefined') {
+                try {
+                    MemoryManager.freeMemory(pid);
+                } catch (e) {
+                    ProcessManager._log(1, `释放内存失败: ${e.message}`);
+                }
+            }
+            
+            // 清理内存引用
+            processInfo.memoryRefs.clear();
+            
+            // 清理 DOM 元素集合
+            if (processInfo.domElements) {
+                processInfo.domElements.clear();
+            }
+            
+            // 停止 DOM 观察器（如果有）
+            if (processInfo.mutationObserver) {
+                processInfo.mutationObserver.disconnect();
+                processInfo.mutationObserver = null;
+            }
+            
+            // 如果是CLI程序且创建了独立终端，先关闭终端
+            if (processInfo.isCLI && processInfo.terminalPid) {
+                ProcessManager._log(2, `CLI程序 ${processInfo.programName} 退出，关闭关联终端 (PID: ${processInfo.terminalPid})`);
+                try {
+                    await ProcessManager.killProgram(processInfo.terminalPid, true);
+                } catch (e) {
+                    ProcessManager._log(1, `关闭关联终端失败: ${e.message}`);
+                }
+            }
+            
+            // 清理所有窗口
+            if (typeof GUIManager !== 'undefined' && typeof GUIManager.getWindowsByPid === 'function') {
+                const windows = GUIManager.getWindowsByPid(pid);
+                for (const window of windows) {
+                    try {
+                        if (window.windowId && typeof GUIManager.unregisterWindow === 'function') {
+                            GUIManager.unregisterWindow(window.windowId);
+                        }
+                    } catch (e) {
+                        ProcessManager._log(1, `清理窗口 ${window.windowId} 失败: ${e.message}`);
+                    }
+                }
+            }
+            
+            // 更新进程状态
+            processInfo.status = 'exited';
+            processInfo.exitTime = Date.now();
+            
+            // 保存进程表
+            const rawTable = ProcessManager._getProcessTable();
+            rawTable.set(pid, processInfo);
+            ProcessManager._saveProcessTable(rawTable);
+            
+            // 清除所有缓存
+            ProcessManager._processTableCache = null;
+            ProcessManager._protectedProcessTableCache = null;
+            
+            // 清除已使用PID缓存（进程状态已更新）
+            ProcessManager._invalidateUsedPidsCache();
+            
+            // 通知任务栏更新
+            if (typeof TaskbarManager !== 'undefined' && typeof TaskbarManager.update === 'function') {
+                setTimeout(() => {
+                    TaskbarManager.update();
+                }, 50);
+            }
+            
+            ProcessManager._log(2, `程序 PID ${pid} 已自终止`);
+            return true;
+        } catch (e) {
+            // 即使出错也强制清理
+            processInfo.status = 'exited';
+            processInfo.exitTime = Date.now();
+            
+            // 保存进程表
+            const rawTable = ProcessManager._getProcessTable();
+            rawTable.set(pid, processInfo);
+            ProcessManager._saveProcessTable(rawTable);
+            
+            ProcessManager._log(1, `程序 PID ${pid} 自终止处理失败，但已强制标记为退出: ${e.message}`);
+            return true;  // 返回 true，因为程序已经被标记为退出
+        }
+    }
+
+    /**
      * 通过进程管理器申请内存（自动生成ID）
      * @param {number} pid 进程 ID
      * @param {number} heapSize 堆大小（-1 表示不需要堆）
@@ -2373,8 +2679,12 @@ class ProcessManager {
         }
         
         // 普通程序需要通过进程管理器代理
-        if (processInfo.status !== 'running') {
-            throw new Error(`Process ${pid} is not running`);
+        // 特殊处理：允许 loading 和 starting 状态的程序调用 requestSelfTermination
+        if (processInfo.status !== 'running' && apiName !== 'Process.requestSelfTermination') {
+            // 对于 requestSelfTermination，允许 loading 和 starting 状态
+            if (processInfo.status === 'loading' || processInfo.status === 'starting') {
+                throw new Error(`Process ${pid} is not running (status: ${processInfo.status})`);
+            }
         }
         
         // 权限检查（如果权限管理器已加载）- 这是强制性的安全检查
@@ -2457,14 +2767,21 @@ class ProcessManager {
             'Storage.read': PermissionManager.PERMISSION.SYSTEM_STORAGE_READ,
             'Storage.write': PermissionManager.PERMISSION.SYSTEM_STORAGE_WRITE,
             
+            // 环境变量API
+            'Environment.get': PermissionManager.PERMISSION.ENVIRONMENT_READ,
+            'Environment.set': PermissionManager.PERMISSION.ENVIRONMENT_WRITE,
+            'Environment.delete': PermissionManager.PERMISSION.ENVIRONMENT_WRITE,
+            'Environment.list': PermissionManager.PERMISSION.ENVIRONMENT_READ,
+            'Environment.getAll': PermissionManager.PERMISSION.ENVIRONMENT_READ,
+            
             // 主题API
             'Theme.read': PermissionManager.PERMISSION.THEME_READ,
             'Theme.write': PermissionManager.PERMISSION.THEME_WRITE,
             
             // 桌面API
             'Desktop.manage': PermissionManager.PERMISSION.DESKTOP_MANAGE,
-            'Desktop.addShortcut': PermissionManager.PERMISSION.DESKTOP_MANAGE, // 添加桌面快捷方式需要桌面管理权限
-            'Desktop.removeShortcut': PermissionManager.PERMISSION.DESKTOP_MANAGE, // 移除桌面快捷方式需要桌面管理权限
+            'Desktop.addShortcut': PermissionManager.PERMISSION.DESKTOP_SHORTCUT, // 添加桌面快捷方式需要快捷方式权限（普通权限）
+            'Desktop.removeShortcut': PermissionManager.PERMISSION.DESKTOP_SHORTCUT, // 移除桌面快捷方式需要快捷方式权限（普通权限）
             'Desktop.getIcons': null, // 读取操作不需要权限
             'Desktop.getConfig': null, // 读取操作不需要权限
             'Desktop.setArrangementMode': PermissionManager.PERMISSION.DESKTOP_MANAGE, // 设置排列模式需要桌面管理权限
@@ -2491,6 +2808,7 @@ class ProcessManager {
             
             // 进程管理API
             'Process.manage': PermissionManager.PERMISSION.PROCESS_MANAGE,
+            'Process.requestSelfTermination': null,  // 程序自终止不需要权限（只能终止自己）
             
             // 多线程API
             'Multithreading.createThread': PermissionManager.PERMISSION.MULTITHREADING_CREATE,
@@ -3999,6 +4317,48 @@ class ProcessManager {
             },
             'LocalStorage.delete': async (pid, key) => {
                 return await ProcessManager.requestLocalStorage(pid, 'delete', key);
+            },
+            
+            // 环境变量API
+            'Environment.get': async (name) => {
+                if (typeof LStorage === 'undefined') {
+                    throw new Error('LStorage 模块未加载');
+                }
+                return await LStorage.getEnvironmentVariable(name);
+            },
+            'Environment.set': async (name, value) => {
+                if (typeof LStorage === 'undefined') {
+                    throw new Error('LStorage 模块未加载');
+                }
+                return await LStorage.setEnvironmentVariable(name, value);
+            },
+            'Environment.delete': async (name) => {
+                if (typeof LStorage === 'undefined') {
+                    throw new Error('LStorage 模块未加载');
+                }
+                return await LStorage.deleteEnvironmentVariable(name);
+            },
+            'Environment.list': async () => {
+                if (typeof LStorage === 'undefined') {
+                    throw new Error('LStorage 模块未加载');
+                }
+                return await LStorage.listEnvironmentVariables();
+            },
+            'Environment.getAll': async () => {
+                if (typeof LStorage === 'undefined') {
+                    throw new Error('LStorage 模块未加载');
+                }
+                return await LStorage.getAllEnvironmentVariables();
+            },
+            
+            // 进程管理API
+            'Process.requestSelfTermination': async () => {
+                // 程序请求自终止，强制关闭程序
+                // 注意：pid 参数从 callKernelAPI 的上下文自动获取
+                if (!pid) {
+                    throw new Error('Process.requestSelfTermination: 无法获取进程 ID');
+                }
+                return await ProcessManager.requestSelfTermination(pid);
             },
             
             // 网络信息API

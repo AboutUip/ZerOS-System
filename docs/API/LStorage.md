@@ -15,7 +15,15 @@
 {
     system: {
         // 系统依赖的本地数据
-        [key: string]: any
+        [key: string]: any,
+        // 注册表（k/v 对象）
+        registry: {
+            // 环境变量（键值对对象）
+            environment: {
+                [name: string]: string
+            },
+            // 其他注册表数据...
+        }
     },
     programs: {
         // 程序的本地数据
@@ -25,6 +33,8 @@
     }
 }
 ```
+
+**注意**: 环境变量保存在 `system.registry.environment` 中，是一个键值对对象。同时支持 `registry.environment` 和 `registry.env` 两种键名（向后兼容）。
 
 ## 初始化
 
@@ -188,6 +198,121 @@ await LStorage.registerProgramStorage(pid, 'settings', {
 });
 ```
 
+### 环境变量管理
+
+环境变量保存在注册表中（`system.registry.environment`），是一个键值对对象。环境变量可以在系统级别使用，供所有程序访问。
+
+**权限要求**:
+- **读取操作**（`getEnvironmentVariable`、`listEnvironmentVariables`、`getAllEnvironmentVariables`）：需要 `SYSTEM_STORAGE_READ` 权限（普通权限，自动授予）
+- **写入操作**（`setEnvironmentVariable`、`deleteEnvironmentVariable`）：需要 `SYSTEM_STORAGE_WRITE` 权限（普通权限，自动授予）
+
+**注意**: 内核模块调用不受权限限制，可以直接访问环境变量。
+
+#### `getEnvironmentVariable(name)`
+
+获取环境变量的值。
+
+**参数**:
+- `name` (string): 环境变量名称
+
+**返回值**: `Promise<string|null>` - 环境变量的值，如果不存在返回 `null`
+
+**权限**: 需要 `SYSTEM_STORAGE_READ` 权限
+
+**示例**:
+```javascript
+// 直接调用（内核模块）
+const path = await LStorage.getEnvironmentVariable('PATH');
+
+// 通过 ProcessManager 调用（用户程序）
+const path = await ProcessManager.callKernelAPI(pid, 'Environment.get', ['PATH']);
+```
+
+#### `setEnvironmentVariable(name, value)`
+
+设置环境变量。如果值为 `null` 或 `undefined`，会自动删除该环境变量。
+
+**参数**:
+- `name` (string): 环境变量名称
+- `value` (string): 环境变量值（必须是字符串）
+
+**返回值**: `Promise<boolean>` - 是否成功
+
+**权限**: 需要 `SYSTEM_STORAGE_WRITE` 权限
+
+**示例**:
+```javascript
+// 直接调用（内核模块）
+await LStorage.setEnvironmentVariable('PATH', '/usr/bin:/usr/local/bin');
+
+// 通过 ProcessManager 调用（用户程序）
+await ProcessManager.callKernelAPI(pid, 'Environment.set', ['PATH', '/usr/bin:/usr/local/bin']);
+
+// 删除环境变量（通过设置 null）
+await LStorage.setEnvironmentVariable('TEMP', null);
+```
+
+#### `deleteEnvironmentVariable(name)`
+
+删除环境变量。
+
+**参数**:
+- `name` (string): 环境变量名称
+
+**返回值**: `Promise<boolean>` - 是否成功（如果环境变量不存在，返回 `false`）
+
+**权限**: 需要 `SYSTEM_STORAGE_WRITE` 权限
+
+**示例**:
+```javascript
+// 直接调用（内核模块）
+const deleted = await LStorage.deleteEnvironmentVariable('TEMP');
+
+// 通过 ProcessManager 调用（用户程序）
+const deleted = await ProcessManager.callKernelAPI(pid, 'Environment.delete', ['TEMP']);
+```
+
+#### `listEnvironmentVariables()`
+
+列出所有环境变量名称。
+
+**返回值**: `Promise<string[]>` - 环境变量名称数组
+
+**权限**: 需要 `SYSTEM_STORAGE_READ` 权限
+
+**示例**:
+```javascript
+// 直接调用（内核模块）
+const envNames = await LStorage.listEnvironmentVariables();
+
+// 通过 ProcessManager 调用（用户程序）
+const envNames = await ProcessManager.callKernelAPI(pid, 'Environment.list', []);
+```
+
+#### `getAllEnvironmentVariables()`
+
+获取所有环境变量（返回键值对对象）。
+
+**返回值**: `Promise<Object>` - 环境变量对象 `{ [name: string]: string }`
+
+**权限**: 需要 `SYSTEM_STORAGE_READ` 权限
+
+**注意**: 返回的是对象的副本，修改返回值不会影响实际存储的环境变量。
+
+**示例**:
+```javascript
+// 直接调用（内核模块）
+const allEnv = await LStorage.getAllEnvironmentVariables();
+
+// 通过 ProcessManager 调用（用户程序）
+const allEnv = await ProcessManager.callKernelAPI(pid, 'Environment.getAll', []);
+
+// 遍历环境变量
+for (const [name, value] of Object.entries(allEnv)) {
+    console.log(`${name} = ${value}`);
+}
+```
+
 ## 使用示例
 
 ### 示例 1: 系统存储
@@ -270,6 +395,89 @@ class MyApp {
 }
 ```
 
+### 示例 4: 环境变量管理（内核模块）
+
+内核模块可以直接调用环境变量 API（无需权限检查）：
+
+```javascript
+// 设置环境变量
+await LStorage.setEnvironmentVariable('PATH', '/usr/bin:/usr/local/bin');
+await LStorage.setEnvironmentVariable('HOME', '/home/user');
+await LStorage.setEnvironmentVariable('TEMP', '/tmp');
+
+// 获取环境变量
+const path = await LStorage.getEnvironmentVariable('PATH');
+console.log(`PATH: ${path}`);
+
+// 列出所有环境变量名称
+const envNames = await LStorage.listEnvironmentVariables();
+console.log('环境变量列表:', envNames);
+
+// 获取所有环境变量
+const allEnv = await LStorage.getAllEnvironmentVariables();
+console.log('所有环境变量:', allEnv);
+
+// 删除环境变量
+await LStorage.deleteEnvironmentVariable('TEMP');
+
+// 在程序中使用环境变量
+async function getProgramPath() {
+    const path = await LStorage.getEnvironmentVariable('PATH');
+    if (path) {
+        return path.split(':');
+    }
+    return [];
+}
+```
+
+### 示例 5: 环境变量管理（用户程序）
+
+用户程序需要通过 `ProcessManager.callKernelAPI` 调用环境变量 API：
+
+```javascript
+__init__: async function(pid, initArgs) {
+    this.pid = pid;
+    
+    // 获取环境变量（需要 SYSTEM_STORAGE_READ 权限）
+    const path = await ProcessManager.callKernelAPI(pid, 'Environment.get', ['PATH']);
+    if (path) {
+        console.log(`PATH 环境变量: ${path}`);
+    }
+    
+    // 设置环境变量（需要 SYSTEM_STORAGE_WRITE 权限）
+    await ProcessManager.callKernelAPI(pid, 'Environment.set', ['CUSTOM_VAR', 'custom_value']);
+    
+    // 列出所有环境变量
+    const envNames = await ProcessManager.callKernelAPI(pid, 'Environment.list', []);
+    console.log('环境变量列表:', envNames);
+    
+    // 获取所有环境变量
+    const allEnv = await ProcessManager.callKernelAPI(pid, 'Environment.getAll', []);
+    console.log('所有环境变量:', allEnv);
+    
+    // 删除环境变量
+    await ProcessManager.callKernelAPI(pid, 'Environment.delete', ['CUSTOM_VAR']);
+}
+```
+
+### 示例 6: 环境变量与注册表
+
+环境变量保存在注册表中，可以通过注册表 API 直接访问（不推荐，建议使用专用 API）：
+
+```javascript
+// 通过注册表 API 访问环境变量（需要 SYSTEM_STORAGE_READ/WRITE 权限）
+const registry = await LStorage.getSystemStorage('registry');
+if (registry && registry.environment) {
+    console.log('环境变量对象:', registry.environment);
+    // 直接修改环境变量（不推荐，建议使用专用 API）
+    registry.environment['CUSTOM_VAR'] = 'custom_value';
+    await LStorage.setSystemStorage('registry', registry);
+}
+
+// 推荐方式：使用环境变量专用 API
+await LStorage.setEnvironmentVariable('CUSTOM_VAR', 'custom_value');
+```
+
 ## 存储文件
 
 - **路径**: `D:/LocalSData.json`
@@ -294,6 +502,21 @@ class MyApp {
    - `desktop.settings` - 桌面设置
 
 3. **普通键** - 基础权限即可操作，自动授予
+   - `registry.environment` - 环境变量（通过环境变量 API 访问，需要相应权限）
+
+### 环境变量权限
+
+环境变量 API 的权限要求：
+
+- **读取操作**（`getEnvironmentVariable`、`listEnvironmentVariables`、`getAllEnvironmentVariables`）：
+  - 需要 `SYSTEM_STORAGE_READ` 权限（普通权限，自动授予）
+  - 内核模块调用不受限制
+
+- **写入操作**（`setEnvironmentVariable`、`deleteEnvironmentVariable`）：
+  - 需要 `SYSTEM_STORAGE_WRITE` 权限（普通权限，自动授予）
+  - 内核模块调用不受限制
+
+**注意**: 环境变量保存在注册表中，属于系统存储的一部分。用户程序需要通过 `ProcessManager.callKernelAPI` 调用环境变量 API，系统会自动进行权限检查。
 
 ### 细粒度权限
 
@@ -329,6 +552,11 @@ class MyApp {
 6. **程序退出**: 程序退出时可以选择保留或删除其存储数据
 7. **权限检查**: 写入系统存储时会自动进行权限检查，缺少权限时会抛出错误
 8. **安全限制**: 某些敏感键（如 `userControl.users`）对用户程序完全禁止写入，只能由内核模块操作
+9. **环境变量访问**: 
+   - 内核模块可以直接调用 `LStorage` 的环境变量 API
+   - 用户程序需要通过 `ProcessManager.callKernelAPI` 调用环境变量 API（`Environment.get`、`Environment.set` 等）
+   - 环境变量操作需要相应的权限（读取需要 `SYSTEM_STORAGE_READ`，写入需要 `SYSTEM_STORAGE_WRITE`）
+10. **环境变量存储**: 环境变量保存在注册表中（`system.registry.environment`），是一个键值对对象
 
 ## 相关文档
 

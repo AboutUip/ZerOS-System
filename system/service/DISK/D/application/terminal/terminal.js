@@ -1386,6 +1386,20 @@
                 registerCommandHandlers(terminalInstance);
             }
             
+            // 在切换标签页之前，先禁用所有标签页的输入框（除了即将激活的）
+            this.tabs.forEach(t => {
+                if (t.id !== tabId && t.terminalInstance && t.terminalInstance.cmdEl) {
+                    t.terminalInstance.cmdEl.setAttribute('tabindex', '-1');
+                    t.terminalInstance.cmdEl.setAttribute('contenteditable', 'false');
+                }
+            });
+            
+            // 确保新标签页的输入框是启用的
+            if (terminalInstance && terminalInstance.cmdEl) {
+                terminalInstance.cmdEl.setAttribute('tabindex', '0');
+                terminalInstance.cmdEl.setAttribute('contenteditable', 'true');
+            }
+            
             this.switchTab(tabId);
             
             return tab;
@@ -1394,10 +1408,34 @@
         switchTab(tabId) {
             if (this.activeTabId === tabId) return;
             
+            // 验证标签页是否存在
+            const targetTab = this.tabs.find(t => t.id === tabId);
+            if (!targetTab) {
+                // 如果目标标签页不存在，尝试切换到第一个标签页
+                if (this.tabs.length > 0) {
+                    const firstTab = this.tabs[0];
+                    if (firstTab && firstTab.id !== this.activeTabId) {
+                        this.switchTab(firstTab.id);
+                    }
+                }
+                return;
+            }
+            
             // 隐藏当前活动标签页
             if (this.activeTabId) {
                 const activeTab = this.tabs.find(t => t.id === this.activeTabId);
                 if (activeTab) {
+                    // 先强制移除焦点
+                    if (activeTab.terminalInstance && activeTab.terminalInstance.cmdEl) {
+                        // 如果当前焦点在这个输入框上，先移除焦点
+                        if (document.activeElement === activeTab.terminalInstance.cmdEl) {
+                            activeTab.terminalInstance.cmdEl.blur();
+                        }
+                        // 禁用非活动标签页的输入框，防止接收键盘事件
+                        activeTab.terminalInstance.cmdEl.setAttribute('tabindex', '-1');
+                        activeTab.terminalInstance.cmdEl.setAttribute('contenteditable', 'false');
+                    }
+                    
                     activeTab.element.classList.remove('active');
                     activeTab.terminalElement.classList.remove('active');
                     activeTab.terminalInstance._setActive(false);
@@ -1410,6 +1448,13 @@
                 tab.element.classList.add('active');
                 tab.terminalElement.classList.add('active');
                 this.activeTabId = tabId;
+                
+                // 启用活动标签页的输入框
+                if (tab.terminalInstance && tab.terminalInstance.cmdEl) {
+                    tab.terminalInstance.cmdEl.setAttribute('tabindex', '0');
+                    tab.terminalInstance.cmdEl.setAttribute('contenteditable', 'true');
+                }
+                
                 // 先设置 activeTabId，再调用 _setActive，确保焦点正确
                 tab.terminalInstance._setActive(true);
                 
@@ -1439,19 +1484,54 @@
             if (tabIndex === -1) return;
             
             const tab = this.tabs[tabIndex];
+            const wasActive = (this.activeTabId === tabId);
+            
+            // 如果关闭的是活动标签页，先清理状态
+            if (wasActive) {
+                // 先强制移除焦点
+                if (tab.terminalInstance && tab.terminalInstance.cmdEl) {
+                    if (document.activeElement === tab.terminalInstance.cmdEl) {
+                        tab.terminalInstance.cmdEl.blur();
+                    }
+                    tab.terminalInstance.cmdEl.setAttribute('tabindex', '-1');
+                    tab.terminalInstance.cmdEl.setAttribute('contenteditable', 'false');
+                }
+                // 清理终端实例状态
+                if (tab.terminalInstance) {
+                    tab.terminalInstance._setActive(false);
+                }
+                // 清除活动标签页ID
+                this.activeTabId = null;
+            }
             
             // 移除 DOM 元素
-            tab.element.remove();
-            tab.terminalElement.remove();
+            if (tab.element && tab.element.parentNode) {
+                tab.element.remove();
+            }
+            if (tab.terminalElement && tab.terminalElement.parentNode) {
+                tab.terminalElement.remove();
+            }
             
             // 从数组中移除
             this.tabs.splice(tabIndex, 1);
             
             // 如果关闭的是活动标签页，切换到其他标签页
-            if (this.activeTabId === tabId) {
-                const newActiveIndex = Math.min(tabIndex, this.tabs.length - 1);
-                if (newActiveIndex >= 0) {
-                    this.switchTab(this.tabs[newActiveIndex].id);
+            if (wasActive && this.tabs.length > 0) {
+                // 计算新活动标签页的索引（关闭后数组已变化）
+                // 如果关闭的是最后一个标签页，选择前一个；否则选择当前索引位置的标签页
+                const newActiveIndex = tabIndex >= this.tabs.length ? this.tabs.length - 1 : tabIndex;
+                if (newActiveIndex >= 0 && newActiveIndex < this.tabs.length) {
+                    const newTabId = this.tabs[newActiveIndex].id;
+                    // 确保新标签页存在且有效
+                    if (newTabId && this.tabs.find(t => t.id === newTabId)) {
+                        this.switchTab(newTabId);
+                    } else if (this.tabs.length > 0) {
+                        // 如果找不到，选择第一个标签页
+                        this.switchTab(this.tabs[0].id);
+                    }
+                } else if (this.tabs.length > 0) {
+                    // 如果索引无效，选择第一个标签页
+                    this.switchTab(this.tabs[0].id);
                 }
             }
         }
@@ -1677,7 +1757,7 @@ function escapeHtml(s){
             // 推荐使用事件监听：Terminal.on('command', handler)
             this.commandHandler = this._defaultHandler.bind(this);
             // 用于 Tab 补全的已知命令列表（可由外部修改）
-            this._completionCommands = ['clear','pwd','whoami','echo','demo','toggleview','cd','markdir','markfile','ls','tree','cat','write','rm','ps','kill','help','check','diskmanger','vim','rename','mv','copy','paste','power','exit','login','su','users','groups','groupadd','groupdel','groupmod','groupinfo'];
+            this._completionCommands = ['clear','pwd','whoami','echo','demo','toggleview','cd','markdir','markfile','ls','tree','cat','write','rm','kill','help','check','diskmanger','vim','rename','mv','copy','paste','power','exit','login','su','users','groups','groupadd','groupdel','groupmod','groupinfo','env','setenv','export','unsetenv','unset','getenv'];
             
             // CLI程序补全缓存（从ApplicationAssetManager获取）
             this._cliProgramsCache = null;
@@ -1799,19 +1879,33 @@ function escapeHtml(s){
                     this.terminalElement.classList.add('active');
                 }
                 
+                // 确保输入框已启用
+                if (this.cmdEl) {
+                    this.cmdEl.setAttribute('tabindex', '0');
+                    this.cmdEl.setAttribute('contenteditable', 'true');
+                }
+                
                 // 延迟获取焦点，确保 DOM 已更新且元素可见
                 requestAnimationFrame(() => {
                     if (this.isActive && this.terminalElement && this.terminalElement.classList.contains('active')) {
                         // 再次延迟，确保 CSS 过渡完成
                         setTimeout(() => {
                             if (this.isActive && !this.busy) {
-                                // 确保输入框可见且可聚焦
-                                if (this.cmdEl && this.cmdEl.offsetParent !== null) {
+                                // 确保输入框可见且可聚焦，并且已启用
+                                if (this.cmdEl && 
+                                    this.cmdEl.offsetParent !== null && 
+                                    this.cmdEl.getAttribute('contenteditable') === 'true' &&
+                                    this.cmdEl.getAttribute('tabindex') !== '-1') {
                                     this.focus();
                                 } else {
                                     // 如果不可见，再延迟一次
                                     setTimeout(() => {
-                                        if (this.isActive && !this.busy && this.cmdEl && this.cmdEl.offsetParent !== null) {
+                                        if (this.isActive && 
+                                            !this.busy && 
+                                            this.cmdEl && 
+                                            this.cmdEl.offsetParent !== null &&
+                                            this.cmdEl.getAttribute('contenteditable') === 'true' &&
+                                            this.cmdEl.getAttribute('tabindex') !== '-1') {
                                             this.focus();
                                         }
                                     }, 100);
@@ -1834,8 +1928,17 @@ function escapeHtml(s){
                     this.terminalElement.classList.remove('active');
                 }
                 
-                // 失去焦点时，移除焦点
-                this.blur();
+                // 失去焦点时，强制移除焦点并禁用输入框
+                if (this.cmdEl) {
+                    // 如果当前焦点在这个输入框上，先移除焦点
+                    if (document.activeElement === this.cmdEl) {
+                        this.cmdEl.blur();
+                    }
+                    // 确保输入框被禁用
+                    this.cmdEl.setAttribute('tabindex', '-1');
+                    this.cmdEl.setAttribute('contenteditable', 'false');
+                    this.cmdEl.classList.remove('focused');
+                }
             }
         }
 
@@ -1872,11 +1975,22 @@ function escapeHtml(s){
                         if (!this.isActive) {
                             if (typeof tabManager !== 'undefined' && tabManager) {
                                 tabManager.switchTab(this.tabId);
+                                // 延迟获取焦点，确保标签页切换完成
+                                setTimeout(() => {
+                                    if (this.isActive && this.cmdEl && 
+                                        this.cmdEl.getAttribute('contenteditable') === 'true') {
+                                        this.focus();
+                                    }
+                                }, 100);
                                 return;
                             }
                         }
                         // 如果是活动标签页，直接获取焦点
-                        this.focus();
+                        if (this.isActive && 
+                            this.cmdEl.getAttribute('contenteditable') === 'true' &&
+                            this.cmdEl.getAttribute('tabindex') !== '-1') {
+                            this.focus();
+                        }
                     }
                 }, {
                     priority: 100,
@@ -1885,7 +1999,15 @@ function escapeHtml(s){
                 
                 // 监听焦点事件（使用 registerElementEvent）
                 EventManager.registerElementEvent(this.pid, this.cmdEl, 'focus', () => {
-                    this.cmdEl.classList.add('focused');
+                    // 只有活动标签页的输入框才能获得焦点
+                    if (this.isActive && 
+                        this.cmdEl.getAttribute('contenteditable') === 'true' &&
+                        this.cmdEl.getAttribute('tabindex') !== '-1') {
+                        this.cmdEl.classList.add('focused');
+                    } else {
+                        // 如果非活动标签页的输入框获得了焦点，立即移除焦点
+                        this.cmdEl.blur();
+                    }
                 });
                 EventManager.registerElementEvent(this.pid, this.cmdEl, 'blur', () => {
                     this.cmdEl.classList.remove('focused');
@@ -1960,15 +2082,20 @@ function escapeHtml(s){
                                 });
                                 bashWindow.classList.add('focused');
                                 
-                                if (!this.isActive) {
-                                    // 逻辑已在 cmdEl 的 click 事件中处理
-                                }
-                                
-                                setTimeout(() => {
-                                    if (this.isActive && !this.busy) {
-                                        this.focus();
+                                // 获取活动标签页的终端实例
+                                if (typeof tabManager !== 'undefined' && tabManager) {
+                                    const activeTerminal = tabManager.getActiveTerminal();
+                                    if (activeTerminal && activeTerminal.isActive && !activeTerminal.busy) {
+                                        setTimeout(() => {
+                                            if (activeTerminal.isActive && 
+                                                activeTerminal.cmdEl &&
+                                                activeTerminal.cmdEl.getAttribute('contenteditable') === 'true' &&
+                                                activeTerminal.cmdEl.getAttribute('tabindex') !== '-1') {
+                                                activeTerminal.focus();
+                                            }
+                                        }, 50);
                                     }
-                                }, 50);
+                                }
                             }
                         }
                     }, {
@@ -2036,7 +2163,31 @@ function escapeHtml(s){
                     }
                     
                     // 只在活动标签页时处理键盘事件
-                    if (!this.isActive) return;
+                    if (!this.isActive) {
+                        // 如果非活动标签页的输入框获得了焦点，阻止事件并切换到该标签页
+                        if (ev.target === this.cmdEl || this.cmdEl.contains(ev.target)) {
+                            ev.preventDefault();
+                            ev.stopPropagation();
+                            if (typeof tabManager !== 'undefined' && tabManager) {
+                                tabManager.switchTab(this.tabId);
+                                // 延迟获取焦点，确保标签页切换完成
+                                setTimeout(() => {
+                                    if (this.isActive && this.cmdEl) {
+                                        this.focus();
+                                    }
+                                }, 50);
+                            }
+                        }
+                        return;
+                    }
+                    
+                    // 额外检查：确保输入框是可编辑的（活动标签页）
+                    if (this.cmdEl.getAttribute('contenteditable') !== 'true' || 
+                        this.cmdEl.getAttribute('tabindex') === '-1') {
+                        ev.preventDefault();
+                        ev.stopPropagation();
+                        return;
+                    }
                     
                     // Vim模式：拦截所有键盘事件
                     if (this._vimMode && this._vimInstance) {
@@ -5994,232 +6145,7 @@ function escapeHtml(s){
                     }
                 }
                 break;
-            case 'ps':
-                {
-                    // ps 命令支持: ps [-l|--long] [-a|--all] [pid]
-                    // - ps: 显示所有运行中的程序的简要信息（排除已退出的）
-                    // - ps -l: 显示所有运行中的程序的详细信息
-                    // - ps -a: 显示所有程序（包括已退出的），已退出的以树状结构显示
-                    // - ps -a -l: 显示所有程序的详细信息，已退出的以树状结构显示
-                    // - ps <pid>: 显示特定程序的简要信息
-                    // - ps -l <pid>: 显示特定程序的详细信息
-                    const args = payload.args.slice(1);
-                    let longFormat = false;
-                    let showAll = false;
-                    let targetPid = -1;
-                    
-                    // 解析参数
-                    for (let i = 0; i < args.length; i++) {
-                        const arg = args[i];
-                        if (arg === '-l' || arg === '--long') {
-                            longFormat = true;
-                        } else if (arg === '-a' || arg === '--all') {
-                            showAll = true;
-                        } else if (!isNaN(parseInt(arg))) {
-                            targetPid = parseInt(arg);
-                        } else if (arg.startsWith('-')) {
-                            payload.write(`ps: invalid option -- ${arg}`);
-                            payload.write('Usage: ps [-l|--long] [-a|--all] [pid]');
-                            return;
-                        }
-                    }
-                    
-                    // 优先使用 ProcessManager，如果不可用则降级到 MemoryManager
-                    let processes = [];
-                    let useProcessManager = false;
-                    
-                    if (typeof ProcessManager !== 'undefined') {
-                        useProcessManager = true;
-                        if (targetPid !== -1) {
-                            const processInfo = ProcessManager.getProcessInfo(targetPid);
-                            if (processInfo) {
-                                processes = [processInfo];
-                            } else {
-                                payload.write(`ps: 程序 ${targetPid} 不存在`);
-                                return;
-                            }
-                        } else {
-                            processes = ProcessManager.getProcessInfo();
-                        }
-                        
-                        // 默认情况下，过滤掉已退出的程序
-                        if (!showAll) {
-                            processes = processes.filter(p => p.status !== 'exited');
-                        }
-                        
-                        if (processes.length === 0) {
-                            payload.write('ps: 没有运行的程序');
-                            return;
-                        }
-                    } else if (typeof MemoryManager !== 'undefined') {
-                        // 降级到 MemoryManager（兼容旧代码）
-                        const memoryInfo = MemoryManager.checkMemory(targetPid);
-                        if (memoryInfo === null) {
-                            payload.write(`ps: 程序 ${targetPid} 不存在`);
-                            return;
-                        }
-                        
-                        if (memoryInfo.totalPrograms === 0) {
-                            payload.write('ps: 没有运行的程序');
-                            return;
-                        }
-                        
-                        // 转换为 ProcessManager 格式
-                        processes = memoryInfo.programs.map(prog => ({
-                            pid: prog.pid,
-                            programName: prog.programName || `Program-${prog.pid}`,
-                            status: 'running',
-                            memoryInfo: {
-                                totalPrograms: 1,
-                                programs: [prog]
-                            }
-                        }));
-                    } else {
-                        payload.write('ps: ProcessManager 和 MemoryManager 都不可用');
-                        return;
-                    }
-                    
-                    // 分离运行中的程序和已退出的程序
-                    const runningProcesses = processes.filter(p => p.status !== 'exited');
-                    const exitedProcesses = showAll ? processes.filter(p => p.status === 'exited') : [];
-                    
-                    // 显示表头（仅对运行中的程序）
-                    if (runningProcesses.length > 0) {
-                        if (longFormat) {
-                            payload.write('PID\tNAME\t\tSTATUS\tHEAPS\tSHEDS\tHEAP_SIZE\tHEAP_USED\tHEAP_FREE\tSHED_SIZE');
-                            payload.write('---\t----\t\t------\t-----\t------\t---------\t----------\t----------\t---------');
-                        } else {
-                            payload.write('PID\tNAME\t\tSTATUS\tHEAPS\tSHEDS\tTOTAL_HEAP\tTOTAL_SHED');
-                            payload.write('---\t----\t\t------\t-----\t------\t----------\t-----------');
-                        }
-                    }
-                    
-                    // 显示运行中的程序
-                    runningProcesses.forEach(processInfo => {
-                        const pid = processInfo.pid;
-                        const programName = processInfo.programName || `Program-${pid}`;
-                        const status = processInfo.status || 'unknown';
-                        const memInfo = processInfo.memoryInfo;
-                        
-                        let heapCount = 0;
-                        let shedCount = 0;
-                        let totalHeap = 0;
-                        let totalShed = 0;
-                        let heapUsed = 0;
-                        let heapFree = 0;
-                        let shedSize = 0;
-                        
-                        if (memInfo && memInfo.programs && memInfo.programs.length > 0) {
-                            const prog = memInfo.programs[0];
-                            heapCount = prog.heaps ? prog.heaps.length : 0;
-                            shedCount = prog.sheds ? prog.sheds.length : 0;
-                            totalHeap = prog.totalHeapSize || 0;
-                            totalShed = prog.totalShedSize || 0;
-                            heapUsed = prog.heapUsedSize || prog.totalHeapUsed || 0;
-                            heapFree = prog.heapFreeSize || prog.totalHeapFree || 0;
-                            shedSize = prog.shedSize || prog.totalShedSize || 0;
-                            
-                            if (longFormat) {
-                                payload.write(`${pid}\t${programName.padEnd(12)}\t${status}\t${heapCount}\t${shedCount}\t${totalHeap}\t\t${heapUsed}\t\t${heapFree}\t\t${shedSize}`);
-                            
-                                // 显示每个堆的详细信息
-                                if (prog.heaps && prog.heaps.length > 0) {
-                                    payload.write(`  Heaps:`);
-                                    for (const heap of prog.heaps) {
-                                        payload.write(`    ${heap.heapId}: size=${heap.heapSize} used=${heap.used} free=${heap.free}`);
-                                    }
-                                }
-                                
-                                // 显示每个栈的详细信息
-                                if (prog.sheds && prog.sheds.length > 0) {
-                                    payload.write(`  Sheds:`);
-                                    for (const shed of prog.sheds) {
-                                        payload.write(`    ${shed.stackId}: size=${shed.stackSize} code=${shed.codeSize} resources=${shed.resourceLinkSize}`);
-                                    }
-                                }
-                            } else {
-                                // 简要格式
-                                payload.write(`${pid}\t${programName.padEnd(12)}\t${status}\t${heapCount}\t${shedCount}\t${totalHeap}\t${totalShed}`);
-                            }
-                        } else {
-                            // 没有内存信息，只显示基本信息
-                            if (longFormat) {
-                                payload.write(`${pid}\t${programName.padEnd(12)}\t${status}\t0\t0\t0\t\t0\t\t0\t\t0`);
-                            } else {
-                                payload.write(`${pid}\t${programName.padEnd(12)}\t${status}\t0\t0\t0\t\t0`);
-                            }
-                        }
-                    });
-                    
-                    // 如果使用 -a 参数，显示已退出的程序（树状结构）
-                    if (showAll && exitedProcesses.length > 0) {
-                        if (runningProcesses.length > 0) {
-                            payload.write(''); // 空行分隔
-                        }
-                        payload.write('已退出的程序:');
-                        exitedProcesses.forEach(processInfo => {
-                            const pid = processInfo.pid;
-                            const programName = processInfo.programName || `Program-${pid}`;
-                            const status = processInfo.status || 'unknown';
-                            const exitTime = processInfo.exitTime ? new Date(processInfo.exitTime).toLocaleString() : '未知';
-                            const startTime = processInfo.startTime ? new Date(processInfo.startTime).toLocaleString() : '未知';
-                            
-                            // 树状结构：使用 └─ 或 ├─ 前缀
-                            const isLast = exitedProcesses.indexOf(processInfo) === exitedProcesses.length - 1;
-                            const prefix = isLast ? '└─' : '├─';
-                            
-                            payload.write(`${prefix} ${pid}\t${programName.padEnd(12)}\t${status}`);
-                            payload.write(`${isLast ? '  ' : '│ '}  启动时间: ${startTime}`);
-                            payload.write(`${isLast ? '  ' : '│ '}  退出时间: ${exitTime}`);
-                            
-                            // 如果有内存信息，也显示
-                            const memInfo = processInfo.memoryInfo;
-                            if (memInfo && memInfo.programs && memInfo.programs.length > 0) {
-                                const prog = memInfo.programs[0];
-                                const heapCount = prog.heaps ? prog.heaps.length : 0;
-                                const shedCount = prog.sheds ? prog.sheds.length : 0;
-                                payload.write(`${isLast ? '  ' : '│ '}  内存: ${heapCount} 堆, ${shedCount} 栈`);
-                            }
-                        });
-                    }
-                    
-                    // 显示总计（只计算运行中的程序，如果有多个）
-                    if (runningProcesses.length > 1) {
-                        let totalHeapSize = 0;
-                        let totalHeapUsed = 0;
-                        let totalHeapFree = 0;
-                        let totalShedSize = 0;
-                        let totalHeapCount = 0;
-                        let totalShedCount = 0;
-                        
-                        runningProcesses.forEach(processInfo => {
-                            const memInfo = processInfo.memoryInfo;
-                            if (memInfo && memInfo.programs && memInfo.programs.length > 0) {
-                                const prog = memInfo.programs[0];
-                                const safeHeapSize = (typeof prog.totalHeapSize === 'number' && !Number.isNaN(prog.totalHeapSize)) ? prog.totalHeapSize : 0;
-                                const safeHeapUsed = (typeof prog.heapUsedSize === 'number' && !Number.isNaN(prog.heapUsedSize)) ? prog.heapUsedSize : (typeof prog.totalHeapUsed === 'number' && !Number.isNaN(prog.totalHeapUsed)) ? prog.totalHeapUsed : 0;
-                                const safeHeapFree = (typeof prog.heapFreeSize === 'number' && !Number.isNaN(prog.heapFreeSize)) ? prog.heapFreeSize : (typeof prog.totalHeapFree === 'number' && !Number.isNaN(prog.totalHeapFree)) ? prog.totalHeapFree : 0;
-                                const safeShedSize = (typeof prog.shedSize === 'number' && !Number.isNaN(prog.shedSize)) ? prog.shedSize : (typeof prog.totalShedSize === 'number' && !Number.isNaN(prog.totalShedSize)) ? prog.totalShedSize : 0;
-                                
-                                totalHeapSize += safeHeapSize;
-                                totalHeapUsed += safeHeapUsed;
-                                totalHeapFree += safeHeapFree;
-                                totalShedSize += safeShedSize;
-                                totalHeapCount += (prog.heaps ? prog.heaps.length : 0);
-                                totalShedCount += (prog.sheds ? prog.sheds.length : 0);
-                            }
-                        });
-                        
-                        if (longFormat) {
-                            payload.write(`---\t----\t\t-----\t------\t---------\t----------\t----------\t---------`);
-                            payload.write(`TOTAL\t${String('').padEnd(12)}\t${totalHeapCount}\t${totalShedCount}\t${totalHeapSize}\t${totalHeapUsed}\t${totalHeapFree}\t${totalShedSize}`);
-                        } else {
-                            payload.write(`---\t----\t\t-----\t------\t----------\t-----------`);
-                            payload.write(`TOTAL\t${String('').padEnd(12)}\t${totalHeapCount}\t${totalShedCount}\t${totalHeapSize}\t${totalShedSize}`);
-                        }
-                    }
-                }
-                break;
+            // ps 命令已移至 bin/ps.js，由终端命令解析器自动处理
             case 'tree':
                 {
                     // 异步处理，从 PHP 服务获取真实文件系统树
@@ -7159,6 +7085,12 @@ function escapeHtml(s){
                 payload.write(' - groupdel <name>        : 删除用户组（需默认管理员权限）');
                 payload.write(' - groupmod <name> <op>   : 修改用户组（需管理员权限），操作: -a/-d/-m (添加/删除成员/修改描述)');
                 payload.write(' - groupinfo <name>       : 显示用户组详细信息');
+                payload.write(' - env                    : 列出所有环境变量');
+                payload.write(' - setenv <name> <value>   : 设置环境变量');
+                payload.write(' - export <name>=<value>  : 设置环境变量（支持 name=value 或 name value 格式）');
+                payload.write(' - unsetenv <name>        : 删除环境变量');
+                payload.write(' - unset <name>           : 删除环境变量（与 unsetenv 相同）');
+                payload.write(' - getenv <name>          : 获取环境变量值');
                 payload.write(' - demo, toggleview       : 演示脚本 / 切换视图');
                 payload.write(' - power <action>         : 系统电源管理（reboot/shutdown/help）');
                 payload.write('Notes: 路径格式以盘符开头如 C:/path，或相对于当前工作目录使用 ../ 和 ./ 。');
@@ -7535,90 +7467,622 @@ function escapeHtml(s){
                     }
                 }
                 break;
-            default:
-                // 检查是否是CLI程序调用
-                // 尝试通过ApplicationAssetManager查找程序
-                let isCLIProgram = false;
-                let programInfo = null;
-                
-                // 获取ApplicationAssetManager
-                let AssetManager = null;
-                if (typeof ApplicationAssetManager !== 'undefined') {
-                    AssetManager = ApplicationAssetManager;
-                } else if (typeof safePoolGet === 'function') {
+            case 'env':
+                // env 命令：列出所有环境变量
+                (async () => {
                     try {
-                        AssetManager = safePoolGet('KERNEL_GLOBAL_POOL', 'ApplicationAssetManager');
-                    } catch (e) {
-                        console.error('[Terminal] 获取ApplicationAssetManager失败:', e);
-                    }
-                }
-                
-                // 调试信息
-                if (!AssetManager) {
-                    payload.write(`[调试] ApplicationAssetManager 不可用`);
-                }
-                
-                // 检查程序是否存在
-                if (AssetManager && typeof AssetManager.hasProgram === 'function') {
-                    const hasProgram = AssetManager.hasProgram(cmd);
-                    if (hasProgram) {
-                        isCLIProgram = true;
-                        programInfo = AssetManager.getProgramInfo(cmd);
-                        payload.write(`[调试] 找到程序: ${cmd}, 类型: ${programInfo?.metadata?.type || 'unknown'}`);
-                    } else {
-                        payload.write(`[调试] 程序 ${cmd} 不存在于ApplicationAssetManager`);
-                    }
-                } else {
-                    payload.write(`[调试] ApplicationAssetManager.hasProgram 不可用`);
-                }
-                
-                if (isCLIProgram && programInfo) {
-                    // 这是一个CLI程序，通过ProcessManager启动
-                    // 获取ProcessManager
-                    let ProcessMgr = null;
-                    if (typeof ProcessManager !== 'undefined') {
-                        ProcessMgr = ProcessManager;
-                    } else if (typeof safePoolGet === 'function') {
-                        try {
-                            ProcessMgr = safePoolGet('KERNEL_GLOBAL_POOL', 'ProcessManager');
-                        } catch (e) {
-                            console.error('[Terminal] 获取ProcessManager失败:', e);
+                        let ProcessMgr = null;
+                        if (typeof ProcessManager !== 'undefined') {
+                            ProcessMgr = ProcessManager;
+                        } else if (typeof safePoolGet === 'function') {
+                            try {
+                                ProcessMgr = safePoolGet('KERNEL_GLOBAL_POOL', 'ProcessManager');
+                            } catch (e) {
+                                console.error('[Terminal] 获取ProcessManager失败:', e);
+                            }
                         }
-                    }
-                    
-                    if (!ProcessMgr) {
-                        payload.write(`[CLI] ${cmd}: ProcessManager 不可用，无法启动程序`);
-                        break;
-                    }
-                    
-                    if (typeof ProcessMgr.startProgram !== 'function') {
-                        payload.write(`[CLI] ${cmd}: ProcessManager.startProgram 不是函数`);
-                        break;
-                    }
-                    
-                    // 异步启动程序
-                    payload.write(`[调试] 正在启动程序: ${cmd}...`);
-                    ProcessMgr.startProgram(cmd, {
-                        terminal: terminalInstance,
-                        args: payload.args.slice(1),  // 传递剩余参数
-                        env: payload.env,
-                        cwd: payload.env.cwd
-                    }).then((pid) => {
-                        // 程序启动成功
-                        payload.write(`[CLI] 程序 ${cmd} 已启动 (PID: ${pid})`);
-                    }).catch((error) => {
-                        // 程序启动失败
-                        console.error(`[Terminal] 启动程序 ${cmd} 失败:`, error);
-                        payload.write(`[CLI] 启动程序 ${cmd} 失败: ${error.message || error}`);
-                        if (error.stack) {
-                            payload.write(`[CLI] 错误堆栈: ${error.stack}`);
+
+                        if (!ProcessMgr || typeof ProcessMgr.callKernelAPI !== 'function') {
+                            payload.write('env: ProcessManager 不可用');
+                            return;
                         }
-                    });
-                } else {
-                    // 不是CLI程序，输出命令未找到
-                    payload.write(`${cmd}: command not found`);
-                }
+
+                        const envVars = await ProcessMgr.callKernelAPI(terminalInstance.pid, 'Environment.getAll', []);
+                        
+                        if (!envVars || typeof envVars !== 'object') {
+                            payload.write('env: 无法获取环境变量列表');
+                            return;
+                        }
+
+                        const keys = Object.keys(envVars);
+                        if (keys.length === 0) {
+                            payload.write('env: 没有环境变量');
+                            return;
+                        }
+
+                        payload.write('环境变量列表:');
+                        // 按名称排序
+                        keys.sort().forEach(key => {
+                            const value = envVars[key];
+                            payload.write(`  ${key}=${value}`);
+                        });
+                    } catch (error) {
+                        payload.write(`env: 错误: ${error.message}`);
+                    }
+                })();
                 break;
+            case 'setenv':
+            case 'export':
+                // setenv/export 命令：设置环境变量
+                // 用法: setenv <name> <value> 或 export <name>=<value>
+                (async () => {
+                    try {
+                        let ProcessMgr = null;
+                        if (typeof ProcessManager !== 'undefined') {
+                            ProcessMgr = ProcessManager;
+                        } else if (typeof safePoolGet === 'function') {
+                            try {
+                                ProcessMgr = safePoolGet('KERNEL_GLOBAL_POOL', 'ProcessManager');
+                            } catch (e) {
+                                console.error('[Terminal] 获取ProcessManager失败:', e);
+                            }
+                        }
+
+                        if (!ProcessMgr || typeof ProcessMgr.callKernelAPI !== 'function') {
+                            payload.write(`${cmd}: ProcessManager 不可用`);
+                            return;
+                        }
+
+                        let name, value;
+                        
+                        if (cmd === 'export' && payload.args.length >= 2) {
+                            // export <name>=<value> 格式
+                            const arg = payload.args[1];
+                            const equalIndex = arg.indexOf('=');
+                            if (equalIndex === -1) {
+                                payload.write(`${cmd}: 用法: export <name>=<value>`);
+                                payload.write(`  或: ${cmd} <name> <value>`);
+                                return;
+                            }
+                            name = arg.substring(0, equalIndex).trim();
+                            value = arg.substring(equalIndex + 1).trim();
+                        } else if (payload.args.length >= 3) {
+                            // setenv <name> <value> 格式
+                            name = payload.args[1];
+                            value = payload.args.slice(2).join(' '); // 支持值中包含空格
+                        } else {
+                            payload.write(`${cmd}: 用法: ${cmd} <name> <value>`);
+                            if (cmd === 'export') {
+                                payload.write(`  或: ${cmd} <name>=<value>`);
+                            }
+                            return;
+                        }
+
+                        if (!name || name.length === 0) {
+                            payload.write(`${cmd}: 环境变量名不能为空`);
+                            return;
+                        }
+
+                        await ProcessMgr.callKernelAPI(terminalInstance.pid, 'Environment.set', [name, value]);
+                        payload.write(`已设置环境变量: ${name}=${value}`);
+                    } catch (error) {
+                        payload.write(`${cmd}: 错误: ${error.message}`);
+                    }
+                })();
+                break;
+            case 'unsetenv':
+            case 'unset':
+                // unsetenv/unset 命令：删除环境变量
+                (async () => {
+                    try {
+                        if (payload.args.length < 2) {
+                            payload.write(`${cmd}: 用法: ${cmd} <name>`);
+                            return;
+                        }
+
+                        const name = payload.args[1];
+                        if (!name || name.length === 0) {
+                            payload.write(`${cmd}: 环境变量名不能为空`);
+                            return;
+                        }
+
+                        let ProcessMgr = null;
+                        if (typeof ProcessManager !== 'undefined') {
+                            ProcessMgr = ProcessManager;
+                        } else if (typeof safePoolGet === 'function') {
+                            try {
+                                ProcessMgr = safePoolGet('KERNEL_GLOBAL_POOL', 'ProcessManager');
+                            } catch (e) {
+                                console.error('[Terminal] 获取ProcessManager失败:', e);
+                            }
+                        }
+
+                        if (!ProcessMgr || typeof ProcessMgr.callKernelAPI !== 'function') {
+                            payload.write(`${cmd}: ProcessManager 不可用`);
+                            return;
+                        }
+
+                        await ProcessMgr.callKernelAPI(terminalInstance.pid, 'Environment.delete', [name]);
+                        payload.write(`已删除环境变量: ${name}`);
+                    } catch (error) {
+                        payload.write(`${cmd}: 错误: ${error.message}`);
+                    }
+                })();
+                break;
+            case 'getenv':
+                // getenv 命令：获取环境变量值
+                (async () => {
+                    try {
+                        if (payload.args.length < 2) {
+                            payload.write('getenv: 用法: getenv <name>');
+                            return;
+                        }
+
+                        const name = payload.args[1];
+                        if (!name || name.length === 0) {
+                            payload.write('getenv: 环境变量名不能为空');
+                            return;
+                        }
+
+                        let ProcessMgr = null;
+                        if (typeof ProcessManager !== 'undefined') {
+                            ProcessMgr = ProcessManager;
+                        } else if (typeof safePoolGet === 'function') {
+                            try {
+                                ProcessMgr = safePoolGet('KERNEL_GLOBAL_POOL', 'ProcessManager');
+                            } catch (e) {
+                                console.error('[Terminal] 获取ProcessManager失败:', e);
+                            }
+                        }
+
+                        if (!ProcessMgr || typeof ProcessMgr.callKernelAPI !== 'function') {
+                            payload.write('getenv: ProcessManager 不可用');
+                            return;
+                        }
+
+                        const value = await ProcessMgr.callKernelAPI(terminalInstance.pid, 'Environment.get', [name]);
+                        
+                        if (value === null || value === undefined) {
+                            payload.write(`getenv: 环境变量 ${name} 不存在`);
+                        } else {
+                            payload.write(`${name}=${value}`);
+                        }
+                    } catch (error) {
+                        payload.write(`getenv: 错误: ${error.message}`);
+                    }
+                })();
+                break;
+            default:
+                // 命令处理优先级：
+                // 1. 内置命令（已在 switch case 中处理）
+                // 2. D/bin/ 目录下的 .js 文件
+                // 3. 程序注册表中的程序（ApplicationAssetManager）
+                // 4. 环境变量中的值（作为程序名执行）
+                
+                // 使用异步函数统一处理所有步骤
+                (async () => {
+                    let isCLIProgram = false;
+                    let programInfo = null;
+                    let programName = cmd;  // 默认使用命令名作为程序名
+                    let foundInBin = false;  // 标记是否在 D/bin/ 中找到文件
+                    
+                    // 步骤1: 尝试从 D/bin/ 目录查找同名 .js 文件
+                    try {
+                        // 获取 SystemInformation（用于构建 FSDirve URL）
+                        let SystemInfo = null;
+                        if (typeof SystemInformation !== 'undefined') {
+                            SystemInfo = SystemInformation;
+                        } else if (typeof safePoolGet === 'function') {
+                            try {
+                                SystemInfo = safePoolGet('KERNEL_GLOBAL_POOL', 'SystemInformation');
+                            } catch (e) {
+                                // 忽略错误
+                            }
+                        }
+                        
+                        if (SystemInfo) {
+                            // 构建 FSDirve 服务 URL
+                            let url = null;
+                            if (SystemInfo.buildServiceUrlObject && SystemInfo.SERVICE_NAMES) {
+                                url = SystemInfo.buildServiceUrlObject(SystemInfo.SERVICE_NAMES.FSDIRVE);
+                            } else if (SystemInfo.getFSDirvePath && SystemInfo.getOrigin) {
+                                url = new URL(SystemInfo.getFSDirvePath(), SystemInfo.getOrigin());
+                            } else {
+                                // 降级方案：使用默认路径
+                                const origin = window.location.origin || 'http://localhost:8089';
+                                url = new URL('/system/service/FSDirve.php', origin);
+                            }
+                            url.searchParams.set('action', 'read_file');
+                            url.searchParams.set('path', 'D:/bin');
+                            url.searchParams.set('fileName', `${cmd}.js`);
+                            
+                            // 尝试读取文件（静默处理 404 错误，因为文件不存在是正常情况）
+                            let response;
+                            try {
+                                response = await fetch(url.toString());
+                            } catch (error) {
+                                // 网络错误，静默继续后续查找
+                                foundInBin = false;
+                                return; // 从 try 块返回，继续后续查找
+                            }
+                            
+                            // 如果响应不是 200，静默继续（文件不存在是正常情况）
+                            if (!response.ok) {
+                                foundInBin = false;
+                                return; // 静默继续后续查找
+                            }
+                            
+                            if (response.ok) {
+                                const result = await response.json();
+                                if (result.status === 'success') {
+                                    const fileContent = result.data?.content || result.data || '';
+                                    if (fileContent && typeof fileContent === 'string') {
+                                        // 文件存在，标记为已找到
+                                        foundInBin = true;
+                                        
+                                        // 获取 ProcessManager
+                                        let ProcessMgr = null;
+                                        if (typeof ProcessManager !== 'undefined') {
+                                            ProcessMgr = ProcessManager;
+                                        } else if (typeof safePoolGet === 'function') {
+                                            try {
+                                                ProcessMgr = safePoolGet('KERNEL_GLOBAL_POOL', 'ProcessManager');
+                                            } catch (e) {
+                                                console.error('[Terminal] 获取ProcessManager失败:', e);
+                                            }
+                                        }
+                                        
+                                        if (!ProcessMgr || typeof ProcessMgr.startProgram !== 'function') {
+                                            // ProcessManager 不可用，静默继续后续查找
+                                            foundInBin = false;
+                                        } else {
+                                            // 验证文件是否是有效的 ZerOS 程序
+                                            let isValidProgram = true;
+                                            if (ProcessMgr.validateProgramFile && typeof ProcessMgr.validateProgramFile === 'function') {
+                                                const validation = ProcessMgr.validateProgramFile(fileContent, `${cmd}.js`);
+                                                if (!validation.valid) {
+                                                    // 文件不是有效的 ZerOS 程序，静默继续后续查找
+                                                    isValidProgram = false;
+                                                    foundInBin = false;
+                                                }
+                                            }
+                                            
+                                            if (isValidProgram) {
+                                                // 使用 tempAsset 启动程序
+                                                const tempAsset = {
+                                                    script: fileContent,
+                                                    styles: [],
+                                                    icon: null,  // 使用默认图标
+                                                    metadata: {
+                                                        name: cmd,
+                                                        type: 'CLI',  // 默认作为 CLI 程序
+                                                        allowMultipleInstances: true
+                                                    }
+                                                };
+                                                
+                                                // 尝试启动程序（异步）
+                                                try {
+                                                    const pid = await ProcessMgr.startProgram(cmd, {
+                                                        terminal: terminalInstance,
+                                                        args: payload.args.slice(1),
+                                                        env: payload.env,
+                                                        cwd: payload.env.cwd,
+                                                        tempAsset: tempAsset
+                                                    });
+                                                    // 启动成功，输出信息并返回
+                                                    payload.write(`[D:/bin] 程序 ${cmd} 已启动 (PID: ${pid})`);
+                                                    return;
+                                                } catch (error) {
+                                                    // 启动失败，检查进程是否已经被创建
+                                                    // 如果进程已经被创建（即使初始化失败），不应该继续查找
+                                                    let processCreated = false;
+                                                    if (ProcessMgr && typeof ProcessMgr.getProcessInfo === 'function') {
+                                                        // 检查是否有同名进程（可能是刚创建的）
+                                                        const allProcesses = ProcessMgr.getProcessInfo();
+                                                        if (Array.isArray(allProcesses)) {
+                                                            const recentProcess = allProcesses.find(p => 
+                                                                p.programName === cmd && 
+                                                                (p.status === 'loading' || p.status === 'exited' || p.status === 'running')
+                                                            );
+                                                            if (recentProcess) {
+                                                                processCreated = true;
+                                                                // 进程已创建但初始化失败，输出错误信息
+                                                                payload.write(`${cmd}: 程序启动失败: ${error.message || error}`);
+                                                                return;
+                                                            }
+                                                        }
+                                                    }
+                                                    
+                                                    // 如果进程没有被创建，继续后续查找
+                                                    if (!processCreated) {
+                                                        console.debug(`[Terminal] D:/bin/${cmd}.js 启动失败，继续查找其他位置:`, error);
+                                                        foundInBin = false;
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    } catch (error) {
+                        // 读取文件失败，继续后续判断（不输出错误，因为可能是文件不存在）
+                        console.debug(`[Terminal] 检查 D:/bin/${cmd}.js 失败:`, error);
+                    }
+                    
+                    // 步骤2: 如果 D/bin/ 中没找到，尝试从程序注册表查找
+                    if (!foundInBin) {
+                        let AssetManager = null;
+                        if (typeof ApplicationAssetManager !== 'undefined') {
+                            AssetManager = ApplicationAssetManager;
+                        } else if (typeof safePoolGet === 'function') {
+                            try {
+                                AssetManager = safePoolGet('KERNEL_GLOBAL_POOL', 'ApplicationAssetManager');
+                            } catch (e) {
+                                console.error('[Terminal] 获取ApplicationAssetManager失败:', e);
+                            }
+                        }
+                        
+                        // 检查程序是否存在
+                        if (AssetManager && typeof AssetManager.hasProgram === 'function') {
+                            const hasProgram = AssetManager.hasProgram(cmd);
+                            if (hasProgram) {
+                                isCLIProgram = true;
+                                programInfo = AssetManager.getProgramInfo(cmd);
+                                programName = cmd;  // 使用命令名作为程序名
+                            }
+                        }
+                    }
+                    
+                    // 步骤3: 如果程序注册表中找不到，尝试从环境变量查找
+                    if (!foundInBin && !isCLIProgram) {
+                        // 获取 ProcessManager（用于调用内核 API）
+                        let ProcessMgr = null;
+                        if (typeof ProcessManager !== 'undefined') {
+                            ProcessMgr = ProcessManager;
+                        } else if (typeof safePoolGet === 'function') {
+                            try {
+                                ProcessMgr = safePoolGet('KERNEL_GLOBAL_POOL', 'ProcessManager');
+                            } catch (e) {
+                                console.error('[Terminal] 获取ProcessManager失败:', e);
+                            }
+                        }
+                        
+                        if (ProcessMgr && typeof ProcessMgr.callKernelAPI === 'function') {
+                            // 通过 ProcessManager 调用环境变量 API（需要权限检查）
+                            try {
+                                // 获取终端程序的 PID（从 terminalInstance 或 tabManager）
+                                let terminalPid = terminalInstance.pid;
+                                if (!terminalPid && terminalInstance.tabManager && terminalInstance.tabManager.pid) {
+                                    terminalPid = terminalInstance.tabManager.pid;
+                                }
+                                
+                                if (!terminalPid) {
+                                    payload.write(`${cmd}: command not found (无法获取终端进程ID)`);
+                                    return;
+                                }
+                                
+                                const envValue = await ProcessMgr.callKernelAPI(terminalPid, 'Environment.get', [cmd]);
+                                if (envValue && typeof envValue === 'string' && envValue.trim()) {
+                                    const envValueTrimmed = envValue.trim();
+                                    
+                                    // 判断环境变量值是否是文件路径
+                                    // 路径特征：包含路径分隔符（/ 或 \），或以 .js 结尾
+                                    const isFilePath = /[\/\\]/.test(envValueTrimmed) || envValueTrimmed.endsWith('.js');
+                                    
+                                    let ProcessMgr = null;
+                                    if (typeof ProcessManager !== 'undefined') {
+                                        ProcessMgr = ProcessManager;
+                                    } else if (typeof safePoolGet === 'function') {
+                                        try {
+                                            ProcessMgr = safePoolGet('KERNEL_GLOBAL_POOL', 'ProcessManager');
+                                        } catch (e) {
+                                            console.error('[Terminal] 获取ProcessManager失败:', e);
+                                        }
+                                    }
+                                    
+                                    if (!ProcessMgr || typeof ProcessMgr.startProgram !== 'function') {
+                                        payload.write(`${cmd}: command not found (无法访问 ProcessManager)`);
+                                        return;
+                                    }
+                                    
+                                    if (isFilePath) {
+                                        // 环境变量值是文件路径，需要读取文件内容并作为程序执行
+                                        try {
+                                            // 规范化路径
+                                            let filePath = envValueTrimmed.replace(/\\/g, '/');
+                                            
+                                            // 读取文件内容
+                                            const pathParts = filePath.split('/');
+                                            const fileName = pathParts[pathParts.length - 1];
+                                            const parentPath = pathParts.slice(0, -1).join('/') || (filePath.split(':')[0] + ':');
+                                            
+                                            // 构建 FSDirve 服务 URL
+                                            let SystemInfo = null;
+                                            if (typeof SystemInformation !== 'undefined') {
+                                                SystemInfo = SystemInformation;
+                                            } else if (typeof safePoolGet === 'function') {
+                                                try {
+                                                    SystemInfo = safePoolGet('KERNEL_GLOBAL_POOL', 'SystemInformation');
+                                                } catch (e) {
+                                                    // 忽略错误
+                                                }
+                                            }
+                                            
+                                            if (!SystemInfo) {
+                                                payload.write(`${cmd}: command not found (无法访问 SystemInformation)`);
+                                                return;
+                                            }
+                                            
+                                            // 构建 FSDirve 服务 URL
+                                            let url = null;
+                                            if (SystemInfo.buildServiceUrlObject && SystemInfo.SERVICE_NAMES) {
+                                                url = SystemInfo.buildServiceUrlObject(SystemInfo.SERVICE_NAMES.FSDIRVE);
+                                            } else if (SystemInfo.getFSDirvePath && SystemInfo.getOrigin) {
+                                                url = new URL(SystemInfo.getFSDirvePath(), SystemInfo.getOrigin());
+                                            } else {
+                                                // 降级方案：使用默认路径
+                                                const origin = window.location.origin || 'http://localhost:8089';
+                                                url = new URL('/system/service/FSDirve.php', origin);
+                                            }
+                                            url.searchParams.set('action', 'read_file');
+                                            url.searchParams.set('path', parentPath);
+                                            url.searchParams.set('fileName', fileName);
+                                            
+                                            const response = await fetch(url.toString());
+                                            if (!response.ok) {
+                                                throw new Error(`HTTP ${response.status}`);
+                                            }
+                                            
+                                            const result = await response.json();
+                                            if (result.status !== 'success') {
+                                                throw new Error(result.message || '读取文件失败');
+                                            }
+                                            
+                                            const fileContent = result.data?.content || result.data || '';
+                                            if (!fileContent || typeof fileContent !== 'string') {
+                                                throw new Error('文件内容为空或格式错误');
+                                            }
+                                            
+                                            // 验证文件是否是有效的 ZerOS 程序
+                                            if (ProcessMgr.validateProgramFile && typeof ProcessMgr.validateProgramFile === 'function') {
+                                                const validation = ProcessMgr.validateProgramFile(fileContent, fileName);
+                                                if (!validation.valid) {
+                                                    payload.write(`${cmd}: command not found (环境变量 ${cmd}=${envValueTrimmed} 对应的文件不是有效的 ZerOS 程序)`);
+                                                    if (validation.errors && validation.errors.length > 0) {
+                                                        validation.errors.forEach(err => {
+                                                            payload.write(`  错误: ${err}`);
+                                                        });
+                                                    }
+                                                    return;
+                                                }
+                                            }
+                                            
+                                            // 使用 tempAsset 启动程序
+                                            const tempAsset = {
+                                                script: fileContent,
+                                                styles: [],
+                                                icon: null,  // 使用默认图标
+                                                metadata: {
+                                                    name: fileName.replace(/\.js$/, ''),
+                                                    type: 'CLI',  // 默认作为 CLI 程序
+                                                    allowMultipleInstances: true
+                                                }
+                                            };
+                                            
+                                            // 使用文件路径作为程序名（去掉扩展名）
+                                            const programNameFromPath = fileName.replace(/\.js$/, '');
+                                            
+                                            ProcessMgr.startProgram(programNameFromPath, {
+                                                terminal: terminalInstance,
+                                                args: payload.args.slice(1),
+                                                env: payload.env,
+                                                cwd: payload.env.cwd,
+                                                tempAsset: tempAsset
+                                            }).then((pid) => {
+                                                payload.write(`[ENV] 程序 ${programNameFromPath} (来自环境变量 ${cmd}=${envValueTrimmed}) 已启动 (PID: ${pid})`);
+                                            }).catch((error) => {
+                                                console.error(`[Terminal] 启动程序 ${programNameFromPath} 失败:`, error);
+                                                payload.write(`${cmd}: command not found (环境变量 ${cmd}=${envValueTrimmed} 对应的程序启动失败: ${error.message || error})`);
+                                            });
+                                        } catch (error) {
+                                            console.error(`[Terminal] 读取或执行文件 ${envValueTrimmed} 失败:`, error);
+                                            payload.write(`${cmd}: command not found (环境变量 ${cmd}=${envValueTrimmed} 对应的文件读取失败: ${error.message || error})`);
+                                        }
+                                    } else {
+                                        // 环境变量值是程序名，尝试从程序注册表查找
+                                        const envProgramName = envValueTrimmed;
+                                        
+                                        // 再次检查程序注册表，看环境变量值对应的程序是否存在
+                                        let envIsCLIProgram = false;
+                                        let envProgramInfo = null;
+                                        if (AssetManager && typeof AssetManager.hasProgram === 'function') {
+                                            const hasProgram = AssetManager.hasProgram(envProgramName);
+                                            if (hasProgram) {
+                                                envIsCLIProgram = true;
+                                                envProgramInfo = AssetManager.getProgramInfo(envProgramName);
+                                            }
+                                        }
+                                        
+                                        // 尝试启动环境变量值对应的程序
+                                        ProcessMgr.startProgram(envProgramName, {
+                                            terminal: terminalInstance,
+                                            args: payload.args.slice(1),
+                                            env: payload.env,
+                                            cwd: payload.env.cwd
+                                        }).then((pid) => {
+                                            payload.write(`[ENV] 程序 ${envProgramName} (来自环境变量 ${cmd}) 已启动 (PID: ${pid})`);
+                                        }).catch((error) => {
+                                            console.error(`[Terminal] 启动程序 ${envProgramName} 失败:`, error);
+                                            payload.write(`${cmd}: command not found (环境变量 ${cmd}=${envProgramName} 对应的程序不存在)`);
+                                        });
+                                    }
+                                } else {
+                                    // 环境变量不存在或为空，输出命令未找到
+                                    payload.write(`${cmd}: command not found`);
+                                    return;
+                                }
+                            } catch (error) {
+                                // 获取环境变量失败，输出命令未找到
+                                console.error(`[Terminal] 获取环境变量 ${cmd} 失败:`, error);
+                                payload.write(`${cmd}: command not found`);
+                                return;
+                            }
+                            // 环境变量处理完成，直接返回，不继续后续步骤
+                            return;
+                        } else {
+                            // 环境变量查找失败或不可用，继续后续步骤
+                        }
+                    }
+                    
+                    // 步骤4: 如果从程序注册表找到了程序，启动它
+                    if (isCLIProgram && programInfo) {
+                        // 这是一个CLI程序，通过ProcessManager启动
+                        let ProcessMgr = null;
+                        if (typeof ProcessManager !== 'undefined') {
+                            ProcessMgr = ProcessManager;
+                        } else if (typeof safePoolGet === 'function') {
+                            try {
+                                ProcessMgr = safePoolGet('KERNEL_GLOBAL_POOL', 'ProcessManager');
+                            } catch (e) {
+                                console.error('[Terminal] 获取ProcessManager失败:', e);
+                            }
+                        }
+                        
+                        if (!ProcessMgr) {
+                            payload.write(`${cmd}: command not found`);
+                            return;
+                        }
+                        
+                        if (typeof ProcessMgr.startProgram !== 'function') {
+                            payload.write(`${cmd}: command not found`);
+                            return;
+                        }
+                        
+                        // 异步启动程序
+                        ProcessMgr.startProgram(programName, {
+                            terminal: terminalInstance,
+                            args: payload.args.slice(1),  // 传递剩余参数
+                            env: payload.env,
+                            cwd: payload.env.cwd
+                        }).then((pid) => {
+                            // 程序启动成功
+                            payload.write(`[CLI] 程序 ${programName} 已启动 (PID: ${pid})`);
+                        }).catch((error) => {
+                            // 程序启动失败
+                            console.error(`[Terminal] 启动程序 ${programName} 失败:`, error);
+                            payload.write(`${cmd}: command not found`);
+                            if (error.stack) {
+                                console.error(`[Terminal] 错误堆栈:`, error.stack);
+                            }
+                        });
+                    } else {
+                        // 如果既不是 D/bin/ 中的文件，也不是程序注册表中的程序，也没有环境变量，输出命令未找到
+                        payload.write(`${cmd}: command not found`);
+                    }
+                })();
+                // 异步处理所有步骤，直接返回
+                return;
         }
         };
         
@@ -7664,7 +8128,8 @@ function escapeHtml(s){
                     PermissionManager.PERMISSION.KERNEL_DISK_WRITE,
                     PermissionManager.PERMISSION.KERNEL_DISK_LIST,
                     PermissionManager.PERMISSION.PROCESS_MANAGE,
-                    PermissionManager.PERMISSION.EVENT_LISTENER
+                    PermissionManager.PERMISSION.EVENT_LISTENER,
+                    PermissionManager.PERMISSION.ENVIRONMENT_READ  // 读取环境变量（用于命令别名查找）
                 ] : [],
                 metadata: {
                     autoStart: true,  // 终端作为系统内置程序，自动启动

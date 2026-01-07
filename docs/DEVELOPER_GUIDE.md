@@ -733,6 +733,74 @@ __init__: async function(pid, initArgs) {
 }
 ```
 
+### D:/bin/ 目录下的可执行程序
+
+对于存放在 `D:/bin/` 目录下的 CLI 程序（如 `ps.js`、`ping.js`），需要特别注意 `__init__` 方法的实现方式。
+
+**重要原则**：
+- `__init__` 方法应该**立即返回**，不要等待异步操作完成
+- 使用 `setTimeout()` 延迟执行实际的命令逻辑
+- 这样进程管理器可以在 `__init__` 返回后将程序状态设置为 `running`
+- 当 `setTimeout` 的回调执行时，程序状态已经是 `running` 了
+
+**正确示例**：
+
+```javascript
+__init__: async function(pid, initArgs = {}) {
+    this.pid = pid;
+    this.terminal = initArgs.terminal;
+
+    if (!this.terminal) {
+        throw new Error('程序需要终端环境');
+    }
+
+    // 保存参数供后续使用
+    const args = initArgs.args || [];
+
+    // 使用 setTimeout 延迟执行命令逻辑
+    // 这样 __init__ 可以立即返回，进程管理器会将状态设置为 running
+    // 然后 setTimeout 回调执行时，状态已经是 running 了
+    setTimeout(async () => {
+        try {
+            // 在这里执行实际的命令逻辑
+            // 此时程序状态已经是 running
+            
+            // 解析参数
+            // 执行命令
+            // 输出结果
+            
+            // 执行完成后，延迟关闭程序
+            setTimeout(async () => {
+                await this._selfClose();
+            }, 300);
+        } catch (error) {
+            // 错误处理
+            setTimeout(async () => {
+                await this._selfClose();
+            }, 300);
+        }
+    }, 0);  // 使用 0ms 延迟，确保在下一个事件循环中执行
+}
+```
+
+**错误示例**（不要这样做）：
+
+```javascript
+__init__: async function(pid, initArgs = {}) {
+    // ❌ 错误：等待异步操作会阻止 __init__ 返回
+    await this._waitForRunning();  // 不要这样做！
+    
+    // ❌ 错误：直接执行命令逻辑会阻止 __init__ 返回
+    await this._executeCommand();  // 不要这样做！
+}
+```
+
+**为什么需要这样做**：
+- 进程管理器在 `__init__` 执行完成后才会将程序状态设置为 `running`
+- 如果 `__init__` 内部有异步等待，会导致 `__init__` 无法及时返回
+- 进程管理器不是基于超时去设置程序状态的，而是基于 `__init__` 的返回
+- 使用 `setTimeout` 可以确保 `__init__` 立即返回，同时命令逻辑在状态变为 `running` 后执行
+
 ### 终端 API
 
 通过共享空间访问终端 API：
@@ -791,6 +859,49 @@ __init__: async function(pid, initArgs) {
     }
 }
 ```
+
+### 命令执行方式
+
+CLI 程序可以通过以下方式被终端执行：
+
+1. **程序注册表** - 在 `applicationAssets.js` 中注册程序，终端可以直接通过程序名执行
+2. **D:/bin/ 目录** - 将程序文件放在 `D:/bin/<程序名>.js`，终端会自动查找并执行
+3. **环境变量** - 设置环境变量为程序名或文件路径，终端会执行环境变量的值
+
+**示例**:
+```javascript
+// 方式1: 在 applicationAssets.js 中注册
+// 终端输入: myapp
+
+// 方式2: 将文件放在 D:/bin/myapp.js
+// 终端输入: myapp（会自动查找 D:/bin/myapp.js）
+
+// 方式3: 设置环境变量
+// export myapp "D:/application/myapp/myapp.js"
+// 终端输入: myapp（会执行环境变量值对应的程序）
+```
+
+**注意**: 
+- 使用 `D:/bin/` 目录时，文件必须是有效的 ZerOS 程序（包含 `__init__` 和 `__info__` 方法）
+- 如果文件不存在或无效，终端会静默继续查找其他位置，不会显示错误
+- 环境变量值可以是程序名（从注册表查找）或文件路径（直接执行文件）
+
+### 环境变量管理
+
+CLI 程序可以通过终端命令管理系统环境变量：
+
+- `env` - 列出所有环境变量
+- `setenv <name> <value>` - 设置环境变量（需要管理员权限）
+- `export <name>=<value>` - 设置环境变量（需要管理员权限）
+- `unsetenv <name>` - 删除环境变量（需要管理员权限）
+- `getenv <name>` - 获取环境变量值
+
+**注意**: 
+- 系统环境变量存储在 `LStorage` 的注册表中（`system.registry.environment`）
+- 普通用户只能读取环境变量，只有管理员可以设置、修改和删除
+- 环境变量可以作为命令别名使用（设置为程序名或文件路径）
+
+详细命令列表请参考 [终端命令参考](../TERMINAL_COMMANDS.md)
 
 ---
 
@@ -1630,6 +1741,8 @@ const data = sharedSpace.getData('myKey');
 
 ### 完整的 CLI 程序示例
 
+#### 示例 1：普通 CLI 程序（非 D:/bin/ 目录）
+
 ```javascript
 // system/service/DISK/D/application/mycli/mycli.js
 (function(window) {
@@ -1694,6 +1807,175 @@ const data = sharedSpace.getData('myKey');
     }
     
 })(typeof window !== 'undefined' ? window : globalThis);
+```
+
+#### 示例 2：D:/bin/ 目录下的可执行程序（推荐模式）
+
+```javascript
+// system/service/DISK/D/bin/mycommand.js
+(function(window) {
+    'use strict';
+    
+    const MYCOMMAND = {
+        pid: null,
+        terminal: null,
+        _closing: false,
+        
+        __init__: async function(pid, initArgs = {}) {
+            this.pid = pid;
+            this.terminal = initArgs.terminal;
+
+            if (!this.terminal) {
+                throw new Error('程序需要终端环境');
+            }
+
+            // 保存参数供后续使用
+            const args = initArgs.args || [];
+
+            // ⚠️ 重要：使用 setTimeout 延迟执行命令逻辑
+            // 这样 __init__ 可以立即返回，进程管理器会将状态设置为 running
+            // 然后 setTimeout 回调执行时，状态已经是 running 了
+            setTimeout(async () => {
+                try {
+                    // 此时程序状态已经是 running，可以安全执行命令逻辑
+                    
+                    // 检查帮助选项
+                    if (args.includes('-h') || args.includes('--help')) {
+                        this._showUsage();
+                        setTimeout(async () => {
+                            await this._selfClose();
+                        }, 300);
+                        return;
+                    }
+                    
+                    // 执行实际命令逻辑
+                    await this._executeCommand(args);
+                    
+                    // 确保所有输出都已完成，然后延迟关闭
+                    await new Promise(resolve => setTimeout(resolve, 200));
+                    setTimeout(async () => {
+                        await this._selfClose();
+                    }, 300);
+                } catch (error) {
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.error("MYCOMMAND", `执行命令失败: ${error.message}`, error);
+                    }
+                    // 错误情况下也延迟关闭
+                    await new Promise(resolve => setTimeout(resolve, 200));
+                    setTimeout(async () => {
+                        await this._selfClose();
+                    }, 300);
+                }
+            }, 0);  // 使用 0ms 延迟，确保在下一个事件循环中执行
+        },
+        
+        _executeCommand: async function(args) {
+            // 执行实际的命令逻辑
+            this.terminal.write('执行命令...\n');
+            // ...
+        },
+        
+        _showUsage: function() {
+            this.terminal.write('用法: mycommand [选项]\n');
+            this.terminal.write('选项:\n');
+            this.terminal.write('  -h, --help    显示帮助信息\n');
+        },
+        
+        _selfClose: async function() {
+            // 防止重复调用
+            if (this._closing) {
+                return;
+            }
+            this._closing = true;
+
+            // 延迟一小段时间，确保所有输出都已完成
+            await new Promise(resolve => setTimeout(resolve, 200));
+
+            // 检查 PID 是否存在
+            if (!this.pid) {
+                return;
+            }
+
+            // 使用 ProcessManager 的强制自终止 API
+            let ProcessMgr = null;
+            if (typeof ProcessManager !== 'undefined') {
+                ProcessMgr = ProcessManager;
+            } else if (typeof POOL !== 'undefined' && typeof POOL.__GET__ === 'function') {
+                try {
+                    ProcessMgr = POOL.__GET__('KERNEL_GLOBAL_POOL', 'ProcessManager');
+                } catch (e) {
+                    // 忽略错误
+                }
+            }
+
+            if (ProcessMgr) {
+                try {
+                    // 优先通过内核 API 调用 requestSelfTermination（强制自终止）
+                    if (typeof ProcessMgr.callKernelAPI === 'function') {
+                        await ProcessMgr.callKernelAPI(this.pid, 'Process.requestSelfTermination', []);
+                    } else if (typeof ProcessMgr.requestSelfTermination === 'function') {
+                        await ProcessMgr.requestSelfTermination(this.pid);
+                    } else if (typeof ProcessMgr.killProgram === 'function') {
+                        await ProcessMgr.killProgram(this.pid, true);
+                    }
+                } catch (error) {
+                    // 如果所有方法都失败，尝试强制关闭
+                    if (typeof ProcessMgr.killProgram === 'function') {
+                        try {
+                            await ProcessMgr.killProgram(this.pid, true);
+                        } catch (forceError) {
+                            // 忽略强制关闭失败
+                        }
+                    }
+                }
+            }
+        },
+        
+        __exit__: async function() {
+            // 清理资源
+            this.terminal = null;
+        },
+        
+        __info__: function() {
+            return {
+                name: 'MYCOMMAND',
+                type: 'CLI',
+                version: '1.0.0',
+                description: '我的命令行工具',
+                author: 'ZerOS Team',
+                copyright: '© 2025 ZerOS',
+                permissions: typeof PermissionManager !== 'undefined' ? [
+                    PermissionManager.PERMISSION.EVENT_LISTENER
+                ] : [],
+                metadata: {
+                    autoStart: false,
+                    priority: 1,
+                    allowMultipleInstances: true
+                }
+            };
+        }
+    };
+
+    // 注册到全局
+    if (typeof window !== 'undefined') {
+        window.MYCOMMAND = MYCOMMAND;
+    }
+
+    // 注册到 POOL（如果可用）
+    if (typeof POOL !== 'undefined' && typeof POOL.__ADD__ === 'function') {
+        try {
+            if (!POOL.__HAS__("APPLICATION_SHARED_POOL")) {
+                POOL.__INIT__("APPLICATION_SHARED_POOL");
+            }
+            POOL.__ADD__("APPLICATION_SHARED_POOL", "MYCOMMAND", MYCOMMAND);
+        } catch (e) {
+            if (typeof KernelLogger !== 'undefined') {
+                KernelLogger.error("MYCOMMAND", `注册到 POOL 失败: ${e.message}`, e);
+            }
+        }
+    }
+
+})(window);
 ```
 
 ---

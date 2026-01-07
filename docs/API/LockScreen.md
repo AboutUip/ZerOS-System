@@ -246,7 +246,7 @@ await LockScreen._switchUser('TestUser');
 锁屏界面支持显示每日一言，提供每日励志语句。
 
 **功能特性**：
-- 自动从API获取每日一言：`https://v.api.aa1.cn/api/yiyan/index.php`
+- 自动从API获取每日一言：`https://uapis.cn/api/v1/saying`（响应格式：`{"text": "..."}`）
 - 智能缓存管理：
   - 系统启动时自动预加载下一句每日一言到缓存
   - 显示时优先使用缓存，使用后删除缓存

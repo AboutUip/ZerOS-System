@@ -225,12 +225,13 @@ KernelLogger.info("LockScreen", "模块初始化");
                     if (typeof KernelLogger !== 'undefined') {
                         KernelLogger.debug('LockScreen', '缓存不存在，从API获取每日一言');
                     }
-                    const response = await fetch('https://v.api.aa1.cn/api/yiyan/index.php');
+                    const response = await fetch('https://uapis.cn/api/v1/saying');
                     if (!response.ok) {
                         throw new Error(`HTTP ${response.status}`);
                     }
                     
-                    const apiQuote = await response.text();
+                    const data = await response.json();
+                    const apiQuote = data && data.text ? data.text : null;
                     if (apiQuote && apiQuote.trim()) {
                         if (typeof KernelLogger !== 'undefined') {
                             KernelLogger.debug('LockScreen', '从API获取每日一言成功');
@@ -297,12 +298,13 @@ KernelLogger.info("LockScreen", "模块初始化");
                 }
                 
                 // 从API获取下一次的每日一言并缓存
-                const response = await fetch('https://v.api.aa1.cn/api/yiyan/index.php');
+                const response = await fetch('https://uapis.cn/api/v1/saying');
                 if (!response.ok) {
                     throw new Error(`HTTP ${response.status}`);
                 }
                 
-                const quote = await response.text();
+                const data = await response.json();
+                const quote = data && data.text ? data.text : null;
                 if (quote && quote.trim()) {
                     // 缓存到系统缓存（永不过期，直到使用后删除）
                     if (typeof ProcessManager !== 'undefined') {

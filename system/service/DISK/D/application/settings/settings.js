@@ -26,6 +26,10 @@
         userManagementPage: 'list', // 'list' | 'create' | 'groups' | 'groupDetail' | 'userGroups'
         userManagementPageData: {}, // 存储页面数据（如当前查看的用户名、组名等）
         
+        // 环境变量管理页面状态（用于页面切换）
+        environmentManagementPage: 'list', // 'list' | 'add' | 'edit'
+        environmentManagementPageData: {}, // 存储页面数据（如当前编辑的环境变量名）
+        
         // 事件处理器ID（用于清理）
         eventHandlers: [],
         
@@ -35,6 +39,9 @@
         // 加载蒙版相关
         _loadingOverlay: null,
         _isLoading: false,
+        
+        // 内联确认提示相关
+        _inlineConfirmElement: null,
         
         /**
          * 初始化程序
@@ -104,6 +111,10 @@
             this.userManagementPage = 'list';
             this.userManagementPageData = {};
             
+            // 初始化环境变量管理页面状态
+            this.environmentManagementPage = 'list';
+            this.environmentManagementPageData = {};
+            
             // 默认显示第一个分类
             if (this.categories.size > 0) {
                 const firstCategory = Array.from(this.categories.keys())[0];
@@ -171,6 +182,8 @@
                     PermissionManager.PERMISSION.SYSTEM_STORAGE_WRITE,
                     PermissionManager.PERMISSION.SYSTEM_STORAGE_READ_USER_CONTROL,
                     PermissionManager.PERMISSION.SYSTEM_STORAGE_WRITE_USER_CONTROL,
+                    PermissionManager.PERMISSION.ENVIRONMENT_READ,
+                    PermissionManager.PERMISSION.ENVIRONMENT_WRITE,
                     PermissionManager.PERMISSION.THEME_READ,
                     PermissionManager.PERMISSION.THEME_WRITE,
                     PermissionManager.PERMISSION.KERNEL_DISK_READ,
@@ -358,6 +371,282 @@
                 );
                 this.eventHandlers.push(inputHandlerId);
             }
+        },
+        
+        /**
+         * 显示通知（替代弹窗）
+         * @param {string} message 消息内容
+         * @param {string} type 类型：'success' | 'error' | 'info' | 'warning'
+         */
+        _showNotification: async function(message, type = 'info') {
+            if (typeof NotificationManager === 'undefined' || typeof NotificationManager.createNotification === 'undefined') {
+                // 降级方案：使用 GUIManager.showAlert
+                if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
+                    await GUIManager.showAlert(message, type === 'error' ? '错误' : type === 'success' ? '成功' : '提示', type);
+                }
+                return;
+            }
+            
+            try {
+                await NotificationManager.createNotification(this.pid, {
+                    type: 'snapshot',
+                    title: type === 'error' ? '错误' : type === 'success' ? '成功' : type === 'warning' ? '警告' : '提示',
+                    content: message,
+                    autoClose: type === 'success' ? 3000 : type === 'error' ? 5000 : 4000
+                });
+            } catch (error) {
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.warn('SETTINGS', `显示通知失败: ${error.message}`);
+                }
+                // 降级方案
+                if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
+                    await GUIManager.showAlert(message, type === 'error' ? '错误' : type === 'success' ? '成功' : '提示', type);
+                }
+            }
+        },
+        
+        /**
+         * 显示内联确认提示（替代确认弹窗）
+         * @param {HTMLElement} container 容器元素
+         * @param {string} message 确认消息
+         * @param {Function} onConfirm 确认回调
+         * @param {Function} onCancel 取消回调（可选）
+         */
+        _showInlineConfirm: function(container, message, onConfirm, onCancel) {
+            // 移除之前的确认提示
+            if (this._inlineConfirmElement && this._inlineConfirmElement.parentElement) {
+                this._inlineConfirmElement.parentElement.removeChild(this._inlineConfirmElement);
+            }
+            
+            const confirmEl = document.createElement('div');
+            confirmEl.style.cssText = `
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                background: var(--theme-background-elevated, var(--theme-background-secondary, #252b35));
+                border: 1px solid var(--theme-border, rgba(139, 92, 246, 0.25));
+                border-radius: 8px;
+                padding: 20px;
+                z-index: 1000;
+                min-width: 300px;
+                max-width: 500px;
+                box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+            `;
+            
+            const messageEl = document.createElement('div');
+            messageEl.textContent = message;
+            messageEl.style.cssText = `
+                font-size: 14px;
+                color: var(--theme-text, #d7e0dd);
+                margin-bottom: 20px;
+                line-height: 1.5;
+            `;
+            confirmEl.appendChild(messageEl);
+            
+            const buttonGroup = document.createElement('div');
+            buttonGroup.style.cssText = `
+                display: flex;
+                gap: 12px;
+                justify-content: flex-end;
+            `;
+            
+            const cancelBtn = document.createElement('button');
+            cancelBtn.textContent = '取消';
+            cancelBtn.style.cssText = `
+                padding: 8px 16px;
+                border: 1px solid var(--theme-border, rgba(139, 92, 246, 0.25));
+                border-radius: 4px;
+                background: transparent;
+                color: var(--theme-text, #d7e0dd);
+                cursor: pointer;
+                font-size: 14px;
+            `;
+            cancelBtn.addEventListener('click', () => {
+                if (confirmEl.parentElement) {
+                    confirmEl.parentElement.removeChild(confirmEl);
+                }
+                this._inlineConfirmElement = null;
+                if (onCancel && typeof onCancel === 'function') {
+                    onCancel();
+                }
+            });
+            buttonGroup.appendChild(cancelBtn);
+            
+            const confirmBtn = document.createElement('button');
+            confirmBtn.textContent = '确认';
+            const primaryColor = typeof ThemeManager !== 'undefined' && ThemeManager.getCurrentTheme() 
+                ? ThemeManager.getCurrentTheme().colors.primary || '#8b5cf6'
+                : '#8b5cf6';
+            confirmBtn.style.cssText = `
+                padding: 8px 16px;
+                border: none;
+                border-radius: 4px;
+                background: ${primaryColor};
+                color: #ffffff;
+                cursor: pointer;
+                font-size: 14px;
+                font-weight: 500;
+            `;
+            confirmBtn.addEventListener('click', () => {
+                if (confirmEl.parentElement) {
+                    confirmEl.parentElement.removeChild(confirmEl);
+                }
+                this._inlineConfirmElement = null;
+                if (onConfirm && typeof onConfirm === 'function') {
+                    onConfirm();
+                }
+            });
+            buttonGroup.appendChild(confirmBtn);
+            
+            confirmEl.appendChild(buttonGroup);
+            
+            // 设置容器为相对定位（如果还没有）
+            const containerStyle = window.getComputedStyle(container);
+            if (containerStyle.position === 'static') {
+                container.style.position = 'relative';
+            }
+            
+            container.appendChild(confirmEl);
+            this._inlineConfirmElement = confirmEl;
+        },
+        
+        /**
+         * 显示通知（替代弹窗）
+         * @param {string} message 消息内容
+         * @param {string} type 类型：'success' | 'error' | 'info' | 'warning'
+         */
+        _showNotification: async function(message, type = 'info') {
+            if (typeof NotificationManager === 'undefined' || typeof NotificationManager.createNotification === 'undefined') {
+                // 降级方案：使用 GUIManager.showAlert
+                if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
+                    await GUIManager.showAlert(message, type === 'error' ? '错误' : type === 'success' ? '成功' : '提示', type);
+                }
+                return;
+            }
+            
+            try {
+                await NotificationManager.createNotification(this.pid, {
+                    type: 'snapshot',
+                    title: type === 'error' ? '错误' : type === 'success' ? '成功' : type === 'warning' ? '警告' : '提示',
+                    content: message,
+                    autoClose: type === 'success' ? 3000 : type === 'error' ? 5000 : 4000
+                });
+            } catch (error) {
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.warn('SETTINGS', `显示通知失败: ${error.message}`);
+                }
+                // 降级方案
+                if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
+                    await GUIManager.showAlert(message, type === 'error' ? '错误' : type === 'success' ? '成功' : '提示', type);
+                }
+            }
+        },
+        
+        /**
+         * 显示内联确认提示（替代确认弹窗）
+         * @param {HTMLElement} container 容器元素
+         * @param {string} message 确认消息
+         * @param {Function} onConfirm 确认回调
+         * @param {Function} onCancel 取消回调（可选）
+         */
+        _showInlineConfirm: function(container, message, onConfirm, onCancel) {
+            // 移除之前的确认提示
+            if (this._inlineConfirmElement && this._inlineConfirmElement.parentElement) {
+                this._inlineConfirmElement.parentElement.removeChild(this._inlineConfirmElement);
+            }
+            
+            const confirmEl = document.createElement('div');
+            confirmEl.style.cssText = `
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                background: var(--theme-background-elevated, var(--theme-background-secondary, #252b35));
+                border: 1px solid var(--theme-border, rgba(139, 92, 246, 0.25));
+                border-radius: 8px;
+                padding: 20px;
+                z-index: 1000;
+                min-width: 300px;
+                max-width: 500px;
+                box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+            `;
+            
+            const messageEl = document.createElement('div');
+            messageEl.textContent = message;
+            messageEl.style.cssText = `
+                font-size: 14px;
+                color: var(--theme-text, #d7e0dd);
+                margin-bottom: 20px;
+                line-height: 1.5;
+            `;
+            confirmEl.appendChild(messageEl);
+            
+            const buttonGroup = document.createElement('div');
+            buttonGroup.style.cssText = `
+                display: flex;
+                gap: 12px;
+                justify-content: flex-end;
+            `;
+            
+            const cancelBtn = document.createElement('button');
+            cancelBtn.textContent = '取消';
+            cancelBtn.style.cssText = `
+                padding: 8px 16px;
+                border: 1px solid var(--theme-border, rgba(139, 92, 246, 0.25));
+                border-radius: 4px;
+                background: transparent;
+                color: var(--theme-text, #d7e0dd);
+                cursor: pointer;
+                font-size: 14px;
+            `;
+            cancelBtn.addEventListener('click', () => {
+                if (confirmEl.parentElement) {
+                    confirmEl.parentElement.removeChild(confirmEl);
+                }
+                this._inlineConfirmElement = null;
+                if (onCancel && typeof onCancel === 'function') {
+                    onCancel();
+                }
+            });
+            buttonGroup.appendChild(cancelBtn);
+            
+            const confirmBtn = document.createElement('button');
+            confirmBtn.textContent = '确认';
+            const primaryColor = typeof ThemeManager !== 'undefined' && ThemeManager.getCurrentTheme() 
+                ? ThemeManager.getCurrentTheme().colors.primary || '#8b5cf6'
+                : '#8b5cf6';
+            confirmBtn.style.cssText = `
+                padding: 8px 16px;
+                border: none;
+                border-radius: 4px;
+                background: ${primaryColor};
+                color: #ffffff;
+                cursor: pointer;
+                font-size: 14px;
+                font-weight: 500;
+            `;
+            confirmBtn.addEventListener('click', () => {
+                if (confirmEl.parentElement) {
+                    confirmEl.parentElement.removeChild(confirmEl);
+                }
+                this._inlineConfirmElement = null;
+                if (onConfirm && typeof onConfirm === 'function') {
+                    onConfirm();
+                }
+            });
+            buttonGroup.appendChild(confirmBtn);
+            
+            confirmEl.appendChild(buttonGroup);
+            
+            // 设置容器为相对定位（如果还没有）
+            const containerStyle = window.getComputedStyle(container);
+            if (containerStyle.position === 'static') {
+                container.style.position = 'relative';
+            }
+            
+            container.appendChild(confirmEl);
+            this._inlineConfirmElement = confirmEl;
         },
         
         /**
@@ -578,6 +867,12 @@
             if (categoryId !== 'users') {
                 this.userManagementPage = 'list';
                 this.userManagementPageData = {};
+            }
+            
+            // 如果切换到非环境变量分类，重置环境变量管理页面状态
+            if (categoryId !== 'environment') {
+                this.environmentManagementPage = 'list';
+                this.environmentManagementPageData = {};
             }
             
             // 更新导航栏选中状态
@@ -1432,6 +1727,25 @@
                     return this._renderUserManagement(setting, control);
                 }
             });
+            
+            // 注册环境变量分类
+            this.registerCategory('environment', {
+                name: '环境变量',
+                icon: `<svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M10 2C5.58 2 2 5.58 2 10C2 14.42 5.58 18 10 18C14.42 18 18 14.42 18 10C18 5.58 14.42 2 10 2ZM10 16C6.69 16 4 13.31 4 10C4 6.69 6.69 4 10 4C13.31 4 16 6.69 16 10C16 13.31 13.31 16 10 16ZM9 5H11V7H9V5ZM9 8H11V15H9V8Z" fill="currentColor"/>
+                </svg>`,
+                description: '管理系统环境变量'
+            });
+            
+            // 注册环境变量管理设置项（使用自定义渲染）
+            this.registerSetting('environment', 'environment_management', {
+                name: '环境变量管理',
+                description: '管理系统环境变量，支持设置、修改、删除操作',
+                type: 'custom',
+                onRender: (setting, control) => {
+                    return this._renderEnvironmentManagement(setting, control);
+                }
+            });
         },
         
         /**
@@ -1992,9 +2306,7 @@
                             const imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'svg'];
                             const fileExt = fileItem.name.split('.').pop()?.toLowerCase();
                             if (!fileExt || !imageExtensions.includes(fileExt)) {
-                                if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                                    await GUIManager.showAlert('请选择图片文件（jpg, png, gif, bmp, webp, svg）', '错误', 'error');
-                                }
+                                await this._showNotification('请选择图片文件（jpg, png, gif, bmp, webp, svg）', 'error');
                                 return;
                             }
                             
@@ -2051,9 +2363,7 @@
                             // 检查文件大小（限制5MB）
                             const fileSize = readResult.data.size || 0;
                             if (fileSize > 5 * 1024 * 1024) {
-                                if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                                    await GUIManager.showAlert('头像文件大小不能超过5MB', '错误', 'error');
-                                }
+                                await this._showNotification('头像文件大小不能超过5MB', 'error');
                                 return;
                             }
                             
@@ -2106,9 +2416,7 @@
                                     KernelLogger.debug('SETTINGS', `头像已保存，准备刷新界面: ${newFileName}`);
                                 }
                                 
-                                if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                                    await GUIManager.showAlert('头像已更新', '成功', 'success');
-                                }
+                                await this._showNotification('头像已更新', 'success');
                                 
                                 // 强制刷新用户列表（清空并重新渲染）
                                 // 确保从 UserControl._users 获取最新数据
@@ -2137,9 +2445,7 @@
                             if (typeof KernelLogger !== 'undefined') {
                                 KernelLogger.error('SETTINGS', `头像上传失败: ${error.message}`, error);
                             }
-                            if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                                await GUIManager.showAlert(`头像上传失败: ${error.message}`, '错误', 'error');
-                            }
+                            await this._showNotification(`头像上传失败: ${error.message}`, 'error');
                         }
                     }
                 });
@@ -2147,9 +2453,7 @@
                 if (typeof KernelLogger !== 'undefined') {
                     KernelLogger.error('SETTINGS', `启动文件管理器失败: ${error.message}`, error);
                 }
-                if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                    await GUIManager.showAlert(`启动文件管理器失败: ${error.message}`, '错误', 'error');
-                }
+                await this._showNotification(`启动文件管理器失败: ${error.message}`, 'error');
             }
         },
         
@@ -2180,17 +2484,13 @@
                     // 刷新用户列表
                     this._switchCategory('users');
                 } else {
-                    if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                        await GUIManager.showAlert('重命名用户失败', '错误', 'error');
-                    }
+                    await this._showNotification('重命名用户失败', 'error');
                 }
             } catch (error) {
                 if (typeof KernelLogger !== 'undefined') {
                     KernelLogger.error('SETTINGS', `重命名用户失败: ${error.message}`, error);
                 }
-                if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                    await GUIManager.showAlert(`重命名用户失败: ${error.message}`, '错误', 'error');
-                }
+                await this._showNotification(`重命名用户失败: ${error.message}`, 'error');
             }
         },
         
@@ -2234,30 +2534,22 @@
             // 如果新密码为空，表示移除密码（仅管理员可以）
                 if (newPassword.trim() === '') {
                     if (!isAdmin) {
-                        if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                            await GUIManager.showAlert('密码不能为空', '错误', 'error');
-                        }
+                        await this._showNotification('密码不能为空', 'error');
                         return;
                     }
                 // 管理员可以移除密码
                 try {
                     const success = await UserControl.setPassword(username, null, currentPassword);
                     if (success) {
-                        if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                            await GUIManager.showAlert('密码已移除', '成功', 'success');
-                        }
+                        await this._showNotification('密码已移除', 'success');
                     } else {
-                        if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                            await GUIManager.showAlert('移除密码失败', '错误', 'error');
-                        }
+                        await this._showNotification('移除密码失败', 'error');
                     }
                 } catch (error) {
                     if (typeof KernelLogger !== 'undefined') {
                         KernelLogger.error('SETTINGS', `移除密码失败: ${error.message}`, error);
                     }
-                    if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                        await GUIManager.showAlert(`移除密码失败: ${error.message}`, '错误', 'error');
-                    }
+                    await this._showNotification(`移除密码失败: ${error.message}`, 'error');
                 }
                 return;
             }
@@ -2270,16 +2562,12 @@
             
             // 检查是否误输入了原密码（如果提供了当前密码）
             if (currentPassword && confirmPassword === currentPassword) {
-                if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                    await GUIManager.showAlert('您输入的是当前密码，请重新输入新密码', '提示', 'warning');
-                }
+                await this._showNotification('您输入的是当前密码，请重新输入新密码', 'warning');
                 return;
             }
             
             if (newPassword !== confirmPassword) {
-                if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                    await GUIManager.showAlert('两次输入的密码不一致，请重新输入', '错误', 'error');
-                }
+                await this._showNotification('两次输入的密码不一致，请重新输入', 'error');
                 return;
             }
             
@@ -2288,21 +2576,15 @@
                 // setPassword方法内部会验证当前密码（对于非管理员用户）
                 const success = await UserControl.setPassword(username, newPassword, currentPassword);
                 if (success) {
-                    if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                        await GUIManager.showAlert('密码已设置', '成功', 'success');
-                    }
+                    await this._showNotification('密码已设置', 'success');
                 } else {
-                    if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                        await GUIManager.showAlert('设置密码失败，请检查当前密码是否正确', '错误', 'error');
-                    }
+                    await this._showNotification('设置密码失败，请检查当前密码是否正确', 'error');
                 }
             } catch (error) {
                 if (typeof KernelLogger !== 'undefined') {
                     KernelLogger.error('SETTINGS', `设置密码失败: ${error.message}`, error);
                 }
-                if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                    await GUIManager.showAlert(`设置密码失败: ${error.message}`, '错误', 'error');
-                }
+                await this._showNotification(`设置密码失败: ${error.message}`, 'error');
             }
         },
         
@@ -2563,42 +2845,33 @@
          * 处理删除用户
          */
         _handleDeleteUser: async function(username) {
-            if (typeof GUIManager === 'undefined') {
+            // 使用内联确认提示
+            const listContainer = this.contentContainer;
+            if (!listContainer) {
                 return;
             }
             
-            // 确认删除
-            const confirmed = await GUIManager.showConfirm(
+            this._showInlineConfirm(
+                listContainer,
                 `确定要删除用户 "${username}" 吗？此操作无法撤销。`,
-                '删除用户',
-                'warning'
+                async () => {
+                    try {
+                        const success = await UserControl.deleteUser(username);
+                        if (success) {
+                            await this._showNotification('用户已删除', 'success');
+                            // 刷新用户列表
+                            this._switchCategory('users');
+                        } else {
+                            await this._showNotification('删除用户失败', 'error');
+                        }
+                    } catch (error) {
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.error('SETTINGS', `删除用户失败: ${error.message}`, error);
+                        }
+                        await this._showNotification(`删除用户失败: ${error.message}`, 'error');
+                    }
+                }
             );
-            
-            if (!confirmed) {
-                return;
-            }
-            
-            try {
-                const success = await UserControl.deleteUser(username);
-                if (success) {
-                    if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                        await GUIManager.showAlert('用户已删除', '成功', 'success');
-                    }
-                    // 刷新用户列表
-                    this._switchCategory('users');
-                } else {
-                    if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                        await GUIManager.showAlert('删除用户失败', '错误', 'error');
-                    }
-                }
-            } catch (error) {
-                if (typeof KernelLogger !== 'undefined') {
-                    KernelLogger.error('SETTINGS', `删除用户失败: ${error.message}`, error);
-                }
-                if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                    await GUIManager.showAlert(`删除用户失败: ${error.message}`, '错误', 'error');
-                }
-            }
         },
         
         /**
@@ -3718,6 +3991,693 @@
                 if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
                     await GUIManager.showAlert(`移除成员失败: ${error.message}`, '错误', 'error');
                 }
+            }
+        },
+        
+        /**
+         * 渲染环境变量管理界面
+         */
+        _renderEnvironmentManagement: function(setting, control) {
+            const container = document.createElement('div');
+            container.style.cssText = `
+                display: flex;
+                flex-direction: column;
+                gap: 24px;
+            `;
+            
+            // 检查 LStorage 是否可用
+            if (typeof LStorage === 'undefined') {
+                const errorMsg = document.createElement('div');
+                errorMsg.textContent = 'LStorage 模块未加载';
+                errorMsg.style.cssText = `
+                    padding: 24px;
+                    text-align: center;
+                    color: var(--theme-text-secondary, #b8c5c0);
+                `;
+                container.appendChild(errorMsg);
+                return container;
+            }
+            
+            // 根据当前页面状态渲染不同的视图
+            if (this.environmentManagementPage === 'add') {
+                return this._renderAddEnvironmentVariablePage(container);
+            } else if (this.environmentManagementPage === 'edit') {
+                return this._renderEditEnvironmentVariablePage(container);
+            } else {
+                // 默认显示环境变量列表
+                return this._renderEnvironmentVariableListPage(container);
+            }
+        },
+        
+        /**
+         * 渲染环境变量列表页面
+         */
+        _renderEnvironmentVariableListPage: function(container) {
+            // 创建工具栏
+            const toolbar = document.createElement('div');
+            toolbar.style.cssText = `
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 16px;
+                padding-bottom: 16px;
+                border-bottom: 1px solid var(--theme-border, rgba(139, 92, 246, 0.25));
+            `;
+            
+            const title = document.createElement('h2');
+            title.textContent = '环境变量列表';
+            title.style.cssText = `
+                font-size: 20px;
+                font-weight: 400;
+                color: var(--theme-text, #d7e0dd);
+                margin: 0;
+            `;
+            toolbar.appendChild(title);
+            
+            const addBtn = document.createElement('button');
+            addBtn.textContent = '+ 添加环境变量';
+            const primaryColor = typeof ThemeManager !== 'undefined' && ThemeManager.getCurrentTheme() 
+                ? ThemeManager.getCurrentTheme().colors.primary || '#8b5cf6'
+                : '#8b5cf6';
+            addBtn.style.cssText = `
+                padding: 8px 16px;
+                border: 1px solid ${primaryColor};
+                border-radius: 4px;
+                background: ${primaryColor};
+                color: #ffffff;
+                cursor: pointer;
+                font-size: 14px;
+                font-weight: 500;
+                transition: background-color 0.2s, border-color 0.2s;
+            `;
+            addBtn.addEventListener('mouseenter', () => {
+                const primaryDark = typeof ThemeManager !== 'undefined' && ThemeManager.getCurrentTheme() 
+                    ? ThemeManager.getCurrentTheme().colors.primaryDark || '#7c3aed'
+                    : '#7c3aed';
+                addBtn.style.background = primaryDark;
+                addBtn.style.borderColor = primaryDark;
+            });
+            addBtn.addEventListener('mouseleave', () => {
+                addBtn.style.background = primaryColor;
+                addBtn.style.borderColor = primaryColor;
+            });
+            addBtn.addEventListener('click', () => {
+                this.environmentManagementPage = 'add';
+                this._switchCategory('environment');
+            });
+            toolbar.appendChild(addBtn);
+            
+            container.appendChild(toolbar);
+            
+            // 创建环境变量列表容器
+            const listContainer = document.createElement('div');
+            listContainer.id = 'environment-variables-list';
+            listContainer.style.cssText = `
+                display: flex;
+                flex-direction: column;
+                gap: 12px;
+            `;
+            container.appendChild(listContainer);
+            
+            // 加载环境变量列表
+            this._loadEnvironmentVariables(listContainer);
+            
+            return container;
+        },
+        
+        /**
+         * 加载环境变量列表
+         */
+        _loadEnvironmentVariables: async function(container) {
+            if (typeof LStorage === 'undefined' || typeof ProcessManager === 'undefined') {
+                return;
+            }
+            
+            // 等待进程完全启动
+            const maxRetries = 10;
+            let retries = 0;
+            let processReady = false;
+            
+            while (retries < maxRetries && !processReady) {
+                const processInfo = ProcessManager.PROCESS_TABLE.get(this.pid);
+                if (processInfo && processInfo.status === 'running') {
+                    processReady = true;
+                    break;
+                }
+                // 等待 100ms 后重试
+                await new Promise(resolve => setTimeout(resolve, 100));
+                retries++;
+            }
+            
+            if (!processReady) {
+                // 如果进程仍未就绪，延迟执行（可能在 __init__ 完成后进程状态才会更新）
+                setTimeout(() => {
+                    this._loadEnvironmentVariables(container);
+                }, 200);
+                return;
+            }
+            
+            try {
+                // 通过 ProcessManager 调用环境变量 API
+                const envVars = await ProcessManager.callKernelAPI(this.pid, 'Environment.getAll', []);
+                
+                // 清空容器
+                container.innerHTML = '';
+                
+                if (!envVars || Object.keys(envVars).length === 0) {
+                    const emptyMsg = document.createElement('div');
+                    emptyMsg.textContent = '暂无环境变量';
+                    emptyMsg.style.cssText = `
+                        padding: 48px;
+                        text-align: center;
+                        color: var(--theme-text-secondary, #b8c5c0);
+                        font-size: 14px;
+                    `;
+                    container.appendChild(emptyMsg);
+                    return;
+                }
+                
+                // 渲染环境变量列表
+                for (const [name, value] of Object.entries(envVars)) {
+                    const item = this._createEnvironmentVariableItem(name, value);
+                    container.appendChild(item);
+                }
+            } catch (error) {
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('SETTINGS', `加载环境变量失败: ${error.message}`, error);
+                }
+                const errorMsg = document.createElement('div');
+                errorMsg.textContent = `加载环境变量失败: ${error.message}`;
+                errorMsg.style.cssText = `
+                    padding: 24px;
+                    text-align: center;
+                    color: #ff6b6b;
+                    font-size: 14px;
+                `;
+                container.appendChild(errorMsg);
+            }
+        },
+        
+        /**
+         * 创建环境变量列表项
+         */
+        _createEnvironmentVariableItem: function(name, value) {
+            const item = document.createElement('div');
+            item.style.cssText = `
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                padding: 12px 16px;
+                background: var(--theme-background-elevated, var(--theme-background-secondary, #252b35));
+                border: 1px solid var(--theme-border, rgba(139, 92, 246, 0.25));
+                border-radius: 8px;
+            `;
+            
+            const info = document.createElement('div');
+            info.style.cssText = `flex: 1; display: flex; flex-direction: column; gap: 4px;`;
+            
+            const nameEl = document.createElement('div');
+            nameEl.textContent = name;
+            nameEl.style.cssText = `
+                font-size: 14px;
+                font-weight: 500;
+                color: var(--theme-text, #d7e0dd);
+            `;
+            info.appendChild(nameEl);
+            
+            const valueEl = document.createElement('div');
+            valueEl.textContent = value;
+            valueEl.style.cssText = `
+                font-size: 12px;
+                color: var(--theme-text-secondary, #b8c5c0);
+                word-break: break-all;
+            `;
+            info.appendChild(valueEl);
+            
+            item.appendChild(info);
+            
+            const actions = document.createElement('div');
+            actions.style.cssText = `display: flex; gap: 8px;`;
+            
+            const editBtn = document.createElement('button');
+            editBtn.textContent = '编辑';
+            editBtn.style.cssText = `
+                padding: 6px 12px;
+                border: 1px solid var(--theme-border, rgba(139, 92, 246, 0.25));
+                border-radius: 4px;
+                background: transparent;
+                color: var(--theme-text, #d7e0dd);
+                cursor: pointer;
+                font-size: 12px;
+            `;
+            editBtn.addEventListener('click', () => {
+                this.environmentManagementPage = 'edit';
+                this.environmentManagementPageData = { name: name, value: value };
+                this._switchCategory('environment');
+            });
+            actions.appendChild(editBtn);
+            
+            const deleteBtn = document.createElement('button');
+            deleteBtn.textContent = '删除';
+            deleteBtn.style.cssText = `
+                padding: 6px 12px;
+                border: 1px solid var(--theme-border, rgba(255, 0, 0, 0.3));
+                border-radius: 4px;
+                background: transparent;
+                color: #ff6b6b;
+                cursor: pointer;
+                font-size: 12px;
+            `;
+            deleteBtn.addEventListener('click', async () => {
+                await this._handleDeleteEnvironmentVariable(name);
+            });
+            actions.appendChild(deleteBtn);
+            
+            item.appendChild(actions);
+            
+            return item;
+        },
+        
+        /**
+         * 渲染添加环境变量页面
+         */
+        _renderAddEnvironmentVariablePage: function(container) {
+            // 创建返回按钮
+            const backBtn = document.createElement('button');
+            backBtn.textContent = '← 返回';
+            backBtn.style.cssText = `
+                padding: 8px 16px;
+                border: 1px solid var(--theme-border, rgba(139, 92, 246, 0.25));
+                border-radius: 4px;
+                background: transparent;
+                color: var(--theme-text, #d7e0dd);
+                cursor: pointer;
+                font-size: 14px;
+                margin-bottom: 24px;
+            `;
+            backBtn.addEventListener('click', () => {
+                this.environmentManagementPage = 'list';
+                this._switchCategory('environment');
+            });
+            container.appendChild(backBtn);
+            
+            // 创建标题
+            const title = document.createElement('h2');
+            title.textContent = '添加环境变量';
+            title.style.cssText = `
+                font-size: 24px;
+                font-weight: 300;
+                color: var(--theme-text, #d7e0dd);
+                margin: 0 0 32px 0;
+            `;
+            container.appendChild(title);
+            
+            // 创建表单
+            const form = document.createElement('div');
+            form.style.cssText = `
+                max-width: 500px;
+                display: flex;
+                flex-direction: column;
+                gap: 24px;
+            `;
+            
+            // 变量名输入
+            const nameGroup = document.createElement('div');
+            nameGroup.style.cssText = `display: flex; flex-direction: column; gap: 8px;`;
+            
+            const nameLabel = document.createElement('label');
+            nameLabel.textContent = '变量名';
+            nameLabel.style.cssText = `
+                font-size: 14px;
+                font-weight: 500;
+                color: var(--theme-text, #d7e0dd);
+            `;
+            nameGroup.appendChild(nameLabel);
+            
+            const nameInput = document.createElement('input');
+            nameInput.type = 'text';
+            nameInput.placeholder = '请输入环境变量名';
+            nameInput.style.cssText = `
+                padding: 10px 12px;
+                border: 1px solid var(--theme-border, rgba(139, 92, 246, 0.25));
+                border-radius: 4px;
+                background: var(--theme-background-elevated, var(--theme-background-secondary, #252b35));
+                color: var(--theme-text, #d7e0dd);
+                font-size: 14px;
+                outline: none;
+            `;
+            nameGroup.appendChild(nameInput);
+            
+            form.appendChild(nameGroup);
+            
+            // 变量值输入
+            const valueGroup = document.createElement('div');
+            valueGroup.style.cssText = `display: flex; flex-direction: column; gap: 8px;`;
+            
+            const valueLabel = document.createElement('label');
+            valueLabel.textContent = '变量值';
+            valueLabel.style.cssText = `
+                font-size: 14px;
+                font-weight: 500;
+                color: var(--theme-text, #d7e0dd);
+            `;
+            valueGroup.appendChild(valueLabel);
+            
+            const valueInput = document.createElement('textarea');
+            valueInput.placeholder = '请输入环境变量值';
+            valueInput.style.cssText = `
+                padding: 10px 12px;
+                border: 1px solid var(--theme-border, rgba(139, 92, 246, 0.25));
+                border-radius: 4px;
+                background: var(--theme-background-elevated, var(--theme-background-secondary, #252b35));
+                color: var(--theme-text, #d7e0dd);
+                font-size: 14px;
+                outline: none;
+                resize: vertical;
+                min-height: 100px;
+                font-family: inherit;
+            `;
+            valueGroup.appendChild(valueInput);
+            
+            form.appendChild(valueGroup);
+            
+            // 按钮组
+            const buttonGroup = document.createElement('div');
+            buttonGroup.style.cssText = `
+                display: flex;
+                gap: 12px;
+                margin-top: 8px;
+            `;
+            
+            const cancelBtn = document.createElement('button');
+            cancelBtn.textContent = '取消';
+            cancelBtn.style.cssText = `
+                padding: 10px 20px;
+                border: 1px solid var(--theme-border, rgba(139, 92, 246, 0.25));
+                border-radius: 4px;
+                background: transparent;
+                color: var(--theme-text, #d7e0dd);
+                cursor: pointer;
+                font-size: 14px;
+            `;
+            cancelBtn.addEventListener('click', () => {
+                this.environmentManagementPage = 'list';
+                this._switchCategory('environment');
+            });
+            buttonGroup.appendChild(cancelBtn);
+            
+            const addBtn = document.createElement('button');
+            addBtn.textContent = '添加';
+            const primaryColor = typeof ThemeManager !== 'undefined' && ThemeManager.getCurrentTheme() 
+                ? ThemeManager.getCurrentTheme().colors.primary || '#8b5cf6'
+                : '#8b5cf6';
+            addBtn.style.cssText = `
+                padding: 10px 20px;
+                border: none;
+                border-radius: 4px;
+                background: ${primaryColor};
+                color: #ffffff;
+                cursor: pointer;
+                font-size: 14px;
+                font-weight: 500;
+            `;
+            addBtn.addEventListener('click', async () => {
+                const name = nameInput.value.trim();
+                const value = valueInput.value.trim();
+                
+                if (!name) {
+                    await this._showNotification('请输入环境变量名', 'error');
+                    return;
+                }
+                
+                if (!value) {
+                    await this._showNotification('请输入环境变量值', 'error');
+                    return;
+                }
+                
+                try {
+                    if (typeof ProcessManager === 'undefined') {
+                        throw new Error('ProcessManager 未加载');
+                    }
+                    
+                    await ProcessManager.callKernelAPI(this.pid, 'Environment.set', [name, value]);
+                    
+                    await this._showNotification('环境变量已添加', 'success');
+                    
+                    // 返回列表页面
+                    this.environmentManagementPage = 'list';
+                    this._switchCategory('environment');
+                } catch (error) {
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.error('SETTINGS', `添加环境变量失败: ${error.message}`, error);
+                    }
+                    await this._showNotification(`添加环境变量失败: ${error.message}`, 'error');
+                }
+            });
+            buttonGroup.appendChild(addBtn);
+            
+            form.appendChild(buttonGroup);
+            container.appendChild(form);
+            
+            return container;
+        },
+        
+        /**
+         * 渲染编辑环境变量页面
+         */
+        _renderEditEnvironmentVariablePage: function(container) {
+            const existingName = this.environmentManagementPageData.name;
+            const existingValue = this.environmentManagementPageData.value;
+            
+            if (!existingName) {
+                const errorMsg = document.createElement('div');
+                errorMsg.textContent = '无效的环境变量名';
+                errorMsg.style.cssText = `
+                    padding: 24px;
+                    text-align: center;
+                    color: var(--theme-text-secondary, #b8c5c0);
+                `;
+                container.appendChild(errorMsg);
+                return container;
+            }
+            
+            // 创建返回按钮
+            const backBtn = document.createElement('button');
+            backBtn.textContent = '← 返回';
+            backBtn.style.cssText = `
+                padding: 8px 16px;
+                border: 1px solid var(--theme-border, rgba(139, 92, 246, 0.25));
+                border-radius: 4px;
+                background: transparent;
+                color: var(--theme-text, #d7e0dd);
+                cursor: pointer;
+                font-size: 14px;
+                margin-bottom: 24px;
+            `;
+            backBtn.addEventListener('click', () => {
+                this.environmentManagementPage = 'list';
+                this._switchCategory('environment');
+            });
+            container.appendChild(backBtn);
+            
+            // 创建标题
+            const title = document.createElement('h2');
+            title.textContent = `编辑环境变量: ${existingName}`;
+            title.style.cssText = `
+                font-size: 24px;
+                font-weight: 300;
+                color: var(--theme-text, #d7e0dd);
+                margin: 0 0 32px 0;
+            `;
+            container.appendChild(title);
+            
+            // 创建表单
+            const form = document.createElement('div');
+            form.style.cssText = `
+                max-width: 500px;
+                display: flex;
+                flex-direction: column;
+                gap: 24px;
+            `;
+            
+            // 变量名显示（只读）
+            const nameGroup = document.createElement('div');
+            nameGroup.style.cssText = `display: flex; flex-direction: column; gap: 8px;`;
+            
+            const nameLabel = document.createElement('label');
+            nameLabel.textContent = '变量名';
+            nameLabel.style.cssText = `
+                font-size: 14px;
+                font-weight: 500;
+                color: var(--theme-text, #d7e0dd);
+            `;
+            nameGroup.appendChild(nameLabel);
+            
+            const nameInput = document.createElement('input');
+            nameInput.type = 'text';
+            nameInput.value = existingName;
+            nameInput.disabled = true; // 编辑时禁用变量名修改
+            nameInput.style.cssText = `
+                padding: 10px 12px;
+                border: 1px solid var(--theme-border, rgba(139, 92, 246, 0.25));
+                border-radius: 4px;
+                background: var(--theme-background-tertiary, #1a1f28);
+                color: var(--theme-text-secondary, #b8c5c0);
+                font-size: 14px;
+                outline: none;
+                cursor: not-allowed;
+            `;
+            nameGroup.appendChild(nameInput);
+            
+            form.appendChild(nameGroup);
+            
+            // 变量值输入
+            const valueGroup = document.createElement('div');
+            valueGroup.style.cssText = `display: flex; flex-direction: column; gap: 8px;`;
+            
+            const valueLabel = document.createElement('label');
+            valueLabel.textContent = '变量值';
+            valueLabel.style.cssText = `
+                font-size: 14px;
+                font-weight: 500;
+                color: var(--theme-text, #d7e0dd);
+            `;
+            valueGroup.appendChild(valueLabel);
+            
+            const valueInput = document.createElement('textarea');
+            valueInput.placeholder = '请输入环境变量值';
+            valueInput.value = existingValue || '';
+            valueInput.style.cssText = `
+                padding: 10px 12px;
+                border: 1px solid var(--theme-border, rgba(139, 92, 246, 0.25));
+                border-radius: 4px;
+                background: var(--theme-background-elevated, var(--theme-background-secondary, #252b35));
+                color: var(--theme-text, #d7e0dd);
+                font-size: 14px;
+                outline: none;
+                resize: vertical;
+                min-height: 100px;
+                font-family: inherit;
+            `;
+            valueGroup.appendChild(valueInput);
+            
+            form.appendChild(valueGroup);
+            
+            // 按钮组
+            const buttonGroup = document.createElement('div');
+            buttonGroup.style.cssText = `
+                display: flex;
+                gap: 12px;
+                margin-top: 8px;
+            `;
+            
+            const cancelBtn = document.createElement('button');
+            cancelBtn.textContent = '取消';
+            cancelBtn.style.cssText = `
+                padding: 10px 20px;
+                border: 1px solid var(--theme-border, rgba(139, 92, 246, 0.25));
+                border-radius: 4px;
+                background: transparent;
+                color: var(--theme-text, #d7e0dd);
+                cursor: pointer;
+                font-size: 14px;
+            `;
+            cancelBtn.addEventListener('click', () => {
+                this.environmentManagementPage = 'list';
+                this._switchCategory('environment');
+            });
+            buttonGroup.appendChild(cancelBtn);
+            
+            const saveBtn = document.createElement('button');
+            saveBtn.textContent = '保存';
+            const primaryColor = typeof ThemeManager !== 'undefined' && ThemeManager.getCurrentTheme() 
+                ? ThemeManager.getCurrentTheme().colors.primary || '#8b5cf6'
+                : '#8b5cf6';
+            saveBtn.style.cssText = `
+                padding: 10px 20px;
+                border: none;
+                border-radius: 4px;
+                background: ${primaryColor};
+                color: #ffffff;
+                cursor: pointer;
+                font-size: 14px;
+                font-weight: 500;
+            `;
+            saveBtn.addEventListener('click', async () => {
+                const value = valueInput.value.trim();
+                
+                if (!value) {
+                    if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
+                        await GUIManager.showAlert('请输入环境变量值', '错误', 'error');
+                    }
+                    return;
+                }
+                
+                try {
+                    if (typeof ProcessManager === 'undefined') {
+                        throw new Error('ProcessManager 未加载');
+                    }
+                    
+                    await ProcessManager.callKernelAPI(this.pid, 'Environment.set', [existingName, value]);
+                    
+                    if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
+                        await GUIManager.showAlert('环境变量已更新', '成功', 'success');
+                    }
+                    
+                    // 返回列表页面
+                    this.environmentManagementPage = 'list';
+                    this._switchCategory('environment');
+                } catch (error) {
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.error('SETTINGS', `更新环境变量失败: ${error.message}`, error);
+                    }
+                    if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
+                        await GUIManager.showAlert(`更新环境变量失败: ${error.message}`, '错误', 'error');
+                    }
+                }
+            });
+            buttonGroup.appendChild(saveBtn);
+            
+            form.appendChild(buttonGroup);
+            container.appendChild(form);
+            
+            return container;
+        },
+        
+        /**
+         * 处理删除环境变量
+         */
+        _handleDeleteEnvironmentVariable: async function(name) {
+            if (typeof GUIManager === 'undefined' || typeof ProcessManager === 'undefined') {
+                return;
+            }
+            
+            // 确认删除
+            const confirmed = await GUIManager.showConfirm(
+                `确定要删除环境变量 "${name}" 吗？此操作无法撤销。`,
+                '删除环境变量',
+                'warning'
+            );
+            
+            if (!confirmed) {
+                return;
+            }
+            
+            try {
+                await ProcessManager.callKernelAPI(this.pid, 'Environment.delete', [name]);
+                
+                await GUIManager.showAlert('环境变量已删除', '成功', 'success');
+                
+                // 刷新环境变量列表
+                const listContainer = this.window.querySelector('#environment-variables-list');
+                if (listContainer) {
+                    this._loadEnvironmentVariables(listContainer);
+                }
+            } catch (error) {
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('SETTINGS', `删除环境变量失败: ${error.message}`, error);
+                }
+                await GUIManager.showAlert(`删除环境变量失败: ${error.message}`, '错误', 'error');
             }
         }
     };

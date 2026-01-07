@@ -37,6 +37,10 @@ class PermissionManager {
         SYSTEM_STORAGE_READ: 'SYSTEM_STORAGE_READ',     // 读取系统存储（基础权限，仅可读取非敏感键）
         SYSTEM_STORAGE_WRITE: 'SYSTEM_STORAGE_WRITE',   // 写入系统存储（基础权限，仅可写入非敏感键）
         
+        // 环境变量权限
+        ENVIRONMENT_READ: 'ENVIRONMENT_READ',           // 读取环境变量
+        ENVIRONMENT_WRITE: 'ENVIRONMENT_WRITE',         // 写入/删除环境变量
+        
         // 系统存储细粒度读取权限（危险权限，仅管理员可授予）
         SYSTEM_STORAGE_READ_USER_CONTROL: 'SYSTEM_STORAGE_READ_USER_CONTROL',           // 读取用户控制相关存储（userControl.*）
         SYSTEM_STORAGE_READ_PERMISSION_CONTROL: 'SYSTEM_STORAGE_READ_PERMISSION_CONTROL', // 读取权限控制相关存储（permissionControl.*, permissionManager.*）
@@ -55,6 +59,7 @@ class PermissionManager {
         
         // 桌面权限
         DESKTOP_MANAGE: 'DESKTOP_MANAGE',               // 管理桌面图标
+        DESKTOP_SHORTCUT: 'DESKTOP_SHORTCUT',           // 创建/删除桌面快捷方式（普通权限）
         
         // 多线程权限
         MULTITHREADING_CREATE: 'MULTITHREADING_CREATE', // 创建线程
@@ -128,6 +133,10 @@ class PermissionManager {
         [PermissionManager.PERMISSION.SYSTEM_STORAGE_READ]: PermissionManager.PERMISSION_LEVEL.NORMAL, // 基础权限，自动授予，但仅可读取非敏感键
         [PermissionManager.PERMISSION.SYSTEM_STORAGE_WRITE]: PermissionManager.PERMISSION_LEVEL.NORMAL, // 基础权限，自动授予，但仅可写入非敏感键
         
+        // 环境变量权限（普通权限，自动授予，但写入需要管理员）
+        [PermissionManager.PERMISSION.ENVIRONMENT_READ]: PermissionManager.PERMISSION_LEVEL.NORMAL,
+        [PermissionManager.PERMISSION.ENVIRONMENT_WRITE]: PermissionManager.PERMISSION_LEVEL.NORMAL,
+        
         // 系统存储细粒度读取权限（危险权限，仅管理员可授予）
         [PermissionManager.PERMISSION.SYSTEM_STORAGE_READ_USER_CONTROL]: PermissionManager.PERMISSION_LEVEL.DANGEROUS,
         [PermissionManager.PERMISSION.SYSTEM_STORAGE_READ_PERMISSION_CONTROL]: PermissionManager.PERMISSION_LEVEL.DANGEROUS,
@@ -135,6 +144,7 @@ class PermissionManager {
         // 系统存储细粒度写入权限（危险权限，仅管理员可授予）
         [PermissionManager.PERMISSION.THEME_WRITE]: PermissionManager.PERMISSION_LEVEL.SPECIAL,
         [PermissionManager.PERMISSION.DESKTOP_MANAGE]: PermissionManager.PERMISSION_LEVEL.SPECIAL,
+        [PermissionManager.PERMISSION.DESKTOP_SHORTCUT]: PermissionManager.PERMISSION_LEVEL.NORMAL, // 桌面快捷方式为普通权限
         [PermissionManager.PERMISSION.MULTITHREADING_CREATE]: PermissionManager.PERMISSION_LEVEL.SPECIAL,
         [PermissionManager.PERMISSION.MULTITHREADING_EXECUTE]: PermissionManager.PERMISSION_LEVEL.SPECIAL,
         
@@ -528,9 +538,14 @@ class PermissionManager {
                         // 从ProcessManager获取程序名称
                         let programName = null;
                         if (typeof ProcessManager !== 'undefined') {
-                            const processInfo = ProcessManager.PROCESS_TABLE.get(pid);
-                            if (processInfo && processInfo.programName) {
-                                programName = processInfo.programName;
+                            try {
+                                const processInfo = ProcessManager.PROCESS_TABLE.get(pid);
+                                if (processInfo && processInfo.programName) {
+                                    programName = processInfo.programName;
+                                }
+                            } catch (e) {
+                                // 忽略获取进程信息时的错误（可能是进程已被删除）
+                                KernelLogger.debug("PermissionManager", `获取PID ${pid} 的进程信息失败: ${e.message}`);
                             }
                         }
                         
@@ -540,7 +555,17 @@ class PermissionManager {
                             if (typeof ProcessManager !== 'undefined' && pid === ProcessManager.EXPLOIT_PID) {
                                 continue;
                             }
-                            KernelLogger.warn("PermissionManager", `无法获取PID ${pid} 对应的程序名称，跳过权限保存`);
+                            // 如果进程不存在或已被删除，静默跳过（不输出警告）
+                            // 这通常发生在进程关闭后权限清理时
+                            if (typeof ProcessManager !== 'undefined') {
+                                const processInfo = ProcessManager.PROCESS_TABLE.get(pid);
+                                if (!processInfo) {
+                                    // 进程已被删除，静默跳过
+                                    continue;
+                                }
+                            }
+                            // 只有在进程存在但无法获取程序名称时才输出警告
+                            KernelLogger.debug("PermissionManager", `无法获取PID ${pid} 对应的程序名称，跳过权限保存（进程可能正在初始化）`);
                             continue;
                         }
                         
@@ -1428,6 +1453,14 @@ class PermissionManager {
                 name: '写入桌面存储',
                 description: '允许程序修改桌面相关存储（desktop.*）'
             },
+            [PermissionManager.PERMISSION.ENVIRONMENT_READ]: {
+                name: '读取环境变量',
+                description: '允许程序读取系统环境变量'
+            },
+            [PermissionManager.PERMISSION.ENVIRONMENT_WRITE]: {
+                name: '写入环境变量',
+                description: '允许程序设置、修改和删除系统环境变量'
+            },
             [PermissionManager.PERMISSION.PROCESS_MANAGE]: {
                 name: '管理进程',
                 description: '允许程序管理其他进程（危险操作）'
@@ -1443,6 +1476,10 @@ class PermissionManager {
             [PermissionManager.PERMISSION.DESKTOP_MANAGE]: {
                 name: '管理桌面',
                 description: '允许程序管理桌面图标'
+            },
+            [PermissionManager.PERMISSION.DESKTOP_SHORTCUT]: {
+                name: '创建桌面快捷方式',
+                description: '允许程序创建和删除桌面快捷方式'
             },
             [PermissionManager.PERMISSION.MULTITHREADING_CREATE]: {
                 name: '创建线程',

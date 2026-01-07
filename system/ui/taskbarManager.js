@@ -8797,38 +8797,19 @@ class TaskbarManager {
             return;
         }
         
-        // 执行关闭（关闭窗口/标签页）
+        // 执行关闭（与 power shutdown 命令行为一致）
         if (typeof KernelLogger !== 'undefined') {
             KernelLogger.info("TaskbarManager", "正在关闭系统...");
         }
         
-        // 延迟一下，让日志输出
-        setTimeout(async () => {
-            // 尝试关闭窗口
-            if (window.opener) {
-                window.close();
-            } else {
-                // 如果无法关闭窗口，使用通知提示（不打断用户）
-                // 注意：系统关闭后，通知可能无法显示，但这是最后的提示
-                if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
-                    try {
-                        // 使用 Exploit PID (10000) 创建通知
-                        const exploitPid = typeof ProcessManager !== 'undefined' ? ProcessManager.EXPLOIT_PID : 10000;
-                        await NotificationManager.createNotification(exploitPid, {
-                            type: 'snapshot',
-                            title: '系统关闭',
-                            content: '系统已关闭。请手动关闭浏览器标签页。',
-                            duration: 0  // 不自动关闭
-                        });
-                    } catch (e) {
-                        // 通知创建失败，静默处理（系统已关闭）
-                        if (typeof KernelLogger !== 'undefined') {
-                            KernelLogger.warn("TaskbarManager", `创建通知失败: ${e.message}`);
-                        }
-                    }
-                }
-            }
-        }, 500);
+        // 显示关闭消息（与 power shutdown 命令一致）
+        // 延迟 1000ms，与命令行为一致
+        setTimeout(() => {
+            // 显示关闭消息（替换整个 body，与 power shutdown 命令一致）
+            document.body.innerHTML = '<div style="display: flex; justify-content: center; align-items: center; height: 100vh; font-family: monospace; color: #00ff00; font-size: 24px;">System Shutdown Complete<br/><span style="font-size: 16px; color: #888;">Please close this window manually</span></div>';
+            // 尝试关闭窗口（大多数浏览器会阻止此操作，与 power shutdown 命令一致）
+            window.close();
+        }, 1000);
     }
     
     /**

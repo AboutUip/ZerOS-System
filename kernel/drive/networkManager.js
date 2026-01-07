@@ -282,19 +282,24 @@
                 // 执行原始 fetch
                 return originalFetch.apply(this, args)
                     .then(response => {
-                        // 异步记录响应（不阻塞响应返回）
-                        response.clone().text().then(body => {
-                            self._handleResponseReceived({
-                                url: url,
-                                status: response.status,
-                                statusText: response.statusText,
-                                headers: Object.fromEntries(response.headers.entries()),
-                                body: body.substring(0, 1000), // 只记录前1000字符
-                                size: new Blob([body]).size
+                        // 对于 D:/bin/ 路径的 404 错误，静默处理（文件不存在是正常情况）
+                        const isBinPath404 = response.status === 404 && url.includes('path=D%3A%2Fbin') || url.includes('path=D:/bin');
+                        
+                        if (!isBinPath404) {
+                            // 异步记录响应（不阻塞响应返回）
+                            response.clone().text().then(body => {
+                                self._handleResponseReceived({
+                                    url: url,
+                                    status: response.status,
+                                    statusText: response.statusText,
+                                    headers: Object.fromEntries(response.headers.entries()),
+                                    body: body.substring(0, 1000), // 只记录前1000字符
+                                    size: new Blob([body]).size
+                                });
+                            }).catch(() => {
+                                // 忽略错误
                             });
-                        }).catch(() => {
-                            // 忽略错误
-                        });
+                        }
                         
                         return response;
                     })

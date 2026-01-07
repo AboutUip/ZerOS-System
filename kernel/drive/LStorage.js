@@ -1456,6 +1456,30 @@ class LStorage {
             'desktop.settings': true,
         };
         
+        // 检查是否写入 registry 键（包含环境变量，需要额外验证）
+        // 注意：环境变量API已经进行了权限检查，但这里需要确保 registry 键的写入也受到保护
+        if (key === 'registry' && value && typeof value === 'object' && value.environment) {
+            // 如果写入的 registry 包含 environment 对象，需要验证调用来源
+            // 环境变量API已经进行了权限检查，但这里需要确保不是直接调用 setSystemStorage
+            if (!isKernelModuleCall && currentPid) {
+                // 检查调用栈，确保是通过环境变量API调用的
+                try {
+                    const stack = new Error().stack;
+                    if (stack && !stack.includes('setEnvironmentVariable') && !stack.includes('deleteEnvironmentVariable')) {
+                        // 如果不是通过环境变量API调用的，拒绝写入
+                        KernelLogger.error("LStorage", `安全拒绝：程序 ${currentPid} 尝试直接写入 registry.environment，必须通过环境变量API`);
+                        throw new Error(`安全策略：不允许直接写入 registry.environment，必须使用环境变量API`);
+                    }
+                } catch (e) {
+                    if (e.message && e.message.includes('安全策略')) {
+                        throw e;
+                    }
+                    // 如果无法检查调用栈，记录警告但允许继续（环境变量API已经进行了权限检查）
+                    KernelLogger.warn("LStorage", `无法验证 registry.environment 写入来源，但环境变量API已进行权限检查`);
+                }
+            }
+        }
+        
         // 检查是否为危险键（需要危险权限，仅管理员可授予）或特殊键（需要特殊权限）
         const isDangerousKey = DANGEROUS_KEYS[key];
         const isSpecialKey = SPECIAL_KEYS[key];
@@ -1873,6 +1897,345 @@ class LStorage {
         LStorage._requestCache.readCache = null;
         LStorage._requestCache.readCacheTime = 0;
         KernelLogger.debug("LStorage", "读取缓存已清除");
+    }
+    
+    // ==================== 环境变量 API ====================
+    
+    /**
+     * 获取环境变量
+     * 环境变量保存在注册表中 (system.registry.environment)
+     * @param {string} name 环境变量名称
+     * @returns {Promise<string|null>} 环境变量的值，如果不存在返回 null
+     */
+    static async getEnvironmentVariable(name) {
+        if (!name || typeof name !== 'string') {
+            throw new Error('环境变量名称必须是字符串');
+        }
+        
+        // 检查是否为内核模块调用
+        const isKernelModuleCall = LStorage._isKernelModuleCall();
+        
+        // 如果不是内核模块调用，需要检查权限
+        if (!isKernelModuleCall) {
+            const currentPid = LStorage._getCurrentPid();
+            if (!currentPid) {
+                KernelLogger.error("LStorage", `无法获取进程PID，拒绝读取环境变量（安全策略）`);
+                throw new Error(`安全策略：无法验证调用来源，拒绝读取环境变量`);
+            }
+            
+            // 检查读取权限（环境变量需要 ENVIRONMENT_READ 权限）
+            if (typeof PermissionManager !== 'undefined' && PermissionManager.checkAndRequestPermission) {
+                try {
+                    const granted = await PermissionManager.checkAndRequestPermission(currentPid, PermissionManager.PERMISSION.ENVIRONMENT_READ);
+                    if (!granted) {
+                        KernelLogger.error("LStorage", `进程 ${currentPid} 尝试读取环境变量 ${name}，但缺少权限 ENVIRONMENT_READ`);
+                        throw new Error(`缺少权限：ENVIRONMENT_READ`);
+                    }
+                } catch (error) {
+                    if (error.message && error.message.includes('缺少权限')) {
+                        throw error;
+                    }
+                    KernelLogger.error("LStorage", `权限检查失败: ${error.message}`, error);
+                    throw new Error(`权限检查失败: ${error.message}`);
+                }
+            }
+        }
+        
+        try {
+            // 获取注册表
+            const registry = await LStorage.getSystemStorage('registry');
+            if (!registry || typeof registry !== 'object') {
+                return null;
+            }
+            
+            // 获取环境变量对象
+            const environment = registry.environment || registry.env;
+            if (!environment || typeof environment !== 'object') {
+                return null;
+            }
+            
+            // 返回环境变量值
+            return environment[name] || null;
+        } catch (error) {
+            KernelLogger.error("LStorage", `获取环境变量失败: ${error.message}`, error);
+            throw error;
+        }
+    }
+    
+    /**
+     * 设置环境变量
+     * 环境变量保存在注册表中 (system.registry.environment)
+     * @param {string} name 环境变量名称
+     * @param {string} value 环境变量值
+     * @returns {Promise<boolean>} 是否成功
+     */
+    static async setEnvironmentVariable(name, value) {
+        if (!name || typeof name !== 'string') {
+            throw new Error('环境变量名称必须是字符串');
+        }
+        
+        if (value === null || value === undefined) {
+            // 如果值为 null 或 undefined，删除环境变量
+            return await LStorage.deleteEnvironmentVariable(name);
+        }
+        
+        if (typeof value !== 'string') {
+            throw new Error('环境变量值必须是字符串');
+        }
+        
+        // 检查是否为内核模块调用
+        const isKernelModuleCall = LStorage._isKernelModuleCall();
+        
+        // 如果不是内核模块调用，需要检查权限
+        if (!isKernelModuleCall) {
+            const currentPid = LStorage._getCurrentPid();
+            if (!currentPid) {
+                KernelLogger.error("LStorage", `无法获取进程PID，拒绝设置环境变量（安全策略）`);
+                throw new Error(`安全策略：无法验证调用来源，拒绝设置环境变量`);
+            }
+            
+            // 检查写入权限（环境变量需要 ENVIRONMENT_WRITE 权限）
+            if (typeof PermissionManager !== 'undefined' && PermissionManager.checkAndRequestPermission) {
+                try {
+                    const granted = await PermissionManager.checkAndRequestPermission(currentPid, PermissionManager.PERMISSION.ENVIRONMENT_WRITE);
+                    if (!granted) {
+                        KernelLogger.error("LStorage", `进程 ${currentPid} 尝试设置环境变量 ${name}，但缺少权限 ENVIRONMENT_WRITE`);
+                        throw new Error(`缺少权限：ENVIRONMENT_WRITE`);
+                    }
+                } catch (error) {
+                    if (error.message && error.message.includes('缺少权限')) {
+                        throw error;
+                    }
+                    KernelLogger.error("LStorage", `权限检查失败: ${error.message}`, error);
+                    throw new Error(`权限检查失败: ${error.message}`);
+                }
+            }
+            
+            // 检查用户级别：普通用户不允许写入环境变量
+            if (typeof UserControl !== 'undefined') {
+                const isAdmin = UserControl.isAdmin();
+                if (!isAdmin) {
+                    KernelLogger.error("LStorage", `进程 ${currentPid} 尝试设置环境变量 ${name}，但当前用户不是管理员，普通用户不允许写入环境变量`);
+                    throw new Error(`安全策略：普通用户不允许写入环境变量，需要管理员权限`);
+                }
+            }
+        }
+        
+        try {
+            // 获取注册表
+            let registry = await LStorage.getSystemStorage('registry');
+            if (!registry || typeof registry !== 'object') {
+                // 如果注册表不存在，创建新的注册表
+                registry = {};
+            }
+            
+            // 确保 environment 对象存在
+            if (!registry.environment || typeof registry.environment !== 'object') {
+                registry.environment = {};
+            }
+            
+            // 设置环境变量
+            registry.environment[name] = value;
+            
+            // 保存注册表
+            await LStorage.setSystemStorage('registry', registry);
+            
+            KernelLogger.info("LStorage", `环境变量已设置: ${name} = ${value}`);
+            return true;
+        } catch (error) {
+            KernelLogger.error("LStorage", `设置环境变量失败: ${error.message}`, error);
+            throw error;
+        }
+    }
+    
+    /**
+     * 删除环境变量
+     * @param {string} name 环境变量名称
+     * @returns {Promise<boolean>} 是否成功
+     */
+    static async deleteEnvironmentVariable(name) {
+        if (!name || typeof name !== 'string') {
+            throw new Error('环境变量名称必须是字符串');
+        }
+        
+        // 检查是否为内核模块调用
+        const isKernelModuleCall = LStorage._isKernelModuleCall();
+        
+        // 如果不是内核模块调用，需要检查权限
+        if (!isKernelModuleCall) {
+            const currentPid = LStorage._getCurrentPid();
+            if (!currentPid) {
+                KernelLogger.error("LStorage", `无法获取进程PID，拒绝删除环境变量（安全策略）`);
+                throw new Error(`安全策略：无法验证调用来源，拒绝删除环境变量`);
+            }
+            
+            // 检查写入权限（删除环境变量需要 ENVIRONMENT_WRITE 权限）
+            if (typeof PermissionManager !== 'undefined' && PermissionManager.checkAndRequestPermission) {
+                try {
+                    const granted = await PermissionManager.checkAndRequestPermission(currentPid, PermissionManager.PERMISSION.ENVIRONMENT_WRITE);
+                    if (!granted) {
+                        KernelLogger.error("LStorage", `进程 ${currentPid} 尝试删除环境变量 ${name}，但缺少权限 ENVIRONMENT_WRITE`);
+                        throw new Error(`缺少权限：ENVIRONMENT_WRITE`);
+                    }
+                } catch (error) {
+                    if (error.message && error.message.includes('缺少权限')) {
+                        throw error;
+                    }
+                    KernelLogger.error("LStorage", `权限检查失败: ${error.message}`, error);
+                    throw new Error(`权限检查失败: ${error.message}`);
+                }
+            }
+            
+            // 检查用户级别：普通用户不允许删除环境变量
+            if (typeof UserControl !== 'undefined') {
+                const isAdmin = UserControl.isAdmin();
+                if (!isAdmin) {
+                    KernelLogger.error("LStorage", `进程 ${currentPid} 尝试删除环境变量 ${name}，但当前用户不是管理员，普通用户不允许删除环境变量`);
+                    throw new Error(`安全策略：普通用户不允许删除环境变量，需要管理员权限`);
+                }
+            }
+        }
+        
+        try {
+            // 获取注册表
+            const registry = await LStorage.getSystemStorage('registry');
+            if (!registry || typeof registry !== 'object') {
+                return false; // 注册表不存在，环境变量也不存在
+            }
+            
+            // 获取环境变量对象
+            const environment = registry.environment || registry.env;
+            if (!environment || typeof environment !== 'object') {
+                return false; // 环境变量对象不存在
+            }
+            
+            // 检查环境变量是否存在
+            if (!(name in environment)) {
+                return false; // 环境变量不存在
+            }
+            
+            // 删除环境变量
+            delete environment[name];
+            
+            // 保存注册表
+            await LStorage.setSystemStorage('registry', registry);
+            
+            KernelLogger.info("LStorage", `环境变量已删除: ${name}`);
+            return true;
+        } catch (error) {
+            KernelLogger.error("LStorage", `删除环境变量失败: ${error.message}`, error);
+            throw error;
+        }
+    }
+    
+    /**
+     * 列出所有环境变量名称
+     * @returns {Promise<string[]>} 环境变量名称数组
+     */
+    static async listEnvironmentVariables() {
+        // 检查是否为内核模块调用
+        const isKernelModuleCall = LStorage._isKernelModuleCall();
+        
+        // 如果不是内核模块调用，需要检查权限
+        if (!isKernelModuleCall) {
+            const currentPid = LStorage._getCurrentPid();
+            if (!currentPid) {
+                KernelLogger.error("LStorage", `无法获取进程PID，拒绝列出环境变量（安全策略）`);
+                throw new Error(`安全策略：无法验证调用来源，拒绝列出环境变量`);
+            }
+            
+            // 检查读取权限（列出环境变量需要 ENVIRONMENT_READ 权限）
+            if (typeof PermissionManager !== 'undefined' && PermissionManager.checkAndRequestPermission) {
+                try {
+                    const granted = await PermissionManager.checkAndRequestPermission(currentPid, PermissionManager.PERMISSION.ENVIRONMENT_READ);
+                    if (!granted) {
+                        KernelLogger.error("LStorage", `进程 ${currentPid} 尝试列出环境变量，但缺少权限 ENVIRONMENT_READ`);
+                        throw new Error(`缺少权限：ENVIRONMENT_READ`);
+                    }
+                } catch (error) {
+                    if (error.message && error.message.includes('缺少权限')) {
+                        throw error;
+                    }
+                    KernelLogger.error("LStorage", `权限检查失败: ${error.message}`, error);
+                    throw new Error(`权限检查失败: ${error.message}`);
+                }
+            }
+        }
+        
+        try {
+            // 获取注册表
+            const registry = await LStorage.getSystemStorage('registry');
+            if (!registry || typeof registry !== 'object') {
+                return [];
+            }
+            
+            // 获取环境变量对象
+            const environment = registry.environment || registry.env;
+            if (!environment || typeof environment !== 'object') {
+                return [];
+            }
+            
+            // 返回所有环境变量名称
+            return Object.keys(environment);
+        } catch (error) {
+            KernelLogger.error("LStorage", `列出环境变量失败: ${error.message}`, error);
+            throw error;
+        }
+    }
+    
+    /**
+     * 获取所有环境变量（返回 k/v 对象）
+     * @returns {Promise<Object>} 环境变量对象 { [name: string]: string }
+     */
+    static async getAllEnvironmentVariables() {
+        // 检查是否为内核模块调用
+        const isKernelModuleCall = LStorage._isKernelModuleCall();
+        
+        // 如果不是内核模块调用，需要检查权限
+        if (!isKernelModuleCall) {
+            const currentPid = LStorage._getCurrentPid();
+            if (!currentPid) {
+                KernelLogger.error("LStorage", `无法获取进程PID，拒绝获取所有环境变量（安全策略）`);
+                throw new Error(`安全策略：无法验证调用来源，拒绝获取所有环境变量`);
+            }
+            
+            // 检查读取权限（获取所有环境变量需要 ENVIRONMENT_READ 权限）
+            if (typeof PermissionManager !== 'undefined' && PermissionManager.checkAndRequestPermission) {
+                try {
+                    const granted = await PermissionManager.checkAndRequestPermission(currentPid, PermissionManager.PERMISSION.ENVIRONMENT_READ);
+                    if (!granted) {
+                        KernelLogger.error("LStorage", `进程 ${currentPid} 尝试获取所有环境变量，但缺少权限 ENVIRONMENT_READ`);
+                        throw new Error(`缺少权限：ENVIRONMENT_READ`);
+                    }
+                } catch (error) {
+                    if (error.message && error.message.includes('缺少权限')) {
+                        throw error;
+                    }
+                    KernelLogger.error("LStorage", `权限检查失败: ${error.message}`, error);
+                    throw new Error(`权限检查失败: ${error.message}`);
+                }
+            }
+        }
+        
+        try {
+            // 获取注册表
+            const registry = await LStorage.getSystemStorage('registry');
+            if (!registry || typeof registry !== 'object') {
+                return {};
+            }
+            
+            // 获取环境变量对象
+            const environment = registry.environment || registry.env;
+            if (!environment || typeof environment !== 'object') {
+                return {};
+            }
+            
+            // 返回环境变量对象的副本（避免直接修改原对象）
+            return { ...environment };
+        } catch (error) {
+            KernelLogger.error("LStorage", `获取所有环境变量失败: ${error.message}`, error);
+            throw error;
+        }
     }
 }
 

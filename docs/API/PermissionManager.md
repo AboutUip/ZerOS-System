@@ -38,6 +38,7 @@ PermissionManager.PERMISSION.PROCESS_MANAGE           // 管理其他进程（�
 PermissionManager.PERMISSION.THEME_READ               // 读取系统主题配置
 PermissionManager.PERMISSION.THEME_WRITE              // 更改系统主题配置
 PermissionManager.PERMISSION.DESKTOP_MANAGE           // 管理桌面快捷方式和背景
+PermissionManager.PERMISSION.DESKTOP_SHORTCUT         // 创建/删除桌面快捷方式（普通权限）
 ```
 
 ### 文件系统权限
@@ -420,6 +421,7 @@ PermissionManager.clearAuditLog(true);
 - `SYSTEM_STORAGE_WRITE_DESKTOP` - 写入桌面相关存储（`desktop.*` 键）
 - `THEME_WRITE` - 修改主题
 - `DESKTOP_MANAGE` - 管理桌面
+- `DESKTOP_SHORTCUT` - 创建/删除桌面快捷方式（普通权限，自动授予）
 - `MULTITHREADING_CREATE` - 创建线程
 - `MULTITHREADING_EXECUTE` - 执行多线程任务
 - `GEOGRAPHY_LOCATION` - 获取地理位置

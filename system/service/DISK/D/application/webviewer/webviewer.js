@@ -76,10 +76,18 @@
             // 添加到GUI容器
             guiContainer.appendChild(this.window);
             
-            // 如果指定了初始文件夹路径，直接加载
+            // 如果指定了初始路径，直接加载
             if (initArgs && initArgs.args && initArgs.args.length > 0) {
-                const folderPath = initArgs.args[0];
-                await this._loadFolder(folderPath);
+                const path = initArgs.args[0];
+                // 检查是文件还是文件夹
+                const isFile = path && (path.toLowerCase().endsWith('.html') || path.toLowerCase().endsWith('.htm'));
+                if (isFile) {
+                    // 直接加载 HTML 文件
+                    await this._loadIndexHtml(path);
+                } else {
+                    // 加载文件夹
+                    await this._loadFolder(path);
+                }
             } else {
                 // 否则打开文件夹选择器
                 await this._openFolderSelector();
