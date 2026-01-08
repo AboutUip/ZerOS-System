@@ -1764,6 +1764,11 @@ function escapeHtml(s){
             this._cliProgramsCacheTime = 0;
             this._cliProgramsCacheTTL = 5000; // 缓存5秒
             
+            // D:/bin/ 目录程序补全缓存
+            this._binProgramsCache = null;
+            this._binProgramsCacheTime = 0;
+            this._binProgramsCacheTTL = 10000; // 缓存10秒（bin目录变化较少）
+            
             // 剪贴板现在存储在 Exploit 内存中（PID 10000）
             
             // Vim模式标记
@@ -2486,14 +2491,38 @@ function escapeHtml(s){
                                                 existingSet.add(p);
                                             }
                                         });
-                                        
-                                        // 按字母顺序排序
-                                        candidates.sort();
                                     }
                                 } catch (e) {
                                     // 如果获取程序失败，忽略错误，继续使用内置命令列表
                                     console.warn('Terminal: Failed to get programs for completion:', e);
                                 }
+                                
+                                // 从 D:/bin/ 目录获取程序并添加到候选列表
+                                try {
+                                    const binPrograms = await this._getBinProgramsForCompletion();
+                                    const tokenLower = token.toLowerCase();
+                                    
+                                    // 过滤匹配token的程序
+                                    const matchingBinPrograms = binPrograms.filter(p => {
+                                        const programNameLower = p.toLowerCase();
+                                        return programNameLower.indexOf(tokenLower) === 0;
+                                    });
+                                    
+                                    // 合并到候选列表（去重）
+                                    const existingSet = new Set(candidates);
+                                    matchingBinPrograms.forEach(p => {
+                                        if (!existingSet.has(p)) {
+                                            candidates.push(p);
+                                            existingSet.add(p);
+                                        }
+                                    });
+                                } catch (e) {
+                                    // 如果获取 bin 目录程序失败，忽略错误
+                                    console.warn('Terminal: Failed to get bin programs for completion:', e);
+                                }
+                                
+                                // 按字母顺序排序
+                                candidates.sort();
                             }else{
                                 // 异步从 PHP 服务获取目录列表
                                 const idx = token.lastIndexOf('/');
@@ -2808,6 +2837,57 @@ function escapeHtml(s){
                                 if(isFirstToken){
                                     // 从内置命令列表获取候选
                                     candidates = this._completionCommands.filter(c => c.indexOf(token) === 0);
+                                    
+                                    // 从ApplicationAssetManager获取CLI程序并添加到候选列表
+                                    try {
+                                        const cliPrograms = this._getCliProgramsForCompletion();
+                                        const tokenLower = token.toLowerCase();
+                                        
+                                        // 过滤匹配token的CLI程序
+                                        const matchingCliPrograms = cliPrograms.filter(p => {
+                                            const programNameLower = p.toLowerCase();
+                                            return programNameLower.indexOf(tokenLower) === 0;
+                                        });
+                                        
+                                        // 合并到候选列表（去重）
+                                        const existingSet = new Set(candidates);
+                                        matchingCliPrograms.forEach(p => {
+                                            if (!existingSet.has(p)) {
+                                                candidates.push(p);
+                                                existingSet.add(p);
+                                            }
+                                        });
+                                    } catch (e) {
+                                        // 如果获取CLI程序失败，忽略错误
+                                        console.warn('Terminal: Failed to get CLI programs for completion:', e);
+                                    }
+                                    
+                                    // 从 D:/bin/ 目录获取程序并添加到候选列表
+                                    try {
+                                        const binPrograms = await this._getBinProgramsForCompletion();
+                                        const tokenLower = token.toLowerCase();
+                                        
+                                        // 过滤匹配token的程序
+                                        const matchingBinPrograms = binPrograms.filter(p => {
+                                            const programNameLower = p.toLowerCase();
+                                            return programNameLower.indexOf(tokenLower) === 0;
+                                        });
+                                        
+                                        // 合并到候选列表（去重）
+                                        const existingSet = new Set(candidates);
+                                        matchingBinPrograms.forEach(p => {
+                                            if (!existingSet.has(p)) {
+                                                candidates.push(p);
+                                                existingSet.add(p);
+                                            }
+                                        });
+                                    } catch (e) {
+                                        // 如果获取 bin 目录程序失败，忽略错误
+                                        console.warn('Terminal: Failed to get bin programs for completion:', e);
+                                    }
+                                    
+                                    // 按字母顺序排序
+                                    candidates.sort();
                                 }else{
                                     // 文件路径补全（简化版，使用 FileSystem.list）
                                     const idx = token.lastIndexOf('/');
@@ -4576,6 +4656,98 @@ function escapeHtml(s){
             this._cliProgramsCacheTime = now;
             
             return cliPrograms;
+        }
+        
+        // 获取 D:/bin/ 目录下的程序列表（用于Tab补全，带缓存）
+        async _getBinProgramsForCompletion() {
+            const now = Date.now();
+            
+            // 检查缓存是否有效
+            if (this._binProgramsCache !== null && (now - this._binProgramsCacheTime) < this._binProgramsCacheTTL) {
+                return this._binProgramsCache;
+            }
+            
+            // 缓存失效或不存在，重新获取
+            const binPrograms = [];
+            
+            try {
+                // 使用 FileSystem.list API 列出 D:/bin/ 目录下的所有 .js 文件
+                if (typeof ProcessManager !== 'undefined' && typeof ProcessManager.callKernelAPI === 'function') {
+                    try {
+                        const items = await ProcessManager.callKernelAPI(this.pid, 'FileSystem.list', ['D:/bin']);
+                        if (Array.isArray(items)) {
+                            for (const item of items) {
+                                let fileName = null;
+                                if (typeof item === 'string') {
+                                    fileName = item;
+                                } else if (typeof item === 'object' && item !== null) {
+                                    fileName = item.name || item.fileName;
+                                }
+                                
+                                if (fileName && fileName.endsWith('.js')) {
+                                    // 移除 .js 扩展名，获取程序名
+                                    const programName = fileName.slice(0, -3);
+                                    if (programName && !binPrograms.includes(programName)) {
+                                        binPrograms.push(programName);
+                                    }
+                                }
+                            }
+                        }
+                    } catch (e) {
+                        // 如果 FileSystem.list 失败，尝试使用 PHP 服务
+                        console.debug('Terminal: FileSystem.list failed, trying PHP service:', e);
+                    }
+                }
+                
+                // 降级方案：使用 PHP 服务
+                if (binPrograms.length === 0) {
+                    const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                        ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                        : new URL('/system/service/FSDirve.php', (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                            ? SystemInformation.getOrigin()
+                            : window.location.origin);
+                    
+                    url.searchParams.set('action', 'list_dir');
+                    url.searchParams.set('path', 'D:/bin');
+                    
+                    const response = await fetch(url.toString());
+                    if (response.ok) {
+                        const result = await response.json();
+                        if (result.status === 'success' && result.data) {
+                            const items = Array.isArray(result.data) ? result.data : (result.data.items || []);
+                            for (const item of items) {
+                                let fileName = null;
+                                if (typeof item === 'string') {
+                                    fileName = item;
+                                } else if (typeof item === 'object' && item !== null) {
+                                    fileName = item.name || item.fileName;
+                                    // 跳过目录
+                                    if (item.type === 'directory' || item.type === 'dir') {
+                                        continue;
+                                    }
+                                }
+                                
+                                if (fileName && fileName.endsWith('.js')) {
+                                    // 移除 .js 扩展名，获取程序名
+                                    const programName = fileName.slice(0, -3);
+                                    if (programName && !binPrograms.includes(programName)) {
+                                        binPrograms.push(programName);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            } catch (e) {
+                // 如果获取 bin 目录程序失败，忽略错误，返回空数组
+                console.warn('Terminal: Failed to get bin programs for completion:', e);
+            }
+            
+            // 更新缓存
+            this._binProgramsCache = binPrograms;
+            this._binProgramsCacheTime = now;
+            
+            return binPrograms;
         }
         
         focus(){

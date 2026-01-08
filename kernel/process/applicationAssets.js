@@ -560,25 +560,6 @@ const APPLICATION_ASSETS = {
             category: "utility"  // 工具类应用
         }
     },
-    
-    // 勒索病毒模拟程序 - ZerOS 安全测试工具
-    // 注意：路径是 D: 盘下的真实路径
-    // ⚠️ 警告：此程序仅用于 ZerOS 系统安全测试
-    "escalate": {
-        script: "D:/application/escalate/escalate.js",
-        icon: "D:/application/escalate/escalate.svg",
-        metadata: {
-            autoStart: false,
-            priority: 10,
-            description: "⚠️勒索病毒模拟程序",
-            version: "3.1.0",
-            type: "GUI",
-            alwaysShowInTaskbar: false,
-            allowMultipleInstances: false,  // 不支持多开（安全考虑）
-            supportsPreview: true,  // 支持窗口预览快照
-            category: "system"  // 系统应用
-        }
-    }
 };
 
 // 不导出到全局作用域，交由POOL管理

@@ -1763,7 +1763,11 @@ class DesktopManager {
                 let programName = null;
                 let programArgs = [iconData.targetPath];
                 
-                if (fileType === 'AUDIO') {
+                if (fileType === 'ZOM') {
+                    // ZOM 文件：使用 zominstall 安装
+                    programName = 'zominstall';
+                    programArgs = [iconData.targetPath];
+                } else if (fileType === 'AUDIO') {
                     programName = 'audioplayer';
                 } else if (fileType === 'VIDEO') {
                     programName = 'videoplayer';
@@ -1820,6 +1824,11 @@ class DesktopManager {
         if (!extension) return 'UNKNOWN';
         
         const ext = extension.toLowerCase();
+        
+        // ZOM 文件类型（ZerOS 程序安装包）
+        if (ext === 'zom') {
+            return 'ZOM';
+        }
         
         // 音频格式
         const audioExts = ['mp3', 'wav', 'flac', 'ogg', 'aac', 'm4a', 'wma', 'opus', 'mp4a'];

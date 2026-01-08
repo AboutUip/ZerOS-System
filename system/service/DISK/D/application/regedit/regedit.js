@@ -13,7 +13,7 @@
         storageData: null,
         refreshTimer: null,
         childWindows: [], // 子窗口列表
-        currentStorageType: 'localSData', // 当前编辑的存储类型：'localSData' 或 'localCache'
+        currentStorageType: 'localSData', // 当前编辑的存储类型：'localSData'、'localCache' 或 'applicationTable'
         _selectedValue: null, // 当前选中的值 { parentPath, key, row }
         
         __init__: async function(pid, initArgs) {
@@ -79,7 +79,7 @@
                 }
             }
             
-            // 创建菜单栏
+            // 创建菜单栏（工具栏）
             const menuBar = this._createMenuBar();
             this.window.appendChild(menuBar);
             
@@ -183,6 +183,93 @@
         },
         
         /**
+         * 创建菜单栏（工具栏）
+         */
+        _createMenuBar: function() {
+            const menuBar = document.createElement('div');
+            menuBar.className = 'regedit-menu-bar';
+            menuBar.style.cssText = `
+                display: flex;
+                align-items: center;
+                padding: 8px 15px;
+                background: rgba(20, 20, 30, 0.5);
+                border-bottom: 1px solid rgba(108, 142, 255, 0.2);
+                gap: 10px;
+            `;
+            
+            // 存储类型切换标签
+            const typeLabel = document.createElement('div');
+            typeLabel.textContent = '存储类型:';
+            typeLabel.style.cssText = `
+                color: rgba(215, 224, 221, 0.7);
+                font-size: 12px;
+                margin-right: 5px;
+            `;
+            menuBar.appendChild(typeLabel);
+            
+            // 存储类型切换按钮组
+            const buttonGroup = document.createElement('div');
+            buttonGroup.style.cssText = `
+                display: flex;
+                gap: 5px;
+            `;
+            
+            const storageTypes = [
+                { value: 'localSData', label: 'LocalSData' },
+                { value: 'localCache', label: 'LocalCache' },
+                { value: 'applicationTable', label: 'ApplicationTable' }
+            ];
+            
+            const self = this;
+            storageTypes.forEach(type => {
+                const btn = this._createMenuButton(type.label, async () => {
+                    if (self.currentStorageType !== type.value) {
+                        self.currentStorageType = type.value;
+                        await self._loadRegistryData();
+                        self._renderTree();
+                        self._selectPath('');
+                        // 更新按钮状态
+                        buttonGroup.querySelectorAll('div').forEach(b => {
+                            if (b.textContent === type.label) {
+                                b.style.background = 'rgba(108, 142, 255, 0.3)';
+                                b.style.borderColor = 'rgba(108, 142, 255, 0.6)';
+                            } else {
+                                b.style.background = 'transparent';
+                                b.style.borderColor = 'rgba(108, 142, 255, 0.2)';
+                            }
+                        });
+                    }
+                });
+                
+                // 设置初始状态
+                if (self.currentStorageType === type.value) {
+                    btn.style.background = 'rgba(108, 142, 255, 0.3)';
+                    btn.style.borderColor = 'rgba(108, 142, 255, 0.6)';
+                } else {
+                    btn.style.background = 'transparent';
+                    btn.style.borderColor = 'rgba(108, 142, 255, 0.2)';
+                }
+                
+                btn.style.border = '1px solid';
+                btn.style.borderRadius = '4px';
+                buttonGroup.appendChild(btn);
+            });
+            
+            menuBar.appendChild(buttonGroup);
+            
+            // 刷新按钮
+            const refreshBtn = this._createMenuButton('刷新', async () => {
+                await self._refreshData();
+                self._renderTree();
+                self._renderValues(self.selectedPath);
+            });
+            refreshBtn.style.marginLeft = 'auto';
+            menuBar.appendChild(refreshBtn);
+            
+            return menuBar;
+        },
+        
+        /**
          * 加载注册表数据
          */
         _loadRegistryData: async function() {
@@ -227,6 +314,34 @@
                         if (typeof KernelLogger !== 'undefined') {
                             KernelLogger.debug('RegEdit', `LocalCache 数据加载成功，system键数: ${Object.keys(this.storageData.system).length}, programs键数: ${Object.keys(this.storageData.programs).length}`);
                         }
+                    }
+                } else if (this.currentStorageType === 'applicationTable') {
+                    // 加载 ApplicationTable.json（动态安装的应用程序注册表）
+                    if (typeof LStorage === 'undefined') {
+                        throw new Error('LStorage 不可用');
+                    }
+                    
+                    // 确保LStorage已初始化
+                    if (!LStorage._initialized) {
+                        await LStorage.init();
+                    }
+                    
+                    // 清除 LStorage 的读取缓存，确保获取最新数据
+                    if (typeof LStorage !== 'undefined' && typeof LStorage.clearCache === 'function') {
+                        LStorage.clearCache();
+                    }
+                    
+                    // 从 ApplicationTable.json 读取数据
+                    const applicationTable = await LStorage.getSystemStorage('applicationTable');
+                    
+                    // ApplicationTable 是一个对象，键是程序名，值是程序资源对象
+                    // 为了统一显示，我们将其包装为 { applications: {...} } 格式
+                    this.storageData = {
+                        applications: applicationTable || {}
+                    };
+                    
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.debug('RegEdit', `ApplicationTable 数据加载成功，应用程序数: ${Object.keys(this.storageData.applications).length}`);
                     }
                 } else {
                     // 加载 LocalSData.json（LStorage 的数据）
@@ -275,10 +390,16 @@
                 if (typeof KernelLogger !== 'undefined') {
                     KernelLogger.error('RegEdit', '加载注册表数据失败', error);
                 }
-                this.storageData = {
-                    system: {},
-                    programs: {}
-                };
+                if (this.currentStorageType === 'applicationTable') {
+                    this.storageData = {
+                        applications: {}
+                    };
+                } else {
+                    this.storageData = {
+                        system: {},
+                        programs: {}
+                    };
+                }
             }
         },
         
@@ -326,7 +447,14 @@
                 color: rgba(215, 224, 221, 0.9);
                 font-size: 13px;
             `;
-            const rootLabel = this.currentStorageType === 'localCache' ? 'LocalCache' : 'LocalSData';
+            let rootLabel;
+            if (this.currentStorageType === 'localCache') {
+                rootLabel = 'LocalCache';
+            } else if (this.currentStorageType === 'applicationTable') {
+                rootLabel = 'ApplicationTable';
+            } else {
+                rootLabel = 'LocalSData';
+            }
             root.innerHTML = `<span style="margin-right: 5px;">📁</span>${rootLabel}`;
             // 使用 EventManager 注册点击事件（如果可用且有权限）
             if (typeof EventManager !== 'undefined' && this.pid) {
@@ -346,20 +474,30 @@
             }
             this.treeContainer.appendChild(root);
             
-            // System节点
-            const systemNode = this._createTreeNode('system', 'System', this.storageData.system || {}, expandedPaths, 0);
-            this.treeContainer.appendChild(systemNode);
-            // 注意：system 的子节点路径应该是 'system.键名'，键名可能包含点号
-            if (expandedPaths.has('system')) {
-                this._renderTreeChildren('system', this.storageData.system || {}, expandedPaths, 1);
-            }
-            
-            // Programs节点
-            const programsNode = this._createTreeNode('programs', 'Programs', this.storageData.programs || {}, expandedPaths, 0);
-            this.treeContainer.appendChild(programsNode);
-            // 注意：programs 的子节点路径应该是 'programs.键名'
-            if (expandedPaths.has('programs')) {
-                this._renderTreeChildren('programs', this.storageData.programs || {}, expandedPaths, 1);
+            if (this.currentStorageType === 'applicationTable') {
+                // ApplicationTable 节点
+                const applicationsNode = this._createTreeNode('applications', 'Applications', this.storageData.applications || {}, expandedPaths, 0);
+                this.treeContainer.appendChild(applicationsNode);
+                // 注意：applications 的子节点路径应该是 'applications.程序名'
+                if (expandedPaths.has('applications')) {
+                    this._renderTreeChildren('applications', this.storageData.applications || {}, expandedPaths, 1);
+                }
+            } else {
+                // System节点
+                const systemNode = this._createTreeNode('system', 'System', this.storageData.system || {}, expandedPaths, 0);
+                this.treeContainer.appendChild(systemNode);
+                // 注意：system 的子节点路径应该是 'system.键名'，键名可能包含点号
+                if (expandedPaths.has('system')) {
+                    this._renderTreeChildren('system', this.storageData.system || {}, expandedPaths, 1);
+                }
+                
+                // Programs节点
+                const programsNode = this._createTreeNode('programs', 'Programs', this.storageData.programs || {}, expandedPaths, 0);
+                this.treeContainer.appendChild(programsNode);
+                // 注意：programs 的子节点路径应该是 'programs.键名'
+                if (expandedPaths.has('programs')) {
+                    this._renderTreeChildren('programs', this.storageData.programs || {}, expandedPaths, 1);
+                }
             }
         },
         
@@ -1098,15 +1236,23 @@
             }
             
             if (path === null || path === '') {
-                // 根节点，返回包含system和programs的对象
-                return {
-                    system: this.storageData.system || {},
-                    programs: this.storageData.programs || {}
-                };
+                // 根节点
+                if (this.currentStorageType === 'applicationTable') {
+                    return {
+                        applications: this.storageData.applications || {}
+                    };
+                } else {
+                    return {
+                        system: this.storageData.system || {},
+                        programs: this.storageData.programs || {}
+                    };
+                }
             } else if (path === 'system') {
                 return this.storageData.system || {};
             } else if (path === 'programs') {
                 return this.storageData.programs || {};
+            } else if (path === 'applications') {
+                return this.storageData.applications || {};
             } else {
                 // 解析路径：注意键名本身可能包含点号
                 const pathParts = path.split('.');
@@ -1192,6 +1338,35 @@
                             data = null;
                         }
                     }
+                } else if (pathParts.length > 0 && pathParts[0] === 'applications') {
+                    data = this.storageData.applications || {};
+                    // 如果路径只有 'applications'，已经完成
+                    if (pathParts.length === 1) {
+                        // data 已经是 applications 对象
+                    } else {
+                        // 路径是 'applications.程序名.xxx.yyy'，需要逐层解析
+                        // 第一层是程序名（如 'piano'），后续层是程序资源对象的属性
+                        const programName = pathParts[1];
+                        if (data && typeof data === 'object' && programName in data) {
+                            data = data[programName];
+                            
+                            // 如果有更多层级，继续解析
+                            if (pathParts.length > 2) {
+                                // 从第三层开始逐层解析（跳过 'applications' 和程序名）
+                                for (let i = 2; i < pathParts.length; i++) {
+                                    const part = pathParts[i];
+                                    if (data && typeof data === 'object' && part in data) {
+                                        data = data[part];
+                                    } else {
+                                        data = null;
+                                        break;
+                                    }
+                                }
+                            }
+                        } else {
+                            data = null;
+                        }
+                    }
                 } else {
                     // 其他路径，可能是system下的键（键名包含点号，如 'permissionControl.whitelist'）
                     // 首先尝试在system对象中查找完整路径作为键名
@@ -1251,12 +1426,18 @@
                     }
                 }
                 
-                // 确保 system 和 programs 存在
-                if (!this.storageData.system || typeof this.storageData.system !== 'object') {
-                    this.storageData.system = {};
-                }
-                if (!this.storageData.programs || typeof this.storageData.programs !== 'object') {
-                    this.storageData.programs = {};
+                // 根据存储类型确保相应的数据结构存在
+                if (this.currentStorageType === 'applicationTable') {
+                    if (!this.storageData.applications || typeof this.storageData.applications !== 'object') {
+                        this.storageData.applications = {};
+                    }
+                } else {
+                    if (!this.storageData.system || typeof this.storageData.system !== 'object') {
+                        this.storageData.system = {};
+                    }
+                    if (!this.storageData.programs || typeof this.storageData.programs !== 'object') {
+                        this.storageData.programs = {};
+                    }
                 }
                 
                 // 使用与_renderValues相同的逻辑解析路径
@@ -1281,6 +1462,30 @@
                             CacheDrive._cacheMetadata = this.storageData;
                         }
                         await CacheDrive._saveCacheMetadata();
+                    } else if (this.currentStorageType === 'applicationTable') {
+                        // 保存到 ApplicationTable.json
+                        if (typeof LStorage === 'undefined') {
+                            throw new Error('LStorage 不可用');
+                        }
+                        
+                        // 如果设置的是 applications 下的程序
+                        if (parentPath === 'applications') {
+                            // 直接保存整个 ApplicationTable
+                            const applicationTable = this.storageData.applications || {};
+                            await LStorage.setSystemStorage('applicationTable', applicationTable);
+                            // 刷新 ApplicationAssetManager
+                            if (typeof ApplicationAssetManager !== 'undefined' && typeof ApplicationAssetManager.refresh === 'function') {
+                                await ApplicationAssetManager.refresh();
+                            }
+                        } else {
+                            // 其他路径的设置，需要保存整个 ApplicationTable
+                            const applicationTable = this.storageData.applications || {};
+                            await LStorage.setSystemStorage('applicationTable', applicationTable);
+                            // 刷新 ApplicationAssetManager
+                            if (typeof ApplicationAssetManager !== 'undefined' && typeof ApplicationAssetManager.refresh === 'function') {
+                                await ApplicationAssetManager.refresh();
+                            }
+                        }
                     } else {
                         // 保存到 LStorage
                         if (typeof LStorage === 'undefined') {
@@ -2058,12 +2263,18 @@
                     }
                 }
                 
-                // 确保 system 和 programs 存在
-                if (!this.storageData.system || typeof this.storageData.system !== 'object') {
-                    this.storageData.system = {};
-                }
-                if (!this.storageData.programs || typeof this.storageData.programs !== 'object') {
-                    this.storageData.programs = {};
+                // 根据存储类型确保相应的数据结构存在
+                if (this.currentStorageType === 'applicationTable') {
+                    if (!this.storageData.applications || typeof this.storageData.applications !== 'object') {
+                        this.storageData.applications = {};
+                    }
+                } else {
+                    if (!this.storageData.system || typeof this.storageData.system !== 'object') {
+                        this.storageData.system = {};
+                    }
+                    if (!this.storageData.programs || typeof this.storageData.programs !== 'object') {
+                        this.storageData.programs = {};
+                    }
                 }
                 
                 // 使用与_renderValues和_setValue相同的逻辑解析路径
@@ -2088,6 +2299,32 @@
                             CacheDrive._cacheMetadata = this.storageData;
                         }
                         await CacheDrive._saveCacheMetadata();
+                    } else if (this.currentStorageType === 'applicationTable') {
+                        // 保存到 ApplicationTable.json
+                        if (typeof LStorage === 'undefined') {
+                            throw new Error('LStorage 不可用');
+                        }
+                        
+                        // 如果删除的是 applications 下的程序
+                        if (parentPath === 'applications') {
+                            // 从 applications 对象中删除程序
+                            const applicationTable = this.storageData.applications || {};
+                            delete applicationTable[key];
+                            // 保存到 ApplicationTable.json
+                            await LStorage.setSystemStorage('applicationTable', applicationTable);
+                            // 刷新 ApplicationAssetManager
+                            if (typeof ApplicationAssetManager !== 'undefined' && typeof ApplicationAssetManager.refresh === 'function') {
+                                await ApplicationAssetManager.refresh();
+                            }
+                        } else {
+                            // 其他路径的删除，需要保存整个 ApplicationTable
+                            const applicationTable = this.storageData.applications || {};
+                            await LStorage.setSystemStorage('applicationTable', applicationTable);
+                            // 刷新 ApplicationAssetManager
+                            if (typeof ApplicationAssetManager !== 'undefined' && typeof ApplicationAssetManager.refresh === 'function') {
+                                await ApplicationAssetManager.refresh();
+                            }
+                        }
                     } else {
                         // 保存到 LStorage
                         if (typeof LStorage === 'undefined') {
@@ -2241,6 +2478,8 @@
                     PermissionManager.PERMISSION.SYSTEM_STORAGE_WRITE,  // 写入系统存储（基础权限，仅可写入非敏感键）
                     PermissionManager.PERMISSION.SYSTEM_STORAGE_WRITE_USER_CONTROL,      // 写入用户控制相关存储（userControl.*）- 需要管理员授权
                     PermissionManager.PERMISSION.SYSTEM_STORAGE_WRITE_PERMISSION_CONTROL, // 写入权限控制相关存储（permissionControl.*, permissionManager.*）- 需要管理员授权
+                    PermissionManager.PERMISSION.APPLICATION_INSTALL,   // 安装应用程序（用于编辑 ApplicationTable）
+                    PermissionManager.PERMISSION.APPLICATION_UNINSTALL, // 卸载应用程序（用于编辑 ApplicationTable）
                     PermissionManager.PERMISSION.KERNEL_DISK_READ,
                     PermissionManager.PERMISSION.KERNEL_DISK_WRITE,
                     PermissionManager.PERMISSION.KERNEL_DISK_LIST

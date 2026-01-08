@@ -12,7 +12,7 @@ class ApplicationAssetManager {
     static async init() {
         ApplicationAssetManager._log(2, "初始化应用程序资源管理器");
         
-        // 从 POOL 获取 APPLICATION_ASSETS
+        // 从 POOL 获取 APPLICATION_ASSETS（静态程序）
         let applicationAssets = null;
         if (typeof POOL !== 'undefined' && typeof POOL.__GET__ === 'function') {
             try {
@@ -32,14 +32,34 @@ class ApplicationAssetManager {
             applicationAssets = {};
         }
         
+        // 加载动态安装的应用程序（ApplicationTable）
+        let dynamicApplications = {};
+        if (typeof LStorage !== 'undefined') {
+            try {
+                // 确保 LStorage 已初始化
+                if (!LStorage._initialized) {
+                    await LStorage.init();
+                }
+                dynamicApplications = await LStorage.listInstalledApplications();
+                ApplicationAssetManager._log(2, `加载动态安装的应用程序: ${Object.keys(dynamicApplications).length} 个`);
+            } catch (e) {
+                ApplicationAssetManager._log(1, `加载动态应用程序失败: ${e.message}`);
+            }
+        }
+        
+        // 合并静态和动态程序（动态程序优先，覆盖同名静态程序）
+        const mergedAssets = { ...applicationAssets, ...dynamicApplications };
+        
         // 存储到内部
-        ApplicationAssetManager._assets = applicationAssets;
+        ApplicationAssetManager._assets = mergedAssets;
         
         // 注册到 POOL
         ApplicationAssetManager._registerToPool();
         
         ApplicationAssetManager._log(2, "应用程序资源管理器初始化完成", {
-            programCount: Object.keys(applicationAssets).length
+            staticPrograms: Object.keys(applicationAssets).length,
+            dynamicPrograms: Object.keys(dynamicApplications).length,
+            totalPrograms: Object.keys(mergedAssets).length
         });
     }
     
@@ -410,18 +430,19 @@ class ApplicationAssetManager {
     }
     
     /**
-     * 刷新资源（从 POOL 重新加载）
-     * @returns {boolean} 是否成功
+     * 刷新资源（从 POOL 和 LStorage 重新加载）
+     * @returns {Promise<boolean>} 是否成功
      */
-    static refresh() {
+    static async refresh() {
         ApplicationAssetManager._log(2, "刷新应用程序资源");
         
+        // 重新加载静态程序
         let applicationAssets = null;
         if (typeof POOL !== 'undefined' && typeof POOL.__GET__ === 'function') {
             try {
                 applicationAssets = POOL.__GET__("KERNEL_GLOBAL_POOL", "APPLICATION_ASSETS");
             } catch (e) {
-                ApplicationAssetManager._log(1, `刷新失败: ${e.message}`);
+                ApplicationAssetManager._log(1, `刷新静态程序失败: ${e.message}`);
                 return false;
             }
         }
@@ -430,9 +451,33 @@ class ApplicationAssetManager {
             applicationAssets = APPLICATION_ASSETS;
         }
         
-        if (applicationAssets) {
-            ApplicationAssetManager._assets = applicationAssets;
-            ApplicationAssetManager._log(2, "资源刷新成功");
+        if (!applicationAssets) {
+            applicationAssets = {};
+        }
+        
+        // 重新加载动态程序
+        let dynamicApplications = {};
+        if (typeof LStorage !== 'undefined') {
+            try {
+                if (!LStorage._initialized) {
+                    await LStorage.init();
+                }
+                dynamicApplications = await LStorage.listInstalledApplications();
+            } catch (e) {
+                ApplicationAssetManager._log(1, `刷新动态程序失败: ${e.message}`);
+            }
+        }
+        
+        // 合并静态和动态程序（动态程序优先）
+        const mergedAssets = { ...applicationAssets, ...dynamicApplications };
+        
+        if (mergedAssets && Object.keys(mergedAssets).length > 0) {
+            ApplicationAssetManager._assets = mergedAssets;
+            ApplicationAssetManager._log(2, "资源刷新成功", {
+                staticPrograms: Object.keys(applicationAssets).length,
+                dynamicPrograms: Object.keys(dynamicApplications).length,
+                totalPrograms: Object.keys(mergedAssets).length
+            });
             return true;
         }
         

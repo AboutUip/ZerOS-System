@@ -187,7 +187,8 @@
                     PermissionManager.PERMISSION.THEME_READ,
                     PermissionManager.PERMISSION.THEME_WRITE,
                     PermissionManager.PERMISSION.KERNEL_DISK_READ,
-                    PermissionManager.PERMISSION.KERNEL_DISK_WRITE
+                    PermissionManager.PERMISSION.KERNEL_DISK_WRITE,
+                    PermissionManager.PERMISSION.APPLICATION_UNINSTALL
                 ] : [],
                 metadata: {
                     allowMultipleInstances: false
@@ -1744,6 +1745,25 @@
                 type: 'custom',
                 onRender: (setting, control) => {
                     return this._renderEnvironmentManagement(setting, control);
+                }
+            });
+            
+            // 注册程序管理分类
+            this.registerCategory('applications', {
+                name: '应用',
+                icon: `<svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M10 2L2 7V9C2 13.55 5.16 17.74 10 18C14.84 17.74 18 13.55 18 9V7L10 2ZM10 4.21L16 8.14V9C16 12.52 13.33 15.86 10 16.18C6.67 15.86 4 12.52 4 9V8.14L10 4.21Z" fill="currentColor"/>
+                </svg>`,
+                description: '管理已安装的应用程序'
+            });
+            
+            // 注册程序管理设置项（使用自定义渲染）
+            this.registerSetting('applications', 'application_management', {
+                name: '程序管理',
+                description: '查看和管理已安装的应用程序，可以卸载动态安装的程序',
+                type: 'custom',
+                onRender: (setting, control) => {
+                    return this._renderApplicationManagement(setting, control);
                 }
             });
         },
@@ -4678,6 +4698,324 @@
                     KernelLogger.error('SETTINGS', `删除环境变量失败: ${error.message}`, error);
                 }
                 await GUIManager.showAlert(`删除环境变量失败: ${error.message}`, '错误', 'error');
+            }
+        },
+        
+        /**
+         * 渲染程序管理界面
+         */
+        _renderApplicationManagement: function(setting, control) {
+            const container = document.createElement('div');
+            container.style.cssText = `
+                display: flex;
+                flex-direction: column;
+                gap: 24px;
+                height: 100%;
+                max-height: 100%;
+                overflow: hidden;
+            `;
+            
+            // 检查 ApplicationAssetManager 和 ProcessManager 是否可用
+            if (typeof ApplicationAssetManager === 'undefined' || typeof ProcessManager === 'undefined') {
+                const errorMsg = document.createElement('div');
+                errorMsg.textContent = 'ApplicationAssetManager 或 ProcessManager 模块未加载';
+                errorMsg.style.cssText = `
+                    padding: 24px;
+                    text-align: center;
+                    color: var(--theme-text-secondary, #b8c5c0);
+                `;
+                container.appendChild(errorMsg);
+                return container;
+            }
+            
+            // 创建工具栏
+            const toolbar = document.createElement('div');
+            toolbar.style.cssText = `
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 16px;
+                padding-bottom: 16px;
+                border-bottom: 1px solid var(--theme-border, rgba(139, 92, 246, 0.25));
+                flex-shrink: 0;
+            `;
+            
+            const title = document.createElement('h2');
+            title.textContent = '已安装的程序';
+            title.style.cssText = `
+                font-size: 20px;
+                font-weight: 400;
+                color: var(--theme-text, #d7e0dd);
+                margin: 0;
+            `;
+            toolbar.appendChild(title);
+            
+            container.appendChild(toolbar);
+            
+            // 创建程序列表容器
+            const listContainer = document.createElement('div');
+            listContainer.id = 'applications-list';
+            listContainer.style.cssText = `
+                display: flex;
+                flex-direction: column;
+                gap: 12px;
+                flex: 1;
+                min-height: 0;
+                overflow-y: auto;
+                overflow-x: hidden;
+            `;
+            container.appendChild(listContainer);
+            
+            // 加载程序列表
+            this._loadApplications(listContainer);
+            
+            return container;
+        },
+        
+        /**
+         * 加载程序列表
+         */
+        _loadApplications: async function(container) {
+            if (typeof ApplicationAssetManager === 'undefined' || typeof ProcessManager === 'undefined') {
+                return;
+            }
+            
+            // 等待进程完全启动
+            const maxRetries = 10;
+            let retries = 0;
+            let processReady = false;
+            
+            while (retries < maxRetries && !processReady) {
+                const processInfo = ProcessManager.PROCESS_TABLE.get(this.pid);
+                if (processInfo && processInfo.status === 'running') {
+                    processReady = true;
+                    break;
+                }
+                // 等待 100ms 后重试
+                await new Promise(resolve => setTimeout(resolve, 100));
+                retries++;
+            }
+            
+            if (!processReady) {
+                // 如果进程仍未就绪，延迟执行
+                setTimeout(() => {
+                    this._loadApplications(container);
+                }, 200);
+                return;
+            }
+            
+            try {
+                // 获取所有程序（包括静态和动态）
+                const allPrograms = ApplicationAssetManager.listAllPrograms();
+                
+                // 获取动态安装的程序列表
+                let installedPrograms = {};
+                try {
+                    installedPrograms = await ProcessManager.callKernelAPI(this.pid, 'Application.list', []) || {};
+                } catch (e) {
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.debug('SETTINGS', `获取动态程序列表失败: ${e.message}`);
+                    }
+                }
+                
+                // 清空容器
+                container.innerHTML = '';
+                
+                if (!allPrograms || allPrograms.length === 0) {
+                    const emptyMsg = document.createElement('div');
+                    emptyMsg.textContent = '暂无已安装的程序';
+                    emptyMsg.style.cssText = `
+                        padding: 48px;
+                        text-align: center;
+                        color: var(--theme-text-secondary, #b8c5c0);
+                        font-size: 14px;
+                    `;
+                    container.appendChild(emptyMsg);
+                    return;
+                }
+                
+                // 渲染程序列表
+                for (const program of allPrograms) {
+                    const isInstalled = installedPrograms.hasOwnProperty(program.name);
+                    const item = this._createApplicationItem(program, isInstalled);
+                    container.appendChild(item);
+                }
+            } catch (error) {
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('SETTINGS', `加载程序列表失败: ${error.message}`, error);
+                }
+                const errorMsg = document.createElement('div');
+                errorMsg.textContent = `加载程序列表失败: ${error.message}`;
+                errorMsg.style.cssText = `
+                    padding: 24px;
+                    text-align: center;
+                    color: #ff6b6b;
+                    font-size: 14px;
+                `;
+                container.appendChild(errorMsg);
+            }
+        },
+        
+        /**
+         * 创建程序列表项
+         */
+        _createApplicationItem: function(program, isInstalled) {
+            const item = document.createElement('div');
+            item.style.cssText = `
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                padding: 16px;
+                background: var(--theme-background-elevated, var(--theme-background-secondary, #252b35));
+                border: 1px solid var(--theme-border, rgba(139, 92, 246, 0.25));
+                border-radius: 8px;
+            `;
+            
+            const leftSection = document.createElement('div');
+            leftSection.style.cssText = `display: flex; align-items: center; gap: 16px; flex: 1;`;
+            
+            // 图标
+            if (program.icon) {
+                const iconContainer = document.createElement('div');
+                iconContainer.style.cssText = `
+                    width: 48px;
+                    height: 48px;
+                    flex-shrink: 0;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    background: var(--theme-background, #1a1f2e);
+                    border-radius: 8px;
+                    overflow: hidden;
+                `;
+                
+                const iconImg = document.createElement('img');
+                let iconUrl = program.icon;
+                if (typeof ProcessManager !== 'undefined' && typeof ProcessManager.convertVirtualPathToUrl === 'function') {
+                    iconUrl = ProcessManager.convertVirtualPathToUrl(iconUrl);
+                }
+                iconImg.src = iconUrl;
+                iconImg.style.cssText = 'width: 48px; height: 48px; object-fit: contain;';
+                iconImg.onerror = () => {
+                    iconImg.style.display = 'none';
+                };
+                iconContainer.appendChild(iconImg);
+                leftSection.appendChild(iconContainer);
+            }
+            
+            // 程序信息
+            const info = document.createElement('div');
+            info.style.cssText = `flex: 1; display: flex; flex-direction: column; gap: 4px;`;
+            
+            const nameEl = document.createElement('div');
+            nameEl.textContent = program.metadata?.description || program.name;
+            nameEl.style.cssText = `
+                font-size: 16px;
+                font-weight: 500;
+                color: var(--theme-text, #d7e0dd);
+            `;
+            info.appendChild(nameEl);
+            
+            const metaInfo = document.createElement('div');
+            metaInfo.style.cssText = `
+                font-size: 12px;
+                color: var(--theme-text-secondary, #b8c5c0);
+                display: flex;
+                gap: 12px;
+            `;
+            
+            if (program.metadata?.version) {
+                const versionEl = document.createElement('span');
+                versionEl.textContent = `版本: ${program.metadata.version}`;
+                metaInfo.appendChild(versionEl);
+            }
+            
+            const typeEl = document.createElement('span');
+            typeEl.textContent = program.metadata?.type === 'CLI' ? '命令行程序' : 'GUI 程序';
+            metaInfo.appendChild(typeEl);
+            
+            if (isInstalled) {
+                const installedEl = document.createElement('span');
+                installedEl.textContent = '动态安装';
+                installedEl.style.cssText = 'color: #8b5cf6;';
+                metaInfo.appendChild(installedEl);
+            } else {
+                const staticEl = document.createElement('span');
+                staticEl.textContent = '系统内置';
+                staticEl.style.cssText = 'color: var(--theme-text-secondary, #b8c5c0);';
+                metaInfo.appendChild(staticEl);
+            }
+            
+            info.appendChild(metaInfo);
+            leftSection.appendChild(info);
+            item.appendChild(leftSection);
+            
+            // 删除按钮（仅动态安装的程序）
+            if (isInstalled) {
+                const deleteBtn = document.createElement('button');
+                deleteBtn.textContent = '卸载';
+                deleteBtn.style.cssText = `
+                    padding: 8px 16px;
+                    border: 1px solid #ff6b6b;
+                    border-radius: 4px;
+                    background: transparent;
+                    color: #ff6b6b;
+                    cursor: pointer;
+                    font-size: 14px;
+                    font-weight: 500;
+                    transition: background-color 0.2s, border-color 0.2s;
+                `;
+                deleteBtn.addEventListener('mouseenter', () => {
+                    deleteBtn.style.background = '#ff6b6b';
+                    deleteBtn.style.color = '#ffffff';
+                });
+                deleteBtn.addEventListener('mouseleave', () => {
+                    deleteBtn.style.background = 'transparent';
+                    deleteBtn.style.color = '#ff6b6b';
+                });
+                deleteBtn.addEventListener('click', () => {
+                    this._handleUninstallApplication(program.name);
+                });
+                item.appendChild(deleteBtn);
+            }
+            
+            return item;
+        },
+        
+        /**
+         * 处理卸载程序
+         */
+        _handleUninstallApplication: async function(programName) {
+            if (typeof GUIManager === 'undefined' || typeof ProcessManager === 'undefined') {
+                return;
+            }
+            
+            // 确认卸载
+            const confirmed = await GUIManager.showConfirm(
+                `确定要卸载程序 "${programName}" 吗？此操作将删除程序的所有文件，且无法撤销。`,
+                '卸载程序',
+                'warning'
+            );
+            
+            if (!confirmed) {
+                return;
+            }
+            
+            try {
+                await ProcessManager.callKernelAPI(this.pid, 'Application.uninstall', [programName]);
+                
+                await GUIManager.showAlert('程序已卸载', '成功', 'success');
+                
+                // 重新加载程序列表
+                const listContainer = document.getElementById('applications-list');
+                if (listContainer) {
+                    await this._loadApplications(listContainer);
+                }
+            } catch (error) {
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('SETTINGS', `卸载程序失败: ${error.message}`, error);
+                }
+                await GUIManager.showAlert(`卸载失败: ${error.message}`, '错误', 'error');
             }
         }
     };

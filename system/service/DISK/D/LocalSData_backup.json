@@ -1,14 +1,11 @@
 {
   "system": {
     "permissionManager.permissions": {
-      "terminal": [
+      "filemanager": [
         "GUI_WINDOW_CREATE",
         "KERNEL_DISK_READ",
         "KERNEL_DISK_LIST",
-        "EVENT_LISTENER",
-        "ENVIRONMENT_READ"
-      ],
-      "ps": [
+        "SYSTEM_NOTIFICATION",
         "EVENT_LISTENER"
       ]
     },
@@ -530,7 +527,7 @@
         "password": "61b249bf6d604d14120821f43625e84e",
         "avatar": "avatar_root_1766272534753.jpg",
         "createdAt": 1766271155991,
-        "lastLogin": 1767797683566
+        "lastLogin": 1767860058925
       },
       "TestUser": {
         "level": "USER",
@@ -604,6 +601,11 @@
     "scheduleTaskManager.tasks": [],
     "registry": {
       "environment": {}
+    },
+    "applicationTable": {},
+    "permissionManager.denialCounts": {
+      "zominstall_KERNEL_DISK_DELETE": 1,
+      "filemanager_SYSTEM_STORAGE_WRITE_DESKTOP": 1
     }
   },
   "programs": {}

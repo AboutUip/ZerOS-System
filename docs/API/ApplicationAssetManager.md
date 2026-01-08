@@ -6,7 +6,8 @@
 
 ## 依赖
 
-- `APPLICATION_ASSETS` - 应用程序资源映射（从 `applicationAssets.js` 加载）
+- `APPLICATION_ASSETS` - 应用程序资源映射（从 `applicationAssets.js` 加载，静态程序）
+- `LStorage` - 本地存储管理器（用于获取动态安装的程序）
 - `POOL` - 全局对象池（用于存储资源映射）
 
 ## 初始化
@@ -16,6 +17,22 @@
 ```javascript
 await ApplicationAssetManager.init();
 ```
+
+**初始化流程**：
+1. 加载静态程序（从 `APPLICATION_ASSETS`，定义在 `applicationAssets.js` 中）
+2. 加载动态程序（从 `LStorage` 的 `ApplicationTable`，存储在 `D:/ApplicationTable.json` 文件中）
+3. 合并静态和动态程序（动态程序优先，覆盖同名静态程序）
+4. 存储到内部 `_assets` 对象
+
+**存储位置**：
+- **静态程序**：定义在 `applicationAssets.js` 中，编译时确定
+- **动态程序**：存储在 `D:/ApplicationTable.json` 文件中（**不是** `D:/LocalSData.json`）
+- `ApplicationTable` 是一个独立的 JSON 文件，专门用于管理动态安装的应用程序
+
+**自动刷新**：
+- 当通过 `LStorage.installApplication()` 安装程序时，`ApplicationAssetManager` 会自动刷新
+- 当通过 `LStorage.uninstallApplication()` 卸载程序时，`ApplicationAssetManager` 会自动刷新
+- 新安装的程序会立即出现在开始菜单中（需要关闭并重新打开开始菜单）
 
 ## API 方法
 
@@ -253,6 +270,25 @@ if (result.valid) {
 
 **返回值**: `Object` - 应用程序资源对象
 
+#### `refresh()`
+
+刷新应用程序资源（重新加载静态和动态程序）。
+
+**返回值**: `Promise<boolean>` - 是否成功
+
+**功能**:
+1. 重新加载静态程序（从 `APPLICATION_ASSETS`）
+2. 重新加载动态程序（从 `LStorage` 的 `ApplicationTable`）
+3. 合并静态和动态程序（动态程序优先）
+
+**注意**: 通常不需要手动调用此方法，`LStorage.installApplication()` 和 `uninstallApplication()` 会自动刷新。
+
+**示例**:
+```javascript
+// 手动刷新（通常不需要）
+await ApplicationAssetManager.refresh();
+```
+
 ## 使用示例
 
 ### 示例 1: 查询程序信息
@@ -353,6 +389,36 @@ if (validation.valid) {
 }
 ```
 
+## 静态程序与动态程序
+
+### 静态程序
+
+静态程序注册在 `applicationAssets.js` 中，是系统内置的程序：
+- 不允许通过 `LStorage.uninstallApplication()` 卸载
+- 在系统启动时自动加载
+- 通常位于 `D:/application/` 目录
+
+### 动态程序
+
+动态程序通过 `LStorage.installApplication()` 安装：
+- 注册在 `ApplicationTable`（存储在 `LStorage` 中）
+- 可以随时安装和卸载
+- 文件位于 `D:/application/<程序名>/` 目录
+
+### 程序合并规则
+
+`ApplicationAssetManager` 会合并静态和动态程序：
+- **动态程序优先**：如果动态程序与静态程序同名，动态程序会覆盖静态程序
+- **统一访问**：通过 `ApplicationAssetManager` 的 API 可以统一访问所有程序（静态和动态）
+- **自动刷新**：安装/卸载动态程序后，`ApplicationAssetManager` 会自动刷新
+
+### 图标路径处理
+
+动态程序的图标路径会被转换为绝对路径（如 `D:/application/piano/piano.svg`）：
+- 开始菜单使用 `ProcessManager.convertVirtualPathToUrl()` 转换路径
+- 转换规则：`D:/application/piano/piano.svg` → `/system/service/DISK/D/application/piano/piano.svg`
+- 图标会在开始菜单中正确显示
+
 ## 注意事项
 
 1. **初始化**: 资源管理器在系统启动时自动初始化，通常不需要手动调用 `init()`
@@ -360,6 +426,9 @@ if (validation.valid) {
 3. **元数据**: 元数据中的 `autoStart` 和 `priority` 用于控制程序自动启动顺序
 4. **任务栏显示**: `alwaysShowInTaskbar` 控制程序是否常显在任务栏
 5. **多实例**: `allowMultipleInstances` 控制程序是否支持多实例运行
+6. **自动刷新**: 安装/卸载动态程序后，`ApplicationAssetManager` 会自动刷新，无需手动调用 `refresh()`
+7. **开始菜单**: 新安装的程序会立即出现在开始菜单中（需要关闭并重新打开开始菜单）
+8. **图标显示**: 动态程序的图标路径会被正确转换，可以在开始菜单中正确显示
 
 ## 相关文档
 

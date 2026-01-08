@@ -2306,6 +2306,9 @@
             const videoExts = ['mp4', 'webm', 'avi', 'mov', 'mkv', 'flv', 'wmv', 'm4v', '3gp'];
             const archiveExts = ['zip', 'rar', '7z', 'tar', 'gz'];
             
+            // ZOM 文件类型（ZerOS 程序安装包）
+            if (ext === 'zom') return 'ZOM';
+            
             if (textExts.includes(ext)) return 'TEXT';
             if (codeExts.includes(ext)) return 'CODE';
             if (imageExts.includes(ext)) return 'IMAGE';
@@ -2477,6 +2480,11 @@
                     case 'ZIP':
                         // ZIP 压缩文件图标（使用 ziper 程序的图标或通用文件图标）
                         iconUrl = 'D:/application/ziper/ziper.svg';
+                        break;
+                    case 'ZOM':
+                        // ZOM 文件图标（使用 zominstall 程序的图标或通用文件图标）
+                        // 如果 zominstall 有图标，使用它；否则使用通用文件图标
+                        iconUrl = 'D:/application/filemanager/assets/file.svg';
                         break;
                     default:
                         iconUrl = 'D:/application/filemanager/assets/file.svg';
@@ -2987,8 +2995,12 @@
                 const extension = fileName.split('.').pop()?.toLowerCase() || '';
                 const isSvg = extension === 'svg';
                 
+                // ZOM 文件默认用 zominstall 安装
+                if (fileType === 'ZOM') {
+                    await this._openFileWithZominstall(item);
+                }
                 // ZIP 压缩文件默认用 ziper 打开
-                if (fileType === 'ZIP') {
+                else if (fileType === 'ZIP') {
                     await this._openFileWithZiper(item);
                 }
                 // 视频文件默认用视频播放器打开
@@ -3419,6 +3431,146 @@
                             type: 'snapshot',
                             title: '文件管理器',
                             content: `启动 ziper 失败: ${error.message}`,
+                            duration: 4000
+                        });
+                    } catch (e) {
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('FileManager', `创建通知失败: ${e.message}`);
+                        }
+                    }
+                }
+            }
+        },
+        
+        /**
+         * 使用 zominstall 安装 ZOM 文件
+         */
+        _openFileWithZominstall: async function(item) {
+            try {
+                if (typeof ProcessManager === 'undefined') {
+                    // ProcessManager 不可用，使用通知提示（不打断用户）
+                    if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                        try {
+                            await NotificationManager.createNotification(this.pid, {
+                                type: 'snapshot',
+                                title: '文件管理器',
+                                content: 'ProcessManager 不可用',
+                                duration: 3000
+                            });
+                        } catch (e) {
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.error('FileManager', `ProcessManager 不可用，且创建通知失败: ${e.message}`);
+                            }
+                        }
+                    } else {
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.error('FileManager', 'ProcessManager 不可用');
+                        }
+                    }
+                    return;
+                }
+                
+                // 确保item.path存在且有效
+                if (!item || !item.path) {
+                    // 文件路径无效，使用通知提示（不打断用户）
+                    if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                        try {
+                            await NotificationManager.createNotification(this.pid, {
+                                type: 'snapshot',
+                                title: '文件管理器',
+                                content: '文件路径无效',
+                                duration: 3000
+                            });
+                        } catch (e) {
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.warn('FileManager', `创建通知失败: ${e.message}`);
+                            }
+                        }
+                    }
+                    return;
+                }
+                
+                // 获取当前路径（用于cwd）
+                const currentPath = this._getCurrentPath();
+                const cwd = currentPath || 'C:';
+                
+                // 尝试从 D:/bin/ 目录加载 zominstall.js
+                let tempAsset = null;
+                try {
+                    // 获取 SystemInformation（用于构建 FSDirve URL）
+                    let SystemInfo = null;
+                    if (typeof SystemInformation !== 'undefined') {
+                        SystemInfo = SystemInformation;
+                    } else if (typeof POOL !== 'undefined' && typeof POOL.__GET__ === 'function') {
+                        try {
+                            SystemInfo = POOL.__GET__('KERNEL_GLOBAL_POOL', 'SystemInformation');
+                        } catch (e) {
+                            // 忽略错误
+                        }
+                    }
+                    
+                    if (SystemInfo) {
+                        // 构建 FSDirve 服务 URL
+                        let url = null;
+                        if (SystemInfo.buildServiceUrlObject && SystemInfo.SERVICE_NAMES) {
+                            url = SystemInfo.buildServiceUrlObject(SystemInfo.SERVICE_NAMES.FSDIRVE);
+                        } else if (SystemInfo.getFSDirvePath && SystemInfo.getOrigin) {
+                            url = new URL(SystemInfo.getFSDirvePath(), SystemInfo.getOrigin());
+                        } else {
+                            // 降级方案：使用默认路径
+                            const origin = window.location.origin || 'http://localhost:8089';
+                            url = new URL('/system/service/FSDirve.php', origin);
+                        }
+                        url.searchParams.set('action', 'read_file');
+                        url.searchParams.set('path', 'D:/bin');
+                        url.searchParams.set('fileName', 'zominstall.js');
+                        
+                        // 读取文件
+                        const response = await fetch(url.toString());
+                        if (response.ok) {
+                            const result = await response.json();
+                            if (result.status === 'success') {
+                                const fileContent = result.data?.content || result.data || '';
+                                if (fileContent && typeof fileContent === 'string') {
+                                    // 创建 tempAsset
+                                    tempAsset = {
+                                        script: fileContent,
+                                        styles: [],
+                                        icon: null,
+                                        metadata: {
+                                            name: 'zominstall',
+                                            type: 'CLI',
+                                            allowMultipleInstances: false
+                                        }
+                                    };
+                                }
+                            }
+                        }
+                    }
+                } catch (e) {
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.debug('FileManager', `从 D:/bin/ 加载 zominstall.js 失败: ${e.message}`);
+                    }
+                }
+                
+                // 启动 zominstall 程序，传递 ZOM 文件路径作为参数
+                await ProcessManager.startProgram('zominstall', {
+                    args: [item.path], // 传递 ZOM 文件路径作为参数
+                    cwd: cwd,
+                    tempAsset: tempAsset // 如果从 D:/bin/ 加载成功，使用 tempAsset
+                });
+                
+            } catch (error) {
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('FileManager', '启动 zominstall 失败', error);
+                }
+                // 启动 zominstall 失败，使用通知提示（不打断用户）
+                if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                    try {
+                        await NotificationManager.createNotification(this.pid, {
+                            type: 'snapshot',
+                            title: '文件管理器',
+                            content: `启动 zominstall 失败: ${error.message || error}`,
                             duration: 4000
                         });
                     } catch (e) {
@@ -4654,6 +4806,37 @@
                             });
                         }
                     }
+                    // ZOM 文件：提供"安装"选项（使用 zominstall）
+                    else if (fileType === 'ZOM') {
+                        if (!isSelectorMode) {
+                            items.push({
+                                label: '安装',
+                                icon: '📦',
+                                action: () => {
+                                    self._openFileWithZominstall({ type: 'file', path: itemPath, name: itemName, fileType: fileType });
+                                }
+                            });
+                        }
+                    }
+                    // ZIP 压缩文件：提供"打开"（默认用 ziper）和"用 ziper 打开"选项
+                    else if (fileType === 'ZIP') {
+                        if (!isSelectorMode) {
+                            items.push({
+                                label: '打开',
+                                icon: '📦',
+                                action: () => {
+                                    self._openFileWithZiper({ type: 'file', path: itemPath, name: itemName, fileType: fileType });
+                                }
+                            });
+                            items.push({
+                                label: '用 ziper 打开',
+                                icon: '📦',
+                                action: () => {
+                                    self._openFileWithZiper({ type: 'file', path: itemPath, name: itemName, fileType: fileType });
+                                }
+                            });
+                        }
+                    }
                     // JS 文件：提供"作为程序执行"和"用 Vim 打开"选项
                     else if (extension === 'js') {
                         if (!isSelectorMode) {
@@ -4811,6 +4994,31 @@
                             icon: '🖥️',
                             action: async () => {
                                 try {
+                                    // 检查是否为 ZOM 文件
+                                    if (itemType === 'file') {
+                                        let fileType = null;
+                                        if (itemElement._fileManagerItem && itemElement._fileManagerItem.fileType) {
+                                            fileType = itemElement._fileManagerItem.fileType;
+                                        } else {
+                                            // 从扩展名推断
+                                            const extension = itemName.split('.').pop()?.toLowerCase() || '';
+                                            if (extension) {
+                                                fileType = self._getFileTypeFromExtension(extension);
+                                            }
+                                        }
+                                        
+                                        // 如果是 ZOM 文件，使用 zominstall 安装
+                                        if (fileType === 'ZOM') {
+                                            await self._openFileWithZominstall({
+                                                type: 'file',
+                                                path: itemPath,
+                                                name: itemName,
+                                                fileType: 'ZOM'
+                                            });
+                                            return;
+                                        }
+                                    }
+                                    
                                     if (typeof DesktopManager === 'undefined') {
                                         // DesktopManager 不可用，使用通知提示（不打断用户）
                                         if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
@@ -4912,6 +5120,12 @@
                                         case 'VIDEO':
                                             iconPath = 'D:/application/filemanager/assets/file-video.svg';
                                             break;
+                                        case 'ZIP':
+                                            iconPath = 'D:/application/ziper/ziper.svg';
+                                            break;
+                                        case 'ZOM':
+                                            iconPath = 'D:/application/filemanager/assets/file.svg';
+                                            break;
                                         default:
                                             iconPath = 'D:/application/filemanager/assets/file.svg';
                                     }
@@ -4936,6 +5150,12 @@
                                                 break;
                                             case 'VIDEO':
                                                 iconPath = 'D:/application/filemanager/assets/file-video.svg';
+                                                break;
+                                            case 'ZIP':
+                                                iconPath = 'D:/application/ziper/ziper.svg';
+                                                break;
+                                            case 'ZOM':
+                                                iconPath = 'D:/application/filemanager/assets/file.svg';
                                                 break;
                                             default:
                                                 iconPath = 'D:/application/filemanager/assets/file.svg';

@@ -7,8 +7,15 @@ KernelLogger.info("LStorage", "模块初始化");
 
 class LStorage {
     // 存储文件路径
-    static STORAGE_FILE_PATH = "D:/";
+    static STORAGE_FILE_PATH = "D:/"
+    
+    // 当前调用上下文 PID（由 ProcessManager 设置）
+    static _currentContextPid = null;;
     static STORAGE_FILE_NAME = "LocalSData.json";
+    
+    // ApplicationTable 文件路径（独立文件）
+    static APPLICATION_TABLE_FILE_PATH = "D:/";
+    static APPLICATION_TABLE_FILE_NAME = "ApplicationTable.json";
     
     // PHP 服务地址（已废弃，使用 SystemInformation.getFSDirvePath() 替代）
     static PHP_SERVICE_URL = "/system/service/FSDirve.php";
@@ -944,6 +951,11 @@ class LStorage {
             await LStorage.init();
         }
         
+        // 特殊处理：applicationTable 存储在独立的文件中
+        if (key === 'applicationTable') {
+            return await LStorage._getApplicationTable();
+        }
+        
         // 检查是否为内核模块调用
         const isKernelModuleCall = LStorage._isKernelModuleCall();
         
@@ -1373,6 +1385,12 @@ class LStorage {
      */
     static _getCurrentPid() {
         try {
+            // 首先检查是否有上下文 PID（由 ProcessManager 设置）
+            if (LStorage._currentContextPid !== null) {
+                KernelLogger.debug("LStorage", `使用上下文 PID: ${LStorage._currentContextPid}`);
+                return LStorage._currentContextPid;
+            }
+            
             if (typeof ProcessManager === 'undefined') {
                 return null;
             }
@@ -1381,15 +1399,56 @@ class LStorage {
             const stack = new Error().stack;
             if (!stack) return null;
             
-            // 查找程序路径（匹配 application/ 目录下的程序）
-            const programPathMatch = stack.match(/service[\/\\]DISK[\/\\][CD][\/\\]application[\/\\]([^\/\\\s]+)/);
+            // 查找程序路径（匹配 application/ 或 bin/ 目录下的程序）
+            // 先尝试 application/ 目录
+            let programPathMatch = stack.match(/service[\/\\]DISK[\/\\][CD][\/\\]application[\/\\]([^\/\\\s]+)/);
+            if (!programPathMatch) {
+                // 如果没找到，尝试 bin/ 目录
+                programPathMatch = stack.match(/service[\/\\]DISK[\/\\][CD][\/\\]bin[\/\\]([^\/\\\s]+)/);
+            }
+            
             if (programPathMatch) {
                 const programName = programPathMatch[1].toLowerCase();
                 // 查找对应的 PID（取第一个匹配的）
                 if (ProcessManager.PROCESS_TABLE) {
                     for (const [pid, info] of ProcessManager.PROCESS_TABLE) {
                         if (info.programName && info.programName.toLowerCase() === programName) {
+                            KernelLogger.debug("LStorage", `通过调用栈找到 PID: ${pid}, 程序: ${programName}`);
                             return pid;
+                        }
+                    }
+                }
+            }
+            
+            // 如果通过调用栈无法找到，尝试从 ProcessManager._executeKernelAPI 的调用栈中获取
+            // 当通过 ProcessManager.callKernelAPI 调用时，调用栈中会有 ProcessManager._executeKernelAPI
+            // 我们需要查找调用 ProcessManager._executeKernelAPI 的程序
+            const executeKernelAPIMatch = stack.match(/ProcessManager\._executeKernelAPI/);
+            if (executeKernelAPIMatch) {
+                // 找到了 ProcessManager._executeKernelAPI，说明是通过 ProcessManager 调用的
+                // 查找调用 ProcessManager._executeKernelAPI 的程序路径
+                // 需要向上查找调用栈，找到调用 callKernelAPI 的程序
+                const stackLines = stack.split('\n');
+                for (let i = 0; i < stackLines.length; i++) {
+                    const line = stackLines[i];
+                    // 查找调用 callKernelAPI 的程序（跳过 ProcessManager 本身的调用栈）
+                    if (line.includes('callKernelAPI') && !line.includes('ProcessManager')) {
+                        // 在后续行中查找程序路径
+                        for (let j = i + 1; j < Math.min(i + 5, stackLines.length); j++) {
+                            const callerLine = stackLines[j];
+                            const callerMatch = callerLine.match(/service[\/\\]DISK[\/\\][CD][\/\\](application|bin)[\/\\]([^\/\\\s]+)/);
+                            if (callerMatch) {
+                                const programName = callerMatch[2].toLowerCase();
+                                // 查找对应的 PID
+                                if (ProcessManager.PROCESS_TABLE) {
+                                    for (const [pid, info] of ProcessManager.PROCESS_TABLE) {
+                                        if (info.programName && info.programName.toLowerCase() === programName) {
+                                            KernelLogger.debug("LStorage", `通过 ProcessManager 调用栈找到 PID: ${pid}, 程序: ${programName}`);
+                                            return pid;
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -1411,6 +1470,38 @@ class LStorage {
     static async setSystemStorage(key, value) {
         if (!LStorage._initialized) {
             await LStorage.init();
+        }
+        
+        // 特殊处理：applicationTable 存储在独立的文件中
+        if (key === 'applicationTable') {
+            // 获取当前进程PID
+            const currentPid = LStorage._getCurrentPid();
+            
+            // 检查是否来自内核模块（内核模块是可信的，可以写入敏感键）
+            const isKernelModuleCall = LStorage._isKernelModuleCall();
+            
+            // 检查是否通过应用程序管理API调用
+            if (!isKernelModuleCall && currentPid) {
+                // 检查调用栈，确保是通过应用程序管理API调用的
+                try {
+                    const stack = new Error().stack;
+                    if (stack && !stack.includes('installApplication') && !stack.includes('uninstallApplication')) {
+                        // 如果不是通过应用程序管理API调用的，拒绝写入
+                        KernelLogger.error("LStorage", `安全拒绝：程序 ${currentPid} 尝试直接写入 applicationTable，必须通过 Application.install/uninstall API`);
+                        throw new Error(`安全策略：不允许直接写入 applicationTable，必须使用 Application.install/uninstall API`);
+                    }
+                } catch (e) {
+                    if (e.message && e.message.includes('安全策略')) {
+                        throw e;
+                    }
+                    // 如果无法检查调用栈，记录警告但拒绝写入（安全策略）
+                    KernelLogger.error("LStorage", `无法验证 applicationTable 写入来源，拒绝写入（安全策略）`);
+                    throw new Error(`安全策略：无法验证 applicationTable 写入来源`);
+                }
+            }
+            
+            // 写入独立的 ApplicationTable.json 文件
+            return await LStorage._setApplicationTable(value);
         }
         
         // 获取当前进程PID
@@ -1447,6 +1538,7 @@ class LStorage {
             'permissionControl.whitelist': true,
             'permissionControl.settings': true,
             'permissionManager.permissions': true,
+            'applicationTable': true,  // 应用程序注册表（只能通过 Application.install/uninstall API 写入）
         };
         
         // 定义特殊键列表（需要特殊权限，但普通用户可以授予）
@@ -1479,6 +1571,8 @@ class LStorage {
                 }
             }
         }
+        
+        // 注意：applicationTable 的特殊处理已经在方法开头完成，这里不再处理
         
         // 检查是否为危险键（需要危险权限，仅管理员可授予）或特殊键（需要特殊权限）
         const isDangerousKey = DANGEROUS_KEYS[key];
@@ -2236,6 +2330,924 @@ class LStorage {
             KernelLogger.error("LStorage", `获取所有环境变量失败: ${error.message}`, error);
             throw error;
         }
+    }
+    
+    // ==================== 应用程序注册表 API ====================
+    
+    /**
+     * 检查程序是否为静态程序（注册在 applicationAssets.js 中）
+     * @param {string} programName 程序名称
+     * @returns {boolean} 是否为静态程序
+     * @private
+     */
+    static _isStaticProgram(programName) {
+        try {
+            // 从 POOL 获取 APPLICATION_ASSETS
+            let applicationAssets = null;
+            if (typeof POOL !== 'undefined' && typeof POOL.__GET__ === 'function') {
+                try {
+                    applicationAssets = POOL.__GET__("KERNEL_GLOBAL_POOL", "APPLICATION_ASSETS");
+                } catch (e) {
+                    // 忽略错误
+                }
+            }
+            
+            // 如果 POOL 中没有，尝试从全局对象获取
+            if (!applicationAssets && typeof APPLICATION_ASSETS !== 'undefined') {
+                applicationAssets = APPLICATION_ASSETS;
+            }
+            
+            // 检查程序是否存在于静态注册表中
+            return applicationAssets && typeof applicationAssets === 'object' && programName in applicationAssets;
+        } catch (e) {
+            KernelLogger.debug("LStorage", `检查静态程序失败: ${e.message}`);
+            return false;
+        }
+    }
+    
+    /**
+     * 从源文件 JSON 结构复制文件到目标目录
+     * @param {Object} sourceFiles JSON 结构，表示文件目录结构 { "path": "content" }
+     * @param {string} targetBasePath 目标基础路径（如 "D:/application/myapp"）
+     * @returns {Promise<boolean>} 是否成功
+     * @private
+     */
+    static async _copyFilesFromJson(sourceFiles, targetBasePath) {
+        if (!sourceFiles || typeof sourceFiles !== 'object') {
+            throw new Error('源文件 JSON 结构无效');
+        }
+        
+        if (!targetBasePath || typeof targetBasePath !== 'string') {
+            throw new Error('目标基础路径无效');
+        }
+        
+        // 规范化目标路径（移除末尾斜杠）
+        const normalizedTargetPath = targetBasePath.replace(/\/+$/, '');
+        
+        /**
+         * 递归创建目录（确保所有父目录都存在）
+         */
+        const ensureDirectoryExists = async (dirPath) => {
+            if (!dirPath || dirPath.length < 3) {
+                return; // 跳过根路径（如 D:）
+            }
+            
+            const dirParts = dirPath.split('/');
+            if (dirParts.length < 2) {
+                return;
+            }
+            
+            // 从根目录开始，逐级创建
+            for (let i = 2; i <= dirParts.length; i++) {
+                const currentPath = dirParts.slice(0, i).join('/');
+                if (currentPath.length < 3) {
+                    continue; // 跳过根路径
+                }
+                
+                const parentPath = dirParts.slice(0, i - 1).join('/');
+                const dirName = dirParts[i - 1];
+                
+                if (!parentPath || parentPath.length < 3) {
+                    continue; // 跳过无效的父路径
+                }
+                
+                try {
+                    // 使用 PHP 服务创建目录
+                    const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                        ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                        : new URL(LStorage.PHP_SERVICE_URL, (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                            ? SystemInformation.getOrigin()
+                            : window.location.origin);
+                    url.searchParams.set('action', 'create_dir');
+                    url.searchParams.set('path', parentPath);
+                    url.searchParams.set('name', dirName);
+                    
+                    const response = await fetch(url.toString());
+                    if (response.ok) {
+                        const result = await response.json();
+                        if (result.status === 'success') {
+                            KernelLogger.debug("LStorage", `目录已创建或已存在: ${currentPath}`);
+                        } else if (result.data && result.data.existed) {
+                            KernelLogger.debug("LStorage", `目录已存在: ${currentPath}`);
+                        } else {
+                            KernelLogger.debug("LStorage", `创建目录结果: ${currentPath}, ${result.message}`);
+                        }
+                    } else if (response.status === 404) {
+                        // 父目录不存在，继续递归创建
+                        await ensureDirectoryExists(parentPath);
+                        // 重试创建当前目录
+                        const retryResponse = await fetch(url.toString());
+                        if (retryResponse.ok) {
+                            const retryResult = await retryResponse.json();
+                            if (retryResult.status === 'success' || (retryResult.data && retryResult.data.existed)) {
+                                KernelLogger.debug("LStorage", `目录已创建或已存在: ${currentPath}`);
+                            }
+                        }
+                    } else {
+                        const errorText = await response.text().catch(() => '');
+                        KernelLogger.debug("LStorage", `创建目录失败: ${currentPath}, HTTP ${response.status}, ${errorText}`);
+                    }
+                } catch (e) {
+                    // 忽略单个目录创建错误，继续
+                    KernelLogger.debug("LStorage", `创建目录时出错（继续）: ${currentPath}, ${e.message}`);
+                }
+            }
+        };
+        
+        // 收集所有需要创建的目录（去重）
+        const directoriesToCreate = new Set();
+        for (const filePath of Object.keys(sourceFiles)) {
+            const fullTargetPath = `${normalizedTargetPath}/${filePath}`;
+            const pathParts = fullTargetPath.split('/');
+            if (pathParts.length >= 2) {
+                // 构建所有父目录路径
+                for (let i = 2; i < pathParts.length; i++) {
+                    const dirPath = pathParts.slice(0, i).join('/');
+                    directoriesToCreate.add(dirPath);
+                }
+            }
+        }
+        
+        // 创建所有需要的目录（按路径深度排序，确保父目录先创建）
+        const sortedDirs = Array.from(directoriesToCreate).sort((a, b) => {
+            const depthA = a.split('/').length;
+            const depthB = b.split('/').length;
+            return depthA - depthB;
+        });
+        
+        for (const dirPath of sortedDirs) {
+            await ensureDirectoryExists(dirPath);
+        }
+        
+        // 遍历所有文件并复制
+        for (const [filePath, content] of Object.entries(sourceFiles)) {
+            if (typeof content !== 'string') {
+                KernelLogger.warn("LStorage", `跳过非字符串内容: ${filePath}`);
+                continue;
+            }
+            
+            // 构建完整的目标路径
+            const fullTargetPath = `${normalizedTargetPath}/${filePath}`;
+            
+            // 解析路径，分离目录和文件名
+            const pathParts = fullTargetPath.split('/');
+            if (pathParts.length < 2) {
+                throw new Error(`无效的文件路径: ${fullTargetPath}`);
+            }
+            
+            const fileName = pathParts[pathParts.length - 1];
+            const dirPath = pathParts.slice(0, -1).join('/');
+            
+            try {
+                // 使用 FileSystem.write API（如果可用）
+                // 由于 LStorage 是内核模块，可以直接调用 ProcessManager._executeKernelAPI
+                if (typeof ProcessManager !== 'undefined' && typeof ProcessManager._executeKernelAPI === 'function') {
+                    // 直接调用内核 API（LStorage 是内核模块）
+                    await ProcessManager._executeKernelAPI('FileSystem.write', [fullTargetPath, content, 'OVERWRITE'], null);
+                } else {
+                    // 降级方案：直接使用 PHP 服务写入文件
+                    const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                        ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                        : new URL(LStorage.PHP_SERVICE_URL, (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                            ? SystemInformation.getOrigin()
+                            : window.location.origin);
+                    url.searchParams.set('action', 'write_file');
+                    url.searchParams.set('path', dirPath);
+                    url.searchParams.set('fileName', fileName);
+                    url.searchParams.set('writeMod', 'overwrite');
+                    
+                    const response = await fetch(url.toString(), {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ content: content })
+                    });
+                    
+                    if (!response.ok) {
+                        // 如果是 404，可能是目录不存在，尝试创建目录后重试
+                        if (response.status === 404) {
+                            KernelLogger.debug("LStorage", `写入文件时目录不存在，尝试创建目录: ${dirPath}`);
+                            // 尝试创建目录
+                            try {
+                                const dirParts = dirPath.split('/');
+                                if (dirParts.length >= 2) {
+                                    const parentPath = dirParts.slice(0, -1).join('/');
+                                    const dirName = dirParts[dirParts.length - 1];
+                                    
+                                    const createUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                                        ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                                        : new URL(LStorage.PHP_SERVICE_URL, (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                                            ? SystemInformation.getOrigin()
+                                            : window.location.origin);
+                                    createUrl.searchParams.set('action', 'create_dir');
+                                    createUrl.searchParams.set('path', parentPath);
+                                    createUrl.searchParams.set('name', dirName);
+                                    
+                                    const createResponse = await fetch(createUrl.toString());
+                                    if (createResponse.ok) {
+                                        // 目录创建成功，重试写入文件
+                                        const retryResponse = await fetch(url.toString(), {
+                                            method: 'POST',
+                                            headers: {
+                                                'Content-Type': 'application/json'
+                                            },
+                                            body: JSON.stringify({ content: content })
+                                        });
+                                        
+                                        if (!retryResponse.ok) {
+                                            const errorText = await retryResponse.text();
+                                            throw new Error(`写入文件失败: ${errorText}`);
+                                        }
+                                        
+                                        const retryResult = await retryResponse.json();
+                                        if (retryResult.status !== 'success') {
+                                            throw new Error(`写入文件失败: ${retryResult.message || '未知错误'}`);
+                                        }
+                                    } else {
+                                        const errorText = await response.text();
+                                        throw new Error(`写入文件失败: 目录创建失败, ${errorText}`);
+                                    }
+                                } else {
+                                    const errorText = await response.text();
+                                    throw new Error(`写入文件失败: ${errorText}`);
+                                }
+                            } catch (createError) {
+                                const errorText = await response.text().catch(() => '');
+                                throw new Error(`写入文件失败: ${errorText || createError.message}`);
+                            }
+                        } else {
+                            const errorText = await response.text();
+                            throw new Error(`写入文件失败: ${errorText}`);
+                        }
+                    } else {
+                        const result = await response.json();
+                        if (result.status !== 'success') {
+                            throw new Error(`写入文件失败: ${result.message || '未知错误'}`);
+                        }
+                    }
+                }
+                
+                KernelLogger.debug("LStorage", `文件已复制: ${fullTargetPath}`);
+            } catch (error) {
+                KernelLogger.error("LStorage", `复制文件失败: ${fullTargetPath}, 错误: ${error.message}`, error);
+                // 提供更详细的错误信息
+                const errorDetails = {
+                    sourcePath: filePath,
+                    targetPath: fullTargetPath,
+                    dirPath: dirPath,
+                    fileName: fileName,
+                    error: error.message
+                };
+                KernelLogger.error("LStorage", `复制文件详细信息:`, errorDetails);
+                throw new Error(`复制文件失败: ${filePath} -> ${fullTargetPath} - ${error.message}`);
+            }
+        }
+        
+        KernelLogger.info("LStorage", `所有文件复制完成，共 ${Object.keys(sourceFiles).length} 个文件`);
+        return true;
+    }
+    
+    /**
+     * 删除应用程序的所有文件
+     * @param {Object} asset 程序资源对象
+     * @returns {Promise<boolean>} 是否成功
+     * @private
+     */
+    static async _deleteApplicationFiles(asset) {
+        if (!asset || typeof asset !== 'object') {
+            return true; // 没有文件需要删除
+        }
+        
+        // 收集所有需要删除的文件路径
+        const filesToDelete = [];
+        
+        // 主脚本文件
+        if (asset.script) {
+            filesToDelete.push(asset.script);
+        } else if (asset.path) {
+            filesToDelete.push(asset.path);
+        }
+        
+        // 样式文件
+        if (Array.isArray(asset.styles)) {
+            filesToDelete.push(...asset.styles);
+        }
+        
+        // 图标文件
+        if (asset.icon) {
+            filesToDelete.push(asset.icon);
+        }
+        
+        // 资源文件
+        if (Array.isArray(asset.assets)) {
+            filesToDelete.push(...asset.assets);
+        } else if (typeof asset.assets === 'string') {
+            filesToDelete.push(asset.assets);
+        }
+        
+        // 删除所有文件
+        for (const filePath of filesToDelete) {
+            try {
+                // 解析路径
+                const pathParts = filePath.split('/');
+                if (pathParts.length < 2) {
+                    KernelLogger.warn("LStorage", `无效的文件路径: ${filePath}`);
+                    continue;
+                }
+                
+                const fileName = pathParts[pathParts.length - 1];
+                const dirPath = pathParts.slice(0, -1).join('/');
+                
+                // 使用 FileSystem.delete API
+                // 由于 LStorage 是内核模块，可以直接调用 ProcessManager._executeKernelAPI
+                if (typeof ProcessManager !== 'undefined' && typeof ProcessManager._executeKernelAPI === 'function') {
+                    try {
+                        // 直接调用内核 API（LStorage 是内核模块）
+                        await ProcessManager._executeKernelAPI('FileSystem.delete', [filePath], null);
+                        KernelLogger.debug("LStorage", `文件已删除: ${filePath}`);
+                    } catch (error) {
+                        // 如果文件不存在，这是可以接受的（可能已经被删除或从未存在）
+                        if (error.message && (error.message.includes('文件不存在') || error.message.includes('not found') || error.message.includes('404'))) {
+                            KernelLogger.debug("LStorage", `文件不存在，跳过删除: ${filePath}`);
+                        } else {
+                            throw error;  // 其他错误继续抛出
+                        }
+                    }
+                } else {
+                    // 降级方案：使用 PHP 服务删除文件
+                    const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                        ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                        : new URL(LStorage.PHP_SERVICE_URL, (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                            ? SystemInformation.getOrigin()
+                            : window.location.origin);
+                    url.searchParams.set('action', 'delete_file');
+                    url.searchParams.set('path', dirPath);
+                    url.searchParams.set('fileName', fileName);
+                    
+                    const response = await fetch(url.toString(), {
+                        method: 'GET',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        }
+                    });
+                    
+                    if (!response.ok) {
+                        // 404 表示文件不存在，这是可以接受的
+                        if (response.status === 404) {
+                            KernelLogger.debug("LStorage", `文件不存在，跳过删除: ${filePath}`);
+                        } else {
+                            KernelLogger.warn("LStorage", `删除文件失败: ${filePath}, HTTP ${response.status}`);
+                        }
+                    } else {
+                        KernelLogger.debug("LStorage", `文件已删除: ${filePath}`);
+                    }
+                }
+            } catch (error) {
+                // 如果文件不存在，这是可以接受的（可能已经被删除或从未存在）
+                if (error.message && (error.message.includes('文件不存在') || error.message.includes('not found') || error.message.includes('404'))) {
+                    KernelLogger.debug("LStorage", `文件不存在，跳过删除: ${filePath}`);
+                } else {
+                    KernelLogger.warn("LStorage", `删除文件失败: ${filePath}, 错误: ${error.message}`);
+                }
+                // 继续删除其他文件，不中断
+            }
+        }
+        
+        // 删除应用程序目录（递归删除整个目录）
+        // 注意：先删除所有文件，最后删除目录
+        try {
+            // 从主脚本路径提取应用程序目录
+            const mainScriptPath = asset.script || asset.path;
+            if (mainScriptPath) {
+                const pathParts = mainScriptPath.split('/');
+                if (pathParts.length >= 3) {
+                    // 假设路径格式为 "D:/application/myapp/myapp.js"
+                    // 提取 "D:/application/myapp"
+                    const appDirPath = pathParts.slice(0, -1).join('/');
+                    
+                    // 使用 FileSystem.delete 递归删除整个目录
+                    // FileSystem.delete 会自动检测是文件还是目录，如果是目录则使用递归删除
+                    if (typeof ProcessManager !== 'undefined' && typeof ProcessManager._executeKernelAPI === 'function') {
+                        try {
+                            KernelLogger.info("LStorage", `删除应用程序目录: ${appDirPath}`);
+                            await ProcessManager._executeKernelAPI('FileSystem.delete', [appDirPath], null);
+                            KernelLogger.info("LStorage", `应用程序目录已删除: ${appDirPath}`);
+                        } catch (e) {
+                            // 如果目录不存在，这是可以接受的
+                            if (e.message && (e.message.includes('文件不存在') || e.message.includes('not found') || e.message.includes('404'))) {
+                                KernelLogger.debug("LStorage", `应用程序目录不存在，跳过删除: ${appDirPath}`);
+                            } else {
+                                KernelLogger.warn("LStorage", `删除应用程序目录失败: ${appDirPath}, 错误: ${e.message}`);
+                                // 如果递归删除失败，尝试使用 PHP 服务直接删除目录
+                                try {
+                                    const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                                        ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                                        : new URL(LStorage.PHP_SERVICE_URL, (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                                            ? SystemInformation.getOrigin()
+                                            : window.location.origin);
+                                    url.searchParams.set('action', 'delete_dir_recursive');
+                                    url.searchParams.set('path', appDirPath);
+                                    
+                                    const response = await fetch(url.toString());
+                                    if (response.ok) {
+                                        const result = await response.json();
+                                        if (result.status === 'success') {
+                                            KernelLogger.info("LStorage", `通过 PHP 服务删除应用程序目录成功: ${appDirPath}`);
+                                        } else {
+                                            KernelLogger.warn("LStorage", `通过 PHP 服务删除应用程序目录失败: ${result.message}`);
+                                        }
+                                    }
+                                } catch (phpError) {
+                                    KernelLogger.warn("LStorage", `通过 PHP 服务删除应用程序目录失败: ${phpError.message}`);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (error) {
+            // 忽略目录删除错误（不影响卸载流程）
+            KernelLogger.warn("LStorage", `删除应用程序目录时出错: ${error.message}`);
+        }
+        
+        return true;
+    }
+    
+    /**
+     * 安装应用程序到 ApplicationTable（动态程序注册表）
+     * @param {string} programName 程序名称
+     * @param {Object} asset 程序资源对象（格式与 applicationAssets.js 相同）
+     * @param {Object} sourceFiles 源文件 JSON 结构，用于复制文件到 application/ 目录（可选）
+     * @returns {Promise<boolean>} 是否成功
+     */
+    static async installApplication(programName, asset, sourceFiles = null) {
+        if (!programName || typeof programName !== 'string') {
+            throw new Error('程序名称必须是字符串');
+        }
+        
+        if (!asset || (typeof asset !== 'string' && (typeof asset !== 'object' || asset === null))) {
+            throw new Error('程序资源无效（必须是字符串路径或对象）');
+        }
+        
+        // 检查是否为内核模块调用
+        const isKernelModuleCall = LStorage._isKernelModuleCall();
+        
+        // 如果不是内核模块调用，需要检查权限
+        if (!isKernelModuleCall) {
+            const currentPid = LStorage._getCurrentPid();
+            if (!currentPid) {
+                KernelLogger.error("LStorage", `无法获取进程PID，拒绝安装应用程序（安全策略）`);
+                throw new Error(`安全策略：无法验证调用来源，拒绝安装应用程序`);
+            }
+            
+            // 检查用户级别：普通用户不允许安装应用程序
+            if (typeof UserControl !== 'undefined') {
+                const isAdmin = UserControl.isAdmin();
+                if (!isAdmin) {
+                    KernelLogger.error("LStorage", `进程 ${currentPid} 尝试安装应用程序 ${programName}，但当前用户不是管理员，普通用户不允许安装应用程序`);
+                    throw new Error(`安全策略：普通用户不允许安装应用程序，需要管理员权限`);
+                }
+            }
+            
+            // 检查应用程序安装权限
+            if (typeof PermissionManager !== 'undefined' && PermissionManager.checkAndRequestPermission) {
+                try {
+                    const granted = await PermissionManager.checkAndRequestPermission(
+                        currentPid, 
+                        PermissionManager.PERMISSION.APPLICATION_INSTALL
+                    );
+                    if (!granted) {
+                        KernelLogger.error("LStorage", `进程 ${currentPid} 尝试安装应用程序 ${programName}，但缺少权限 APPLICATION_INSTALL`);
+                        throw new Error(`缺少权限：APPLICATION_INSTALL`);
+                    }
+                } catch (error) {
+                    if (error.message && error.message.includes('缺少权限')) {
+                        throw error;
+                    }
+                    KernelLogger.error("LStorage", `权限检查失败: ${error.message}`, error);
+                    throw new Error(`权限检查失败: ${error.message}`);
+                }
+            }
+        }
+        
+        try {
+            // 获取 ApplicationTable
+            let applicationTable = await LStorage.getSystemStorage('applicationTable');
+            if (!applicationTable || typeof applicationTable !== 'object') {
+                applicationTable = {};
+            }
+            
+            // 验证资源格式
+            if (typeof asset === 'string') {
+                // 简单格式：字符串路径
+                if (!asset.trim()) {
+                    throw new Error('脚本路径不能为空');
+                }
+            } else if (typeof asset === 'object' && asset !== null) {
+                // 完整格式：对象
+                if (!asset.script && !asset.path) {
+                    throw new Error('缺少脚本路径（script 或 path）');
+                }
+                if (asset.styles !== undefined && !Array.isArray(asset.styles)) {
+                    throw new Error('styles 必须是数组');
+                }
+                if (asset.icon !== undefined && typeof asset.icon !== 'string') {
+                    throw new Error('icon 必须是字符串');
+                }
+                if (asset.metadata !== undefined && (typeof asset.metadata !== 'object' || asset.metadata === null)) {
+                    throw new Error('metadata 必须是对象');
+                }
+            }
+            
+            // 如果提供了源文件 JSON 结构，复制文件到 application/ 目录
+            if (sourceFiles && typeof sourceFiles === 'object') {
+                // 确定目标基础路径（D:/application/programName）
+                const targetBasePath = `D:/application/${programName}`;
+                
+                KernelLogger.info("LStorage", `开始复制源文件到: ${targetBasePath}`);
+                
+                // 复制所有文件
+                await LStorage._copyFilesFromJson(sourceFiles, targetBasePath);
+                
+                // 更新 asset 中的路径，使其指向 application/ 目录
+                // 注意：路径应该基于源文件 JSON 结构中的实际路径
+                if (typeof asset === 'object' && asset !== null) {
+                    // 更新 script 路径
+                    if (asset.script) {
+                        // 如果 script 是相对路径，更新为绝对路径
+                        if (!asset.script.startsWith('D:/') && !asset.script.startsWith('C:/')) {
+                            asset.script = `${targetBasePath}/${asset.script}`;
+                        }
+                    } else if (asset.path) {
+                        if (!asset.path.startsWith('D:/') && !asset.path.startsWith('C:/')) {
+                            asset.path = `${targetBasePath}/${asset.path}`;
+                        }
+                    } else {
+                        // 如果没有指定 script，尝试从源文件 JSON 中找到主脚本文件
+                        // 通常主脚本文件名与程序名相同
+                        const mainScriptKey = Object.keys(sourceFiles).find(key => 
+                            key.endsWith(`${programName}.js`) || key.endsWith('index.js') || key.endsWith('main.js')
+                        );
+                        if (mainScriptKey) {
+                            asset.script = `${targetBasePath}/${mainScriptKey}`;
+                        } else {
+                            // 使用默认路径
+                            asset.script = `${targetBasePath}/${programName}.js`;
+                        }
+                    }
+                    
+                    // 更新 styles 路径
+                    if (Array.isArray(asset.styles)) {
+                        asset.styles = asset.styles.map(style => {
+                            if (!style.startsWith('D:/') && !style.startsWith('C:/')) {
+                                return `${targetBasePath}/${style}`;
+                            }
+                            return style;
+                        });
+                    }
+                    
+                    // 更新 icon 路径
+                    if (asset.icon && !asset.icon.startsWith('D:/') && !asset.icon.startsWith('C:/')) {
+                        // 确保路径正确拼接（避免重复斜杠）
+                        const iconPath = asset.icon.startsWith('/') ? asset.icon.substring(1) : asset.icon;
+                        asset.icon = `${targetBasePath}/${iconPath}`.replace(/\/+/g, '/');
+                        KernelLogger.debug("LStorage", `图标路径已更新: ${asset.icon}`);
+                    } else if (asset.icon && (asset.icon.startsWith('D:/') || asset.icon.startsWith('C:/'))) {
+                        // 如果已经是绝对路径，确保格式正确
+                        asset.icon = asset.icon.replace(/\/+/g, '/');
+                        KernelLogger.debug("LStorage", `图标路径（绝对路径）: ${asset.icon}`);
+                    }
+                    
+                    // 更新 assets 路径
+                    if (Array.isArray(asset.assets)) {
+                        asset.assets = asset.assets.map(assetPath => {
+                            if (!assetPath.startsWith('D:/') && !assetPath.startsWith('C:/')) {
+                                return `${targetBasePath}/${assetPath}`;
+                            }
+                            return assetPath;
+                        });
+                    } else if (typeof asset.assets === 'string' && !asset.assets.startsWith('D:/') && !asset.assets.startsWith('C:/')) {
+                        asset.assets = `${targetBasePath}/${asset.assets}`;
+                    }
+                } else if (typeof asset === 'string' && !asset.startsWith('D:/') && !asset.startsWith('C:/')) {
+                    // 简单格式：更新路径
+                    asset = `${targetBasePath}/${asset}`;
+                }
+                
+                KernelLogger.info("LStorage", `源文件复制完成`);
+            }
+            
+            // 添加或更新应用程序
+            applicationTable[programName] = asset;
+            
+            // 记录图标路径（用于调试）
+            if (asset.icon) {
+                KernelLogger.info("LStorage", `程序 ${programName} 的图标路径: ${asset.icon}`);
+            } else {
+                KernelLogger.warn("LStorage", `程序 ${programName} 没有图标路径`);
+            }
+            
+            // 保存到系统存储
+            await LStorage.setSystemStorage('applicationTable', applicationTable);
+            
+            // 刷新 ApplicationAssetManager，使新安装的程序立即可用
+            if (typeof ApplicationAssetManager !== 'undefined' && typeof ApplicationAssetManager.refresh === 'function') {
+                try {
+                    await ApplicationAssetManager.refresh();
+                    KernelLogger.info("LStorage", `ApplicationAssetManager 已刷新`);
+                } catch (e) {
+                    KernelLogger.warn("LStorage", `刷新 ApplicationAssetManager 失败: ${e.message}`);
+                }
+            }
+            
+            KernelLogger.info("LStorage", `应用程序已安装: ${programName}`);
+            return true;
+        } catch (error) {
+            KernelLogger.error("LStorage", `安装应用程序失败: ${error.message}`, error);
+            throw error;
+        }
+    }
+    
+    /**
+     * 卸载应用程序（从 ApplicationTable 中删除）
+     * @param {string} programName 程序名称
+     * @returns {Promise<boolean>} 是否成功
+     */
+    static async uninstallApplication(programName) {
+        if (!programName || typeof programName !== 'string') {
+            throw new Error('程序名称必须是字符串');
+        }
+        
+        // 检查是否为内核模块调用
+        const isKernelModuleCall = LStorage._isKernelModuleCall();
+        
+        // 如果不是内核模块调用，需要检查权限
+        if (!isKernelModuleCall) {
+            const currentPid = LStorage._getCurrentPid();
+            if (!currentPid) {
+                KernelLogger.error("LStorage", `无法获取进程PID，拒绝卸载应用程序（安全策略）`);
+                throw new Error(`安全策略：无法验证调用来源，拒绝卸载应用程序`);
+            }
+            
+            // 检查用户级别：普通用户不允许卸载应用程序
+            if (typeof UserControl !== 'undefined') {
+                const isAdmin = UserControl.isAdmin();
+                if (!isAdmin) {
+                    KernelLogger.error("LStorage", `进程 ${currentPid} 尝试卸载应用程序 ${programName}，但当前用户不是管理员，普通用户不允许卸载应用程序`);
+                    throw new Error(`安全策略：普通用户不允许卸载应用程序，需要管理员权限`);
+                }
+            }
+            
+            // 检查应用程序卸载权限
+            if (typeof PermissionManager !== 'undefined' && PermissionManager.checkAndRequestPermission) {
+                try {
+                    const granted = await PermissionManager.checkAndRequestPermission(
+                        currentPid, 
+                        PermissionManager.PERMISSION.APPLICATION_UNINSTALL
+                    );
+                    if (!granted) {
+                        KernelLogger.error("LStorage", `进程 ${currentPid} 尝试卸载应用程序 ${programName}，但缺少权限 APPLICATION_UNINSTALL`);
+                        throw new Error(`缺少权限：APPLICATION_UNINSTALL`);
+                    }
+                } catch (error) {
+                    if (error.message && error.message.includes('缺少权限')) {
+                        throw error;
+                    }
+                    KernelLogger.error("LStorage", `权限检查失败: ${error.message}`, error);
+                    throw new Error(`权限检查失败: ${error.message}`);
+                }
+            }
+        }
+        
+        try {
+            // 检查是否为静态程序（禁止删除静态程序）
+            if (LStorage._isStaticProgram(programName)) {
+                KernelLogger.error("LStorage", `拒绝卸载静态程序: ${programName}（静态程序注册在 applicationAssets.js 中，不允许删除）`);
+                throw new Error(`安全策略：不允许卸载静态程序 ${programName}（静态程序注册在 applicationAssets.js 中）`);
+            }
+            
+            // 获取 ApplicationTable
+            const applicationTable = await LStorage.getSystemStorage('applicationTable');
+            if (!applicationTable || typeof applicationTable !== 'object') {
+                KernelLogger.warn("LStorage", `ApplicationTable 不存在，无法卸载应用程序 ${programName}`);
+                return false;
+            }
+            
+            // 检查应用程序是否存在
+            if (!(programName in applicationTable)) {
+                KernelLogger.warn("LStorage", `应用程序 ${programName} 不存在于 ApplicationTable`);
+                return false;
+            }
+            
+            // 获取应用程序资源对象（用于删除文件）
+            const asset = applicationTable[programName];
+            
+            // 1. 删除桌面图标（如果存在）
+            try {
+                if (typeof ProcessManager !== 'undefined' && typeof ProcessManager._executeKernelAPI === 'function') {
+                    // 获取所有桌面图标
+                    const desktopIcons = await ProcessManager._executeKernelAPI('Desktop.getIcons', [], null);
+                    if (Array.isArray(desktopIcons)) {
+                        // 查找匹配 programName 的图标
+                        const matchingIcons = desktopIcons.filter(icon => 
+                            icon && icon.programName && icon.programName.toLowerCase() === programName.toLowerCase()
+                        );
+                        
+                        // 删除所有匹配的图标
+                        for (const icon of matchingIcons) {
+                            if (icon.id !== undefined) {
+                                try {
+                                    await ProcessManager._executeKernelAPI('Desktop.removeShortcut', [icon.id], null);
+                                    KernelLogger.info("LStorage", `已删除桌面图标: ${icon.name} (ID: ${icon.id})`);
+                                } catch (e) {
+                                    KernelLogger.warn("LStorage", `删除桌面图标失败: ${e.message}`);
+                                }
+                            }
+                        }
+                    }
+                }
+            } catch (e) {
+                KernelLogger.warn("LStorage", `删除桌面图标时出错: ${e.message}`);
+            }
+            
+            // 2. 取消任务栏固定（如果已固定）
+            try {
+                if (typeof ProcessManager !== 'undefined' && typeof ProcessManager._executeKernelAPI === 'function') {
+                    await ProcessManager._executeKernelAPI('Taskbar.unpinProgram', [programName], null);
+                    KernelLogger.info("LStorage", `已取消任务栏固定: ${programName}`);
+                }
+            } catch (e) {
+                // 如果未固定，这是可以接受的
+                if (!e.message || !e.message.includes('未固定')) {
+                    KernelLogger.warn("LStorage", `取消任务栏固定时出错: ${e.message}`);
+                }
+            }
+            
+            // 3. 删除应用程序的所有文件
+            KernelLogger.info("LStorage", `开始删除应用程序文件: ${programName}`);
+            await LStorage._deleteApplicationFiles(asset);
+            
+            // 从 ApplicationTable 中删除应用程序
+            delete applicationTable[programName];
+            
+            // 保存到系统存储
+            await LStorage.setSystemStorage('applicationTable', applicationTable);
+            
+            // 刷新 ApplicationAssetManager，使卸载的程序立即从列表中移除
+            if (typeof ApplicationAssetManager !== 'undefined' && typeof ApplicationAssetManager.refresh === 'function') {
+                try {
+                    await ApplicationAssetManager.refresh();
+                    KernelLogger.info("LStorage", `ApplicationAssetManager 已刷新`);
+                } catch (e) {
+                    KernelLogger.warn("LStorage", `刷新 ApplicationAssetManager 失败: ${e.message}`);
+                }
+            }
+            
+            KernelLogger.info("LStorage", `应用程序已卸载: ${programName}`);
+            return true;
+        } catch (error) {
+            KernelLogger.error("LStorage", `卸载应用程序失败: ${error.message}`, error);
+            throw error;
+        }
+    }
+    
+    /**
+     * 获取动态安装的应用程序信息
+     * @param {string} programName 程序名称
+     * @returns {Promise<Object|null>} 应用程序资源对象，如果不存在则返回 null
+     */
+    static async getInstalledApplication(programName) {
+        if (!programName || typeof programName !== 'string') {
+            return null;
+        }
+        
+        try {
+            // 获取 ApplicationTable
+            const applicationTable = await LStorage.getSystemStorage('applicationTable');
+            if (!applicationTable || typeof applicationTable !== 'object') {
+                return null;
+            }
+            
+            return applicationTable[programName] || null;
+        } catch (error) {
+            KernelLogger.error("LStorage", `获取应用程序信息失败: ${error.message}`, error);
+            return null;
+        }
+    }
+    
+    /**
+     * 检查应用程序是否已动态安装
+     * @param {string} programName 程序名称
+     * @returns {Promise<boolean>} 是否已安装
+     */
+    static async isApplicationInstalled(programName) {
+        if (!programName || typeof programName !== 'string') {
+            return false;
+        }
+        
+        const app = await LStorage.getInstalledApplication(programName);
+        return app !== null;
+    }
+    
+    /**
+     * 读取 ApplicationTable.json 文件
+     * @returns {Promise<Object>} ApplicationTable 对象，如果文件不存在则返回 {}
+     * @private
+     */
+    static async _getApplicationTable() {
+        try {
+            const content = await LStorage._readFileFromPHP(
+                LStorage.APPLICATION_TABLE_FILE_PATH,
+                LStorage.APPLICATION_TABLE_FILE_NAME
+            );
+            
+            if (!content) {
+                // 文件不存在，返回空对象
+                KernelLogger.debug("LStorage", "ApplicationTable.json 不存在，返回空对象");
+                return {};
+            }
+            
+            // 解析 JSON
+            try {
+                const parsed = JSON.parse(content);
+                if (typeof parsed !== 'object' || parsed === null) {
+                    KernelLogger.warn("LStorage", "ApplicationTable.json 格式错误，返回空对象");
+                    return {};
+                }
+                return parsed;
+            } catch (parseError) {
+                KernelLogger.error("LStorage", `解析 ApplicationTable.json 失败: ${parseError.message}`);
+                return {};
+            }
+        } catch (error) {
+            KernelLogger.error("LStorage", `读取 ApplicationTable.json 失败: ${error.message}`, error);
+            return {};
+        }
+    }
+    
+    /**
+     * 写入 ApplicationTable.json 文件
+     * @param {Object} applicationTable ApplicationTable 对象
+     * @returns {Promise<boolean>} 是否成功
+     * @private
+     */
+    static async _setApplicationTable(applicationTable) {
+        try {
+            if (!applicationTable || typeof applicationTable !== 'object') {
+                throw new Error('ApplicationTable 必须是对象');
+            }
+            
+            // 序列化为 JSON
+            const content = JSON.stringify(applicationTable, null, 2);
+            
+            // 写入文件
+            const success = await LStorage._writeFileToPHP(
+                LStorage.APPLICATION_TABLE_FILE_PATH,
+                LStorage.APPLICATION_TABLE_FILE_NAME,
+                content
+            );
+            
+            if (success) {
+                KernelLogger.debug("LStorage", "ApplicationTable.json 已保存");
+            } else {
+                KernelLogger.warn("LStorage", "ApplicationTable.json 保存失败");
+            }
+            
+            return success;
+        } catch (error) {
+            KernelLogger.error("LStorage", `写入 ApplicationTable.json 失败: ${error.message}`, error);
+            return false;
+        }
+    }
+    
+    /**
+     * 列出所有动态安装的应用程序
+     * @returns {Promise<Object>} 应用程序注册表对象 { [programName]: asset }
+     */
+    static async listInstalledApplications() {
+        try {
+            // 获取 ApplicationTable
+            const applicationTable = await LStorage.getSystemStorage('applicationTable');
+            if (!applicationTable || typeof applicationTable !== 'object') {
+                return {};
+            }
+            
+            // 返回副本（避免直接修改原对象）
+            return { ...applicationTable };
+        } catch (error) {
+            KernelLogger.error("LStorage", `列出应用程序失败: ${error.message}`, error);
+            return {};
+        }
+    }
+    
+    /**
+     * 获取所有动态安装的应用程序名称列表
+     * @returns {Promise<Array<string>>} 应用程序名称数组
+     */
+    static async listInstalledApplicationNames() {
+        const applications = await LStorage.listInstalledApplications();
+        return Object.keys(applications);
     }
 }
 

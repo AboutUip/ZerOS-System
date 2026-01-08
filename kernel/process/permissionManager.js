@@ -98,7 +98,11 @@ class PermissionManager {
         // 计划任务权限
         SCHEDULE_TASK_CREATE: 'SCHEDULE_TASK_CREATE',       // 创建计划任务
         SCHEDULE_TASK_MANAGE: 'SCHEDULE_TASK_MANAGE',       // 管理计划任务（更新、删除）
-        SCHEDULE_TASK_STARTUP: 'SCHEDULE_TASK_STARTUP'     // 创建系统启动后的计划任务（危险权限）
+        SCHEDULE_TASK_STARTUP: 'SCHEDULE_TASK_STARTUP',     // 创建系统启动后的计划任务（危险权限）
+        
+        // 应用程序管理权限（危险权限，仅管理员可授予）
+        APPLICATION_INSTALL: 'APPLICATION_INSTALL',         // 安装应用程序
+        APPLICATION_UNINSTALL: 'APPLICATION_UNINSTALL'       // 卸载应用程序
     };
     
     /**
@@ -185,6 +189,10 @@ class PermissionManager {
         // 危险权限（需要明确授权）
         [PermissionManager.PERMISSION.PROCESS_MANAGE]: PermissionManager.PERMISSION_LEVEL.DANGEROUS,
         [PermissionManager.PERMISSION.SCHEDULE_TASK_STARTUP]: PermissionManager.PERMISSION_LEVEL.DANGEROUS,  // 系统启动后的计划任务需要危险权限
+        
+        // 应用程序管理权限（危险权限，仅管理员可授予）
+        [PermissionManager.PERMISSION.APPLICATION_INSTALL]: PermissionManager.PERMISSION_LEVEL.DANGEROUS,
+        [PermissionManager.PERMISSION.APPLICATION_UNINSTALL]: PermissionManager.PERMISSION_LEVEL.DANGEROUS,
         
         // 系统存储细粒度权限（危险权限，仅管理员可授予）
         [PermissionManager.PERMISSION.SYSTEM_STORAGE_WRITE_USER_CONTROL]: PermissionManager.PERMISSION_LEVEL.DANGEROUS,
@@ -1492,6 +1500,14 @@ class PermissionManager {
             [PermissionManager.PERMISSION.EVENT_LISTENER]: {
                 name: '事件监听',
                 description: '允许程序注册事件监听器，监听用户交互和系统事件'
+            },
+            [PermissionManager.PERMISSION.APPLICATION_INSTALL]: {
+                name: '安装应用程序',
+                description: '允许程序安装新的应用程序到系统（危险操作，需要管理员授权）'
+            },
+            [PermissionManager.PERMISSION.APPLICATION_UNINSTALL]: {
+                name: '卸载应用程序',
+                description: '允许程序卸载已安装的应用程序（危险操作，需要管理员授权）'
             }
         };
         

@@ -1486,12 +1486,29 @@ class ProcessManager {
                     
                     // 使用 Promise 等待脚本执行完成
                     await new Promise((resolve, reject) => {
+                        let resolved = false;
+                        
                         script.onload = () => {
-                            ProcessManager._log(2, `[启动程序] 脚本内容执行完成`);
-                            resolve();
+                            if (resolved) return;
+                            resolved = true;
+                            ProcessManager._log(2, `[启动程序] 脚本内容执行完成（onload）`);
+                            
+                            // 脚本执行后，立即检查程序对象是否已注册
+                            setTimeout(() => {
+                                if (script.parentNode) {
+                                    script.parentNode.removeChild(script);
+                                }
+                                resolve();
+                            }, 100);  // 给程序对象注册一点时间
                         };
+                        
                         script.onerror = (e) => {
-                            ProcessManager._log(1, `[启动程序] 脚本内容执行失败`);
+                            if (resolved) return;
+                            resolved = true;
+                            ProcessManager._log(1, `[启动程序] 脚本内容执行失败（onerror）`);
+                            if (script.parentNode) {
+                                script.parentNode.removeChild(script);
+                            }
                             reject(new Error('脚本执行失败'));
                         };
                         
@@ -1500,14 +1517,24 @@ class ProcessManager {
                         
                         // 对于内联脚本，onload 可能不会触发，使用 setTimeout 作为备用
                         // 增加延迟以确保程序对象有足够时间注册到 window 和 POOL
+                        // 对于 tempAsset 程序，可能需要更长时间来注册程序对象
                         setTimeout(() => {
+                            if (resolved) return;
+                            resolved = true;
+                            ProcessManager._log(2, `[启动程序] 脚本内容执行完成（setTimeout 备用）`);
                             if (script.parentNode) {
-                                // 脚本已执行，移除 script 标签
                                 script.parentNode.removeChild(script);
-                                resolve();
                             }
-                        }, 150);  // 增加到 150ms，确保程序对象注册完成
+                            resolve();
+                        }, 500);  // 增加到 500ms，确保程序对象有足够时间注册完成
                     });
+                    
+                    // 脚本执行后，立即检查程序对象是否已注册（用于调试）
+                    if (typeof window !== 'undefined' && window[programNameUpper]) {
+                        ProcessManager._log(2, `[启动程序] 脚本执行后立即找到程序对象: ${programNameUpper}`);
+                    } else {
+                        ProcessManager._log(2, `[启动程序] 脚本执行后未找到程序对象: ${programNameUpper}，将在等待循环中继续检查`);
+                    }
                 } catch (e) {
                     ProcessManager._log(1, `[启动程序] 脚本内容执行失败: ${e.message}`);
                     throw e;
@@ -1524,10 +1551,12 @@ class ProcessManager {
             // 等待程序通过依赖管理器注册加载完成
             // 程序应该调用 DependencyConfig.publishSignal() 来通知加载完成
             // 这里我们通过轮询检查全局对象是否存在
-            const maxWaitTime = 5000; // 最多等待5秒
+            // 对于 tempAsset 程序，可能需要更长的等待时间，因为脚本是直接执行的
+            const isTempAsset = !!initArgs.tempAsset;
+            const maxWaitTime = isTempAsset ? 10000 : 5000; // tempAsset 程序等待10秒，普通程序等待5秒
             const checkInterval = 50; // 每50ms检查一次
             const startTime = Date.now();
-            const maxChecks = 100;  // 最多检查100次（5秒/50ms）
+            const maxChecks = Math.ceil(maxWaitTime / checkInterval);  // 根据等待时间计算最大检查次数
             let checkCount = 0;
             
             let programLoaded = false;
@@ -1590,7 +1619,30 @@ class ProcessManager {
             }
             
             if (!programLoaded) {
-                ProcessManager._log(1, `程序 ${programName} 加载超时，未找到对象: ${programNameUpper}`);
+                // 对于 tempAsset 程序，提供更详细的调试信息
+                if (isTempAsset) {
+                    ProcessManager._log(1, `程序 ${programName} 加载超时，未找到对象: ${programNameUpper}`);
+                    ProcessManager._log(1, `调试信息：`);
+                    ProcessManager._log(1, `  - 检查了 window.${programNameUpper}: ${typeof window !== 'undefined' && window[programNameUpper] ? '存在' : '不存在'}`);
+                    ProcessManager._log(1, `  - 检查了 globalThis.${programNameUpper}: ${typeof globalThis !== 'undefined' && globalThis[programNameUpper] ? '存在' : '不存在'}`);
+                    if (typeof POOL !== 'undefined' && typeof POOL.__GET__ === 'function') {
+                        try {
+                            if (POOL.__HAS__("APPLICATION_SHARED_POOL")) {
+                                const sharedPoolObj = POOL.__GET__("APPLICATION_SHARED_POOL", programNameUpper);
+                                ProcessManager._log(1, `  - 检查了 APPLICATION_SHARED_POOL.${programNameUpper}: ${sharedPoolObj ? '存在' : '不存在'}`);
+                            }
+                            if (POOL.__HAS__("APPLICATION_POOL")) {
+                                const poolObj = POOL.__GET__("APPLICATION_POOL", programNameUpper);
+                                ProcessManager._log(1, `  - 检查了 APPLICATION_POOL.${programNameUpper}: ${poolObj ? '存在' : '不存在'}`);
+                            }
+                        } catch (e) {
+                            ProcessManager._log(1, `  - POOL 检查失败: ${e.message}`);
+                        }
+                    }
+                    ProcessManager._log(1, `提示：请确保 ${programName}.js 正确注册了程序对象 ${programNameUpper} 到 window 或 POOL 中`);
+                } else {
+                    ProcessManager._log(1, `程序 ${programName} 加载超时，未找到对象: ${programNameUpper}`);
+                }
                 throw new Error(`Program ${programName} failed to load within timeout`);
             }
             
@@ -2810,6 +2862,14 @@ class ProcessManager {
             'Process.manage': PermissionManager.PERMISSION.PROCESS_MANAGE,
             'Process.requestSelfTermination': null,  // 程序自终止不需要权限（只能终止自己）
             
+            // 应用程序管理API（危险权限，仅管理员可授予）
+            'Application.install': PermissionManager.PERMISSION.APPLICATION_INSTALL,
+            'Application.uninstall': PermissionManager.PERMISSION.APPLICATION_UNINSTALL,
+            'Application.get': null,  // 读取操作不需要权限
+            'Application.isInstalled': null,  // 读取操作不需要权限
+            'Application.list': null,  // 读取操作不需要权限
+            'Application.listNames': null,  // 读取操作不需要权限
+            
             // 多线程API
             'Multithreading.createThread': PermissionManager.PERMISSION.MULTITHREADING_CREATE,
             'Multithreading.executeTask': PermissionManager.PERMISSION.MULTITHREADING_EXECUTE,
@@ -3760,20 +3820,38 @@ class ProcessManager {
                                     // 是目录，使用递归删除
                                     url.searchParams.set('action', 'delete_dir_recursive');
                                     url.searchParams.set('path', path);
-                                } else {
+                                } else if (item) {
                                     // 是文件
                                     url.searchParams.set('action', 'delete_file');
                                     url.searchParams.set('path', phpPath);
                                     url.searchParams.set('fileName', itemName);
+                                } else {
+                                    // 文件或目录不存在，这是可以接受的
+                                    if (typeof KernelLogger !== 'undefined') {
+                                        KernelLogger.debug('ProcessManager', `文件或目录不存在，跳过删除: ${path}`);
+                                    }
+                                    return { status: 'success', data: { deleted: false, reason: 'file_not_found' } };
                                 }
+                            } else if (checkResult.status === 'success' && (!checkResult.data || !checkResult.data.items || checkResult.data.items.length === 0)) {
+                                // 目录为空或不存在，这是可以接受的
+                                if (typeof KernelLogger !== 'undefined') {
+                                    KernelLogger.debug('ProcessManager', `目录不存在或为空，跳过删除: ${path}`);
+                                }
+                                return { status: 'success', data: { deleted: false, reason: 'file_not_found' } };
                             } else {
                                 // 默认尝试删除文件
                                 url.searchParams.set('action', 'delete_file');
                                 url.searchParams.set('path', phpPath);
                                 url.searchParams.set('fileName', itemName);
                             }
+                        } else if (checkResponse.status === 404) {
+                            // 目录不存在，这是可以接受的
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.debug('ProcessManager', `目录不存在，跳过删除: ${path}`);
+                            }
+                            return { status: 'success', data: { deleted: false, reason: 'file_not_found' } };
                         } else {
-                            // 默认尝试删除文件
+                            // 检查失败，默认尝试删除文件
                             url.searchParams.set('action', 'delete_file');
                             url.searchParams.set('path', phpPath);
                             url.searchParams.set('fileName', itemName);
@@ -3795,11 +3873,26 @@ class ProcessManager {
                     const result = await response.json();
                     
                     if (result.status !== 'success') {
+                        // 如果文件不存在，这是可以接受的（可能已经被删除或从未存在）
+                        if (result.message && (result.message.includes('文件不存在') || result.message.includes('not found') || result.message.includes('404'))) {
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.debug('ProcessManager', `文件不存在，跳过删除: ${path}`);
+                            }
+                            return { status: 'success', data: { deleted: false, reason: 'file_not_found' } };
+                        }
                         throw new Error(result.message || '删除失败');
                     }
                     
                     return { status: 'success', data: result.data };
                 } catch (error) {
+                    // 如果错误是文件不存在，这是可以接受的
+                    if (error.message && (error.message.includes('文件不存在') || error.message.includes('not found') || error.message.includes('404'))) {
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.debug('ProcessManager', `文件不存在，跳过删除: ${path}`);
+                        }
+                        return { status: 'success', data: { deleted: false, reason: 'file_not_found' } };
+                    }
+                    
                     if (typeof KernelLogger !== 'undefined') {
                         KernelLogger.error('ProcessManager', `FileSystem.delete 失败: ${error.message}`, { path });
                     }
@@ -4359,6 +4452,107 @@ class ProcessManager {
                     throw new Error('Process.requestSelfTermination: 无法获取进程 ID');
                 }
                 return await ProcessManager.requestSelfTermination(pid);
+            },
+            
+            // 应用程序管理API
+            'Application.install': async (programName, asset, sourceFiles = null) => {
+                if (!programName || typeof programName !== 'string') {
+                    throw new Error('Application.install: 程序名称必须是字符串');
+                }
+                if (!asset) {
+                    throw new Error('Application.install: 程序资源不能为空');
+                }
+                if (typeof LStorage === 'undefined') {
+                    throw new Error('Application.install: LStorage 模块未加载');
+                }
+                // 设置上下文 PID，以便 LStorage 可以获取
+                const oldContextPid = LStorage._currentContextPid;
+                LStorage._currentContextPid = pid;
+                try {
+                    return await LStorage.installApplication(programName, asset, sourceFiles);
+                } finally {
+                    // 恢复原来的上下文 PID
+                    LStorage._currentContextPid = oldContextPid;
+                }
+            },
+            'Application.uninstall': async (programName) => {
+                if (!programName || typeof programName !== 'string') {
+                    throw new Error('Application.uninstall: 程序名称必须是字符串');
+                }
+                if (typeof LStorage === 'undefined') {
+                    throw new Error('Application.uninstall: LStorage 模块未加载');
+                }
+                // 设置上下文 PID，以便 LStorage 可以获取
+                const oldContextPid = LStorage._currentContextPid;
+                LStorage._currentContextPid = pid;
+                try {
+                    return await LStorage.uninstallApplication(programName);
+                } finally {
+                    // 恢复原来的上下文 PID
+                    LStorage._currentContextPid = oldContextPid;
+                }
+            },
+            'Application.get': async (programName) => {
+                if (!programName || typeof programName !== 'string') {
+                    throw new Error('Application.get: 程序名称必须是字符串');
+                }
+                if (typeof LStorage === 'undefined') {
+                    throw new Error('Application.get: LStorage 模块未加载');
+                }
+                // 设置上下文 PID，以便 LStorage 可以获取
+                const oldContextPid = LStorage._currentContextPid;
+                LStorage._currentContextPid = pid;
+                try {
+                    return await LStorage.getInstalledApplication(programName);
+                } finally {
+                    // 恢复原来的上下文 PID
+                    LStorage._currentContextPid = oldContextPid;
+                }
+            },
+            'Application.isInstalled': async (programName) => {
+                if (!programName || typeof programName !== 'string') {
+                    throw new Error('Application.isInstalled: 程序名称必须是字符串');
+                }
+                if (typeof LStorage === 'undefined') {
+                    throw new Error('Application.isInstalled: LStorage 模块未加载');
+                }
+                // 设置上下文 PID，以便 LStorage 可以获取
+                const oldContextPid = LStorage._currentContextPid;
+                LStorage._currentContextPid = pid;
+                try {
+                    return await LStorage.isApplicationInstalled(programName);
+                } finally {
+                    // 恢复原来的上下文 PID
+                    LStorage._currentContextPid = oldContextPid;
+                }
+            },
+            'Application.list': async () => {
+                if (typeof LStorage === 'undefined') {
+                    throw new Error('Application.list: LStorage 模块未加载');
+                }
+                // 设置上下文 PID，以便 LStorage 可以获取
+                const oldContextPid = LStorage._currentContextPid;
+                LStorage._currentContextPid = pid;
+                try {
+                    return await LStorage.listInstalledApplications();
+                } finally {
+                    // 恢复原来的上下文 PID
+                    LStorage._currentContextPid = oldContextPid;
+                }
+            },
+            'Application.listNames': async () => {
+                if (typeof LStorage === 'undefined') {
+                    throw new Error('Application.listNames: LStorage 模块未加载');
+                }
+                // 设置上下文 PID，以便 LStorage 可以获取
+                const oldContextPid = LStorage._currentContextPid;
+                LStorage._currentContextPid = pid;
+                try {
+                    return await LStorage.listInstalledApplicationNames();
+                } finally {
+                    // 恢复原来的上下文 PID
+                    LStorage._currentContextPid = oldContextPid;
+                }
             },
             
             // 网络信息API

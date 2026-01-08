@@ -2,7 +2,7 @@
 
 ## 概述
 
-`LStorage` 是 ZerOS 内核的本地存储管理器，负责本地数据的管理、注册等操作。所有系统依赖的本地数据和程序的本地数据都存储在 `D:/LocalSData.json` 文件中。
+`LStorage` 是 ZerOS 内核的本地存储管理器，负责本地数据的管理、注册等操作。系统依赖的本地数据和程序的本地数据存储在 `D:/LocalSData.json` 文件中，而动态安装的应用程序注册表存储在 `D:/ApplicationTable.json` 文件中。
 
 ## 依赖
 
@@ -558,6 +558,186 @@ await LStorage.setEnvironmentVariable('CUSTOM_VAR', 'custom_value');
    - 环境变量操作需要相应的权限（读取需要 `SYSTEM_STORAGE_READ`，写入需要 `SYSTEM_STORAGE_WRITE`）
 10. **环境变量存储**: 环境变量保存在注册表中（`system.registry.environment`），是一个键值对对象
 
+### 应用程序管理
+
+#### `installApplication(programName, asset, sourceFiles)`
+
+安装应用程序到 `ApplicationTable`（动态程序注册表）。
+
+**参数**:
+- `programName` (string): 程序名称
+- `asset` (Object): 程序资源对象（格式与 `applicationAssets.js` 相同）
+- `sourceFiles` (Object, 可选): 源文件 JSON 结构，用于复制文件到 `application/` 目录
+
+**返回值**: `Promise<boolean>` - 是否成功
+
+**权限要求**: 
+- 需要 `APPLICATION_INSTALL` 权限（危险权限，仅管理员可授予）
+- 需要管理员用户权限
+
+**存储位置**:
+- `ApplicationTable` 存储在 `D:/ApplicationTable.json` 文件中（**不是** `D:/LocalSData.json`）
+- 该文件独立于系统存储，专门用于管理动态安装的应用程序
+
+**功能**:
+1. 验证权限（管理员权限和 `APPLICATION_INSTALL` 权限）
+2. 如果提供了 `sourceFiles`，复制文件到 `D:/application/<程序名>/` 目录
+3. 更新 `asset` 中的路径为绝对路径
+4. 注册程序到 `ApplicationTable`（写入 `D:/ApplicationTable.json`）
+5. **自动刷新 `ApplicationAssetManager`**（使新程序立即可用）
+
+**示例**:
+```javascript
+// 通过 ProcessManager 调用（用户程序）
+await ProcessManager.callKernelAPI(pid, 'Application.install', [
+    'myapp',
+    {
+        script: 'myapp.js',
+        styles: ['myapp.css'],
+        icon: 'icon.svg',
+        metadata: {
+            description: '我的应用',
+            version: '1.0.0',
+            type: 'GUI'
+        }
+    },
+    {
+        'myapp.js': '...文件内容...',
+        'myapp.css': '...文件内容...',
+        'icon.svg': '...文件内容...'
+    }
+]);
+```
+
+**注意**:
+- 安装后，`ApplicationAssetManager` 会自动刷新，新程序会立即出现在开始菜单中（需要关闭并重新打开开始菜单）
+- 静态程序（注册在 `applicationAssets.js` 中）不需要通过此 API 安装
+- 如果动态安装的程序与静态程序同名，动态程序会覆盖静态程序（在 `ApplicationAssetManager` 中，动态程序优先）
+
+#### `uninstallApplication(programName)`
+
+卸载应用程序（从 `ApplicationTable` 中删除并删除所有文件）。
+
+**参数**:
+- `programName` (string): 程序名称
+
+**返回值**: `Promise<boolean>` - 是否成功
+
+**权限要求**: 
+- 需要 `APPLICATION_UNINSTALL` 权限（危险权限，仅管理员可授予）
+- 需要管理员用户权限
+
+**功能**:
+1. 验证权限（管理员权限和 `APPLICATION_UNINSTALL` 权限）
+2. 检查是否为静态程序（静态程序不允许卸载）
+3. 删除 `D:/application/<程序名>/` 目录下的所有文件
+4. 从 `ApplicationTable` 中删除程序
+5. **自动刷新 `ApplicationAssetManager`**（使卸载的程序立即从列表中移除）
+
+**示例**:
+```javascript
+// 通过 ProcessManager 调用（用户程序）
+await ProcessManager.callKernelAPI(pid, 'Application.uninstall', ['myapp']);
+```
+
+**注意**:
+- 卸载后，`ApplicationAssetManager` 会自动刷新，程序会立即从开始菜单中消失（需要关闭并重新打开开始菜单）
+- 静态程序（注册在 `applicationAssets.js` 中）不允许卸载
+- 卸载会删除程序的所有文件，包括脚本、样式、图标和资源文件
+
+#### `getInstalledApplication(programName)`
+
+获取动态安装的应用程序信息。
+
+**参数**:
+- `programName` (string): 程序名称
+
+**返回值**: `Promise<Object|null>` - 程序资源对象，如果不存在返回 `null`
+
+**权限要求**: 不需要权限（读取操作）
+
+**示例**:
+```javascript
+// 通过 ProcessManager 调用（用户程序）
+const app = await ProcessManager.callKernelAPI(pid, 'Application.get', ['myapp']);
+if (app) {
+    console.log(`脚本: ${app.script}`);
+    console.log(`图标: ${app.icon}`);
+}
+```
+
+#### `isApplicationInstalled(programName)`
+
+检查程序是否已动态安装。
+
+**参数**:
+- `programName` (string): 程序名称
+
+**返回值**: `Promise<boolean>` - 是否已安装
+
+**权限要求**: 不需要权限（读取操作）
+
+**示例**:
+```javascript
+// 通过 ProcessManager 调用（用户程序）
+const isInstalled = await ProcessManager.callKernelAPI(pid, 'Application.isInstalled', ['myapp']);
+if (isInstalled) {
+    console.log('程序已安装');
+}
+```
+
+#### `listInstalledApplications()`
+
+列出所有动态安装的应用程序。
+
+**返回值**: `Promise<Object>` - 应用程序对象 `{ [programName: string]: asset }`
+
+**权限要求**: 不需要权限（读取操作）
+
+**示例**:
+```javascript
+// 通过 ProcessManager 调用（用户程序）
+const apps = await ProcessManager.callKernelAPI(pid, 'Application.list', []);
+console.log(`已安装 ${Object.keys(apps).length} 个动态程序`);
+```
+
+#### `listInstalledApplicationNames()`
+
+列出所有动态安装的应用程序名称。
+
+**返回值**: `Promise<Array<string>>` - 程序名称数组
+
+**权限要求**: 不需要权限（读取操作）
+
+**示例**:
+```javascript
+// 通过 ProcessManager 调用（用户程序）
+const names = await ProcessManager.callKernelAPI(pid, 'Application.listNames', []);
+console.log('已安装的程序:', names);
+```
+
+### 应用程序管理注意事项
+
+1. **自动刷新机制**：
+   - `installApplication()` 和 `uninstallApplication()` 会自动刷新 `ApplicationAssetManager`
+   - 新安装的程序会立即出现在开始菜单中（需要关闭并重新打开开始菜单）
+   - 卸载的程序会立即从开始菜单中消失（需要关闭并重新打开开始菜单）
+
+2. **静态程序保护**：
+   - 静态程序（注册在 `applicationAssets.js` 中）不允许通过 `uninstallApplication()` 卸载
+   - 如果尝试卸载静态程序，会抛出错误
+
+3. **路径处理**：
+   - 安装时，相对路径会自动转换为绝对路径（`D:/application/<程序名>/<路径>`）
+   - 图标路径会被正确转换，可以在开始菜单中正确显示
+
+4. **权限控制**：
+   - `ApplicationTable` 存储在独立的文件 `D:/ApplicationTable.json` 中（**不是** `D:/LocalSData.json`）
+   - `applicationTable` 键受到特殊保护，只能通过 `installApplication()` 和 `uninstallApplication()` 修改
+   - 直接调用 `setSystemStorage('applicationTable', ...)` 会被拒绝
+   - 读取 `ApplicationTable` 使用 `getSystemStorage('applicationTable')`，会从 `D:/ApplicationTable.json` 读取
+   - 写入 `ApplicationTable` 使用 `setSystemStorage('applicationTable', ...)`，会写入到 `D:/ApplicationTable.json`
+
 ## 相关文档
 
 - [ZEROS_KERNEL.md](../ZEROS_KERNEL.md) - 内核概述
@@ -565,4 +745,6 @@ await LStorage.setEnvironmentVariable('CUSTOM_VAR', 'custom_value');
 - [Disk.md](./Disk.md) - 虚拟磁盘管理 API
 - [PermissionManager.md](./PermissionManager.md) - 权限管理 API（了解权限系统）
 - [UserControl.md](./UserControl.md) - 用户控制 API（了解用户级别和权限授权）
+- [ApplicationAssetManager.md](./ApplicationAssetManager.md) - 应用程序资源管理器 API
+- [ZOMInstall.md](./ZOMInstall.md) - ZOM 程序安装包文档
 

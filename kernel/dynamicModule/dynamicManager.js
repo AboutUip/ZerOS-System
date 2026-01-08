@@ -28,6 +28,18 @@ KernelLogger.info("DynamicManager", "模块初始化");
 //   - dependencies: Array<string> - 依赖的其他模块名称（可选）
 //   - type: 'css' - 模块类型（必需，标识为纯 CSS 模块）
 const DYNAMIC_MODULES = {
+    // Tone.js - 音频合成和处理库
+    "tone": {
+        script: "../kernel/dynamicModule/libs/Tone.js",
+        metadata: {
+            name: "tone",
+            version: "15.1.1",
+            description: "Tone.js - 音频合成和处理库",
+            globalName: "Tone",
+            autoLoad: false,
+            dependencies: []
+        }
+    },
     // html2canvas - 用于生成窗口快照
     "html2canvas": {
         script: "../kernel/dynamicModule/libs/html2canvas.min.js",
