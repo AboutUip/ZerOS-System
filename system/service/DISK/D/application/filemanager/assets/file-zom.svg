@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <!-- 文件主体 -->
+  <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/>
+  <polyline points="13 2 13 9 20 9"/>
+  <!-- ZOM 标识：盒子/包装图标 -->
+  <rect x="7" y="12" width="10" height="8" rx="1" fill="none"/>
+  <line x1="9" y1="14" x2="15" y2="14"/>
+  <line x1="9" y1="16" x2="15" y2="16"/>
+  <line x1="9" y1="18" x2="13" y2="18"/>
+  <!-- 右上角装饰：表示安装包 -->
+  <circle cx="16" cy="5" r="1.5" fill="currentColor"/>
+</svg>
+

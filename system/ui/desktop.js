@@ -889,6 +889,8 @@ class DesktopManager {
                 let skippedCount = 0;
                 
                 // 恢复保存的图标
+                const iconsToRemove = []; // 记录需要从存储中删除的无效图标ID
+                
                 for (let i = 0; i < savedIcons.length; i++) {
                     const iconData = savedIcons[i];
                     
@@ -896,6 +898,40 @@ class DesktopManager {
                     // 支持程序快捷方式（有 programName）和文件/文件夹图标（有 type 和 targetPath）
                     const isValidProgramIcon = iconData && iconData.programName && iconData.id !== undefined;
                     const isValidFileOrFolderIcon = iconData && iconData.type && iconData.targetPath && iconData.id !== undefined;
+                    
+                    // 对于程序快捷方式，检查程序是否存在
+                    if (isValidProgramIcon) {
+                        // 检查程序是否存在
+                        let programExists = false;
+                        if (typeof ApplicationAssetManager !== 'undefined' && typeof ApplicationAssetManager.getProgramInfo === 'function') {
+                            try {
+                                const programInfo = ApplicationAssetManager.getProgramInfo(iconData.programName);
+                                programExists = programInfo !== null && programInfo !== undefined;
+                                
+                                if (!programExists) {
+                                    KernelLogger.warn("DesktopManager", `程序 ${iconData.programName} 不存在，跳过桌面图标: ${iconData.name} (ID: ${iconData.id})`);
+                                    skippedCount++;
+                                    // 记录需要删除的图标ID
+                                    iconsToRemove.push(iconData.id);
+                                    continue; // 跳过不存在的程序图标
+                                }
+                                
+                                // 如果程序存在，更新图标数据（使用最新的程序信息）
+                                if (programInfo.icon) {
+                                    iconData.icon = programInfo.icon;
+                                }
+                                if (programInfo.metadata && programInfo.metadata.description) {
+                                    iconData.description = programInfo.metadata.description;
+                                }
+                            } catch (e) {
+                                KernelLogger.warn("DesktopManager", `检查程序 ${iconData.programName} 是否存在时出错: ${e.message}`);
+                                // 如果检查失败，仍然尝试创建图标（降级处理）
+                            }
+                        } else {
+                            // ApplicationAssetManager 不可用，仍然尝试创建图标（降级处理）
+                            KernelLogger.debug("DesktopManager", `ApplicationAssetManager 不可用，跳过程序存在性检查: ${iconData.programName}`);
+                        }
+                    }
                     
                     if (isValidProgramIcon || isValidFileOrFolderIcon) {
                         DesktopManager._icons.set(iconData.id, iconData);
@@ -909,6 +945,20 @@ class DesktopManager {
                     } else {
                         skippedCount++;
                         KernelLogger.warn("DesktopManager", `图标数据无效，跳过: ${iconData?.name || '未知'}`);
+                    }
+                }
+                
+                // 如果有需要删除的无效图标，从存储中删除它们
+                if (iconsToRemove.length > 0) {
+                    try {
+                        const currentIcons = await LStorage.getSystemStorage(DesktopManager.STORAGE_KEY_ICONS);
+                        if (Array.isArray(currentIcons)) {
+                            const filteredIcons = currentIcons.filter(icon => !iconsToRemove.includes(icon.id));
+                            await LStorage.setSystemStorage(DesktopManager.STORAGE_KEY_ICONS, filteredIcons);
+                            KernelLogger.info("DesktopManager", `已从存储中删除 ${iconsToRemove.length} 个无效程序图标`);
+                        }
+                    } catch (e) {
+                        KernelLogger.warn("DesktopManager", `删除无效图标失败: ${e.message}`);
                     }
                 }
                 
@@ -1661,6 +1711,24 @@ class DesktopManager {
             return;
         }
         
+        // 检查程序是否存在
+        if (typeof ApplicationAssetManager !== 'undefined' && typeof ApplicationAssetManager.getProgramInfo === 'function') {
+            const programInfo = ApplicationAssetManager.getProgramInfo(iconData.programName);
+            if (!programInfo) {
+                KernelLogger.warn("DesktopManager", `程序 ${iconData.programName} 不存在，无法启动`);
+                // 可以显示提示给用户
+                if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                    NotificationManager.createNotification({
+                        title: '程序不存在',
+                        message: `程序 "${iconData.programName}" 不存在或已被卸载`,
+                        type: 'warning',
+                        duration: 3000
+                    });
+                }
+                return;
+            }
+        }
+        
         if (typeof ProcessManager === 'undefined') {
             KernelLogger.warn("DesktopManager", "ProcessManager 不可用，无法启动程序");
             return;
@@ -1682,9 +1750,27 @@ class DesktopManager {
                     })
                     .catch((e) => {
                         KernelLogger.error("DesktopManager", `启动程序失败: ${e.message}`, e);
+                        // 如果启动失败，可能是程序不存在，显示提示
+                        if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                            NotificationManager.createNotification({
+                                title: '启动失败',
+                                message: `无法启动程序 "${iconData.programName}"：${e.message}`,
+                                type: 'error',
+                                duration: 3000
+                            });
+                        }
                     });
             } catch (e) {
                 KernelLogger.error("DesktopManager", `启动程序失败: ${e.message}`, e);
+                // 如果启动失败，可能是程序不存在，显示提示
+                if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                    NotificationManager.createNotification({
+                        title: '启动失败',
+                        message: `无法启动程序 "${iconData.programName}"：${e.message}`,
+                        type: 'error',
+                        duration: 3000
+                    });
+                }
             }
         }
     }
@@ -1773,7 +1859,12 @@ class DesktopManager {
                     programName = 'videoplayer';
                 } else if (fileType === 'IMAGE') {
                     programName = 'imageviewer';
-                } else if (fileType === 'TEXT' || fileType === 'CODE' || fileType === 'MARKDOWN') {
+                } else if (fileType === 'MARKDOWN' || extension === 'md' || extension === 'markdown') {
+                    // Markdown 文件：使用 cat -md 命令在终端渲染
+                    // cat 是终端的内置命令，需要在终端中执行
+                    await DesktopManager._openMarkdownInTerminal(iconData.targetPath);
+                    return; // 直接返回，不继续执行后续逻辑
+                } else if (fileType === 'TEXT' || fileType === 'CODE') {
                     programName = 'vim';
                     programArgs = [iconData.targetPath];
                 } else {
@@ -1816,6 +1907,91 @@ class DesktopManager {
     }
     
     /**
+     * 在终端中打开 Markdown 文件
+     * @param {string} filePath 文件路径
+     */
+    static async _openMarkdownInTerminal(filePath) {
+        try {
+            if (typeof ProcessManager === 'undefined') {
+                KernelLogger.warn("DesktopManager", "ProcessManager 不可用，无法启动终端");
+                return;
+            }
+            
+            // 获取或启动终端实例
+            let terminalInstance = null;
+            let terminalPid = null;
+            
+            // 查找活动的终端实例
+            if (typeof TERMINAL !== 'undefined' && TERMINAL._instances) {
+                const instances = Array.from(TERMINAL._instances.values());
+                for (const instance of instances) {
+                    if (instance && instance.tabManager) {
+                        const activeTerm = instance.tabManager.getActiveTerminal();
+                        if (activeTerm) {
+                            terminalInstance = activeTerm;
+                            break;
+                        }
+                    }
+                }
+            }
+            
+            // 如果没有活动的终端，先启动一个终端
+            if (!terminalInstance) {
+                terminalPid = await ProcessManager.startProgram('terminal');
+                // 等待终端初始化
+                await new Promise(resolve => setTimeout(resolve, 500));
+                // 获取终端实例（从 tabManager 获取活动终端）
+                if (typeof TERMINAL !== 'undefined' && TERMINAL._instances) {
+                    const instance = TERMINAL._instances.get(terminalPid);
+                    if (instance && instance.tabManager) {
+                        terminalInstance = instance.tabManager.getActiveTerminal();
+                    }
+                }
+            }
+            
+            if (!terminalInstance) {
+                KernelLogger.warn("DesktopManager", "无法获取终端实例，无法执行 cat 命令");
+                return;
+            }
+            
+            // 注意：终端使用简单的空格分割解析参数，不会处理引号
+            // 如果路径包含空格，需要用引号包裹，但不要转义引号
+            // 由于 ZerOS 路径通常不包含空格，直接使用路径即可
+            let command;
+            if (filePath.includes(' ')) {
+                // 如果路径包含空格，使用引号包裹（不转义）
+                command = `cat -md "${filePath}"`;
+            } else {
+                // 路径不包含空格，直接使用
+                command = `cat -md ${filePath}`;
+            }
+            
+            // 执行 cat -md 命令
+            if (typeof terminalInstance._handleInput === 'function') {
+                // 使用 _handleInput 方法执行命令
+                terminalInstance._handleInput(command);
+            } else if (terminalInstance.cmdEl) {
+                // 降级方案：直接设置命令并触发回车
+                terminalInstance.cmdEl.textContent = command;
+                const enterEvent = new KeyboardEvent('keydown', {
+                    key: 'Enter',
+                    code: 'Enter',
+                    keyCode: 13,
+                    which: 13,
+                    bubbles: true
+                });
+                terminalInstance.cmdEl.dispatchEvent(enterEvent);
+            } else {
+                KernelLogger.warn("DesktopManager", "终端实例不支持命令执行");
+            }
+            
+            KernelLogger.info("DesktopManager", `在终端中执行 cat -md 命令: ${filePath}`);
+        } catch (error) {
+            KernelLogger.error("DesktopManager", `在终端中打开 Markdown 文件失败: ${error.message}`, error);
+        }
+    }
+    
+    /**
      * 根据扩展名获取文件类型
      * @param {string} extension 文件扩展名（小写）
      * @returns {string} 文件类型
@@ -1848,8 +2024,13 @@ class DesktopManager {
             return 'IMAGE';
         }
         
+        // Markdown 格式（优先检查，因为 md 和 markdown 也在 textExts 中）
+        if (ext === 'md' || ext === 'markdown') {
+            return 'MARKDOWN';
+        }
+        
         // 文本格式
-        const textExts = ['txt', 'md', 'markdown', 'log', 'ini', 'conf', 'cfg', 'json', 'xml', 'csv'];
+        const textExts = ['txt', 'log', 'ini', 'conf', 'cfg', 'json', 'xml', 'csv'];
         if (textExts.includes(ext)) {
             return 'TEXT';
         }

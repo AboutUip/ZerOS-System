@@ -886,6 +886,7 @@
             };
 
             // 收集所有需要复制的文件（排除 application.json 和 setup.js）
+            // 注意：uninstall.js 需要被复制到程序目录，因为卸载时会从程序目录读取并执行它
             const sourceFiles = {};
             // 排除的文件名（无论路径）
             const filesToExclude = ['application.json', 'setup.js'];

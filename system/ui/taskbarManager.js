@@ -842,6 +842,7 @@ class TaskbarManager {
         }
         
         // 先添加固定程序（无论是否运行都显示）
+        const invalidPinnedPrograms = []; // 记录无效的固定程序
         for (const programName of pinnedPrograms) {
             // 获取程序信息
             let programInfo = null;
@@ -853,27 +854,34 @@ class TaskbarManager {
                 }
             }
             
-            if (programInfo) {
-                programMap.set(programName, {
-                    name: programName,
-                    icon: programInfo.icon,
-                    metadata: programInfo.metadata || {},
-                    isRunning: false,
-                    isMinimized: false,
-                    pid: null,
-                    instances: [] // 实例列表
-                });
-            } else {
-                // 即使没有程序信息，也添加到映射中（使用默认图标）
-                programMap.set(programName, {
-                    name: programName,
-                    icon: null,
-                    metadata: {},
-                    isRunning: false,
-                    isMinimized: false,
-                    pid: null,
-                    instances: []
-                });
+            // 检查程序是否存在
+            if (!programInfo) {
+                KernelLogger.warn("TaskbarManager", `固定程序 ${programName} 不存在，跳过渲染`);
+                invalidPinnedPrograms.push(programName);
+                continue; // 跳过不存在的程序
+            }
+            
+            programMap.set(programName, {
+                name: programName,
+                icon: programInfo.icon,
+                metadata: programInfo.metadata || {},
+                isRunning: false,
+                isMinimized: false,
+                pid: null,
+                instances: [] // 实例列表
+            });
+        }
+        
+        // 如果有无效的固定程序，从存储中删除它们
+        if (invalidPinnedPrograms.length > 0) {
+            try {
+                const validPinnedPrograms = pinnedPrograms.filter(p => !invalidPinnedPrograms.includes(p));
+                if (typeof LStorage !== 'undefined' && typeof LStorage.setSystemStorage === 'function') {
+                    await LStorage.setSystemStorage('taskbar.pinnedPrograms', validPinnedPrograms);
+                    KernelLogger.info("TaskbarManager", `已从存储中删除 ${invalidPinnedPrograms.length} 个无效的固定程序`);
+                }
+            } catch (e) {
+                KernelLogger.warn("TaskbarManager", `删除无效固定程序失败: ${e.message}`);
             }
         }
         
@@ -2588,6 +2596,15 @@ class TaskbarManager {
      */
     static _recordProgramUsage(programName) {
         try {
+            // 检查程序是否存在
+            if (typeof ApplicationAssetManager !== 'undefined' && typeof ApplicationAssetManager.getProgramInfo === 'function') {
+                const programInfo = ApplicationAssetManager.getProgramInfo(programName);
+                if (!programInfo) {
+                    KernelLogger.debug("TaskbarManager", `程序 ${programName} 不存在，跳过记录最近使用`);
+                    return; // 如果程序不存在，不记录
+                }
+            }
+            
             let recentPrograms = [];
             const stored = localStorage.getItem(TaskbarManager.RECENT_PROGRAMS_KEY);
             if (stored) {
@@ -2697,12 +2714,28 @@ class TaskbarManager {
             programMap.set(program.name, program);
         }
         
-        // 根据最近使用记录获取程序对象
+        // 根据最近使用记录获取程序对象，并检查程序是否存在
         const recentPrograms = [];
+        const invalidRecentRecords = []; // 记录无效的最近使用记录
         for (const record of recentRecords) {
             const program = programMap.get(record.name);
             if (program) {
                 recentPrograms.push(program);
+            } else {
+                // 程序不存在，记录为无效记录
+                invalidRecentRecords.push(record.name);
+                KernelLogger.debug("TaskbarManager", `最近使用程序 ${record.name} 不存在，跳过渲染`);
+            }
+        }
+        
+        // 如果有无效的最近使用记录，清理它们
+        if (invalidRecentRecords.length > 0) {
+            try {
+                const validRecentRecords = recentRecords.filter(r => !invalidRecentRecords.includes(r.name));
+                localStorage.setItem(TaskbarManager.RECENT_PROGRAMS_KEY, JSON.stringify(validRecentRecords));
+                KernelLogger.info("TaskbarManager", `已从存储中删除 ${invalidRecentRecords.length} 个无效的最近使用程序记录`);
+            } catch (e) {
+                KernelLogger.warn("TaskbarManager", `清理无效最近使用记录失败: ${e.message}`);
             }
         }
         
@@ -11392,6 +11425,15 @@ class TaskbarManager {
         }
         
         try {
+            // 检查程序是否存在
+            if (typeof ApplicationAssetManager !== 'undefined' && typeof ApplicationAssetManager.getProgramInfo === 'function') {
+                const programInfo = ApplicationAssetManager.getProgramInfo(programName);
+                if (!programInfo) {
+                    KernelLogger.warn("TaskbarManager", `程序 ${programName} 不存在，无法固定到任务栏`);
+                    throw new Error(`程序 ${programName} 不存在`);
+                }
+            }
+            
             // 获取当前固定程序列表
             let pinnedPrograms = [];
             if (typeof LStorage !== 'undefined' && typeof LStorage.getSystemStorage === 'function') {

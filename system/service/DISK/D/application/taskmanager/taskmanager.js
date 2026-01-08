@@ -38,6 +38,16 @@
         __init__: async function(pid, initArgs) {
             this.pid = pid;
             
+            // 检查是否是选择模式
+            this._isProcessSelectorMode = initArgs && initArgs.mode === 'process-selector';
+            this._isProgramSelectorMode = initArgs && initArgs.mode === 'program-selector';
+            this._onProcessSelected = initArgs && initArgs.onProcessSelected;
+            this._onProgramSelected = initArgs && initArgs.onProgramSelected;
+            
+            // 选择模式下选中的项
+            this._selectedProcess = null;
+            this._selectedProgram = null;
+            
             // 初始化内存管理
             this._initMemory(pid);
             
@@ -61,8 +71,16 @@
                     icon = ApplicationAssetManager.getIcon('taskmanager');
                 }
                 
+                // 根据模式设置不同的窗口标题
+                let windowTitle = '任务管理器';
+                if (this._isProcessSelectorMode) {
+                    windowTitle = '选择进程';
+                } else if (this._isProgramSelectorMode) {
+                    windowTitle = '选择程序';
+                }
+                
                 const windowInfo = GUIManager.registerWindow(pid, this.window, {
-                    title: '任务管理器',
+                    title: windowTitle,
                     icon: icon,
                     onClose: () => {
                         // onClose 回调只做清理工作，不调用 _closeWindow 或 unregisterWindow
@@ -93,17 +111,35 @@
             content.style.cssText = `
                 flex: 1;
                 display: flex;
+                flex-direction: column;
                 overflow: hidden;
             `;
             
-            // 创建左侧进程列表
-            const processList = this._createProcessList();
-            content.appendChild(processList);
+            // 选择模式下的提示栏
+            if (this._isProcessSelectorMode || this._isProgramSelectorMode) {
+                const selectorHint = this._createSelectorHint();
+                content.appendChild(selectorHint);
+            }
             
-            // 创建右侧详情面板
-            this.detailPanel = this._createDetailPanel();
-            content.appendChild(this.detailPanel);
+            // 主内容区域（列表和详情）
+            const mainContent = document.createElement('div');
+            mainContent.style.cssText = `
+                flex: 1;
+                display: flex;
+                overflow: hidden;
+            `;
             
+            // 创建左侧列表（进程列表或程序列表）
+            const listContainer = this._createProcessList();
+            mainContent.appendChild(listContainer);
+            
+            // 创建右侧详情面板（选择模式下可以隐藏或简化）
+            if (!this._isProcessSelectorMode && !this._isProgramSelectorMode) {
+                this.detailPanel = this._createDetailPanel();
+                mainContent.appendChild(this.detailPanel);
+            }
+            
+            content.appendChild(mainContent);
             this.window.appendChild(content);
             
             // 添加到容器
@@ -134,12 +170,20 @@
                 this.window.style.transform = 'translate(-50%, -50%)';
             }
             
-            // 开始更新循环
-            this._startUpdateLoop();
+            // 开始更新循环（选择模式下不需要自动更新）
+            if (!this._isProcessSelectorMode && !this._isProgramSelectorMode) {
+                this._startUpdateLoop();
+            }
             
             // 初始更新
-            this._updateProcessList();
-            this._updateSystemInfo();
+            if (this._isProgramSelectorMode) {
+                this._updateProgramList();
+            } else {
+                this._updateProcessList();
+            }
+            if (!this._isProcessSelectorMode && !this._isProgramSelectorMode) {
+                this._updateSystemInfo();
+            }
         },
         
         _createTitleBar: function() {
@@ -222,12 +266,62 @@
             return titleBar;
         },
         
+        _createSelectorHint: function() {
+            const selectorHint = document.createElement('div');
+            selectorHint.className = 'taskmanager-selector-hint';
+            selectorHint.style.cssText = `
+                padding: 8px 16px;
+                background: rgba(139, 92, 246, 0.1);
+                border-bottom: 1px solid rgba(139, 92, 246, 0.2);
+                color: rgba(215, 224, 221, 0.9);
+                font-size: 13px;
+                flex-shrink: 0;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+            `;
+            
+            const hintText = document.createElement('span');
+            if (this._isProcessSelectorMode) {
+                hintText.textContent = '⚙️ 请选择一个运行中的进程（单击选中后点击"选择"按钮）';
+            } else if (this._isProgramSelectorMode) {
+                hintText.textContent = '📦 请选择一个程序（单击选中后点击"选择"按钮）';
+            }
+            selectorHint.appendChild(hintText);
+            
+            // 选择按钮（单选模式）
+            const selectButton = document.createElement('button');
+            selectButton.className = 'taskmanager-select-button';
+            selectButton.textContent = '选择';
+            selectButton.style.cssText = `
+                padding: 6px 16px;
+                background: rgba(139, 92, 246, 0.3);
+                border: 1px solid rgba(139, 92, 246, 0.5);
+                border-radius: 6px;
+                color: rgba(215, 224, 221, 0.9);
+                font-size: 13px;
+                cursor: pointer;
+                transition: all 0.2s;
+                opacity: 0.5;
+                pointer-events: none;
+            `;
+            selectButton.addEventListener('click', () => {
+                this._confirmSelection();
+            });
+            selectorHint.appendChild(selectButton);
+            this.selectButton = selectButton;
+            
+            return selectorHint;
+        },
+        
         _createProcessList: function() {
             const container = document.createElement('div');
             container.className = 'taskmanager-process-list';
+            // 选择模式下占满整个窗口，否则固定宽度
+            const isSelectorMode = this._isProcessSelectorMode || this._isProgramSelectorMode;
             container.style.cssText = `
-                width: 400px;
-                border-right: 1px solid rgba(108, 142, 255, 0.2);
+                ${isSelectorMode ? 'flex: 1;' : 'width: 400px;'}
+                ${!isSelectorMode ? 'border-right: 1px solid rgba(108, 142, 255, 0.2);' : ''}
                 display: flex;
                 flex-direction: column;
                 overflow: hidden;
@@ -262,54 +356,62 @@
                 refreshBtn.style.background = 'rgba(108, 142, 255, 0.1)';
             });
             refreshBtn.addEventListener('click', () => {
-                this._updateProcessList();
+                if (this._isProgramSelectorMode) {
+                    this._updateProgramList();
+                } else {
+                    this._updateProcessList();
+                }
             });
             
-            // 查看POOL按钮
-            const viewPoolBtn = document.createElement('button');
-            viewPoolBtn.textContent = '查看POOL';
-            viewPoolBtn.style.cssText = `
-                padding: 6px 12px;
-                border: 1px solid rgba(108, 142, 255, 0.3);
-                background: rgba(108, 142, 255, 0.1);
-                color: #e8ecf0;
-                border-radius: 6px;
-                cursor: pointer;
-                font-size: 13px;
-                transition: all 0.2s;
-            `;
-            viewPoolBtn.addEventListener('mouseenter', () => {
-                viewPoolBtn.style.background = 'rgba(108, 142, 255, 0.2)';
-            });
-            viewPoolBtn.addEventListener('mouseleave', () => {
-                viewPoolBtn.style.background = 'rgba(108, 142, 255, 0.1)';
-            });
-            viewPoolBtn.addEventListener('click', () => {
-                this._openPoolViewWindow();
-            });
-            
-            // 查看网络按钮
-            const viewNetworkBtn = document.createElement('button');
-            viewNetworkBtn.textContent = '查看网络';
-            viewNetworkBtn.style.cssText = `
-                padding: 6px 12px;
-                border: 1px solid rgba(108, 142, 255, 0.3);
-                background: rgba(108, 142, 255, 0.1);
-                color: #e8ecf0;
-                border-radius: 6px;
-                cursor: pointer;
-                font-size: 13px;
-                transition: all 0.2s;
-            `;
-            viewNetworkBtn.addEventListener('mouseenter', () => {
-                viewNetworkBtn.style.background = 'rgba(108, 142, 255, 0.2)';
-            });
-            viewNetworkBtn.addEventListener('mouseleave', () => {
-                viewNetworkBtn.style.background = 'rgba(108, 142, 255, 0.1)';
-            });
-            viewNetworkBtn.addEventListener('click', () => {
-                this._openNetworkViewWindow();
-            });
+            // 查看POOL按钮（选择模式下隐藏）
+            if (!isSelectorMode) {
+                const viewPoolBtn = document.createElement('button');
+                viewPoolBtn.textContent = '查看POOL';
+                viewPoolBtn.style.cssText = `
+                    padding: 6px 12px;
+                    border: 1px solid rgba(108, 142, 255, 0.3);
+                    background: rgba(108, 142, 255, 0.1);
+                    color: #e8ecf0;
+                    border-radius: 6px;
+                    cursor: pointer;
+                    font-size: 13px;
+                    transition: all 0.2s;
+                `;
+                viewPoolBtn.addEventListener('mouseenter', () => {
+                    viewPoolBtn.style.background = 'rgba(108, 142, 255, 0.2)';
+                });
+                viewPoolBtn.addEventListener('mouseleave', () => {
+                    viewPoolBtn.style.background = 'rgba(108, 142, 255, 0.1)';
+                });
+                viewPoolBtn.addEventListener('click', () => {
+                    this._openPoolViewWindow();
+                });
+                toolbar.appendChild(viewPoolBtn);
+                
+                // 查看网络按钮（选择模式下隐藏）
+                const viewNetworkBtn = document.createElement('button');
+                viewNetworkBtn.textContent = '查看网络';
+                viewNetworkBtn.style.cssText = `
+                    padding: 6px 12px;
+                    border: 1px solid rgba(108, 142, 255, 0.3);
+                    background: rgba(108, 142, 255, 0.1);
+                    color: #e8ecf0;
+                    border-radius: 6px;
+                    cursor: pointer;
+                    font-size: 13px;
+                    transition: all 0.2s;
+                `;
+                viewNetworkBtn.addEventListener('mouseenter', () => {
+                    viewNetworkBtn.style.background = 'rgba(108, 142, 255, 0.2)';
+                });
+                viewNetworkBtn.addEventListener('mouseleave', () => {
+                    viewNetworkBtn.style.background = 'rgba(108, 142, 255, 0.1)';
+                });
+                viewNetworkBtn.addEventListener('click', () => {
+                    this._openNetworkViewWindow();
+                });
+                toolbar.appendChild(viewNetworkBtn);
+            }
             
             // 搜索框
             const searchContainer = document.createElement('div');
@@ -322,7 +424,7 @@
             
             const searchInput = document.createElement('input');
             searchInput.type = 'text';
-            searchInput.placeholder = '搜索进程...';
+            searchInput.placeholder = this._isProgramSelectorMode ? '搜索程序...' : '搜索进程...';
             searchInput.style.cssText = `
                 width: 100%;
                 padding: 6px 12px;
@@ -335,7 +437,11 @@
             `;
             searchInput.addEventListener('input', (e) => {
                 this._searchQuery = e.target.value.toLowerCase();
-                this._updateProcessList();
+                if (this._isProgramSelectorMode) {
+                    this._updateProgramList();
+                } else {
+                    this._updateProcessList();
+                }
             });
             searchInput.addEventListener('focus', () => {
                 searchInput.style.borderColor = 'rgba(108, 142, 255, 0.5)';
@@ -348,86 +454,86 @@
             searchContainer.appendChild(searchInput);
             this.searchInput = searchInput;
             
-            // 排序选择
-            const sortContainer = document.createElement('div');
-            sortContainer.style.cssText = `
-                display: flex;
-                align-items: center;
-                gap: 6px;
-            `;
-            
-            const sortLabel = document.createElement('span');
-            sortLabel.textContent = '排序:';
-            sortLabel.style.cssText = `
-                font-size: 12px;
-                color: #aab2c0;
-            `;
-            
-            const sortSelect = document.createElement('select');
-            sortSelect.style.cssText = `
-                padding: 4px 8px;
-                border: 1px solid rgba(108, 142, 255, 0.3);
-                background: rgba(108, 142, 255, 0.1);
-                color: #e8ecf0;
-                border-radius: 4px;
-                font-size: 12px;
-                cursor: pointer;
-                outline: none;
-            `;
-            sortSelect.innerHTML = `
-                <option value="status">按状态</option>
-                <option value="name">按名称</option>
-                <option value="pid">按PID</option>
-                <option value="memory">按内存</option>
-                <option value="time">按启动时间</option>
-            `;
-            sortSelect.value = this._sortBy || 'status';
-            sortSelect.addEventListener('change', (e) => {
-                this._sortBy = e.target.value;
-                this._updateProcessList();
-            });
-            sortContainer.appendChild(sortLabel);
-            sortContainer.appendChild(sortSelect);
-            this.sortSelect = sortSelect;
-            
-            // 过滤已退出程序的开关
-            const filterCheckbox = document.createElement('label');
-            filterCheckbox.style.cssText = `
-                display: flex;
-                align-items: center;
-                gap: 6px;
-                cursor: pointer;
-                font-size: 12px;
-                color: #aab2c0;
-                margin-left: auto;
-                user-select: none;
-            `;
-            
-            const filterInput = document.createElement('input');
-            filterInput.type = 'checkbox';
-            filterInput.checked = this._getFilterExited();
-            filterInput.style.cssText = `
-                width: 16px;
-                height: 16px;
-                cursor: pointer;
-            `;
-            filterInput.addEventListener('change', (e) => {
-                this._setFilterExited(e.target.checked);
-                this._updateProcessList();
-            });
-            
-            const filterLabel = document.createElement('span');
-            filterLabel.textContent = '隐藏已退出';
-            
-            filterCheckbox.appendChild(filterInput);
-            filterCheckbox.appendChild(filterLabel);
+            // 排序选择（选择模式下简化）
+            if (!isSelectorMode) {
+                const sortContainer = document.createElement('div');
+                sortContainer.style.cssText = `
+                    display: flex;
+                    align-items: center;
+                    gap: 6px;
+                `;
+                
+                const sortLabel = document.createElement('span');
+                sortLabel.textContent = '排序:';
+                sortLabel.style.cssText = `
+                    font-size: 12px;
+                    color: #aab2c0;
+                `;
+                
+                const sortSelect = document.createElement('select');
+                sortSelect.style.cssText = `
+                    padding: 4px 8px;
+                    border: 1px solid rgba(108, 142, 255, 0.3);
+                    background: rgba(108, 142, 255, 0.1);
+                    color: #e8ecf0;
+                    border-radius: 4px;
+                    font-size: 12px;
+                    cursor: pointer;
+                    outline: none;
+                `;
+                sortSelect.innerHTML = `
+                    <option value="status">按状态</option>
+                    <option value="name">按名称</option>
+                    <option value="pid">按PID</option>
+                    <option value="memory">按内存</option>
+                    <option value="time">按启动时间</option>
+                `;
+                sortSelect.value = this._sortBy || 'status';
+                sortSelect.addEventListener('change', (e) => {
+                    this._sortBy = e.target.value;
+                    this._updateProcessList();
+                });
+                sortContainer.appendChild(sortLabel);
+                sortContainer.appendChild(sortSelect);
+                this.sortSelect = sortSelect;
+                toolbar.appendChild(sortContainer);
+                
+                // 过滤已退出程序的开关（选择模式下隐藏）
+                const filterCheckbox = document.createElement('label');
+                filterCheckbox.style.cssText = `
+                    display: flex;
+                    align-items: center;
+                    gap: 6px;
+                    cursor: pointer;
+                    font-size: 12px;
+                    color: #aab2c0;
+                    margin-left: auto;
+                    user-select: none;
+                `;
+                
+                const filterInput = document.createElement('input');
+                filterInput.type = 'checkbox';
+                filterInput.checked = this._getFilterExited();
+                filterInput.style.cssText = `
+                    width: 16px;
+                    height: 16px;
+                    cursor: pointer;
+                `;
+                filterInput.addEventListener('change', (e) => {
+                    this._setFilterExited(e.target.checked);
+                    this._updateProcessList();
+                });
+                
+                const filterLabel = document.createElement('span');
+                filterLabel.textContent = '隐藏已退出';
+                
+                filterCheckbox.appendChild(filterInput);
+                filterCheckbox.appendChild(filterLabel);
+                toolbar.appendChild(filterCheckbox);
+            }
             
             toolbar.appendChild(refreshBtn);
-            toolbar.appendChild(viewPoolBtn);
-            toolbar.appendChild(viewNetworkBtn);
             toolbar.appendChild(searchContainer);
-            toolbar.appendChild(sortContainer);
-            toolbar.appendChild(filterCheckbox);
             container.appendChild(toolbar);
             
             // 进程列表
@@ -728,11 +834,12 @@
                 return;
             }
             
-            // 过滤已退出的程序（如果启用）
+            // 过滤已退出的程序（如果启用，或选择模式下只显示运行中的进程）
             let filteredProcesses = processes;
             const filterExited = this._getFilterExited();
-            if (filterExited) {
-                filteredProcesses = processes.filter(p => p.status !== 'exited');
+            if (filterExited || this._isProcessSelectorMode) {
+                // 选择模式下只显示运行中的进程
+                filteredProcesses = processes.filter(p => p.status === 'running');
             }
             
             // 搜索过滤
@@ -818,14 +925,21 @@
             });
             
             item.addEventListener('click', () => {
-                this._selectProcess(process.pid);
+                if (this._isProcessSelectorMode) {
+                    // 选择模式下，选择进程
+                    this._selectProcessForSelection(process);
+                } else {
+                    this._selectProcess(process.pid);
+                }
             });
             
-            // 右键菜单
-            item.addEventListener('contextmenu', (e) => {
-                e.preventDefault();
-                this._showProcessContextMenu(e, process);
-            });
+            // 右键菜单（选择模式下隐藏）
+            if (!this._isProcessSelectorMode && !this._isProgramSelectorMode) {
+                item.addEventListener('contextmenu', (e) => {
+                    e.preventDefault();
+                    this._showProcessContextMenu(e, process);
+                });
+            }
             
             // 进程信息
             const name = document.createElement('div');
@@ -904,8 +1018,8 @@
             
             item.appendChild(info);
             
-            // 添加终止按钮（对于运行中的非Exploit程序）
-            if (!process.isExploit && process.status === 'running') {
+            // 添加终止按钮（对于运行中的非Exploit程序，选择模式下隐藏）
+            if (!this._isProcessSelectorMode && !this._isProgramSelectorMode && !process.isExploit && process.status === 'running') {
                 const killBtn = document.createElement('button');
                 killBtn.textContent = '×';
                 killBtn.title = '强制退出';
@@ -1091,6 +1205,237 @@
             if (this.tabs && this.tabs.logs && this.tabs.logs.classList.contains('active')) {
                 this._updateProcessLogs(pid);
             }
+        },
+        
+        _selectProcessForSelection: function(process) {
+            // 选择模式下的进程选择
+            this._selectedProcess = process;
+            
+            // 更新列表项样式
+            const items = this.processListElement.querySelectorAll('.taskmanager-process-item');
+            items.forEach(item => {
+                const itemPid = parseInt(item.dataset.pid);
+                if (itemPid === process.pid) {
+                    item.style.background = 'rgba(139, 92, 246, 0.2)';
+                    item.style.borderColor = '#8b5cf6';
+                } else {
+                    item.style.background = 'rgba(108, 142, 255, 0.05)';
+                    item.style.borderColor = 'rgba(108, 142, 255, 0.2)';
+                }
+            });
+            
+            // 更新选择按钮状态
+            if (this.selectButton) {
+                this.selectButton.style.opacity = '1';
+                this.selectButton.style.pointerEvents = 'auto';
+                this.selectButton.style.background = 'rgba(139, 92, 246, 0.5)';
+            }
+        },
+        
+        _selectProgramForSelection: function(programName, programInfo) {
+            // 选择模式下的程序选择
+            this._selectedProgram = { name: programName, info: programInfo };
+            
+            // 更新列表项样式
+            const items = this.processListElement.querySelectorAll('.taskmanager-program-item');
+            items.forEach(item => {
+                const itemName = item.dataset.programName;
+                if (itemName === programName) {
+                    item.style.background = 'rgba(139, 92, 246, 0.2)';
+                    item.style.borderColor = '#8b5cf6';
+                } else {
+                    item.style.background = 'rgba(108, 142, 255, 0.05)';
+                    item.style.borderColor = 'rgba(108, 142, 255, 0.2)';
+                }
+            });
+            
+            // 更新选择按钮状态
+            if (this.selectButton) {
+                this.selectButton.style.opacity = '1';
+                this.selectButton.style.pointerEvents = 'auto';
+                this.selectButton.style.background = 'rgba(139, 92, 246, 0.5)';
+            }
+        },
+        
+        _confirmSelection: async function() {
+            if (this._isProcessSelectorMode && this._selectedProcess) {
+                // 进程选择模式
+                if (this._onProcessSelected && typeof this._onProcessSelected === 'function') {
+                    await this._onProcessSelected(this._selectedProcess);
+                }
+                // 选择完成后关闭任务管理器
+                if (typeof ProcessManager !== 'undefined') {
+                    ProcessManager.killProgram(this.pid);
+                }
+            } else if (this._isProgramSelectorMode && this._selectedProgram) {
+                // 程序选择模式
+                if (this._onProgramSelected && typeof this._onProgramSelected === 'function') {
+                    await this._onProgramSelected(this._selectedProgram.name, this._selectedProgram.info);
+                }
+                // 选择完成后关闭任务管理器
+                if (typeof ProcessManager !== 'undefined') {
+                    ProcessManager.killProgram(this.pid);
+                }
+            }
+        },
+        
+        _updateProgramList: function() {
+            if (!this.processListElement) return;
+            
+            // 清空列表
+            this.processListElement.innerHTML = '';
+            
+            // 获取所有程序
+            if (typeof ApplicationAssetManager === 'undefined') {
+                const error = document.createElement('div');
+                error.textContent = 'ApplicationAssetManager 不可用';
+                error.style.cssText = `
+                    padding: 20px;
+                    text-align: center;
+                    color: #ff4444;
+                `;
+                this.processListElement.appendChild(error);
+                return;
+            }
+            
+            const programs = ApplicationAssetManager.listAllPrograms();
+            
+            if (programs.length === 0) {
+                const empty = document.createElement('div');
+                empty.textContent = '没有安装的程序';
+                empty.style.cssText = `
+                    padding: 20px;
+                    text-align: center;
+                    color: #aab2c0;
+                `;
+                this.processListElement.appendChild(empty);
+                return;
+            }
+            
+            // 搜索过滤
+            let filteredPrograms = programs;
+            if (this._searchQuery) {
+                filteredPrograms = programs.filter(p => {
+                    const name = (p.name || '').toLowerCase();
+                    const description = (p.description || '').toLowerCase();
+                    return name.includes(this._searchQuery) || description.includes(this._searchQuery);
+                });
+            }
+            
+            if (filteredPrograms.length === 0) {
+                const empty = document.createElement('div');
+                empty.textContent = this._searchQuery ? '未找到匹配的程序' : '没有程序';
+                empty.style.cssText = `
+                    padding: 20px;
+                    text-align: center;
+                    color: #aab2c0;
+                `;
+                this.processListElement.appendChild(empty);
+                return;
+            }
+            
+            // 按名称排序
+            filteredPrograms.sort((a, b) => {
+                const nameA = (a.name || '').toLowerCase();
+                const nameB = (b.name || '').toLowerCase();
+                return nameA.localeCompare(nameB);
+            });
+            
+            filteredPrograms.forEach(program => {
+                const item = this._createProgramItem(program);
+                this.processListElement.appendChild(item);
+            });
+        },
+        
+        _createProgramItem: function(program) {
+            const item = document.createElement('div');
+            item.className = 'taskmanager-program-item';
+            item.dataset.programName = program.name;
+            item.style.cssText = `
+                padding: 12px;
+                margin-bottom: 8px;
+                background: rgba(108, 142, 255, 0.05);
+                border: 1px solid rgba(108, 142, 255, 0.2);
+                border-radius: 8px;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                gap: 12px;
+            `;
+            
+            const isSelected = this._selectedProgram && this._selectedProgram.name === program.name;
+            if (isSelected) {
+                item.style.background = 'rgba(139, 92, 246, 0.2)';
+                item.style.borderColor = '#8b5cf6';
+            }
+            
+            item.addEventListener('mouseenter', () => {
+                if (!isSelected && (!this._selectedProgram || this._selectedProgram.name !== program.name)) {
+                    item.style.background = 'rgba(108, 142, 255, 0.1)';
+                }
+            });
+            item.addEventListener('mouseleave', () => {
+                if (!isSelected && (!this._selectedProgram || this._selectedProgram.name !== program.name)) {
+                    item.style.background = 'rgba(108, 142, 255, 0.05)';
+                }
+            });
+            
+            item.addEventListener('click', () => {
+                this._selectProgramForSelection(program.name, program);
+            });
+            
+            // 程序图标
+            if (program.icon) {
+                const icon = document.createElement('img');
+                icon.src = typeof ProcessManager !== 'undefined' && typeof ProcessManager.convertVirtualPathToUrl === 'function'
+                    ? ProcessManager.convertVirtualPathToUrl(program.icon)
+                    : program.icon;
+                icon.style.cssText = `
+                    width: 32px;
+                    height: 32px;
+                    flex-shrink: 0;
+                    object-fit: contain;
+                `;
+                icon.onerror = () => {
+                    icon.style.display = 'none';
+                };
+                item.appendChild(icon);
+            }
+            
+            // 程序信息
+            const info = document.createElement('div');
+            info.style.cssText = `
+                flex: 1;
+                min-width: 0;
+            `;
+            
+            const name = document.createElement('div');
+            name.style.cssText = `
+                font-size: 14px;
+                font-weight: 600;
+                color: #e8ecf0;
+                margin-bottom: 4px;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            `;
+            name.textContent = program.name || '未知程序';
+            info.appendChild(name);
+            
+            const description = document.createElement('div');
+            description.style.cssText = `
+                font-size: 12px;
+                color: #aab2c0;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            `;
+            description.textContent = program.description || program.type || '';
+            info.appendChild(description);
+            
+            item.appendChild(info);
+            
+            return item;
         },
         
         _updateProcessDetail: function(pid) {

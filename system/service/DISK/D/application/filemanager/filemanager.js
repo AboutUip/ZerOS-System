@@ -2482,9 +2482,8 @@
                         iconUrl = 'D:/application/ziper/ziper.svg';
                         break;
                     case 'ZOM':
-                        // ZOM 文件图标（使用 zominstall 程序的图标或通用文件图标）
-                        // 如果 zominstall 有图标，使用它；否则使用通用文件图标
-                        iconUrl = 'D:/application/filemanager/assets/file.svg';
+                        // ZOM 文件图标（ZerOS 程序安装包专用图标）
+                        iconUrl = 'D:/application/filemanager/assets/file-zom.svg';
                         break;
                     default:
                         iconUrl = 'D:/application/filemanager/assets/file.svg';
@@ -3019,8 +3018,12 @@
                 else if (extension === 'html' || extension === 'htm') {
                     await this._openFileWithWebViewer(item);
                 }
-                // 所有文本文件类型（TEXT、CODE、MARKDOWN）默认用 vim 打开
-                else if (fileType === 'TEXT' || fileType === 'CODE' || fileType === 'MARKDOWN') {
+                // Markdown 文件默认用 cat -md 命令在终端渲染
+                else if (fileType === 'MARKDOWN' || extension === 'md' || extension === 'markdown') {
+                    await this._openFileWithCat(item);
+                }
+                // 其他文本文件类型（TEXT、CODE）默认用 vim 打开
+                else if (fileType === 'TEXT' || fileType === 'CODE') {
                     await this._openFileWithVim(item);
                 } else {
                     // 其他类型文件（如 BINARY），提示用vim打开
@@ -3917,6 +3920,168 @@
         },
         
         /**
+         * 使用 cat -md 命令在终端渲染 Markdown 文件
+         */
+        _openFileWithCat: async function(item) {
+            try {
+                if (typeof ProcessManager === 'undefined') {
+                    // ProcessManager 不可用，使用通知提示（不打断用户）
+                    if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                        try {
+                            await NotificationManager.createNotification(this.pid, {
+                                type: 'snapshot',
+                                title: '文件管理器',
+                                content: 'ProcessManager 不可用',
+                                duration: 3000
+                            });
+                        } catch (e) {
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.error('FileManager', `ProcessManager 不可用，且创建通知失败: ${e.message}`);
+                            }
+                        }
+                    } else {
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.error('FileManager', 'ProcessManager 不可用');
+                        }
+                    }
+                    return;
+                }
+                
+                // 确保item.path存在且有效
+                if (!item || !item.path) {
+                    // 文件路径无效，使用通知提示（不打断用户）
+                    if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                        try {
+                            await NotificationManager.createNotification(this.pid, {
+                                type: 'snapshot',
+                                title: '文件管理器',
+                                content: '文件路径无效',
+                                duration: 3000
+                            });
+                        } catch (e) {
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.warn('FileManager', `创建通知失败: ${e.message}`);
+                            }
+                        }
+                    }
+                    return;
+                }
+                
+                // 获取终端实例（cat 需要终端来运行）
+                // 尝试获取当前活动的终端，如果没有则启动一个新的终端
+                let terminalInstance = null;
+                let terminalPid = null;
+                
+                // 查找活动的终端实例
+                // TERMINAL._instances 存储的是 { tabManager, pid } 对象
+                // 需要从 tabManager 获取活动的终端实例
+                if (typeof TERMINAL !== 'undefined' && TERMINAL._instances) {
+                    const instances = Array.from(TERMINAL._instances.values());
+                    for (const instance of instances) {
+                        if (instance && instance.tabManager) {
+                            const activeTerm = instance.tabManager.getActiveTerminal();
+                            if (activeTerm) {
+                                terminalInstance = activeTerm;
+                                break;
+                            }
+                        }
+                    }
+                }
+                
+                // 如果没有活动的终端，先启动一个终端
+                if (!terminalInstance) {
+                    terminalPid = await ProcessManager.startProgram('terminal');
+                    // 等待终端初始化
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                    // 获取终端实例（从 tabManager 获取活动终端）
+                    if (typeof TERMINAL !== 'undefined' && TERMINAL._instances) {
+                        const instance = TERMINAL._instances.get(terminalPid);
+                        if (instance && instance.tabManager) {
+                            terminalInstance = instance.tabManager.getActiveTerminal();
+                        }
+                    }
+                }
+                
+                if (!terminalInstance) {
+                    // 无法获取终端实例，使用通知提示（不打断用户）
+                    if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                        try {
+                            await NotificationManager.createNotification(this.pid, {
+                                type: 'snapshot',
+                                title: '文件管理器',
+                                content: '无法获取终端实例，cat 需要终端来运行',
+                                duration: 4000
+                            });
+                        } catch (e) {
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.warn('FileManager', `创建通知失败: ${e.message}`);
+                            }
+                        }
+                    }
+                    return;
+                }
+                
+                // cat 是终端的内置命令，不是独立程序
+                // 需要在终端实例中执行 cat -md 命令
+                const filePath = item.path;
+                
+                // 执行 cat -md 命令，使用文件的完整路径
+                // 注意：终端使用简单的空格分割解析参数（_argsFrom 使用 split(/\s+/)）
+                // 这意味着引号会被当作路径的一部分，而不是分隔符
+                // 所以如果路径包含空格，需要用引号包裹，但引号会被包含在参数中
+                // 由于 ZerOS 路径通常不包含空格，直接使用路径即可
+                // 如果路径包含空格，使用引号包裹（引号会被包含在参数中，cat 命令需要处理）
+                let command;
+                if (filePath.includes(' ')) {
+                    // 如果路径包含空格，使用引号包裹
+                    // 注意：引号会被包含在参数中，cat 命令需要去除引号
+                    command = `cat -md "${filePath}"`;
+                } else {
+                    // 路径不包含空格，直接使用（推荐方式）
+                    command = `cat -md ${filePath}`;
+                }
+                
+                if (terminalInstance && typeof terminalInstance._handleInput === 'function') {
+                    // 使用 _handleInput 方法执行命令
+                    terminalInstance._handleInput(command);
+                } else if (terminalInstance && terminalInstance.cmdEl) {
+                    // 降级方案：直接设置命令并触发回车
+                    terminalInstance.cmdEl.textContent = command;
+                    const enterEvent = new KeyboardEvent('keydown', {
+                        key: 'Enter',
+                        code: 'Enter',
+                        keyCode: 13,
+                        which: 13,
+                        bubbles: true
+                    });
+                    terminalInstance.cmdEl.dispatchEvent(enterEvent);
+                } else {
+                    throw new Error('终端实例不支持命令执行');
+                }
+                
+            } catch (error) {
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('FileManager', '启动 cat 失败', error);
+                }
+                // 启动 cat 失败，使用通知提示（不打断用户）
+                if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                    try {
+                        await NotificationManager.createNotification(this.pid, {
+                            type: 'snapshot',
+                            title: '文件管理器',
+                            content: `启动 cat 失败: ${error.message}`,
+                            duration: 4000
+                        });
+                    } catch (e) {
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('FileManager', `创建通知失败: ${e.message}`);
+                        }
+                    }
+                }
+            }
+        },
+        
+        /**
          * 返回上级目录
          */
         _goUp: async function() {
@@ -4471,6 +4636,8 @@
                         return 'D:/application/filemanager/assets/file-audio.svg';
                     case 'VIDEO':
                         return 'D:/application/filemanager/assets/file-video.svg';
+                    case 'ZOM':
+                        return 'D:/application/filemanager/assets/file-zom.svg';
                     default:
                         return 'D:/application/filemanager/assets/file.svg';
                 }
@@ -4491,6 +4658,8 @@
                             return 'D:/application/filemanager/assets/file-audio.svg';
                         case 'VIDEO':
                             return 'D:/application/filemanager/assets/file-video.svg';
+                        case 'ZOM':
+                            return 'D:/application/filemanager/assets/file-zom.svg';
                         default:
                             return 'D:/application/filemanager/assets/file.svg';
                     }

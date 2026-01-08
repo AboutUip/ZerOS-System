@@ -5804,7 +5804,15 @@ function escapeHtml(s){
                             return;
                         }
                         
-                        const full = resolvePath(payload.env.cwd, fArg);
+                        // 去除参数中的引号（如果存在）
+                        // 因为终端使用简单的空格分割，引号会被包含在参数中
+                        let cleanArg = fArg;
+                        if ((cleanArg.startsWith('"') && cleanArg.endsWith('"')) || 
+                            (cleanArg.startsWith("'") && cleanArg.endsWith("'"))) {
+                            cleanArg = cleanArg.slice(1, -1);
+                        }
+                        
+                        const full = resolvePath(payload.env.cwd, cleanArg);
                         
                         // 检查系统盘D:访问权限
                         if (!checkSystemDiskAccess(full, payload)) {

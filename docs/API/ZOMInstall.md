@@ -458,6 +458,115 @@ const apps = await Process.callKernelAPI('Application.list', []);
 await Process.callKernelAPI('Application.uninstall', ['myapp']);
 ```
 
+**卸载流程**：
+
+1. 验证权限（管理员权限和 `APPLICATION_UNINSTALL` 权限）
+2. 检查是否为静态程序（静态程序不允许卸载）
+3. 删除桌面图标和任务栏固定（如果存在）
+4. **执行 `uninstall.js`（如果存在）**：在删除文件之前，尝试执行 `D:/application/<程序名>/uninstall.js`
+5. 删除 `D:/application/<程序名>/` 目录下的所有文件
+6. 从 `ApplicationTable` 中删除程序
+7. 自动刷新 `ApplicationAssetManager`（使卸载的程序立即从列表中移除）
+
+**uninstall.js（可选）**：
+
+如果程序目录中存在 `uninstall.js` 文件，卸载流程会在删除文件之前执行它。`uninstall.js` 必须遵守 ZerOS 程序开发约定，作为标准的 ZerOS GUI 程序执行。
+
+**uninstall.js 职责**：
+
+`uninstall.js` 应该负责以下任务：
+
+1. **清理注册表数据**：删除程序在注册表中注册的数据（如配置、缓存键等）
+2. **删除缓存文件**：删除程序创建的缓存文件（如 `D:/cache/<程序名>/` 目录下的文件）
+3. **清理其他残留数据**：删除程序创建的其他数据文件（但不包括程序资源文件，因为系统会自动处理）
+
+**重要**：`uninstall.js` **不应该**删除程序资源文件（如脚本、样式、图标等），因为这些文件会在 `uninstall.js` 执行完成后由系统自动删除。
+
+**uninstall.js 程序结构**：
+
+`uninstall.js` 必须实现以下必需方法：
+
+```javascript
+(function(window) {
+    'use strict';
+    
+    // 重要：程序对象必须命名为 UNINSTALL，不能使用其他名称
+    const UNINSTALL = {
+        pid: null,
+        _uninstallContext: null,
+        
+        __info__: function() {
+            return {
+                name: 'Uninstall',
+                type: 'GUI',
+                version: '1.0.0',
+                description: '卸载脚本',
+                author: 'Your Name',
+                copyright: '© 2025',
+                permissions: [
+                    PermissionManager.PERMISSION.SYSTEM_STORAGE_WRITE,
+                    PermissionManager.PERMISSION.KERNEL_DISK_DELETE
+                ],
+                metadata: {
+                    allowMultipleInstances: false
+                }
+            };
+        },
+        
+        __init__: async function(pid, initArgs) {
+            this.pid = pid;
+            
+            // 获取卸载上下文
+            if (initArgs && initArgs.metadata && initArgs.metadata.uninstallContext) {
+                this._uninstallContext = initArgs.metadata.uninstallContext;
+            }
+            
+            const programName = this._uninstallContext ? this._uninstallContext.programName : 'unknown';
+            const appDirPath = this._uninstallContext ? this._uninstallContext.appDirPath : null;
+            
+            // 执行清理操作
+            // 1. 删除注册表数据
+            // 2. 删除缓存文件
+            // 3. 清理其他残留数据
+            
+            // 完成后，程序会自动退出
+        },
+        
+        __exit__: async function() {
+            // 清理资源
+        }
+    };
+    
+    // 重要：必须导出到 window.UNINSTALL，不能使用其他名称
+    if (typeof window !== 'undefined') {
+        window.UNINSTALL = UNINSTALL;
+    }
+    
+})(window);
+```
+
+**卸载上下文**：
+
+`uninstall.js` 通过 `initArgs.metadata.uninstallContext` 获取卸载上下文：
+
+```javascript
+{
+    programName: "myapp",              // 程序名称
+    appDirPath: "D:/application/myapp", // 程序目录路径
+    asset: { ... }                      // 程序资源对象
+}
+```
+
+**重要提示**：
+
+- **程序对象名称必须为 `UNINSTALL`**：`uninstall.js` 中的程序对象必须命名为 `UNINSTALL`，并导出到 `window.UNINSTALL`
+- **不能使用其他名称**：如 `PIANO_UNINSTALL`、`MYAPP_UNINSTALL` 等都是错误的，必须使用 `UNINSTALL`
+- **原因**：`LStorage.uninstallApplication()` 使用 `ProcessManager.startProgram()` 启动 `uninstall.js` 时，会查找 `window.UNINSTALL` 来注册程序对象
+- **如果使用错误的名称**：程序将无法正确注册，导致加载超时错误
+- **执行时机**：`uninstall.js` 在删除程序文件**之前**执行，因此可以访问程序的所有资源文件
+- **执行超时**：如果 `uninstall.js` 在 30 秒内未完成，卸载流程会继续，但会记录警告信息
+- **错误处理**：如果 `uninstall.js` 执行失败或加载超时，卸载过程会继续，但会记录警告信息
+
 **注意**：
 - 卸载程序会删除 `D:/application/<程序名>/` 目录下的所有文件
 - 静态程序（注册在 `applicationAssets.js` 中）不允许卸载
@@ -539,9 +648,11 @@ ZOMInstall 与 LStorage 的交互流程：
 
 以下文件**不会被复制**到 `D:/application/` 目录：
 - `application.json`（仅用于安装时读取配置）
-- `setup.js`（仅在临时目录中执行）
+- `setup.js`（仅在临时目录中执行，安装时使用）
 
-**注意**：如果这些文件在子目录中（如 `config/application.json`），它们**会被复制**。只有根目录下的 `application.json` 和 `setup.js` 会被排除。
+**注意**：
+- `uninstall.js` **会被复制**到程序目录，因为卸载时需要从程序目录读取并执行它
+- 如果这些文件在子目录中（如 `config/application.json`），它们**会被复制**。只有根目录下的 `application.json` 和 `setup.js` 会被排除
 
 ### 与静态程序的兼容性
 

@@ -1,12 +1,12 @@
 {
   "system": {
     "permissionManager.permissions": {
-      "filemanager": [
-        "GUI_WINDOW_CREATE",
+      "zominstall": [
         "KERNEL_DISK_READ",
-        "KERNEL_DISK_LIST",
-        "SYSTEM_NOTIFICATION",
-        "EVENT_LISTENER"
+        "APPLICATION_INSTALL"
+      ],
+      "settings": [
+        "SYSTEM_STORAGE_READ"
       ]
     },
     "system.style": "macos",
@@ -43,15 +43,6 @@
         "description": "画板",
         "position": null,
         "createdAt": 1766307135134
-      },
-      {
-        "id": 4,
-        "programName": "snake",
-        "name": "贪吃蛇",
-        "icon": "D:/application/snake/snake.svg",
-        "description": "贪吃蛇",
-        "position": null,
-        "createdAt": 1765924910097
       },
       {
         "id": 16,
@@ -520,14 +511,13 @@
       "keys": {},
       "defaultKeyId": null
     },
-    "snake.highScore": 40,
     "userControl.users": {
       "root": {
         "level": "DEFAULT_ADMIN",
         "password": "61b249bf6d604d14120821f43625e84e",
         "avatar": "avatar_root_1766272534753.jpg",
         "createdAt": 1766271155991,
-        "lastLogin": 1767860058925
+        "lastLogin": 1767899353564
       },
       "TestUser": {
         "level": "USER",
@@ -574,10 +564,7 @@
       "test": "escalate_attempt",
       "timestamp": 1766509735075
     },
-    "permissionControl.whitelist": {
-      "test": "escalate_attempt",
-      "timestamp": 1766509735075
-    },
+    "permissionControl.whitelist": [],
     "userControl.groups": {
       "admins": {
         "type": "ADMIN_GROUP",
@@ -604,8 +591,7 @@
     },
     "applicationTable": {},
     "permissionManager.denialCounts": {
-      "zominstall_KERNEL_DISK_DELETE": 1,
-      "filemanager_SYSTEM_STORAGE_WRITE_DESKTOP": 1
+      "zominstall_KERNEL_DISK_DELETE": 1
     }
   },
   "programs": {}

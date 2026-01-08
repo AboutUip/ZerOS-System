@@ -1004,12 +1004,21 @@
                     `;
                     actionInputContainer.appendChild(programNameLabel);
                     
+                    // 输入框和选择按钮容器
+                    const programNameContainer = document.createElement('div');
+                    programNameContainer.style.cssText = `
+                        display: flex;
+                        gap: 8px;
+                        align-items: stretch;
+                    `;
+                    
                     const programNameInput = document.createElement('input');
                     programNameInput.type = 'text';
                     programNameInput.value = task && task.taskType !== 'command' ? (task.programName || '') : '';
                     programNameInput.required = true;
                     programNameInput.id = 'scheduletask-program-name';
                     programNameInput.style.cssText = `
+                        flex: 1;
                         padding: 10px 12px;
                         background: var(--theme-background-secondary, rgba(20, 25, 35, 0.4));
                         border: 1px solid var(--theme-border, rgba(139, 92, 246, 0.3));
@@ -1017,7 +1026,35 @@
                         color: var(--theme-text, #d7e0dd);
                         font-size: 14px;
                     `;
-                    actionInputContainer.appendChild(programNameInput);
+                    programNameContainer.appendChild(programNameInput);
+                    
+                    // 选择程序按钮
+                    const selectProgramBtn = document.createElement('button');
+                    selectProgramBtn.type = 'button';
+                    selectProgramBtn.textContent = '选择程序';
+                    selectProgramBtn.style.cssText = `
+                        padding: 10px 16px;
+                        background: var(--theme-primary, rgba(139, 92, 246, 0.3));
+                        border: 1px solid var(--theme-border, rgba(139, 92, 246, 0.5));
+                        border-radius: 8px;
+                        color: var(--theme-text, #d7e0dd);
+                        font-size: 14px;
+                        cursor: pointer;
+                        white-space: nowrap;
+                        transition: all 0.2s;
+                    `;
+                    selectProgramBtn.addEventListener('mouseenter', () => {
+                        selectProgramBtn.style.background = 'var(--theme-primary-hover, rgba(139, 92, 246, 0.5))';
+                    });
+                    selectProgramBtn.addEventListener('mouseleave', () => {
+                        selectProgramBtn.style.background = 'var(--theme-primary, rgba(139, 92, 246, 0.3))';
+                    });
+                    selectProgramBtn.addEventListener('click', () => {
+                        this._selectProgram(programNameInput);
+                    });
+                    programNameContainer.appendChild(selectProgramBtn);
+                    
+                    actionInputContainer.appendChild(programNameContainer);
                 } else if (selectedType === 'command') {
                     // 命令输入
                     const commandLabel = document.createElement('label');
@@ -1605,6 +1642,106 @@
             this.refreshInterval = setInterval(() => {
                 this._loadTasks();
             }, 30000);
+        },
+        
+        /**
+         * 选择程序（调用任务管理器的选择模式）
+         * @param {HTMLInputElement} programNameInput 程序名称输入框
+         */
+        _selectProgram: async function(programNameInput) {
+            if (typeof ProcessManager === 'undefined') {
+                await this._showError('ProcessManager 不可用');
+                return;
+            }
+            
+            try {
+                // 读取任务管理器程序文件
+                const taskManagerPath = 'D:/application/taskmanager/taskmanager.js';
+                let taskManagerContent = null;
+                
+                // 尝试通过 ProcessManager 读取文件
+                if (typeof ProcessManager !== 'undefined' && typeof ProcessManager.callKernelAPI === 'function') {
+                    try {
+                        const result = await ProcessManager.callKernelAPI(this.pid, 'FileSystem.read', [taskManagerPath], null);
+                        if (result && result.content) {
+                            taskManagerContent = result.content;
+                        }
+                    } catch (e) {
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('SCHEDULETASK', `通过 ProcessManager 读取任务管理器失败: ${e.message}`);
+                        }
+                    }
+                }
+                
+                // 如果 ProcessManager 读取失败，尝试直接使用 fetch
+                if (!taskManagerContent) {
+                    try {
+                        const url = typeof SystemInformation !== 'undefined' && typeof SystemInformation.buildServiceUrlObject === 'function'
+                            ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                            : new URL('/system/service/FSDirve.php', window.location.origin);
+                        url.searchParams.set('action', 'read_file');
+                        url.searchParams.set('path', 'D:/application/taskmanager');
+                        url.searchParams.set('fileName', 'taskmanager.js');
+                        
+                        const response = await fetch(url.toString());
+                        if (response.ok) {
+                            const result = await response.json();
+                            if (result.status === 'success' && result.data && result.data.content) {
+                                taskManagerContent = result.data.content;
+                            }
+                        }
+                    } catch (e) {
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('SCHEDULETASK', `通过 fetch 读取任务管理器失败: ${e.message}`);
+                        }
+                    }
+                }
+                
+                if (!taskManagerContent) {
+                    await this._showError('无法读取任务管理器程序文件');
+                    return;
+                }
+                
+                // 创建 tempAsset
+                const tempAsset = {
+                    script: taskManagerContent,
+                    styles: [],
+                    icon: null,
+                    metadata: {
+                        name: 'taskmanager',
+                        type: 'GUI',
+                        allowMultipleInstances: false
+                    }
+                };
+                
+                // 启动任务管理器，使用程序选择模式
+                const taskManagerPid = await ProcessManager.startProgram('taskmanager', {
+                    mode: 'program-selector',
+                    onProgramSelected: async (programName, programInfo) => {
+                        // 选择完成，更新输入框
+                        if (programNameInput) {
+                            programNameInput.value = programName;
+                            // 触发 input 事件，确保表单验证能够识别
+                            programNameInput.dispatchEvent(new Event('input', { bubbles: true }));
+                        }
+                        
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.info('SCHEDULETASK', `已选择程序: ${programName}`);
+                        }
+                    }
+                }, null, {
+                    tempAsset: tempAsset
+                });
+                
+                if (!taskManagerPid) {
+                    await this._showError('启动任务管理器失败');
+                }
+            } catch (error) {
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('SCHEDULETASK', '选择程序失败', error);
+                }
+                await this._showError(`选择程序失败: ${error.message}`);
+            }
         },
         
         /**

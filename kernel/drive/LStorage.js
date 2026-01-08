@@ -2609,6 +2609,237 @@ class LStorage {
     }
     
     /**
+     * 执行 uninstall.js（如果存在）
+     * @param {string} programName 程序名称
+     * @param {Object} asset 应用程序资源对象
+     * @returns {Promise<boolean>} 是否执行成功（文件不存在返回 true）
+     * @private
+     */
+    static async _executeUninstall(programName, asset) {
+        if (!programName || !asset) {
+            return false;
+        }
+        
+        try {
+            // 从主脚本路径提取应用程序目录
+            const mainScriptPath = asset.script || asset.path;
+            if (!mainScriptPath) {
+                KernelLogger.debug("LStorage", `无法确定应用程序目录，跳过 uninstall.js 执行`);
+                return false;
+            }
+            
+            // 提取应用程序目录路径
+            const pathParts = mainScriptPath.split('/');
+            if (pathParts.length < 3) {
+                KernelLogger.debug("LStorage", `无效的主脚本路径，跳过 uninstall.js 执行: ${mainScriptPath}`);
+                return false;
+            }
+            
+            // 假设路径格式为 "D:/application/myapp/myapp.js"
+            // 提取 "D:/application/myapp"
+            const appDirPath = pathParts.slice(0, -1).join('/');
+            const uninstallPath = `${appDirPath}/uninstall.js`;
+            
+            // 检查文件是否存在并读取
+            let uninstallContent = null;
+            
+            // 尝试通过 ProcessManager 读取文件
+            if (typeof ProcessManager !== 'undefined' && typeof ProcessManager._executeKernelAPI === 'function') {
+                try {
+                    const result = await ProcessManager._executeKernelAPI('FileSystem.read', [uninstallPath], null);
+                    if (result && result.content) {
+                        uninstallContent = result.content;
+                    }
+                } catch (e) {
+                    // 文件不存在或其他错误
+                    if (e.message && (e.message.includes('文件不存在') || e.message.includes('not found') || e.message.includes('404'))) {
+                        KernelLogger.debug("LStorage", `uninstall.js 不存在，跳过执行: ${uninstallPath}`);
+                        return true; // 文件不存在，返回 true（表示成功，因为没有需要执行的）
+                    }
+                    KernelLogger.warn("LStorage", `读取 uninstall.js 失败: ${e.message}`);
+                }
+            }
+            
+            // 如果 ProcessManager 读取失败，尝试直接使用 fetch
+            if (!uninstallContent) {
+                try {
+                    const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                        ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                        : new URL(LStorage.PHP_SERVICE_URL, (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                            ? SystemInformation.getOrigin()
+                            : window.location.origin);
+                    url.searchParams.set('action', 'read_file');
+                    url.searchParams.set('path', appDirPath);
+                    url.searchParams.set('fileName', 'uninstall.js');
+                    
+                    const response = await fetch(url.toString());
+                    if (response.ok) {
+                        const result = await response.json();
+                        if (result.status === 'success' && result.data && result.data.content) {
+                            uninstallContent = result.data.content;
+                        } else if (result.status === 'error' && result.message && 
+                                   (result.message.includes('文件不存在') || result.message.includes('not found'))) {
+                            KernelLogger.debug("LStorage", `uninstall.js 不存在，跳过执行: ${uninstallPath}`);
+                            return true; // 文件不存在，返回 true
+                        }
+                    } else if (response.status === 404) {
+                        KernelLogger.debug("LStorage", `uninstall.js 不存在，跳过执行: ${uninstallPath}`);
+                        return true; // 文件不存在，返回 true
+                    }
+                } catch (e) {
+                    KernelLogger.warn("LStorage", `通过 fetch 读取 uninstall.js 失败: ${e.message}`);
+                }
+            }
+            
+            // 如果文件不存在，返回 true（表示成功，因为没有需要执行的）
+            if (!uninstallContent) {
+                return true;
+            }
+            
+            KernelLogger.info("LStorage", `找到 uninstall.js，开始执行: ${uninstallPath}`);
+            
+            // 使用 ProcessManager 启动 uninstall.js 作为 ZerOS 程序
+            if (typeof ProcessManager === 'undefined' || typeof ProcessManager.startProgram !== 'function') {
+                KernelLogger.error("LStorage", `ProcessManager 不可用，无法执行 uninstall.js`);
+                return false;
+            }
+            
+            // 创建临时程序配置
+            const tempAsset = {
+                script: uninstallContent,  // 直接传入脚本内容
+                styles: [],
+                assets: [],
+                metadata: {
+                    type: 'CLI',  // uninstall.js 通常是 CLI 程序，不需要 GUI
+                    autoStart: false,
+                    allowMultipleInstances: false,
+                    description: `${programName} 卸载脚本`
+                }
+            };
+            
+            // 启动 uninstall.js 程序
+            // 注意：uninstall.js 应该是一个 IIFE 包装的程序，它会将程序对象注册到 window 或 POOL 中
+            // 程序对象名称应该是 'UNINSTALL'（大写）
+            try {
+                const uninstallPid = await ProcessManager.startProgram('uninstall', {
+                    tempAsset: tempAsset,
+                    args: [programName],
+                    metadata: {
+                        uninstallContext: {
+                            programName: programName,
+                            appDirPath: appDirPath,
+                            asset: asset
+                        }
+                    }
+                });
+                
+                KernelLogger.info("LStorage", `uninstall.js 已启动 (PID: ${uninstallPid})`);
+                
+                // 等待 uninstall 程序完成（通过检查进程状态）
+                // 需要等待 uninstall 程序完成后再继续删除文件
+                // 对于 CLI 程序，可能执行很快，立即开始检查
+                const maxWaitTime = 30000; // 最多等待 30 秒
+                const checkInterval = 100; // 每 100ms 检查一次（更频繁的检查）
+                const startTime = Date.now();
+                let lastStatus = null;
+                let runningStartTime = null; // 记录程序进入 running 状态的时间
+                
+                while (Date.now() - startTime < maxWaitTime) {
+                    try {
+                        if (typeof ProcessManager !== 'undefined' && typeof ProcessManager.getProcessInfo === 'function') {
+                            const processInfo = ProcessManager.getProcessInfo(uninstallPid);
+                            if (!processInfo) {
+                                // 进程不存在，可能已经退出
+                                KernelLogger.info("LStorage", `uninstall.js 程序已退出 (PID: ${uninstallPid})`);
+                                return true;
+                            }
+                            
+                            const currentStatus = processInfo.status;
+                            
+                            // 如果状态发生变化，记录日志
+                            if (currentStatus !== lastStatus) {
+                                KernelLogger.debug("LStorage", `uninstall.js 程序状态变化: ${lastStatus || '未知'} -> ${currentStatus} (PID: ${uninstallPid})`);
+                                lastStatus = currentStatus;
+                                
+                                // 如果程序进入 running 状态，记录时间
+                                if (currentStatus === 'running' && !runningStartTime) {
+                                    runningStartTime = Date.now();
+                                }
+                            }
+                            
+                            // 检查程序状态
+                            if (currentStatus === 'exited' || currentStatus === 'exiting') {
+                                KernelLogger.info("LStorage", `uninstall.js 程序已完成 (PID: ${uninstallPid}, 状态: ${currentStatus})`);
+                                return true;
+                            }
+                            
+                            // 对于 CLI 程序，如果状态是 running 但已经运行了一段时间（比如 5 秒），
+                            // 可能是程序已经执行完成但状态没有及时更新，假设已完成
+                            if (currentStatus === 'running' && runningStartTime) {
+                                const runningDuration = Date.now() - runningStartTime;
+                                // CLI 程序通常执行很快，如果运行超过 5 秒，假设已完成
+                                if (runningDuration > 5000) {
+                                    KernelLogger.info("LStorage", `uninstall.js 程序已运行 ${runningDuration}ms，假设已完成 (PID: ${uninstallPid})`);
+                                    return true;
+                                }
+                            }
+                            
+                            // 如果程序状态是 loading，继续等待（程序可能还在初始化）
+                            // 如果程序状态是 running，也继续等待（程序可能正在执行清理操作）
+                            
+                            // 进程仍在运行，继续等待
+                        } else {
+                            // ProcessManager 不可用，无法检查进程状态
+                            // 等待一段时间后假设完成
+                            await new Promise(resolve => setTimeout(resolve, 2000));
+                            return true;
+                        }
+                    } catch (e) {
+                        // 检查失败，可能是进程已经退出
+                        KernelLogger.debug("LStorage", `检查 uninstall.js 状态时出错（可能已退出）: ${e.message}`);
+                        // 如果检查失败，可能是进程已经不存在，等待一小段时间后继续
+                        await new Promise(resolve => setTimeout(resolve, 500));
+                        // 再次尝试检查，如果仍然失败，假设程序已完成
+                        try {
+                            if (typeof ProcessManager !== 'undefined' && typeof ProcessManager.getProcessInfo === 'function') {
+                                const processInfo = ProcessManager.getProcessInfo(uninstallPid);
+                                if (!processInfo || processInfo.status === 'exited' || processInfo.status === 'exiting') {
+                                    KernelLogger.info("LStorage", `uninstall.js 程序已完成 (PID: ${uninstallPid})`);
+                                    return true;
+                                }
+                            }
+                        } catch (e2) {
+                            // 再次检查也失败，假设程序已完成
+                            KernelLogger.info("LStorage", `uninstall.js 程序可能已完成 (PID: ${uninstallPid})`);
+                            return true;
+                        }
+                    }
+                    
+                    await new Promise(resolve => setTimeout(resolve, checkInterval));
+                }
+                
+                // 超时，但继续卸载（不中断）
+                KernelLogger.warn("LStorage", `uninstall.js 程序等待超时 (PID: ${uninstallPid})，继续卸载`);
+                return true;
+            } catch (error) {
+                // 如果是加载超时错误，可能是 uninstall.js 没有正确注册程序对象
+                // 这种情况下，我们仍然允许卸载继续，但记录警告
+                if (error.message && error.message.includes('failed to load within timeout')) {
+                    KernelLogger.warn("LStorage", `uninstall.js 加载超时，可能未正确注册程序对象，跳过 uninstall.js 执行`);
+                    return false; // 返回 false 表示未执行
+                }
+                KernelLogger.error("LStorage", `启动 uninstall.js 程序失败: ${error.message}`, error);
+                // 即使失败也继续卸载流程，不中断
+                return false;
+            }
+        } catch (error) {
+            KernelLogger.error("LStorage", `执行 uninstall.js 时出错: ${error.message}`, error);
+            // 即使出错也继续卸载流程，不中断
+            return false;
+        }
+    }
+    
+    /**
      * 删除应用程序的所有文件
      * @param {Object} asset 程序资源对象
      * @returns {Promise<boolean>} 是否成功
@@ -3084,7 +3315,11 @@ class LStorage {
                 }
             }
             
-            // 3. 删除应用程序的所有文件
+            // 3. 执行 uninstall.js（如果存在）
+            KernelLogger.info("LStorage", `检查是否存在 uninstall.js: ${programName}`);
+            await LStorage._executeUninstall(programName, asset);
+            
+            // 4. 删除应用程序的所有文件
             KernelLogger.info("LStorage", `开始删除应用程序文件: ${programName}`);
             await LStorage._deleteApplicationFiles(asset);
             

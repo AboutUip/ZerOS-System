@@ -110,25 +110,6 @@ const APPLICATION_ASSETS = {
         }
     },
     
-    // 贪吃蛇游戏
-    // 注意：路径是 D: 盘下的真实路径
-    "snake": {
-        script: "D:/application/snake/snake.js",
-        styles: ["D:/application/snake/snake.css"],
-        icon: "D:/application/snake/snake.svg",
-        metadata: {
-            autoStart: false,
-            priority: 4,
-            description: "贪吃蛇",
-            version: "1.1.0",
-            type: "GUI",
-            alwaysShowInTaskbar: false,
-            allowMultipleInstances: false,
-            supportsPreview: true,  // 支持窗口预览快照
-            category: "other"  // 其他程序
-        }
-    },
-    
     // 扫雷游戏
     // 注意：路径是 D: 盘下的真实路径
     "minesweeper": {

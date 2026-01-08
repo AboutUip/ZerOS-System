@@ -1084,17 +1084,8 @@
         _showAddBlacklistDialog: async function () {
             const programs = this._getAvailablePrograms();
             
-            if (typeof GUIManager !== 'undefined' && typeof GUIManager.showPrompt === 'function') {
-                const programName = await GUIManager.showPrompt(
-                    '请输入要添加到黑名单的程序名称',
-                    '添加黑名单',
-                    '',
-                    { placeholder: '例如: filemanager' }
-                );
-                if (programName && programName.trim()) {
-                    this._addToBlacklist(programName.trim());
-                }
-            } else {
+            // 统一使用自定义对话框，以便支持选择程序按钮
+            {
                 // 降级方案：使用自定义对话框
                 const result = await this._showCustomDialog({
                     title: '添加黑名单',
@@ -1109,12 +1100,44 @@
                         label.style.cssText = 'display: block; margin-bottom: 8px; color: rgba(215, 224, 221, 0.9); font-size: 13px;';
                         container.appendChild(label);
                         
+                        // 输入框和选择按钮容器
+                        const inputContainer = document.createElement('div');
+                        inputContainer.style.cssText = 'display: flex; gap: 8px; align-items: stretch;';
+                        
                         const input = document.createElement('input');
                         input.type = 'text';
                         input.id = 'blacklist-program-input';
                         input.placeholder = '例如: filemanager';
-                        input.style.cssText = 'width: 100%; padding: 8px; background: rgba(20, 20, 30, 0.5); border: 1px solid rgba(108, 142, 255, 0.3); border-radius: 6px; color: rgba(215, 224, 221, 0.9); font-size: 13px; box-sizing: border-box;';
-                        container.appendChild(input);
+                        input.style.cssText = 'flex: 1; padding: 8px; background: rgba(20, 20, 30, 0.5); border: 1px solid rgba(108, 142, 255, 0.3); border-radius: 6px; color: rgba(215, 224, 221, 0.9); font-size: 13px; box-sizing: border-box;';
+                        inputContainer.appendChild(input);
+                        
+                        // 选择程序按钮
+                        const selectBtn = document.createElement('button');
+                        selectBtn.type = 'button';
+                        selectBtn.textContent = '选择程序';
+                        selectBtn.style.cssText = `
+                            padding: 8px 16px;
+                            background: rgba(139, 92, 246, 0.3);
+                            border: 1px solid rgba(139, 92, 246, 0.5);
+                            border-radius: 6px;
+                            color: rgba(215, 224, 221, 0.9);
+                            font-size: 13px;
+                            cursor: pointer;
+                            white-space: nowrap;
+                            transition: all 0.2s;
+                        `;
+                        selectBtn.addEventListener('mouseenter', () => {
+                            selectBtn.style.background = 'rgba(139, 92, 246, 0.5)';
+                        });
+                        selectBtn.addEventListener('mouseleave', () => {
+                            selectBtn.style.background = 'rgba(139, 92, 246, 0.3)';
+                        });
+                        selectBtn.addEventListener('click', () => {
+                            this._selectProgram(input, 'blacklist');
+                        });
+                        inputContainer.appendChild(selectBtn);
+                        
+                        container.appendChild(inputContainer);
                         
                         return container;
                     },
@@ -1169,17 +1192,8 @@
         _showAddWhitelistDialog: async function () {
             const programs = this._getAvailablePrograms();
             
-            if (typeof GUIManager !== 'undefined' && typeof GUIManager.showPrompt === 'function') {
-                const programName = await GUIManager.showPrompt(
-                    '请输入要添加到白名单的程序名称',
-                    '添加白名单',
-                    '',
-                    { placeholder: '例如: filemanager' }
-                );
-                if (programName && programName.trim()) {
-                    this._addToWhitelist(programName.trim());
-                }
-            } else {
+            // 统一使用自定义对话框，以便支持选择程序按钮
+            {
                 // 降级方案：使用自定义对话框
                 const result = await this._showCustomDialog({
                     title: '添加白名单',
@@ -1194,12 +1208,44 @@
                         label.style.cssText = 'display: block; margin-bottom: 8px; color: rgba(215, 224, 221, 0.9); font-size: 13px;';
                         container.appendChild(label);
                         
+                        // 输入框和选择按钮容器
+                        const inputContainer = document.createElement('div');
+                        inputContainer.style.cssText = 'display: flex; gap: 8px; align-items: stretch;';
+                        
                         const input = document.createElement('input');
                         input.type = 'text';
                         input.id = 'whitelist-program-input';
                         input.placeholder = '例如: filemanager';
-                        input.style.cssText = 'width: 100%; padding: 8px; background: rgba(20, 20, 30, 0.5); border: 1px solid rgba(108, 142, 255, 0.3); border-radius: 6px; color: rgba(215, 224, 221, 0.9); font-size: 13px; box-sizing: border-box;';
-                        container.appendChild(input);
+                        input.style.cssText = 'flex: 1; padding: 8px; background: rgba(20, 20, 30, 0.5); border: 1px solid rgba(108, 142, 255, 0.3); border-radius: 6px; color: rgba(215, 224, 221, 0.9); font-size: 13px; box-sizing: border-box;';
+                        inputContainer.appendChild(input);
+                        
+                        // 选择程序按钮
+                        const selectBtn = document.createElement('button');
+                        selectBtn.type = 'button';
+                        selectBtn.textContent = '选择程序';
+                        selectBtn.style.cssText = `
+                            padding: 8px 16px;
+                            background: rgba(139, 92, 246, 0.3);
+                            border: 1px solid rgba(139, 92, 246, 0.5);
+                            border-radius: 6px;
+                            color: rgba(215, 224, 221, 0.9);
+                            font-size: 13px;
+                            cursor: pointer;
+                            white-space: nowrap;
+                            transition: all 0.2s;
+                        `;
+                        selectBtn.addEventListener('mouseenter', () => {
+                            selectBtn.style.background = 'rgba(139, 92, 246, 0.5)';
+                        });
+                        selectBtn.addEventListener('mouseleave', () => {
+                            selectBtn.style.background = 'rgba(139, 92, 246, 0.3)';
+                        });
+                        selectBtn.addEventListener('click', () => {
+                            this._selectProgram(input, 'whitelist');
+                        });
+                        inputContainer.appendChild(selectBtn);
+                        
+                        container.appendChild(inputContainer);
                         
                         return container;
                     },
@@ -1246,6 +1292,112 @@
             this.whitelist.delete(programName);
             await this._saveWhitelist();
             await this._refreshData();
+        },
+
+        /**
+         * 选择程序（调用任务管理器的选择模式）
+         * @param {HTMLInputElement} programNameInput 程序名称输入框
+         * @param {string} listType 列表类型：'blacklist' 或 'whitelist'
+         */
+        _selectProgram: async function (programNameInput, listType) {
+            if (typeof ProcessManager === 'undefined') {
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('PermissionControl', 'ProcessManager 不可用');
+                }
+                return;
+            }
+
+            try {
+                // 读取任务管理器程序文件
+                const taskManagerPath = 'D:/application/taskmanager/taskmanager.js';
+                let taskManagerContent = null;
+
+                // 尝试通过 ProcessManager 读取文件
+                if (typeof ProcessManager !== 'undefined' && typeof ProcessManager.callKernelAPI === 'function') {
+                    try {
+                        const result = await ProcessManager.callKernelAPI(this.pid, 'FileSystem.read', [taskManagerPath], null);
+                        if (result && result.content) {
+                            taskManagerContent = result.content;
+                        }
+                    } catch (e) {
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('PermissionControl', `通过 ProcessManager 读取任务管理器失败: ${e.message}`);
+                        }
+                    }
+                }
+
+                // 如果 ProcessManager 读取失败，尝试直接使用 fetch
+                if (!taskManagerContent) {
+                    try {
+                        const url = typeof SystemInformation !== 'undefined' && typeof SystemInformation.buildServiceUrlObject === 'function'
+                            ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                            : new URL('/system/service/FSDirve.php', window.location.origin);
+                        url.searchParams.set('action', 'read_file');
+                        url.searchParams.set('path', 'D:/application/taskmanager');
+                        url.searchParams.set('fileName', 'taskmanager.js');
+
+                        const response = await fetch(url.toString());
+                        if (response.ok) {
+                            const result = await response.json();
+                            if (result.status === 'success' && result.data && result.data.content) {
+                                taskManagerContent = result.data.content;
+                            }
+                        }
+                    } catch (e) {
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('PermissionControl', `通过 fetch 读取任务管理器失败: ${e.message}`);
+                        }
+                    }
+                }
+
+                if (!taskManagerContent) {
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.error('PermissionControl', '无法读取任务管理器程序文件');
+                    }
+                    return;
+                }
+
+                // 创建 tempAsset
+                const tempAsset = {
+                    script: taskManagerContent,
+                    styles: [],
+                    icon: null,
+                    metadata: {
+                        name: 'taskmanager',
+                        type: 'GUI',
+                        allowMultipleInstances: false
+                    }
+                };
+
+                // 启动任务管理器，使用程序选择模式
+                const taskManagerPid = await ProcessManager.startProgram('taskmanager', {
+                    mode: 'program-selector',
+                    onProgramSelected: async (programName, programInfo) => {
+                        // 选择完成，更新输入框
+                        if (programNameInput) {
+                            programNameInput.value = programName;
+                            // 触发 input 事件，确保表单验证能够识别
+                            programNameInput.dispatchEvent(new Event('input', { bubbles: true }));
+                        }
+
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.info('PermissionControl', `已选择程序: ${programName} (${listType})`);
+                        }
+                    }
+                }, null, {
+                    tempAsset: tempAsset
+                });
+
+                if (!taskManagerPid) {
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.error('PermissionControl', '启动任务管理器失败');
+                    }
+                }
+            } catch (error) {
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('PermissionControl', '选择程序失败', error);
+                }
+            }
         },
 
         /**
