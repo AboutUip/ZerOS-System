@@ -213,6 +213,36 @@ kill 12345           # 终止进程
 kill -9 12345        # 强制终止进程
 ```
 
+## 网络命令
+
+### `netport <命令> [选项]`
+
+TCP 端口管理工具。
+
+**命令**:
+- `register, reg, r <端口> [程序名]`: 注册端口监听
+- `unregister, unreg, u <端口>`: 取消端口监听
+- `status, stat, s <端口>`: 查看端口状态
+- `list, ls, l`: 列出所有已注册的端口
+- `send <主机> <端口> <数据>`: 向端口发送数据
+
+**选项**:
+- `-h, --help`: 显示帮助信息
+
+**示例**:
+```bash
+netport register 8080 MyServer        # 注册端口 8080
+netport unregister 8080               # 取消端口 8080
+netport status 8080                   # 查看端口 8080 状态
+netport list                          # 列出所有端口
+netport send 127.0.0.1 8080 "Hello"  # 向端口发送数据
+netport --help                        # 显示帮助
+```
+
+**注意**: 
+- 需要 `NETWORK_ACCESS` 权限（普通权限，自动授予）
+- **需要管理员权限**：只有管理员用户才能使用此命令
+
 ## 系统命令
 
 ### `clear`

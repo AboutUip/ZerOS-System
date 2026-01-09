@@ -164,7 +164,9 @@
                 if (typeof KernelLogger !== 'undefined') {
                     KernelLogger.error("MINESWEEPER", `初始化失败: ${error.message}`, error);
                 } else {
-                    console.error('扫雷游戏初始化失败:', error);
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.error('Minesweeper', '扫雷游戏初始化失败', error);
+                    }
                 }
             }
         },
@@ -890,7 +892,9 @@
                 if (typeof KernelLogger !== 'undefined') {
                     KernelLogger.error("MINESWEEPER", `清理资源失败: ${error.message}`, error);
                 } else {
-                    console.error('扫雷游戏清理失败:', error);
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.error('Minesweeper', '扫雷游戏清理失败', error);
+                    }
                 }
             }
         },

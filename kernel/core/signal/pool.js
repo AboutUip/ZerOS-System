@@ -108,11 +108,7 @@ const POOL = {
     __ADD__(type, name, elem) {
         // 移除调试日志，这是高频调用的内部方法
         if (typeof name === "undefined" || name === null || name === "") {
-            if (typeof KernelLogger !== 'undefined') {
-                KernelLogger.warn("POOL", "__ADD__: name 不能为空或空字符串", { type, name });
-            } else {
-                console.warn("[内核][POOL] __ADD__: name 不能为空或空字符串", { type, name });
-            }
+            KernelLogger.warn("POOL", "__ADD__: name 不能为空或空字符串", { type, name });
             return;
         }
         // 如果 type 是伪枚举对象且 name 对应其中某个枚举字段，则将该枚举字段的值作为真实类型
@@ -130,11 +126,7 @@ const POOL = {
         // 检查是否尝试添加系统加载标志位
         // 如果标志位已被删除，永久拒绝添加（安全策略）
         if (name === this.__SYSTEM_LOADING_FLAG__ && this.__SYSTEM_LOADING_REMOVED__) {
-            if (typeof KernelLogger !== 'undefined') {
-                KernelLogger.warn("POOL", `拒绝添加系统加载标志位 ${name}：系统加载已完成，标志位已被永久删除（安全策略）`);
-            } else {
-                console.warn(`[内核][POOL] 拒绝添加系统加载标志位 ${name}：系统加载已完成，标志位已被永久删除（安全策略）`);
-            }
+            KernelLogger.warn("POOL", `拒绝添加系统加载标志位 ${name}：系统加载已完成，标志位已被永久删除（安全策略）`);
             return; // 拒绝添加
         }
         
@@ -225,11 +217,7 @@ const POOL = {
             // 特殊处理：如果删除的是系统加载标志位，标记为永久删除
             if (name === this.__SYSTEM_LOADING_FLAG__) {
                 this.__SYSTEM_LOADING_REMOVED__ = true;
-                if (typeof KernelLogger !== 'undefined') {
-                    KernelLogger.info("POOL", `系统加载标志位已删除，系统加载完成。此后永久拒绝添加该标志位（安全策略）`);
-                } else {
-                    console.log("[内核][POOL] 系统加载标志位已删除，系统加载完成。此后永久拒绝添加该标志位（安全策略）");
-                }
+                KernelLogger.info("POOL", `系统加载标志位已删除，系统加载完成。此后永久拒绝添加该标志位（安全策略）`);
             }
             delete obj[name];
         }
@@ -309,11 +297,7 @@ const POOL = {
      */
     __INIT__(datas) {
         // 只保留INFO级别的初始化日志，移除DEBUG日志
-        if (typeof KernelLogger !== 'undefined') {
-            KernelLogger.info("POOL", "pool init start");
-        } else {
-            console.log("[内核][POOL] pool init start");
-        }
+        KernelLogger.info("POOL", "pool init start");
         // 支持传入：数组、单个伪枚举对象、或单个值
         if (typeof datas === "undefined" || datas === null) {
             datas = [];
@@ -349,11 +333,7 @@ const POOL = {
             });
         }
         this.__IS_INITED__ = true;
-        if (typeof KernelLogger !== 'undefined') {
-            KernelLogger.info("POOL", "pool init complete");
-        } else {
-            console.log("[内核][POOL] pool init complete");
-        }
+        KernelLogger.info("POOL", "pool init complete");
     },
 };
 

@@ -38,6 +38,7 @@
 ### 驱动层
 - [AnimateManager.md](./AnimateManager.md) - 动画管理 ✅
 - [NetworkManager.md](./NetworkManager.md) - 网络管理 ✅
+- [NetworkPort.md](./NetworkPort.md) - TCP 端口监听和管理 ✅
 - [LStorage.md](./LStorage.md) - 本地存储 ✅
 - [CacheDrive.md](./CacheDrive.md) - 缓存驱动（统一缓存管理、生命周期管控） ✅
 - [DragDrive.md](./DragDrive.md) - 拖拽驱动 ✅
@@ -108,6 +109,7 @@
 **系统服务**
 - AnimateManager
 - NetworkManager
+- NetworkPort (TCP 端口监听和管理)
 - LStorage
 - CacheDrive
 - PermissionManager

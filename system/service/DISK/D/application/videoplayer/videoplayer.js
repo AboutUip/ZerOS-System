@@ -119,7 +119,9 @@
                 if (typeof KernelLogger !== 'undefined') {
                     KernelLogger.error('VideoPlayer', `视频播放器初始化失败: ${error.message}`, error);
                 } else {
-                    console.error('视频播放器初始化失败:', error);
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.error('VideoPlayer', '视频播放器初始化失败', error);
+                    }
                 }
                 if (this.window && this.window.parentElement) {
                     this.window.parentElement.removeChild(this.window);
@@ -910,11 +912,9 @@
                     this.fileInfo.textContent = `加载中: ${fileName}`;
                 }
                 
-                console.log('[VideoPlayer] 加载视频:', {
-                    resolvedPath,
-                    videoUrl,
-                    fileName
-                });
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.debug('VideoPlayer', `加载视频: ${fileName}`, { resolvedPath, videoUrl, fileName });
+                }
                 
                 // 设置视频源
                 this.videoElement.src = videoUrl;
@@ -966,7 +966,9 @@
             if (typeof KernelLogger !== 'undefined') {
                 KernelLogger.error('VideoPlayer', `视频加载失败: ${errorMsg}`, errorInfo);
             } else {
-                console.error('[VideoPlayer] 视频加载失败:', errorInfo);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('VideoPlayer', '视频加载失败', errorInfo);
+                }
             }
             
             if (this.fileInfo) {
@@ -1051,7 +1053,9 @@
                     if (typeof KernelLogger !== 'undefined') {
                         KernelLogger.error('VideoPlayer', `播放失败: ${error.message}`, error);
                     } else {
-                        console.error('[VideoPlayer] 播放失败:', error);
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.error('VideoPlayer', '播放失败', error);
+                        }
                     }
                     // 播放失败，使用通知提示（不打断用户）
                     if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
@@ -1306,7 +1310,9 @@
                         this.videoElement.src = '';
                         this.videoElement.load();
                     } catch (e) {
-                        console.warn('[VideoPlayer] 停止视频失败:', e);
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('VideoPlayer', '停止视频失败', e);
+                        }
                     }
                 }
                 
@@ -1321,7 +1327,9 @@
                             document.mozCancelFullScreen();
                         }
                     } catch (e) {
-                        console.warn('[VideoPlayer] 退出全屏失败:', e);
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('VideoPlayer', '退出全屏失败', e);
+                        }
                     }
                 }
                 
@@ -1334,13 +1342,17 @@
                             GUIManager.unregisterWindow(this.pid);
                         }
                     } catch (e) {
-                        console.warn('[VideoPlayer] 注销 GUIManager 窗口失败:', e);
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('VideoPlayer', '注销 GUIManager 窗口失败', e);
+                        }
                         // 如果注销失败，手动移除 DOM
                         if (this.window && this.window.parentElement) {
                             try {
                                 this.window.parentElement.removeChild(this.window);
                             } catch (domError) {
-                                console.warn('[VideoPlayer] 手动移除窗口 DOM 失败:', domError);
+                                if (typeof KernelLogger !== 'undefined') {
+                                    KernelLogger.warn('VideoPlayer', '手动移除窗口 DOM 失败', domError);
+                                }
                             }
                         }
                     }
@@ -1350,7 +1362,9 @@
                         try {
                             this.window.parentElement.removeChild(this.window);
                         } catch (e) {
-                            console.warn('[VideoPlayer] 移除窗口 DOM 失败:', e);
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.warn('VideoPlayer', '移除窗口 DOM 失败', e);
+                            }
                         }
                     }
                 }
@@ -1375,7 +1389,9 @@
                 this.windowId = null;
                 
             } catch (error) {
-                console.error('[VideoPlayer] 退出时发生错误:', error);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('VideoPlayer', '退出时发生错误', error);
+                }
                 // 即使出错，也尝试强制清理
                 try {
                     if (this.videoElement) {
@@ -1395,7 +1411,9 @@
                                 this.window.parentNode.removeChild(this.window);
                             }
                         } catch (e) {
-                            console.error('[VideoPlayer] 强制移除窗口失败:', e);
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.error('VideoPlayer', '强制移除窗口失败', e);
+                            }
                         }
                     }
                     
@@ -1403,11 +1421,15 @@
                         try {
                             GUIManager.unregisterWindow(this.pid);
                         } catch (e) {
-                            console.error('[VideoPlayer] 强制注销窗口失败:', e);
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.error('VideoPlayer', '强制注销窗口失败', e);
+                            }
                         }
                     }
                 } catch (cleanupError) {
-                    console.error('[VideoPlayer] 清理资源时发生错误:', cleanupError);
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.error('VideoPlayer', '清理资源时发生错误', cleanupError);
+                    }
                 }
             }
         },

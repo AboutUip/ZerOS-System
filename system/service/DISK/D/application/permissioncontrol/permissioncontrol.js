@@ -9,7 +9,7 @@
         window: null,
         windowId: null,
         refreshTimer: null,
-        currentTab: 'overview', // 'overview', 'programs', 'permissions', 'blacklist', 'whitelist', 'audit'
+        currentTab: 'overview', // 'overview', 'programs', 'permissions', 'blacklist', 'whitelist', 'audit', 'systemlogs'
         blacklist: new Set(), // 程序黑名单
         whitelist: new Set(), // 程序白名单
         autoGrantEnabled: true, // 是否启用自动授予（仅普通权限）
@@ -158,7 +158,8 @@
                     PermissionManager.PERMISSION.SYSTEM_STORAGE_READ_PERMISSION_CONTROL, // 读取权限控制存储（读取黑名单、白名单、设置）- 需要管理员授权
                     PermissionManager.PERMISSION.SYSTEM_STORAGE_WRITE,  // 写入系统存储（基础权限，仅可写入非敏感键）
                     PermissionManager.PERMISSION.SYSTEM_STORAGE_WRITE_PERMISSION_CONTROL, // 写入权限控制存储（保存黑名单、白名单、设置）- 需要管理员授权
-                    PermissionManager.PERMISSION.PROCESS_MANAGE          // 管理进程（需要查看和管理其他程序的权限）
+                    PermissionManager.PERMISSION.PROCESS_MANAGE,          // 管理进程（需要查看和管理其他程序的权限）
+                    PermissionManager.PERMISSION.SYSTEM_LOG_READ          // 读取系统日志
                 ] : [],
                 metadata: {
                     allowMultipleInstances: false
@@ -278,7 +279,8 @@
                 { id: 'permissions', label: '权限统计', icon: '📈' },
                 { id: 'blacklist', label: '黑名单', icon: '🚫' },
                 { id: 'whitelist', label: '白名单', icon: '✅' },
-                { id: 'audit', label: '审计日志', icon: '📋' }
+                { id: 'audit', label: '审计日志', icon: '📋' },
+                { id: 'systemlogs', label: '系统日志', icon: '📝' }
             ];
 
             navItems.forEach(item => {
@@ -378,6 +380,9 @@
                     break;
                 case 'audit':
                     await this._renderAudit();
+                    break;
+                case 'systemlogs':
+                    await this._renderSystemLogs();
                     break;
             }
         },
@@ -1524,6 +1529,356 @@
                 dialogWindow.appendChild(buttonBar);
                 guiContainer.appendChild(dialogWindow);
             });
+        },
+
+        /**
+         * 渲染系统日志页面
+         */
+        _renderSystemLogs: async function () {
+            const container = document.createElement('div');
+            container.style.cssText = `
+                flex: 1;
+                display: flex;
+                flex-direction: column;
+                overflow: hidden;
+                padding: 24px;
+            `;
+
+            if (typeof ProcessManager === 'undefined') {
+                container.innerHTML = '<div style="color: rgba(255, 95, 87, 0.8);">ProcessManager 不可用</div>';
+                this.contentPanel.appendChild(container);
+                return;
+            }
+
+            // 筛选器容器
+            const filterContainer = document.createElement('div');
+            filterContainer.style.cssText = `
+                background: rgba(20, 20, 30, 0.5);
+                border: 1px solid rgba(108, 142, 255, 0.2);
+                border-radius: 12px;
+                padding: 16px;
+                margin-bottom: 16px;
+            `;
+
+            // 筛选器标题
+            const filterTitle = document.createElement('div');
+            filterTitle.textContent = '筛选条件';
+            filterTitle.style.cssText = `
+                font-size: 14px;
+                font-weight: 600;
+                color: rgba(215, 224, 221, 0.9);
+                margin-bottom: 12px;
+            `;
+            filterContainer.appendChild(filterTitle);
+
+            // 筛选器表单
+            const filterForm = document.createElement('div');
+            filterForm.style.cssText = `
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+                gap: 12px;
+                margin-bottom: 12px;
+            `;
+
+            // 级别筛选
+            const levelContainer = document.createElement('div');
+            levelContainer.style.cssText = 'display: flex; flex-direction: column; gap: 4px;';
+            const levelLabel = document.createElement('label');
+            levelLabel.textContent = '日志级别:';
+            levelLabel.style.cssText = 'font-size: 12px; color: rgba(215, 224, 221, 0.7);';
+            levelContainer.appendChild(levelLabel);
+            const levelSelect = document.createElement('select');
+            levelSelect.id = 'log-level-filter';
+            levelSelect.style.cssText = `
+                padding: 6px 12px;
+                background: rgba(20, 20, 30, 0.8);
+                border: 1px solid rgba(108, 142, 255, 0.3);
+                border-radius: 6px;
+                color: rgba(215, 224, 221, 0.9);
+                font-size: 13px;
+            `;
+            levelSelect.innerHTML = `
+                <option value="">全部</option>
+                <option value="DEBUG">调试</option>
+                <option value="INFO">信息</option>
+                <option value="WARN">警告</option>
+                <option value="ERROR">错误</option>
+            `;
+            levelContainer.appendChild(levelSelect);
+            filterForm.appendChild(levelContainer);
+
+            // 子系统筛选
+            const subsystemContainer = document.createElement('div');
+            subsystemContainer.style.cssText = 'display: flex; flex-direction: column; gap: 4px;';
+            const subsystemLabel = document.createElement('label');
+            subsystemLabel.textContent = '子系统:';
+            subsystemLabel.style.cssText = 'font-size: 12px; color: rgba(215, 224, 221, 0.7);';
+            subsystemContainer.appendChild(subsystemLabel);
+            const subsystemSelect = document.createElement('select');
+            subsystemSelect.id = 'log-subsystem-filter';
+            subsystemSelect.style.cssText = `
+                padding: 6px 12px;
+                background: rgba(20, 20, 30, 0.8);
+                border: 1px solid rgba(108, 142, 255, 0.3);
+                border-radius: 6px;
+                color: rgba(215, 224, 221, 0.9);
+                font-size: 13px;
+            `;
+            subsystemSelect.innerHTML = '<option value="">全部</option>';
+            subsystemContainer.appendChild(subsystemSelect);
+            filterForm.appendChild(subsystemContainer);
+
+            // 关键词搜索
+            const keywordContainer = document.createElement('div');
+            keywordContainer.style.cssText = 'display: flex; flex-direction: column; gap: 4px;';
+            const keywordLabel = document.createElement('label');
+            keywordLabel.textContent = '关键词:';
+            keywordLabel.style.cssText = 'font-size: 12px; color: rgba(215, 224, 221, 0.7);';
+            keywordContainer.appendChild(keywordLabel);
+            const keywordInput = document.createElement('input');
+            keywordInput.type = 'text';
+            keywordInput.id = 'log-keyword-filter';
+            keywordInput.placeholder = '搜索日志内容...';
+            keywordInput.style.cssText = `
+                padding: 6px 12px;
+                background: rgba(20, 20, 30, 0.8);
+                border: 1px solid rgba(108, 142, 255, 0.3);
+                border-radius: 6px;
+                color: rgba(215, 224, 221, 0.9);
+                font-size: 13px;
+            `;
+            keywordContainer.appendChild(keywordInput);
+            filterForm.appendChild(keywordContainer);
+
+            // 数量限制
+            const limitContainer = document.createElement('div');
+            limitContainer.style.cssText = 'display: flex; flex-direction: column; gap: 4px;';
+            const limitLabel = document.createElement('label');
+            limitLabel.textContent = '显示数量:';
+            limitLabel.style.cssText = 'font-size: 12px; color: rgba(215, 224, 221, 0.7);';
+            limitContainer.appendChild(limitLabel);
+            const limitInput = document.createElement('input');
+            limitInput.type = 'number';
+            limitInput.id = 'log-limit-filter';
+            limitInput.value = '100';
+            limitInput.min = '1';
+            limitInput.max = '1000';
+            limitInput.style.cssText = `
+                padding: 6px 12px;
+                background: rgba(20, 20, 30, 0.8);
+                border: 1px solid rgba(108, 142, 255, 0.3);
+                border-radius: 6px;
+                color: rgba(215, 224, 221, 0.9);
+                font-size: 13px;
+            `;
+            limitContainer.appendChild(limitInput);
+            filterForm.appendChild(limitContainer);
+
+            filterContainer.appendChild(filterForm);
+
+            // 操作按钮
+            const buttonContainer = document.createElement('div');
+            buttonContainer.style.cssText = 'display: flex; gap: 8px;';
+            
+            const refreshBtn = document.createElement('button');
+            refreshBtn.textContent = '刷新';
+            refreshBtn.style.cssText = `
+                padding: 6px 16px;
+                background: rgba(108, 142, 255, 0.2);
+                border: 1px solid rgba(108, 142, 255, 0.3);
+                border-radius: 6px;
+                color: rgba(215, 224, 221, 0.9);
+                font-size: 13px;
+                cursor: pointer;
+            `;
+            buttonContainer.appendChild(refreshBtn);
+
+            const clearBtn = document.createElement('button');
+            clearBtn.textContent = '清空筛选';
+            clearBtn.style.cssText = `
+                padding: 6px 16px;
+                background: rgba(108, 142, 255, 0.1);
+                border: 1px solid rgba(108, 142, 255, 0.2);
+                border-radius: 6px;
+                color: rgba(215, 224, 221, 0.7);
+                font-size: 13px;
+                cursor: pointer;
+            `;
+            buttonContainer.appendChild(clearBtn);
+
+            filterContainer.appendChild(buttonContainer);
+            container.appendChild(filterContainer);
+
+            // 日志列表容器
+            const logListContainer = document.createElement('div');
+            logListContainer.id = 'system-logs-list';
+            logListContainer.style.cssText = `
+                flex: 1;
+                overflow-y: auto;
+                background: rgba(20, 20, 30, 0.5);
+                border: 1px solid rgba(108, 142, 255, 0.2);
+                border-radius: 12px;
+                padding: 16px;
+                min-height: 0;
+            `;
+            container.appendChild(logListContainer);
+
+            // 加载子系统列表
+            const loadSubsystems = async () => {
+                try {
+                    const subsystems = await ProcessManager.callKernelAPI(this.pid, 'Log.getSubsystems', []);
+                    subsystemSelect.innerHTML = '<option value="">全部</option>';
+                    subsystems.forEach(subsystem => {
+                        const option = document.createElement('option');
+                        option.value = subsystem;
+                        option.textContent = subsystem;
+                        subsystemSelect.appendChild(option);
+                    });
+                } catch (error) {
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.warn('PermissionControl', `加载子系统列表失败: ${error.message}`);
+                    }
+                }
+            };
+
+            // 加载日志
+            const loadLogs = async () => {
+                try {
+                    logListContainer.innerHTML = '<div style="text-align: center; padding: 24px; color: rgba(215, 224, 221, 0.5);">加载中...</div>';
+                    
+                    // 检查 ProcessManager 是否可用
+                    if (typeof ProcessManager === 'undefined' || typeof ProcessManager.callKernelAPI !== 'function') {
+                        throw new Error('ProcessManager.callKernelAPI 不可用');
+                    }
+                    
+                    const level = levelSelect.value || null;
+                    const subsystem = subsystemSelect.value || null;
+                    const keyword = keywordInput.value.trim() || null;
+                    const limit = parseInt(limitInput.value) || 100;
+
+                    const queryOptions = {
+                        level: level,
+                        subsystem: subsystem,
+                        keyword: keyword,
+                        limit: Math.min(limit, 1000),
+                        offset: 0,
+                        reverse: true  // 最新的在前
+                    };
+
+                    // 移除 null 值，避免传递无效参数
+                    Object.keys(queryOptions).forEach(key => {
+                        if (queryOptions[key] === null || queryOptions[key] === undefined) {
+                            delete queryOptions[key];
+                        }
+                    });
+
+                    const logs = await ProcessManager.callKernelAPI(this.pid, 'Log.query', [queryOptions]);
+                    
+                    if (logs.length === 0) {
+                        logListContainer.innerHTML = '<div style="text-align: center; padding: 24px; color: rgba(215, 224, 221, 0.5);">暂无日志</div>';
+                        return;
+                    }
+
+                    // 清空容器
+                    logListContainer.innerHTML = '';
+
+                    // 创建日志表格
+                    const table = document.createElement('table');
+                    table.style.cssText = `
+                        width: 100%;
+                        border-collapse: collapse;
+                    `;
+
+                    // 表头
+                    const thead = document.createElement('thead');
+                    thead.innerHTML = `
+                        <tr style="background: rgba(108, 142, 255, 0.1);">
+                            <th style="padding: 12px; text-align: left; color: rgba(215, 224, 221, 0.9); font-size: 13px; font-weight: 600; width: 180px;">时间</th>
+                            <th style="padding: 12px; text-align: left; color: rgba(215, 224, 221, 0.9); font-size: 13px; font-weight: 600; width: 80px;">级别</th>
+                            <th style="padding: 12px; text-align: left; color: rgba(215, 224, 221, 0.9); font-size: 13px; font-weight: 600; width: 150px;">子系统</th>
+                            <th style="padding: 12px; text-align: left; color: rgba(215, 224, 221, 0.9); font-size: 13px; font-weight: 600;">消息</th>
+                            <th style="padding: 12px; text-align: left; color: rgba(215, 224, 221, 0.9); font-size: 13px; font-weight: 600; width: 120px;">源文件</th>
+                        </tr>
+                    `;
+                    table.appendChild(thead);
+
+                    // 表体
+                    const tbody = document.createElement('tbody');
+                    logs.forEach(log => {
+                        const row = document.createElement('tr');
+                        row.style.cssText = `
+                            border-bottom: 1px solid rgba(108, 142, 255, 0.1);
+                            transition: background 0.2s;
+                        `;
+                        row.addEventListener('mouseenter', () => {
+                            row.style.background = 'rgba(108, 142, 255, 0.05)';
+                        });
+                        row.addEventListener('mouseleave', () => {
+                            row.style.background = 'transparent';
+                        });
+
+                        // 级别颜色
+                        let levelColor = 'rgba(215, 224, 221, 0.7)';
+                        if (log.level === 'ERROR') levelColor = '#EF4444';
+                        else if (log.level === 'WARN') levelColor = '#F59E0B';
+                        else if (log.level === 'INFO') levelColor = '#10B981';
+                        else if (log.level === 'DEBUG') levelColor = '#6C8EFF';
+
+                        row.innerHTML = `
+                            <td style="padding: 12px; color: rgba(215, 224, 221, 0.7); font-size: 12px;">${log.timestamp}</td>
+                            <td style="padding: 12px; color: ${levelColor}; font-size: 13px; font-weight: 600;">${log.level}</td>
+                            <td style="padding: 12px; color: rgba(215, 224, 221, 0.9); font-size: 13px;">${log.subsystem}</td>
+                            <td style="padding: 12px; color: rgba(215, 224, 221, 0.9); font-size: 13px; word-break: break-word; max-width: 400px;">${this._escapeHtml(log.message)}</td>
+                            <td style="padding: 12px; color: rgba(215, 224, 221, 0.6); font-size: 12px;">${log.sourceFile || '-'}</td>
+                        `;
+                        tbody.appendChild(row);
+                    });
+                    table.appendChild(tbody);
+                    logListContainer.appendChild(table);
+
+                } catch (error) {
+                    logListContainer.innerHTML = `<div style="color: rgba(255, 95, 87, 0.8); padding: 24px;">加载日志失败: ${error.message}</div>`;
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.error('PermissionControl', `加载系统日志失败: ${error.message}`, error);
+                    }
+                }
+            };
+
+            // 事件监听
+            refreshBtn.addEventListener('click', loadLogs);
+            clearBtn.addEventListener('click', () => {
+                levelSelect.value = '';
+                subsystemSelect.value = '';
+                keywordInput.value = '';
+                limitInput.value = '100';
+                loadLogs();
+            });
+
+            // 筛选器变化时自动刷新
+            levelSelect.addEventListener('change', loadLogs);
+            subsystemSelect.addEventListener('change', loadLogs);
+            keywordInput.addEventListener('input', () => {
+                // 防抖：延迟500ms后执行
+                clearTimeout(this._logSearchTimer);
+                this._logSearchTimer = setTimeout(loadLogs, 500);
+            });
+            limitInput.addEventListener('change', loadLogs);
+
+            // 初始加载
+            await loadSubsystems();
+            await loadLogs();
+
+            this.contentPanel.appendChild(container);
+        },
+
+        /**
+         * HTML转义
+         */
+        _escapeHtml: function (text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
         },
 
         /**

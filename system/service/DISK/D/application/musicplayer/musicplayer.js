@@ -175,7 +175,9 @@
                         }
                     }
                 } catch (e) {
-                    console.warn('[MusicPlayer] 内存初始化失败:', e);
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.warn('MusicPlayer', '内存初始化失败', e);
+                    }
                 }
             }
         },
@@ -188,12 +190,16 @@
                 try {
                     this._networkManager = POOL.__GET__('KERNEL_GLOBAL_POOL', 'NetworkManager');
                 } catch (e) {
-                    console.warn('[MusicPlayer] 从 POOL 获取 NetworkManager 失败:', e);
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.warn('MusicPlayer', '从 POOL 获取 NetworkManager 失败', e);
+                    }
                 }
             }
             
             if (!this._networkManager) {
-                console.warn('[MusicPlayer] NetworkManager 不可用，将使用原生 fetch');
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.warn('MusicPlayer', 'NetworkManager 不可用，将使用原生 fetch');
+                }
             }
         },
         
@@ -265,7 +271,9 @@
                     this._audio.play().catch(e => {
                         // 忽略 AbortError
                         if (e.name !== 'AbortError' && !this._isExiting) {
-                            console.error('[MusicPlayer] 播放失败:', e);
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.error('MusicPlayer', '播放失败', e);
+                            }
                         }
                     });
                 } else {
@@ -280,7 +288,9 @@
                 if (this._isExiting) {
                     return;
                 }
-                console.error('[MusicPlayer] 播放错误:', e);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('MusicPlayer', '播放错误', e);
+                }
                 this._showMessage('播放失败，请稍后重试');
             });
         },
@@ -1238,7 +1248,9 @@
         _handleMenuClick: function(menuId) {
             // 确保元素已创建
             if (!this._searchResults || !this._defaultContent) {
-                console.warn('[MusicPlayer] _searchResults 或 _defaultContent 未创建，跳过菜单点击处理');
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.warn('MusicPlayer', '_searchResults 或 _defaultContent 未创建，跳过菜单点击处理');
+                }
                 return;
             }
             
@@ -1480,7 +1492,9 @@
                     });
                 }
             } catch (e) {
-                console.error('[MusicPlayer] 加载热门搜索失败:', e);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('MusicPlayer', '加载热门搜索失败', e);
+                }
                 this._showMessage('加载失败，请稍后重试');
             }
         },
@@ -1547,7 +1561,9 @@
                     });
                 }
             } catch (e) {
-                console.error('[MusicPlayer] 加载歌单失败:', e);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('MusicPlayer', '加载歌单失败', e);
+                }
                 this._showMessage('加载失败，请稍后重试');
             }
         },
@@ -1649,7 +1665,9 @@
                     });
                 }
             } catch (e) {
-                console.error('[MusicPlayer] 加载排行榜失败:', e);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('MusicPlayer', '加载排行榜失败', e);
+                }
                 this._showMessage('加载失败，请稍后重试');
             }
         },
@@ -1718,7 +1736,9 @@
                     });
                 }
             } catch (e) {
-                console.error('[MusicPlayer] 加载歌手失败:', e);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('MusicPlayer', '加载歌手失败', e);
+                }
                 this._showMessage('加载失败，请稍后重试');
             }
         },
@@ -1819,7 +1839,9 @@
                     });
                 }
             } catch (e) {
-                console.error('[MusicPlayer] 加载每日推荐失败:', e);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('MusicPlayer', '加载每日推荐失败', e);
+                }
                 this._showMessage('加载失败，请稍后重试');
             }
         },
@@ -1931,7 +1953,9 @@
                     });
                 }
             } catch (e) {
-                console.error('[MusicPlayer] 搜索失败:', e);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('MusicPlayer', '搜索失败', e);
+                }
                 this._showMessage('搜索失败，请稍后重试');
             }
         },
@@ -2148,7 +2172,9 @@
                     this._loadArtists(page);
                     break;
                 default:
-                    console.warn('[MusicPlayer] 未知的分页类型:', type);
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.warn('MusicPlayer', `未知的分页类型: ${type}`);
+                    }
             }
         },
         
@@ -2269,7 +2295,9 @@
                     });
                 }
             } catch (e) {
-                console.error('[MusicPlayer] 加载歌手歌曲失败:', e);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('MusicPlayer', '加载歌手歌曲失败', e);
+                }
                 this._showMessage('加载失败，请稍后重试');
             }
         },
@@ -2315,7 +2343,9 @@
                 // 播放歌曲
                 await this._playSong(song);
             } catch (e) {
-                console.error('[MusicPlayer] 播放歌曲失败:', e);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('MusicPlayer', '播放歌曲失败', e);
+                }
                 this._showMessage('播放失败，请稍后重试');
             }
         },
@@ -2351,7 +2381,9 @@
                             }
                         }
                     } catch (e) {
-                        console.warn(`[MusicPlayer] 通过搜索API查找歌曲 ${rid} 失败:`, e.message);
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('MusicPlayer', `通过搜索API查找歌曲 ${rid} 失败: ${e.message}`);
+                        }
                     }
                 }
                 
@@ -2364,7 +2396,9 @@
                             songData = rankData.data.musicList.find(s => String(s.rid) === ridStr);
                         }
                     } catch (e) {
-                        console.warn(`[MusicPlayer] 从热歌榜查找歌曲 ${rid} 失败:`, e.message);
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('MusicPlayer', `从热歌榜查找歌曲 ${rid} 失败: ${e.message}`);
+                        }
                     }
                 }
                 
@@ -2385,7 +2419,9 @@
                             }
                         }
                     } catch (e) {
-                        console.warn(`[MusicPlayer] 从推荐歌单查找歌曲 ${rid} 失败:`, e.message);
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('MusicPlayer', `从推荐歌单查找歌曲 ${rid} 失败: ${e.message}`);
+                        }
                     }
                 }
                 
@@ -2411,7 +2447,9 @@
                     
                     // 异步保存缓存（不阻塞返回）
                     this._saveSettings().catch(e => {
-                        console.warn('[MusicPlayer] 保存歌曲缓存失败:', e);
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('MusicPlayer', '保存歌曲缓存失败', e);
+                        }
                     });
                     
                     return songInfo;
@@ -2439,7 +2477,9 @@
                 }
                 
                 // 如果所有方法都失败，返回基本结构（至少可以播放）
-                console.warn(`[MusicPlayer] 无法获取歌曲 ${rid} 的详细信息，使用基本结构。建议：收藏时确保歌曲信息完整。`);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.warn('MusicPlayer', `无法获取歌曲 ${rid} 的详细信息，使用基本结构。建议：收藏时确保歌曲信息完整。`);
+                }
                 return {
                     rid: ridStr,
                     name: '未知歌曲',
@@ -2450,7 +2490,9 @@
                     lrc: `${this.API_BASE}?id=${ridStr}&type=lyr&format=all`
                 };
             } catch (e) {
-                console.error('[MusicPlayer] 获取歌曲信息失败:', e);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('MusicPlayer', '获取歌曲信息失败', e);
+                }
                 // 返回基本结构
                 return {
                     rid: String(rid),
@@ -2495,7 +2537,9 @@
                             }
                         }
                     } catch (e) {
-                        console.warn(`[MusicPlayer] 通过搜索API获取封面失败:`, e.message);
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('MusicPlayer', `通过搜索API获取封面失败: ${e.message}`);
+                        }
                     }
                 }
                 
@@ -2503,7 +2547,9 @@
                 const songInfo = await this._fetchSongInfo(rid);
                 return songInfo.pic || '';
             } catch (e) {
-                console.error('[MusicPlayer] 获取歌曲封面失败:', e);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('MusicPlayer', '获取歌曲封面失败', e);
+                }
                 return '';
             }
         },
@@ -2567,7 +2613,9 @@
                     
                     // 异步保存缓存（不阻塞播放）
                     this._saveSettings().catch(e => {
-                        console.warn('[MusicPlayer] 保存歌曲信息到缓存失败:', e);
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('MusicPlayer', '保存歌曲信息到缓存失败', e);
+                        }
                     });
                 }
                 
@@ -2819,7 +2867,9 @@
                     
                     // 忽略 AbortError（通常是因为快速切换歌曲导致的）
                     if (playError.name !== 'AbortError') {
-                        console.error('[MusicPlayer] 播放失败:', playError);
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.error('MusicPlayer', '播放失败', playError);
+                        }
                         this._showMessage('播放失败，请检查音频源');
                     }
                     this._isPlaying = false;
@@ -2853,7 +2903,9 @@
                 if (this._isExiting) {
                     return;
                 }
-                console.error('[MusicPlayer] 播放失败:', e);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('MusicPlayer', '播放失败', e);
+                }
                 this._showMessage('播放失败，请稍后重试');
                 this._isPlaying = false;
                 this._updatePlayButton();
@@ -2898,12 +2950,16 @@
                         
                         // 异步保存缓存
                         this._saveSettings().catch(e => {
-                            console.warn('[MusicPlayer] 保存歌词缓存失败:', e);
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.warn('MusicPlayer', '保存歌词缓存失败', e);
+                            }
                         });
                     }
                 }
             } catch (e) {
-                console.error('[MusicPlayer] 加载歌词失败:', e);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('MusicPlayer', '加载歌词失败', e);
+                }
             }
         },
         
@@ -2969,7 +3025,9 @@
                         }
                         // 忽略 AbortError
                         if (e.name !== 'AbortError') {
-                            console.error('[MusicPlayer] 播放失败:', e);
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.error('MusicPlayer', '播放失败', e);
+                            }
                             this._showMessage('播放失败，请稍后重试');
                         }
                     });
@@ -3004,11 +3062,15 @@
                     });
                 } else {
                     // 降级方案：使用 console
-                    console.log('[MusicPlayer]', message);
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.info('MusicPlayer', message);
+                    }
                 }
             } catch (e) {
                 // 如果显示消息失败，只记录日志
-                console.log('[MusicPlayer]', message);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.info('MusicPlayer', message);
+                }
             }
         },
         
@@ -3461,7 +3523,9 @@
                 this._updateDesktopWidget();
                 
             } catch (e) {
-                console.error('[MusicPlayer] 创建桌面组件失败:', e);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('MusicPlayer', '创建桌面组件失败', e);
+                }
             }
         },
         
@@ -3514,7 +3578,9 @@
                     this._desktopComponentId = null;
                     this._desktopComponent = null;
                 } catch (e) {
-                    console.error('[MusicPlayer] 删除桌面组件失败:', e);
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.error('MusicPlayer', '删除桌面组件失败', e);
+                    }
                 }
             }
         },
@@ -3546,7 +3612,9 @@
                     }
                 }
             } catch (e) {
-                console.error('[MusicPlayer] 加载设置失败:', e);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('MusicPlayer', '加载设置失败', e);
+                }
             }
         },
         
@@ -3599,10 +3667,14 @@
                     await LStorage.setSystemStorage('musicplayer.songCache', sanitizedCache);
                 }
             } catch (e) {
-                console.error('[MusicPlayer] 保存设置失败:', e);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('MusicPlayer', '保存设置失败', e);
+                }
                 // 如果保存失败，尝试清理可能损坏的数据
                 if (e.message && e.message.includes('JSON')) {
-                    console.warn('[MusicPlayer] 检测到JSON序列化错误，尝试清理数据...');
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.warn('MusicPlayer', '检测到JSON序列化错误，尝试清理数据...');
+                    }
                     // 清理歌词数据中的问题字符
                     if (this._songInfoCache) {
                         for (const key in this._songInfoCache) {
@@ -3615,9 +3687,13 @@
                         try {
                             const sanitizedCache = this._sanitizeDataForStorage(this._songInfoCache);
                             await LStorage.setSystemStorage('musicplayer.songCache', sanitizedCache);
-                            console.log('[MusicPlayer] 清理后保存成功');
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.info('MusicPlayer', '清理后保存成功');
+                            }
                         } catch (retryError) {
-                            console.error('[MusicPlayer] 重试保存仍然失败:', retryError);
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.error('MusicPlayer', '重试保存仍然失败', retryError);
+                            }
                         }
                     }
                 }
@@ -3702,7 +3778,9 @@
                     try {
                         document.body.removeChild(dialog);
                     } catch (e) {
-                        console.warn('[MusicPlayer] 移除对话框失败:', e);
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('MusicPlayer', '移除对话框失败', e);
+                        }
                         // 如果移除失败，尝试使用 remove 方法
                         if (dialog.remove) {
                             dialog.remove();
@@ -3749,7 +3827,9 @@
                         }
                     }
                 } catch (e) {
-                    console.error('[MusicPlayer] 保存设置时出错:', e);
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.error('MusicPlayer', '保存设置时出错', e);
+                    }
                     this._showMessage('保存设置失败: ' + e.message);
                 } finally {
                     safeRemoveDialog();
@@ -3760,7 +3840,9 @@
         // 创建通知依赖
         _createNotificationDependent: function() {
             if (typeof NotificationManager === 'undefined') {
-                console.warn('[MusicPlayer] NotificationManager 不可用');
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.warn('MusicPlayer', 'NotificationManager 不可用');
+                }
                 return;
             }
             
@@ -3967,7 +4049,9 @@
                     onClose: (notificationId, pid) => {
                         // 通知被关闭时的回调
                         if (!this._isExiting) {
-                            console.log('[MusicPlayer] 通知被关闭');
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.info('MusicPlayer', '通知被关闭');
+                            }
                         }
                         this._notificationId = null;
                     }
@@ -3980,15 +4064,21 @@
                         return;
                     }
                     this._notificationId = notificationId;
-                    console.log('[MusicPlayer] 创建通知依赖:', this._notificationId);
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.debug('MusicPlayer', `创建通知依赖: ${this._notificationId}`);
+                    }
                 }).catch(e => {
                     // 如果程序正在退出，忽略错误
                     if (!this._isExiting) {
-                        console.error('[MusicPlayer] 创建通知依赖失败:', e);
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.error('MusicPlayer', '创建通知依赖失败', e);
+                        }
                     }
                 });
             } catch (e) {
-                console.error('[MusicPlayer] 创建通知依赖失败:', e);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('MusicPlayer', '创建通知依赖失败', e);
+                }
             }
         },
         
@@ -4010,13 +4100,17 @@
                         .catch(e => {
                             // 如果程序正在退出，忽略错误
                             if (!this._isExiting) {
-                                console.error('[MusicPlayer] 删除通知依赖失败:', e);
+                                if (typeof KernelLogger !== 'undefined') {
+                                    KernelLogger.error('MusicPlayer', '删除通知依赖失败', e);
+                                }
                             }
                         });
                 } catch (e) {
                     // 如果程序正在退出，忽略错误
                     if (!this._isExiting) {
-                        console.error('[MusicPlayer] 删除通知依赖失败:', e);
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.error('MusicPlayer', '删除通知依赖失败', e);
+                        }
                     }
                 }
             }
@@ -4099,7 +4193,9 @@
                     progressBar.style.width = `${progress}%`;
                 }
             } catch (e) {
-                console.error('[MusicPlayer] 更新通知依赖失败:', e);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('MusicPlayer', '更新通知依赖失败', e);
+                }
             }
         },
         
@@ -4251,7 +4347,9 @@
                         const songInfo = await this._fetchSongInfo(rid);
                         favoriteSongs.push(songInfo);
                     } catch (e) {
-                        console.error(`[MusicPlayer] 获取收藏歌曲 ${rid} 信息失败:`, e);
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.error('MusicPlayer', `获取收藏歌曲 ${rid} 信息失败`, e);
+                        }
                     }
                 }
                 
@@ -4318,7 +4416,9 @@
                     
                     const rid = favoriteItem.dataset.rid;
                     if (!rid) {
-                        console.warn('[MusicPlayer] 收藏项缺少 rid 属性');
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('MusicPlayer', '收藏项缺少 rid 属性');
+                        }
                         return;
                     }
                     
@@ -4326,23 +4426,31 @@
                     const song = favoriteSongs.find(s => String(s.rid) === String(rid));
                     if (song) {
                         try {
-                            console.log('[MusicPlayer] 播放收藏歌曲:', song.name, song.rid);
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.info('MusicPlayer', `播放收藏歌曲: ${song.name} (${song.rid})`);
+                            }
                             // 确保歌曲信息完整后再播放
                             await this._playSong(song);
                         } catch (error) {
-                            console.error('[MusicPlayer] 播放收藏歌曲失败:', error);
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.error('MusicPlayer', '播放收藏歌曲失败', error);
+                            }
                             // 如果程序正在退出，不显示错误消息
                             if (!this._isExiting) {
                                 this._showMessage('播放失败，请稍后重试');
                             }
                         }
                     } else {
-                        console.warn(`[MusicPlayer] 未找到收藏歌曲: ${rid}，尝试直接使用rid播放`);
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('MusicPlayer', `未找到收藏歌曲: ${rid}，尝试直接使用rid播放`);
+                        }
                         // 如果找不到，尝试直接使用rid播放
                         try {
                             await this._playSong(rid);
                         } catch (error) {
-                            console.error('[MusicPlayer] 播放收藏歌曲失败:', error);
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.error('MusicPlayer', '播放收藏歌曲失败', error);
+                            }
                             // 如果程序正在退出，不显示错误消息
                             if (!this._isExiting) {
                                 this._showMessage('播放失败，请稍后重试');
@@ -4393,7 +4501,9 @@
                     });
                 });
             } catch (e) {
-                console.error('[MusicPlayer] 加载收藏列表失败:', e);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('MusicPlayer', '加载收藏列表失败', e);
+                }
                 this._showMessage('加载收藏列表失败');
             }
         },
@@ -4549,7 +4659,9 @@
                     });
                 });
             } catch (e) {
-                console.error('[MusicPlayer] 加载歌单列表失败:', e);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('MusicPlayer', '加载歌单列表失败', e);
+                }
                 this._showMessage('加载歌单列表失败');
             }
         },
@@ -4624,7 +4736,9 @@
                     try {
                         document.body.removeChild(dialog);
                     } catch (e) {
-                        console.warn('[MusicPlayer] 移除对话框失败:', e);
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('MusicPlayer', '移除对话框失败', e);
+                        }
                         if (dialog.remove) {
                             dialog.remove();
                         }
@@ -4651,7 +4765,9 @@
                         this._showMessage('请输入歌单名称');
                     }
                 } catch (e) {
-                    console.error('[MusicPlayer] 创建歌单失败:', e);
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.error('MusicPlayer', '创建歌单失败', e);
+                    }
                     this._showMessage('创建歌单失败: ' + e.message);
                 } finally {
                     safeRemoveDialog();
@@ -4671,7 +4787,9 @@
                             this._showMessage('歌单创建成功');
                         }
                     } catch (err) {
-                        console.error('[MusicPlayer] 创建歌单失败:', err);
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.error('MusicPlayer', '创建歌单失败', err);
+                        }
                         this._showMessage('创建歌单失败: ' + err.message);
                     } finally {
                         safeRemoveDialog();
@@ -4694,7 +4812,9 @@
                     await this._loadRecommendedPlaylistDetail(playlistId);
                 }
             } catch (e) {
-                console.error('[MusicPlayer] 加载歌单详情失败:', e);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('MusicPlayer', '加载歌单详情失败', e);
+                }
                 this._showMessage('加载歌单详情失败');
             }
         },
@@ -4708,7 +4828,9 @@
                 this._pagination.currentPlaylistId = playlistId;
                 
                 const url = `${this.API_BASE}?id=${playlistId}&page=${page}&limit=${this._pagination.pageSize}&type=list`;
-                console.log('[MusicPlayer] 加载推荐歌单详情，URL:', url);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.debug('MusicPlayer', `加载推荐歌单详情，URL: ${url}`);
+                }
                 
                 const response = await this._fetch(url);
                 if (!response.ok) {
@@ -4716,11 +4838,15 @@
                 }
                 
                 const data = await response.json();
-                console.log('[MusicPlayer] API响应数据:', data);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.debug('MusicPlayer', 'API响应数据', data);
+                }
                 
                 // 检查响应格式
                 if (data.code !== 200) {
-                    console.error('[MusicPlayer] API返回错误码:', data.code, '消息:', data.msg || data.message);
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.error('MusicPlayer', `API返回错误码: ${data.code}, 消息: ${data.msg || data.message}`);
+                    }
                     this._showMessage(data.msg || data.message || '加载歌单详情失败');
                     return;
                 }
@@ -4872,7 +4998,9 @@
                         });
                     });
                 } else {
-                    console.warn('[MusicPlayer] 歌单为空或数据格式不正确，响应数据:', data);
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.warn('MusicPlayer', '歌单为空或数据格式不正确，响应数据', data);
+                    }
                     this._defaultContent.innerHTML = `
                         <div style="margin-bottom: 20px;">
                             <button class="back-button" style="
@@ -4897,8 +5025,10 @@
                     }
                 }
             } catch (e) {
-                console.error('[MusicPlayer] 加载推荐歌单详情失败:', e);
-                console.error('[MusicPlayer] 错误堆栈:', e.stack);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('MusicPlayer', '加载推荐歌单详情失败', e);
+                    KernelLogger.error('MusicPlayer', '错误堆栈', e.stack);
+                }
                 this._defaultContent.innerHTML = `
                     <div style="margin-bottom: 20px;">
                         <button class="back-button" style="
@@ -4971,7 +5101,9 @@
                         const songInfo = await this._fetchSongInfo(rid);
                         songs.push(songInfo);
                     } catch (e) {
-                        console.error(`[MusicPlayer] 获取歌单歌曲 ${rid} 信息失败:`, e);
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.error('MusicPlayer', `获取歌单歌曲 ${rid} 信息失败`, e);
+                        }
                     }
                 }
                 
@@ -5082,7 +5214,9 @@
                     });
                 });
             } catch (e) {
-                console.error('[MusicPlayer] 加载歌单详情失败:', e);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('MusicPlayer', '加载歌单详情失败', e);
+                }
                 this._showMessage('加载歌单详情失败');
             }
         },
@@ -5105,7 +5239,9 @@
                         const songInfo = await this._fetchSongInfo(rid);
                         this._playlist.push(songInfo);
                     } catch (e) {
-                        console.error(`[MusicPlayer] 获取歌单歌曲 ${rid} 信息失败:`, e);
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.error('MusicPlayer', `获取歌单歌曲 ${rid} 信息失败`, e);
+                        }
                     }
                 }
                 
@@ -5115,7 +5251,9 @@
                     await this._playSong(this._playlist[0]);
                 }
             } catch (e) {
-                console.error('[MusicPlayer] 播放歌单失败:', e);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('MusicPlayer', '播放歌单失败', e);
+                }
                 this._showMessage('播放歌单失败');
             }
         },
@@ -5190,7 +5328,9 @@
                     try {
                         document.body.removeChild(dialog);
                     } catch (e) {
-                        console.warn('[MusicPlayer] 移除对话框失败:', e);
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('MusicPlayer', '移除对话框失败', e);
+                        }
                         if (dialog.remove) {
                             dialog.remove();
                         }
@@ -5207,7 +5347,9 @@
                         safeRemoveDialog();
                         this._showMessage('已添加到歌单');
                     } catch (e) {
-                        console.error('[MusicPlayer] 添加到歌单失败:', e);
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.error('MusicPlayer', '添加到歌单失败', e);
+                        }
                         this._showMessage('添加到歌单失败: ' + e.message);
                     } finally {
                         safeRemoveDialog();
@@ -5283,7 +5425,9 @@
                         }
                         this._audio = null;
                     } catch (e) {
-                        console.warn('[MusicPlayer] 清理音频失败:', e);
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('MusicPlayer', '清理音频失败', e);
+                        }
                     }
                 }
                 
@@ -5301,7 +5445,9 @@
                     try {
                         DesktopManager.removeComponent(this._desktopComponentId);
                     } catch (e) {
-                        console.warn('[MusicPlayer] 清理桌面组件失败:', e);
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('MusicPlayer', '清理桌面组件失败', e);
+                        }
                     }
                     this._desktopComponentId = null;
                     this._desktopComponent = null;
@@ -5327,7 +5473,9 @@
                 this._isLoading = false;
                 
             } catch (e) {
-                console.error('[MusicPlayer] 清理资源失败:', e);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('MusicPlayer', '清理资源失败', e);
+                }
             }
         }
     };

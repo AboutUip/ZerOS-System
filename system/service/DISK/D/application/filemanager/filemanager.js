@@ -3450,6 +3450,75 @@
          */
         _openFileWithZominstall: async function(item) {
             try {
+                // 检查管理员权限（安装程序需要管理员权限）
+                if (typeof UserControl !== 'undefined') {
+                    try {
+                        await UserControl.ensureInitialized();
+                        const isAdmin = UserControl.isAdmin();
+                        if (!isAdmin) {
+                            // 权限不足，使用通知提示
+                            if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                                try {
+                                    await NotificationManager.createNotification(this.pid, {
+                                        type: 'snapshot',
+                                        title: '文件管理器',
+                                        content: '权限不足：安装程序需要管理员权限',
+                                        duration: 4000
+                                    });
+                                } catch (e) {
+                                    if (typeof KernelLogger !== 'undefined') {
+                                        KernelLogger.warn('FileManager', `创建通知失败: ${e.message}`);
+                                    }
+                                }
+                            }
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.warn('FileManager', '非管理员用户尝试安装程序，已拒绝');
+                            }
+                            return;
+                        }
+                    } catch (e) {
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.error('FileManager', `检查用户权限失败: ${e.message}`, e);
+                        }
+                        // 权限检查失败，为了安全起见，拒绝执行
+                        if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                            try {
+                                await NotificationManager.createNotification(this.pid, {
+                                    type: 'snapshot',
+                                    title: '文件管理器',
+                                    content: '无法验证用户权限，拒绝安装',
+                                    duration: 4000
+                                });
+                            } catch (notifyError) {
+                                if (typeof KernelLogger !== 'undefined') {
+                                    KernelLogger.warn('FileManager', `创建通知失败: ${notifyError.message}`);
+                                }
+                            }
+                        }
+                        return;
+                    }
+                } else {
+                    // UserControl 未加载，为了安全起见，拒绝执行
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.error('FileManager', 'UserControl 未加载，无法验证用户权限，拒绝安装程序');
+                    }
+                    if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                        try {
+                            await NotificationManager.createNotification(this.pid, {
+                                type: 'snapshot',
+                                title: '文件管理器',
+                                content: '无法验证用户权限，拒绝安装',
+                                duration: 4000
+                            });
+                        } catch (e) {
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.warn('FileManager', `创建通知失败: ${e.message}`);
+                            }
+                        }
+                    }
+                    return;
+                }
+                
                 if (typeof ProcessManager === 'undefined') {
                     // ProcessManager 不可用，使用通知提示（不打断用户）
                     if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {

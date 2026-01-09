@@ -33,22 +33,25 @@ class ProcessManager {
     }
 
     static _log(level, ...args) {
-        // 总是输出到console.log（用于调试）
+        // 检查 ProcessManager 的日志级别（如果设置了）
+        if (ProcessManager.logLevel !== undefined && ProcessManager.logLevel < level) {
+            return;  // 如果 ProcessManager 的日志级别低于当前级别，不输出
+        }
+        
         const message = args.length > 0 && typeof args[0] === 'string' ? args[0] : '';
         const meta = args.length > 1 ? args.slice(1) : undefined;
-        console.log(`[ProcessManager._log] level=${level}, logLevel=${ProcessManager.logLevel}, message=${message}`, meta);
         
-        if (ProcessManager.logLevel >= level) {
-            const debugLevel = (typeof LogLevel !== 'undefined' && LogLevel.LEVEL && LogLevel.LEVEL.DEBUG) ? LogLevel.LEVEL.DEBUG : 3;
-            const infoLevel = (typeof LogLevel !== 'undefined' && LogLevel.LEVEL && LogLevel.LEVEL.INFO) ? LogLevel.LEVEL.INFO : 2;
-            const errorLevel = (typeof LogLevel !== 'undefined' && LogLevel.LEVEL && LogLevel.LEVEL.ERROR) ? LogLevel.LEVEL.ERROR : 1;
-            const debugName = (typeof LogLevel !== 'undefined' && LogLevel.NAME && LogLevel.NAME.DEBUG) ? LogLevel.NAME.DEBUG : "DEBUG";
-            const infoName = (typeof LogLevel !== 'undefined' && LogLevel.NAME && LogLevel.NAME.INFO) ? LogLevel.NAME.INFO : "INFO";
-            const errorName = (typeof LogLevel !== 'undefined' && LogLevel.NAME && LogLevel.NAME.ERROR) ? LogLevel.NAME.ERROR : "ERROR";
-            const lvlName = level >= debugLevel ? debugName : level >= infoLevel ? infoName : errorName;
-            const subsystem = "ProcessManager";
-            KernelLogger.log(lvlName, subsystem, message, meta);
-        }
+        // 不再总是输出到 console.log，而是通过 KernelLogger 统一管理
+        // 这样会遵循 KernelLogger 的日志级别设置
+        const debugLevel = (typeof LogLevel !== 'undefined' && LogLevel.LEVEL && LogLevel.LEVEL.DEBUG) ? LogLevel.LEVEL.DEBUG : 3;
+        const infoLevel = (typeof LogLevel !== 'undefined' && LogLevel.LEVEL && LogLevel.LEVEL.INFO) ? LogLevel.LEVEL.INFO : 2;
+        const errorLevel = (typeof LogLevel !== 'undefined' && LogLevel.LEVEL && LogLevel.LEVEL.ERROR) ? LogLevel.LEVEL.ERROR : 1;
+        const debugName = (typeof LogLevel !== 'undefined' && LogLevel.NAME && LogLevel.NAME.DEBUG) ? LogLevel.NAME.DEBUG : "DEBUG";
+        const infoName = (typeof LogLevel !== 'undefined' && LogLevel.NAME && LogLevel.NAME.INFO) ? LogLevel.NAME.INFO : "INFO";
+        const errorName = (typeof LogLevel !== 'undefined' && LogLevel.NAME && LogLevel.NAME.ERROR) ? LogLevel.NAME.ERROR : "ERROR";
+        const lvlName = level >= debugLevel ? debugName : level >= infoLevel ? infoName : errorName;
+        const subsystem = "ProcessManager";
+        KernelLogger.log(lvlName, subsystem, message, meta);
     }
 
     // 进程表 Map<pid, ProcessInfo>
@@ -2810,6 +2813,11 @@ class ProcessManager {
             // 网络API
             'Network.request': PermissionManager.PERMISSION.NETWORK_ACCESS,
             'Network.fetch': PermissionManager.PERMISSION.NETWORK_ACCESS,
+            'Network.Port.register': PermissionManager.PERMISSION.NETWORK_ACCESS,
+            'Network.Port.unregister': PermissionManager.PERMISSION.NETWORK_ACCESS,
+            'Network.Port.getStatus': PermissionManager.PERMISSION.NETWORK_ACCESS,
+            'Network.Port.list': PermissionManager.PERMISSION.NETWORK_ACCESS,
+            'Network.Port.send': PermissionManager.PERMISSION.NETWORK_ACCESS,
             
             // GUI API
             'GUI.createWindow': PermissionManager.PERMISSION.GUI_WINDOW_CREATE,
@@ -2934,6 +2942,18 @@ class ProcessManager {
             'ScheduleTask.get': null,  // 读取操作不需要权限
             'ScheduleTask.getAll': null,  // 读取操作不需要权限
             'ScheduleTask.setEnabled': PermissionManager.PERMISSION.SCHEDULE_TASK_MANAGE,
+            
+            // 日志API（需要日志读取权限）
+            'Log.getStatistics': PermissionManager.PERMISSION.SYSTEM_LOG_READ,
+            'Log.query': PermissionManager.PERMISSION.SYSTEM_LOG_READ,
+            'Log.getByLevel': PermissionManager.PERMISSION.SYSTEM_LOG_READ,
+            'Log.getBySubsystem': PermissionManager.PERMISSION.SYSTEM_LOG_READ,
+            'Log.getByDate': PermissionManager.PERMISSION.SYSTEM_LOG_READ,
+            'Log.getByTimeRange': PermissionManager.PERMISSION.SYSTEM_LOG_READ,
+            'Log.search': PermissionManager.PERMISSION.SYSTEM_LOG_READ,
+            'Log.getRecent': PermissionManager.PERMISSION.SYSTEM_LOG_READ,
+            'Log.getSubsystems': PermissionManager.PERMISSION.SYSTEM_LOG_READ,
+            'Log.getDates': PermissionManager.PERMISSION.SYSTEM_LOG_READ,
         };
         
         return apiPermissionMap[apiName] || null;
@@ -4577,6 +4597,51 @@ class ProcessManager {
             'Network.toggle': async () => {
                 return await ProcessManager.toggleNetwork();
             },
+            'Network.Port.register': async (port, pid, programName, options) => {
+                if (typeof port !== 'number') {
+                    port = parseInt(port, 10);
+                    if (isNaN(port)) {
+                        throw new Error(`无效的端口号: ${port}`);
+                    }
+                }
+                if (typeof pid !== 'number') {
+                    pid = parseInt(pid, 10);
+                    if (isNaN(pid)) {
+                        throw new Error(`无效的进程ID: ${pid}`);
+                    }
+                }
+                return await ProcessManager.registerPort(port, pid, programName, options);
+            },
+            'Network.Port.unregister': async (port) => {
+                if (typeof port !== 'number') {
+                    port = parseInt(port, 10);
+                    if (isNaN(port)) {
+                        throw new Error(`无效的端口号: ${port}`);
+                    }
+                }
+                return await ProcessManager.unregisterPort(port);
+            },
+            'Network.Port.getStatus': async (port) => {
+                if (typeof port !== 'number') {
+                    port = parseInt(port, 10);
+                    if (isNaN(port)) {
+                        throw new Error(`无效的端口号: ${port}`);
+                    }
+                }
+                return await ProcessManager.getPortStatus(port);
+            },
+            'Network.Port.list': async () => {
+                return await ProcessManager.listPorts();
+            },
+            'Network.Port.send': async (host, port, data) => {
+                if (typeof port !== 'number') {
+                    port = parseInt(port, 10);
+                    if (isNaN(port)) {
+                        throw new Error(`无效的端口号: ${port}`);
+                    }
+                }
+                return await ProcessManager.sendDataToPort(host, port, data);
+            },
             
             // 电池信息API
             'Battery.getInfo': async () => {
@@ -5412,6 +5477,116 @@ class ProcessManager {
                 return await ScheduleTaskManager.setTaskEnabled(taskId, enabled);
             },
             
+            // ==================== 日志API ====================
+            
+            'Log.getStatistics': async () => {
+                if (typeof KernelLogger === 'undefined') {
+                    throw new Error('KernelLogger 模块未加载');
+                }
+                
+                return KernelLogger.getStatistics();
+            },
+            
+            'Log.query': async (options) => {
+                if (typeof KernelLogger === 'undefined') {
+                    throw new Error('KernelLogger 模块未加载');
+                }
+                
+                if (!options || typeof options !== 'object') {
+                    throw new Error('Log.query: options 必须是对象');
+                }
+                
+                return KernelLogger.queryLogs(options);
+            },
+            
+            'Log.getByLevel': async (level, limit, offset) => {
+                if (typeof KernelLogger === 'undefined') {
+                    throw new Error('KernelLogger 模块未加载');
+                }
+                
+                if (!level || typeof level !== 'string') {
+                    throw new Error('Log.getByLevel: level 必须是字符串');
+                }
+                
+                return KernelLogger.getLogsByLevel(level, limit || 100, offset || 0);
+            },
+            
+            'Log.getBySubsystem': async (subsystem, limit, offset) => {
+                if (typeof KernelLogger === 'undefined') {
+                    throw new Error('KernelLogger 模块未加载');
+                }
+                
+                if (!subsystem || typeof subsystem !== 'string') {
+                    throw new Error('Log.getBySubsystem: subsystem 必须是字符串');
+                }
+                
+                return KernelLogger.getLogsBySubsystem(subsystem, limit || 100, offset || 0);
+            },
+            
+            'Log.getByDate': async (date, limit, offset) => {
+                if (typeof KernelLogger === 'undefined') {
+                    throw new Error('KernelLogger 模块未加载');
+                }
+                
+                if (!date || typeof date !== 'string') {
+                    throw new Error('Log.getByDate: date 必须是字符串（格式：YYYY-MM-DD）');
+                }
+                
+                return KernelLogger.getLogsByDate(date, limit || 100, offset || 0);
+            },
+            
+            'Log.getByTimeRange': async (startTime, endTime, limit, offset) => {
+                if (typeof KernelLogger === 'undefined') {
+                    throw new Error('KernelLogger 模块未加载');
+                }
+                
+                if (typeof startTime !== 'number' || typeof endTime !== 'number') {
+                    throw new Error('Log.getByTimeRange: startTime 和 endTime 必须是数字（时间戳，毫秒）');
+                }
+                
+                if (startTime > endTime) {
+                    throw new Error('Log.getByTimeRange: startTime 不能大于 endTime');
+                }
+                
+                return KernelLogger.getLogsByTimeRange(startTime, endTime, limit || 100, offset || 0);
+            },
+            
+            'Log.search': async (keyword, limit, offset) => {
+                if (typeof KernelLogger === 'undefined') {
+                    throw new Error('KernelLogger 模块未加载');
+                }
+                
+                if (!keyword || typeof keyword !== 'string') {
+                    throw new Error('Log.search: keyword 必须是字符串');
+                }
+                
+                return KernelLogger.searchLogs(keyword, limit || 100, offset || 0);
+            },
+            
+            'Log.getRecent': async (count) => {
+                if (typeof KernelLogger === 'undefined') {
+                    throw new Error('KernelLogger 模块未加载');
+                }
+                
+                return KernelLogger.getRecentLogs(count || 100);
+            },
+            
+            'Log.getSubsystems': async () => {
+                if (typeof KernelLogger === 'undefined') {
+                    throw new Error('KernelLogger 模块未加载');
+                }
+                
+                return KernelLogger.getSubsystems();
+            },
+            
+            'Log.getDates': async () => {
+                if (typeof KernelLogger === 'undefined') {
+                    throw new Error('KernelLogger 模块未加载');
+                }
+                
+                return KernelLogger.getDates();
+            },
+            
             // 其他API可以在这里添加
         };
         
@@ -5445,8 +5620,21 @@ class ProcessManager {
         } catch (error) {
             // 增强错误信息
             const errorMsg = `Kernel API调用失败: ${apiName} - ${error.message}`;
+            
+            // 对于某些正常的业务逻辑错误（如端口未注册），不应该记录为错误
+            const isNormalBusinessLogic = (
+                (apiName === 'Network.Port.getStatus' && error.message && error.message.includes('未注册')) ||
+                (apiName === 'Network.Port.unregister' && error.message && error.message.includes('未注册'))
+            );
+            
             if (typeof KernelLogger !== 'undefined') {
-                KernelLogger.error('ProcessManager', errorMsg, { apiName, args, error: error.message, stack: error.stack });
+                if (isNormalBusinessLogic) {
+                    // 正常业务逻辑，使用调试日志
+                    KernelLogger.debug('ProcessManager', errorMsg, { apiName, args, error: error.message });
+                } else {
+                    // 真正的错误，记录为错误日志
+                    KernelLogger.error('ProcessManager', errorMsg, { apiName, args, error: error.message, stack: error.stack });
+                }
             }
             throw new Error(errorMsg);
         }
@@ -6252,6 +6440,208 @@ class ProcessManager {
         } catch (e) {
             ProcessManager._log(1, `切换网络状态失败: ${e.message}`);
             return false;
+        }
+    }
+    
+    /**
+     * 注册 TCP 端口监听（供程序调用）
+     * @param {number} port - 端口号（1-65535）
+     * @param {number} pid - 进程 ID
+     * @param {string} programName - 程序名称
+     * @param {Object} options - 选项（可选）
+     * @param {number} pidForCheck - 进程ID（可选，用于权限检查）
+     * @returns {Promise<Object>} 注册结果
+     */
+    static async registerPort(port, pid, programName, options = {}, pidForCheck = null) {
+        // 确保端口号是数字类型
+        if (typeof port !== 'number') {
+            port = parseInt(port, 10);
+            if (isNaN(port)) {
+                throw new Error(`无效的端口号: ${port}`);
+            }
+        }
+        
+        if (!Number.isInteger(port) || port < 1 || port > 65535) {
+            throw new Error(`端口号必须是 1-65535 之间的整数，当前值: ${port} (类型: ${typeof port})`);
+        }
+        
+        // 如果提供了 pidForCheck，验证进程是否存在
+        if (pidForCheck !== null) {
+            const processInfo = ProcessManager.PROCESS_TABLE.get(pidForCheck);
+            if (!processInfo || processInfo.status !== 'running') {
+                throw new Error(`Process ${pidForCheck} does not exist or is not running`);
+            }
+            ProcessManager._logProgramAction(pidForCheck, 'registerPort', { port, pid, programName });
+        }
+        
+        const networkManager = ProcessManager._getNetworkManager();
+        if (!networkManager) {
+            throw new Error('NetworkManager 不可用');
+        }
+        
+        try {
+            return await networkManager.registerPort(port, pid, programName, options);
+        } catch (e) {
+            ProcessManager._log(1, `注册端口失败: ${e.message}`);
+            throw e;
+        }
+    }
+    
+    /**
+     * 取消 TCP 端口监听（供程序调用）
+     * @param {number} port - 端口号
+     * @param {number} pidForCheck - 进程ID（可选，用于权限检查）
+     * @returns {Promise<Object>} 取消结果
+     */
+    static async unregisterPort(port, pidForCheck = null) {
+        // 确保端口号是数字类型
+        if (typeof port !== 'number') {
+            port = parseInt(port, 10);
+            if (isNaN(port)) {
+                throw new Error(`无效的端口号: ${port}`);
+            }
+        }
+        
+        if (!Number.isInteger(port) || port < 1 || port > 65535) {
+            throw new Error(`端口号必须是 1-65535 之间的整数，当前值: ${port} (类型: ${typeof port})`);
+        }
+        
+        // 如果提供了 pidForCheck，验证进程是否存在
+        if (pidForCheck !== null) {
+            const processInfo = ProcessManager.PROCESS_TABLE.get(pidForCheck);
+            if (!processInfo || processInfo.status !== 'running') {
+                throw new Error(`Process ${pidForCheck} does not exist or is not running`);
+            }
+            ProcessManager._logProgramAction(pidForCheck, 'unregisterPort', { port });
+        }
+        
+        const networkManager = ProcessManager._getNetworkManager();
+        if (!networkManager) {
+            throw new Error('NetworkManager 不可用');
+        }
+        
+        try {
+            return await networkManager.unregisterPort(port);
+        } catch (e) {
+            ProcessManager._log(1, `取消端口注册失败: ${e.message}`);
+            throw e;
+        }
+    }
+    
+    /**
+     * 获取端口状态（供程序调用）
+     * @param {number} port - 端口号
+     * @param {number} pidForCheck - 进程ID（可选，用于权限检查）
+     * @returns {Promise<Object>} 端口状态
+     */
+    static async getPortStatus(port, pidForCheck = null) {
+        // 确保端口号是数字类型
+        if (typeof port !== 'number') {
+            port = parseInt(port, 10);
+            if (isNaN(port)) {
+                throw new Error(`无效的端口号: ${port}`);
+            }
+        }
+        
+        if (!Number.isInteger(port) || port < 1 || port > 65535) {
+            throw new Error(`端口号必须是 1-65535 之间的整数，当前值: ${port} (类型: ${typeof port})`);
+        }
+        
+        // 如果提供了 pidForCheck，验证进程是否存在
+        if (pidForCheck !== null) {
+            const processInfo = ProcessManager.PROCESS_TABLE.get(pidForCheck);
+            if (!processInfo || processInfo.status !== 'running') {
+                throw new Error(`Process ${pidForCheck} does not exist or is not running`);
+            }
+            ProcessManager._logProgramAction(pidForCheck, 'getPortStatus', { port });
+        }
+        
+        const networkManager = ProcessManager._getNetworkManager();
+        if (!networkManager) {
+            throw new Error('NetworkManager 不可用');
+        }
+        
+        try {
+            return await networkManager.getPortStatus(port);
+        } catch (e) {
+            // 端口未注册是正常情况，不应该记录为错误
+            if (e.message && e.message.includes('未注册')) {
+                ProcessManager._log(3, `端口 ${port} 未注册（正常情况）`);
+            } else {
+                ProcessManager._log(1, `获取端口状态失败: ${e.message}`);
+            }
+            throw e;
+        }
+    }
+    
+    /**
+     * 列出所有已注册的端口（供程序调用）
+     * @param {number} pidForCheck - 进程ID（可选，用于权限检查）
+     * @returns {Promise<Array>} 端口列表
+     */
+    static async listPorts(pidForCheck = null) {
+        // 如果提供了 pidForCheck，验证进程是否存在
+        if (pidForCheck !== null) {
+            const processInfo = ProcessManager.PROCESS_TABLE.get(pidForCheck);
+            if (!processInfo || processInfo.status !== 'running') {
+                throw new Error(`Process ${pidForCheck} does not exist or is not running`);
+            }
+            ProcessManager._logProgramAction(pidForCheck, 'listPorts', {});
+        }
+        
+        const networkManager = ProcessManager._getNetworkManager();
+        if (!networkManager) {
+            throw new Error('NetworkManager 不可用');
+        }
+        
+        try {
+            return await networkManager.listPorts();
+        } catch (e) {
+            ProcessManager._log(1, `获取端口列表失败: ${e.message}`);
+            throw e;
+        }
+    }
+    
+    /**
+     * 向端口发送数据（作为客户端）（供程序调用）
+     * @param {string} host - 主机地址
+     * @param {number} port - 端口号
+     * @param {string|ArrayBuffer|Blob} data - 要发送的数据
+     * @param {number} pidForCheck - 进程ID（可选，用于权限检查）
+     * @returns {Promise<Object>} 发送结果
+     */
+    static async sendDataToPort(host, port, data, pidForCheck = null) {
+        // 确保端口号是数字类型
+        if (typeof port !== 'number') {
+            port = parseInt(port, 10);
+            if (isNaN(port)) {
+                throw new Error(`无效的端口号: ${port}`);
+            }
+        }
+        
+        if (!Number.isInteger(port) || port < 1 || port > 65535) {
+            throw new Error(`端口号必须是 1-65535 之间的整数，当前值: ${port} (类型: ${typeof port})`);
+        }
+        
+        // 如果提供了 pidForCheck，验证进程是否存在
+        if (pidForCheck !== null) {
+            const processInfo = ProcessManager.PROCESS_TABLE.get(pidForCheck);
+            if (!processInfo || processInfo.status !== 'running') {
+                throw new Error(`Process ${pidForCheck} does not exist or is not running`);
+            }
+            ProcessManager._logProgramAction(pidForCheck, 'sendDataToPort', { host, port });
+        }
+        
+        const networkManager = ProcessManager._getNetworkManager();
+        if (!networkManager) {
+            throw new Error('NetworkManager 不可用');
+        }
+        
+        try {
+            return await networkManager.sendDataToPort(host, port, data);
+        } catch (e) {
+            ProcessManager._log(1, `发送数据到端口失败: ${e.message}`);
+            throw e;
         }
     }
     

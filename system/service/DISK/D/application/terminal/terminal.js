@@ -414,13 +414,17 @@
                                             // 先关闭关联的 CLI 程序（异步，不阻塞窗口关闭）
                                             if (cliProgramPid) {
                                                 ProcessManager.killProgram(cliProgramPid, false).catch(e => {
-                                                    console.error('关闭关联 CLI 程序失败:', e);
+                                                    if (typeof KernelLogger !== 'undefined') {
+                                                        KernelLogger.error('Terminal', '关闭关联 CLI 程序失败', e);
+                                                    }
                                                 });
                                             }
                                         }
                                     }
                                 } catch (e) {
-                                    console.error('获取 ProcessManager 失败:', e);
+                                    if (typeof KernelLogger !== 'undefined') {
+                                        KernelLogger.error('Terminal', '获取 ProcessManager 失败', e);
+                                    }
                                 }
                             }
                             // onClose 回调只做清理工作，不调用 _closeWindow 或 unregisterWindow
@@ -482,7 +486,9 @@
                                         ProcessManager.killProgram(this.pid);
                                     }
                                 } catch (e) {
-                                    console.error('Failed to close terminal:', e);
+                                    if (typeof KernelLogger !== 'undefined') {
+                                        KernelLogger.error('Terminal', 'Failed to close terminal', e);
+                                    }
                                 }
                             }
                         }, {
@@ -500,7 +506,9 @@
                                         ProcessManager.killProgram(this.pid);
                                     }
                                 } catch (e) {
-                                    console.error('Failed to close terminal:', e);
+                                    if (typeof KernelLogger !== 'undefined') {
+                                        KernelLogger.error('Terminal', 'Failed to close terminal', e);
+                                    }
                                 }
                             }
                         });
@@ -2211,7 +2219,9 @@ function escapeHtml(s){
                         
                         // 调试信息（仅在开发模式下）
                         if (this._vimInstance.mode === 1 && window._debugVim) { // MODE_INSERT
-                            console.log(`Terminal: Vim Insert Mode - key: ${key}, ctrlKey: ${ctrlKey}, shiftKey: ${shiftKey}`);
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.debug('Terminal', `Vim Insert Mode - key: ${key}, ctrlKey: ${ctrlKey}, shiftKey: ${shiftKey}`);
+                            }
                         }
                         
                         // ev.key已经自动处理了Shift键组合
@@ -2220,10 +2230,14 @@ function escapeHtml(s){
                             try {
                                 this._vimInstance.handleKey(key, ctrlKey, shiftKey);
                             } catch (error) {
-                                console.error('Terminal: Vim handleKey error:', error);
+                                if (typeof KernelLogger !== 'undefined') {
+                                    KernelLogger.error('Terminal', 'Vim handleKey error', error);
+                                }
                             }
                         } else {
-                            console.error('Terminal: _vimInstance.handleKey is not a function', this._vimInstance);
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.error('Terminal', '_vimInstance.handleKey is not a function', this._vimInstance);
+                            }
                         }
                         return;
                     }
@@ -2494,7 +2508,9 @@ function escapeHtml(s){
                                     }
                                 } catch (e) {
                                     // 如果获取程序失败，忽略错误，继续使用内置命令列表
-                                    console.warn('Terminal: Failed to get programs for completion:', e);
+                                    if (typeof KernelLogger !== 'undefined') {
+                                        KernelLogger.warn('Terminal', 'Failed to get programs for completion', e);
+                                    }
                                 }
                                 
                                 // 从 D:/bin/ 目录获取程序并添加到候选列表
@@ -2518,7 +2534,9 @@ function escapeHtml(s){
                                     });
                                 } catch (e) {
                                     // 如果获取 bin 目录程序失败，忽略错误
-                                    console.warn('Terminal: Failed to get bin programs for completion:', e);
+                                    if (typeof KernelLogger !== 'undefined') {
+                                        KernelLogger.warn('Terminal', 'Failed to get bin programs for completion', e);
+                                    }
                                 }
                                 
                                 // 按字母顺序排序
@@ -2637,7 +2655,9 @@ function escapeHtml(s){
                         
                         // 调试信息
                         if (this._vimInstance.mode === 1) { // MODE_INSERT
-                            console.log(`Terminal: Vim Insert Mode - key: ${key}, ctrlKey: ${ctrlKey}, shiftKey: ${shiftKey}`);
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.debug('Terminal', `Vim Insert Mode - key: ${key}, ctrlKey: ${ctrlKey}, shiftKey: ${shiftKey}`);
+                            }
                         }
                         
                         // ev.key已经自动处理了Shift键组合
@@ -2645,7 +2665,9 @@ function escapeHtml(s){
                         if (this._vimInstance && typeof this._vimInstance.handleKey === 'function') {
                             this._vimInstance.handleKey(key, ctrlKey, shiftKey);
                         } else {
-                            console.error('Terminal: _vimInstance.handleKey is not a function', this._vimInstance);
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.error('Terminal', '_vimInstance.handleKey is not a function', this._vimInstance);
+                            }
                         }
                         return;
                     }
@@ -2859,7 +2881,9 @@ function escapeHtml(s){
                                         });
                                     } catch (e) {
                                         // 如果获取CLI程序失败，忽略错误
-                                        console.warn('Terminal: Failed to get CLI programs for completion:', e);
+                                        if (typeof KernelLogger !== 'undefined') {
+                                            KernelLogger.warn('Terminal', 'Failed to get CLI programs for completion', e);
+                                        }
                                     }
                                     
                                     // 从 D:/bin/ 目录获取程序并添加到候选列表
@@ -2883,7 +2907,9 @@ function escapeHtml(s){
                                         });
                                     } catch (e) {
                                         // 如果获取 bin 目录程序失败，忽略错误
-                                        console.warn('Terminal: Failed to get bin programs for completion:', e);
+                                        if (typeof KernelLogger !== 'undefined') {
+                                        KernelLogger.warn('Terminal', 'Failed to get bin programs for completion', e);
+                                    }
                                     }
                                     
                                     // 按字母顺序排序
@@ -2986,7 +3012,9 @@ function escapeHtml(s){
                                 this._vimInstance._pasteText(text);
                             }
                         } catch (e) {
-                            console.error('Vim: Failed to paste', e);
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.error('Terminal', 'Vim: Failed to paste', e);
+                            }
                         }
                         return;
                     }
@@ -3015,7 +3043,9 @@ function escapeHtml(s){
                                     this._vimInstance._pasteText(text);
                                 }
                             } catch (e) {
-                                console.error('Vim: Failed to paste', e);
+                                if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.error('Terminal', 'Vim: Failed to paste', e);
+                            }
                             }
                             return;
                         }
@@ -3067,7 +3097,9 @@ function escapeHtml(s){
             const bashWindow = this.terminalElement ? this.terminalElement.closest('.bash-window') : null;
             
             if (!bashWindow) {
-                console.warn('Terminal: bash-window not found for window controls');
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.warn('Terminal', 'bash-window not found for window controls');
+                }
                 return;
             }
             
@@ -4049,7 +4081,11 @@ function escapeHtml(s){
             if(!list || list.length === 0) return false;
             // 调用所有监听器（不阻塞）
             list.forEach(fn => {
-                try{ fn(payload); }catch(e){ console.error('Terminal listener errored', e); }
+                try{ fn(payload); }catch(e){ 
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.error('Terminal', 'Terminal listener errored', e);
+                    }
+                }
             });
             return true;
         }
@@ -4141,7 +4177,9 @@ function escapeHtml(s){
                     shed: appMem.sheds.get(SHED_ID)
                 };
             } catch (e) {
-                console.error('Failed to ensure Exploit memory:', e);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('Terminal', 'Failed to ensure Exploit memory', e);
+                }
                 return null;
             }
         }
@@ -4170,7 +4208,9 @@ function escapeHtml(s){
                 const length = serialized.length;
                 const addr = heap.alloc(length + 1);
                 if (!addr) {
-                    console.error('Failed to allocate heap memory for terminal content');
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.error('Terminal', 'Failed to allocate heap memory for terminal content');
+                    }
                     return null;
                 }
                 
@@ -4197,7 +4237,9 @@ function escapeHtml(s){
                 
                 return { pid: exploit.pid, addr: addr, size: length };
             } catch (e) {
-                console.error('Failed to save terminal content:', e);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('Terminal', 'Failed to save terminal content', e);
+                }
             }
             return null;
         }
@@ -4266,7 +4308,9 @@ function escapeHtml(s){
                 
                 return true;
             } catch (e) {
-                console.error('Failed to restore terminal content:', e);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('Terminal', 'Failed to restore terminal content', e);
+                }
             }
             return false;
         }
@@ -4297,7 +4341,9 @@ function escapeHtml(s){
                 // 分配新内存
                 const addr = heap.alloc(length + 1);
                 if (!addr) {
-                    console.error('Failed to allocate heap memory for clipboard');
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.error('Terminal', 'Failed to allocate heap memory for clipboard');
+                    }
                     return false;
                 }
                 
@@ -4324,7 +4370,9 @@ function escapeHtml(s){
                 
                 return true;
             } catch (e) {
-                console.error('Failed to save clipboard to memory:', e);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('Terminal', 'Failed to save clipboard to memory', e);
+                }
                 return false;
             }
         }
@@ -4367,7 +4415,9 @@ function escapeHtml(s){
                 // 反序列化
                 return JSON.parse(serialized);
             } catch (e) {
-                console.error('Failed to load clipboard from memory:', e);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('Terminal', 'Failed to load clipboard from memory', e);
+                }
                 return null;
             }
         }
@@ -4522,7 +4572,9 @@ function escapeHtml(s){
                 
                 return true;
             } catch (e) {
-                console.error(`Failed to save data to memory (key: ${key}):`, e);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('Terminal', `Failed to save data to memory (key: ${key})`, e);
+                }
                 return false;
             }
         }
@@ -4564,7 +4616,9 @@ function escapeHtml(s){
                 
                 return serialized || null;
             } catch (e) {
-                console.error(`Failed to load data from memory (key: ${key}):`, e);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('Terminal', `Failed to load data from memory (key: ${key})`, e);
+                }
                 if (typeof KernelLogger !== 'undefined') {
                     KernelLogger.error('Terminal', `_loadDataFromMemory 异常 key=${key}`, { error: e.message, stack: e.stack });
                 }
@@ -4648,7 +4702,9 @@ function escapeHtml(s){
                 }
             } catch (e) {
                 // 如果获取CLI程序失败，忽略错误，返回空数组
-                console.warn('Terminal: Failed to get CLI programs for completion:', e);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.warn('Terminal', 'Failed to get CLI programs for completion', e);
+                }
             }
             
             // 更新缓存
@@ -4695,7 +4751,9 @@ function escapeHtml(s){
                         }
                     } catch (e) {
                         // 如果 FileSystem.list 失败，尝试使用 PHP 服务
-                        console.debug('Terminal: FileSystem.list failed, trying PHP service:', e);
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.debug('Terminal', 'FileSystem.list failed, trying PHP service', e);
+                        }
                     }
                 }
                 
@@ -4740,7 +4798,9 @@ function escapeHtml(s){
                 }
             } catch (e) {
                 // 如果获取 bin 目录程序失败，忽略错误，返回空数组
-                console.warn('Terminal: Failed to get bin programs for completion:', e);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.warn('Terminal', 'Failed to get bin programs for completion', e);
+                }
             }
             
             // 更新缓存
@@ -4790,7 +4850,9 @@ function escapeHtml(s){
                 this.cmdEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
             } catch(e) {
                 // 如果选择失败，至少确保焦点
-                console.warn('Terminal focus error:', e);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.warn('Terminal', 'Terminal focus error', e);
+                }
                 try {
                     this.cmdEl.focus();
                     this.cmdEl.classList.add('focused');
@@ -7658,7 +7720,9 @@ function escapeHtml(s){
                             try {
                                 ProcessMgr = safePoolGet('KERNEL_GLOBAL_POOL', 'ProcessManager');
                             } catch (e) {
-                                console.error('[Terminal] 获取ProcessManager失败:', e);
+                                if (typeof KernelLogger !== 'undefined') {
+                                    KernelLogger.error('Terminal', '获取ProcessManager失败', e);
+                                }
                             }
                         }
 
@@ -7704,7 +7768,9 @@ function escapeHtml(s){
                             try {
                                 ProcessMgr = safePoolGet('KERNEL_GLOBAL_POOL', 'ProcessManager');
                             } catch (e) {
-                                console.error('[Terminal] 获取ProcessManager失败:', e);
+                                if (typeof KernelLogger !== 'undefined') {
+                                    KernelLogger.error('Terminal', '获取ProcessManager失败', e);
+                                }
                             }
                         }
 
@@ -7773,7 +7839,9 @@ function escapeHtml(s){
                             try {
                                 ProcessMgr = safePoolGet('KERNEL_GLOBAL_POOL', 'ProcessManager');
                             } catch (e) {
-                                console.error('[Terminal] 获取ProcessManager失败:', e);
+                                if (typeof KernelLogger !== 'undefined') {
+                                    KernelLogger.error('Terminal', '获取ProcessManager失败', e);
+                                }
                             }
                         }
 
@@ -7811,7 +7879,9 @@ function escapeHtml(s){
                             try {
                                 ProcessMgr = safePoolGet('KERNEL_GLOBAL_POOL', 'ProcessManager');
                             } catch (e) {
-                                console.error('[Terminal] 获取ProcessManager失败:', e);
+                                if (typeof KernelLogger !== 'undefined') {
+                                    KernelLogger.error('Terminal', '获取ProcessManager失败', e);
+                                }
                             }
                         }
 
@@ -7841,10 +7911,18 @@ function escapeHtml(s){
                 
                 // 使用异步函数统一处理所有步骤
                 (async () => {
+                    // 验证命令名是否有效
+                    if (!cmd || typeof cmd !== 'string' || cmd.trim() === '') {
+                        payload.write(`${cmd || ''} command not found`);
+                        return;
+                    }
+                    
                     let isCLIProgram = false;
                     let programInfo = null;
                     let programName = cmd;  // 默认使用命令名作为程序名
                     let foundInBin = false;  // 标记是否在 D/bin/ 中找到文件
+                    let foundInRegistry = false;  // 标记是否在程序注册表中找到
+                    let foundInEnv = false;  // 标记是否在环境变量中找到
                     
                     // 步骤1: 尝试从 D/bin/ 目录查找同名 .js 文件
                     try {
@@ -7860,7 +7938,7 @@ function escapeHtml(s){
                             }
                         }
                         
-                        if (SystemInfo) {
+                        if (SystemInfo && cmd && typeof cmd === 'string' && cmd.trim() !== '') {
                             // 构建 FSDirve 服务 URL
                             let url = null;
                             if (SystemInfo.buildServiceUrlObject && SystemInfo.SERVICE_NAMES) {
@@ -7874,6 +7952,7 @@ function escapeHtml(s){
                             }
                             url.searchParams.set('action', 'read_file');
                             url.searchParams.set('path', 'D:/bin');
+                            // 确保 cmd 是有效字符串，避免 undefined.js
                             url.searchParams.set('fileName', `${cmd}.js`);
                             
                             // 尝试读取文件（静默处理 404 错误，因为文件不存在是正常情况）
@@ -7908,7 +7987,9 @@ function escapeHtml(s){
                                             try {
                                                 ProcessMgr = safePoolGet('KERNEL_GLOBAL_POOL', 'ProcessManager');
                                             } catch (e) {
-                                                console.error('[Terminal] 获取ProcessManager失败:', e);
+                                                if (typeof KernelLogger !== 'undefined') {
+                                                    KernelLogger.error('Terminal', '获取ProcessManager失败', e);
+                                                }
                                             }
                                         }
                                         
@@ -7975,7 +8056,9 @@ function escapeHtml(s){
                                                     
                                                     // 如果进程没有被创建，继续后续查找
                                                     if (!processCreated) {
-                                                        console.debug(`[Terminal] D:/bin/${cmd}.js 启动失败，继续查找其他位置:`, error);
+                                                        if (typeof KernelLogger !== 'undefined') {
+                                                            KernelLogger.debug('Terminal', `D:/bin/${cmd}.js 启动失败，继续查找其他位置`, error);
+                                                        }
                                                         foundInBin = false;
                                                     }
                                                 }
@@ -7987,7 +8070,9 @@ function escapeHtml(s){
                         }
                     } catch (error) {
                         // 读取文件失败，继续后续判断（不输出错误，因为可能是文件不存在）
-                        console.debug(`[Terminal] 检查 D:/bin/${cmd}.js 失败:`, error);
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.debug('Terminal', `检查 D:/bin/${cmd}.js 失败`, error);
+                        }
                     }
                     
                     // 步骤2: 如果 D/bin/ 中没找到，尝试从程序注册表查找
@@ -7999,7 +8084,9 @@ function escapeHtml(s){
                             try {
                                 AssetManager = safePoolGet('KERNEL_GLOBAL_POOL', 'ApplicationAssetManager');
                             } catch (e) {
-                                console.error('[Terminal] 获取ApplicationAssetManager失败:', e);
+                                if (typeof KernelLogger !== 'undefined') {
+                                    KernelLogger.error('Terminal', '获取ApplicationAssetManager失败', e);
+                                }
                             }
                         }
                         
@@ -8007,6 +8094,7 @@ function escapeHtml(s){
                         if (AssetManager && typeof AssetManager.hasProgram === 'function') {
                             const hasProgram = AssetManager.hasProgram(cmd);
                             if (hasProgram) {
+                                foundInRegistry = true;
                                 isCLIProgram = true;
                                 programInfo = AssetManager.getProgramInfo(cmd);
                                 programName = cmd;  // 使用命令名作为程序名
@@ -8024,7 +8112,9 @@ function escapeHtml(s){
                             try {
                                 ProcessMgr = safePoolGet('KERNEL_GLOBAL_POOL', 'ProcessManager');
                             } catch (e) {
-                                console.error('[Terminal] 获取ProcessManager失败:', e);
+                                if (typeof KernelLogger !== 'undefined') {
+                                    KernelLogger.error('Terminal', '获取ProcessManager失败', e);
+                                }
                             }
                         }
                         
@@ -8044,6 +8134,7 @@ function escapeHtml(s){
                                 
                                 const envValue = await ProcessMgr.callKernelAPI(terminalPid, 'Environment.get', [cmd]);
                                 if (envValue && typeof envValue === 'string' && envValue.trim()) {
+                                    foundInEnv = true;
                                     const envValueTrimmed = envValue.trim();
                                     
                                     // 判断环境变量值是否是文件路径
@@ -8057,7 +8148,9 @@ function escapeHtml(s){
                                         try {
                                             ProcessMgr = safePoolGet('KERNEL_GLOBAL_POOL', 'ProcessManager');
                                         } catch (e) {
-                                            console.error('[Terminal] 获取ProcessManager失败:', e);
+                                            if (typeof KernelLogger !== 'undefined') {
+                                    KernelLogger.error('Terminal', '获取ProcessManager失败', e);
+                                }
                                         }
                                     }
                                     
@@ -8162,11 +8255,15 @@ function escapeHtml(s){
                                             }).then((pid) => {
                                                 payload.write(`[ENV] 程序 ${programNameFromPath} (来自环境变量 ${cmd}=${envValueTrimmed}) 已启动 (PID: ${pid})`);
                                             }).catch((error) => {
-                                                console.error(`[Terminal] 启动程序 ${programNameFromPath} 失败:`, error);
+                                                if (typeof KernelLogger !== 'undefined') {
+                                                KernelLogger.error('Terminal', `启动程序 ${programNameFromPath} 失败`, error);
+                                            }
                                                 payload.write(`${cmd}: command not found (环境变量 ${cmd}=${envValueTrimmed} 对应的程序启动失败: ${error.message || error})`);
                                             });
                                         } catch (error) {
-                                            console.error(`[Terminal] 读取或执行文件 ${envValueTrimmed} 失败:`, error);
+                                            if (typeof KernelLogger !== 'undefined') {
+                                                KernelLogger.error('Terminal', `读取或执行文件 ${envValueTrimmed} 失败`, error);
+                                            }
                                             payload.write(`${cmd}: command not found (环境变量 ${cmd}=${envValueTrimmed} 对应的文件读取失败: ${error.message || error})`);
                                         }
                                     } else {
@@ -8193,7 +8290,9 @@ function escapeHtml(s){
                                         }).then((pid) => {
                                             payload.write(`[ENV] 程序 ${envProgramName} (来自环境变量 ${cmd}) 已启动 (PID: ${pid})`);
                                         }).catch((error) => {
-                                            console.error(`[Terminal] 启动程序 ${envProgramName} 失败:`, error);
+                                            if (typeof KernelLogger !== 'undefined') {
+                                                KernelLogger.error('Terminal', `启动程序 ${envProgramName} 失败`, error);
+                                            }
                                             payload.write(`${cmd}: command not found (环境变量 ${cmd}=${envProgramName} 对应的程序不存在)`);
                                         });
                                     }
@@ -8204,7 +8303,9 @@ function escapeHtml(s){
                                 }
                             } catch (error) {
                                 // 获取环境变量失败，输出命令未找到
-                                console.error(`[Terminal] 获取环境变量 ${cmd} 失败:`, error);
+                                if (typeof KernelLogger !== 'undefined') {
+                                    KernelLogger.error('Terminal', `获取环境变量 ${cmd} 失败`, error);
+                                }
                                 payload.write(`${cmd}: command not found`);
                                 return;
                             }
@@ -8225,7 +8326,9 @@ function escapeHtml(s){
                             try {
                                 ProcessMgr = safePoolGet('KERNEL_GLOBAL_POOL', 'ProcessManager');
                             } catch (e) {
-                                console.error('[Terminal] 获取ProcessManager失败:', e);
+                                if (typeof KernelLogger !== 'undefined') {
+                                    KernelLogger.error('Terminal', '获取ProcessManager失败', e);
+                                }
                             }
                         }
                         
@@ -8250,15 +8353,22 @@ function escapeHtml(s){
                             payload.write(`[CLI] 程序 ${programName} 已启动 (PID: ${pid})`);
                         }).catch((error) => {
                             // 程序启动失败
-                            console.error(`[Terminal] 启动程序 ${programName} 失败:`, error);
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.error('Terminal', `启动程序 ${programName} 失败`, error);
+                            }
                             payload.write(`${cmd}: command not found`);
                             if (error.stack) {
-                                console.error(`[Terminal] 错误堆栈:`, error.stack);
+                                if (typeof KernelLogger !== 'undefined') {
+                                    KernelLogger.error('Terminal', '错误堆栈', error.stack);
+                                }
                             }
                         });
                     } else {
                         // 如果既不是 D/bin/ 中的文件，也不是程序注册表中的程序，也没有环境变量，输出命令未找到
-                        payload.write(`${cmd}: command not found`);
+                        // 只有在所有查找都失败时才提示命令不存在
+                        if (!foundInBin && !foundInRegistry && !foundInEnv) {
+                            payload.write(`${cmd}: command not found`);
+                        }
                     }
                 })();
                 // 异步处理所有步骤，直接返回
@@ -8552,7 +8662,9 @@ function escapeHtml(s){
                     }
                     POOL.__ADD__("APPLICATION_SHARED_POOL", "TerminalAPI", terminalAPI);
                 } catch (e) {
-                    console.error('Failed to expose TerminalAPI to shared space:', e);
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.error('Terminal', 'Failed to expose TerminalAPI to shared space', e);
+                    }
                 }
             }
             

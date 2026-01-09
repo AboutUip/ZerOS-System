@@ -69,6 +69,43 @@
                         return;
                     }
 
+                    // 检查管理员权限（安装程序需要管理员权限）
+                    if (typeof UserControl !== 'undefined') {
+                        try {
+                            await UserControl.ensureInitialized();
+                            const isAdmin = UserControl.isAdmin();
+                            if (!isAdmin) {
+                                this.terminal.write('zominstall: 错误: 权限不足\n');
+                                this.terminal.write('安装程序需要管理员权限，当前用户不是管理员\n');
+                                setTimeout(async () => {
+                                    await this._selfClose();
+                                }, 300);
+                                return;
+                            }
+                        } catch (e) {
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.error("ZOMInstall", `检查用户权限失败: ${e.message}`, e);
+                            }
+                            this.terminal.write('zominstall: 错误: 无法验证用户权限\n');
+                            this.terminal.write('为了安全起见，拒绝执行安装操作\n');
+                            setTimeout(async () => {
+                                await this._selfClose();
+                            }, 300);
+                            return;
+                        }
+                    } else {
+                        // UserControl 未加载，为了安全起见，拒绝执行
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.error("ZOMInstall", `UserControl 未加载，无法验证用户权限，拒绝执行安装操作`);
+                        }
+                        this.terminal.write('zominstall: 错误: 无法验证用户权限\n');
+                        this.terminal.write('UserControl 未加载，为了安全起见，拒绝执行安装操作\n');
+                        setTimeout(async () => {
+                            await this._selfClose();
+                        }, 300);
+                        return;
+                    }
+
                     // 检查参数
                     if (args.length === 0) {
                         this.terminal.write('zominstall: 错误: 缺少参数\n');
@@ -235,13 +272,12 @@
                 }
 
                 // 步骤 5: 执行 setup.js（如果存在）
-                this.terminal.write('步骤 5/6: 执行安装脚本...\n');
+                // setup.js 是可选的，不存在时静默跳过
                 const setupExecuted = await this._executeSetup(tempDir);
                 if (setupExecuted) {
-                    this.terminal.write('安装脚本执行完成\n');
-                } else {
-                    this.terminal.write('未找到 setup.js，跳过安装脚本\n');
+                    this.terminal.write('步骤 5/6: 安装脚本执行完成\n');
                 }
+                // 如果 setup.js 不存在，不输出任何信息（静默跳过）
 
                 // 步骤 6: 清理临时文件
                 this.terminal.write('步骤 6/6: 清理临时文件...\n');
@@ -1093,10 +1129,14 @@
 
         /**
          * 读取文件内容（直接使用 PHP 后端服务）
+         * @param {string} filePath - 文件路径
+         * @param {boolean} silent - 静默模式，如果为 true，文件不存在时不输出错误信息（用于 setup.js 等可选文件）
          */
-        _readFile: async function(filePath) {
+        _readFile: async function(filePath, silent = false) {
             try {
-                this.terminal.write(`[读取文件] 开始读取: ${filePath}\n`);
+                if (!silent) {
+                    this.terminal.write(`[读取文件] 开始读取: ${filePath}\n`);
+                }
                 
                 // 直接使用 PHP 服务读取文件
                 // 规范化路径：统一使用正斜杠
@@ -1139,9 +1179,11 @@
                     dirPath = dirPath.slice(0, -1);
                 }
 
-                this.terminal.write(`[读取文件] 原始路径: ${filePath}\n`);
-                this.terminal.write(`[读取文件] 规范化路径: ${normalizedPath}\n`);
-                this.terminal.write(`[读取文件] 解析结果 - 目录: "${dirPath}", 文件名: "${fileName}"\n`);
+                if (!silent) {
+                    this.terminal.write(`[读取文件] 原始路径: ${filePath}\n`);
+                    this.terminal.write(`[读取文件] 规范化路径: ${normalizedPath}\n`);
+                    this.terminal.write(`[读取文件] 解析结果 - 目录: "${dirPath}", 文件名: "${fileName}"\n`);
+                }
 
                 const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
                     ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
@@ -1153,22 +1195,41 @@
                 url.searchParams.set('path', dirPath);
                 url.searchParams.set('fileName', fileName);
 
-                this.terminal.write(`[读取文件] 请求 URL: ${url.toString()}\n`);
+                if (!silent) {
+                    this.terminal.write(`[读取文件] 请求 URL: ${url.toString()}\n`);
+                }
 
                 const response = await fetch(url.toString());
-                this.terminal.write(`[读取文件] HTTP 响应状态: ${response.status} ${response.statusText}\n`);
                 
+                // 如果是 404 错误且为静默模式，直接返回 null，不输出错误
                 if (!response.ok) {
-                    const errorText = await response.text().catch(() => '无法读取错误信息');
-                    this.terminal.write(`[读取文件] HTTP 错误响应: ${errorText.substring(0, 300)}\n`);
+                    if (response.status === 404 && silent) {
+                        // 文件不存在，静默返回
+                        return null;
+                    }
+                    
+                    if (!silent) {
+                        this.terminal.write(`[读取文件] HTTP 响应状态: ${response.status} ${response.statusText}\n`);
+                        const errorText = await response.text().catch(() => '无法读取错误信息');
+                        this.terminal.write(`[读取文件] HTTP 错误响应: ${errorText.substring(0, 300)}\n`);
+                    }
                     return null;
                 }
 
+                if (!silent) {
+                    this.terminal.write(`[读取文件] HTTP 响应状态: ${response.status} ${response.statusText}\n`);
+                }
+
                 const contentType = response.headers.get('content-type');
-                this.terminal.write(`[读取文件] 响应 Content-Type: ${contentType || '未知'}\n`);
+                if (!silent) {
+                    this.terminal.write(`[读取文件] 响应 Content-Type: ${contentType || '未知'}\n`);
+                }
 
                 const result = await response.json();
-                this.terminal.write(`[读取文件] PHP 响应状态: ${result.status}, 消息: ${result.message || '无'}\n`);
+                
+                if (!silent) {
+                    this.terminal.write(`[读取文件] PHP 响应状态: ${result.status}, 消息: ${result.message || '无'}\n`);
+                }
                 
                 if (result.status === 'success' && result.data) {
                     if (result.data.content !== undefined) {
@@ -1176,38 +1237,58 @@
                         
                         // 如果是 base64 编码，需要解码
                         if (result.data.isBase64) {
-                            this.terminal.write(`[读取文件] 检测到 base64 编码，尝试解码...\n`);
+                            if (!silent) {
+                                this.terminal.write(`[读取文件] 检测到 base64 编码，尝试解码...\n`);
+                            }
                             try {
                                 content = atob(content);
-                                this.terminal.write(`[读取文件] base64 解码成功\n`);
+                                if (!silent) {
+                                    this.terminal.write(`[读取文件] base64 解码成功\n`);
+                                }
                             } catch (e) {
-                                this.terminal.write(`[读取文件] base64 解码失败: ${e.message}，使用原始内容\n`);
+                                if (!silent) {
+                                    this.terminal.write(`[读取文件] base64 解码失败: ${e.message}，使用原始内容\n`);
+                                }
                                 // 解码失败，使用原始内容（可能不是 base64）
                             }
                         }
                         
-                        const contentLength = typeof content === 'string' ? content.length : 'N/A';
-                        const contentPreview = typeof content === 'string' 
-                            ? content.substring(0, 100).replace(/\n/g, '\\n') 
-                            : 'N/A';
-                        this.terminal.write(`[读取文件] 读取成功，内容长度: ${contentLength}, 预览: ${contentPreview}...\n`);
+                        if (!silent) {
+                            const contentLength = typeof content === 'string' ? content.length : 'N/A';
+                            const contentPreview = typeof content === 'string' 
+                                ? content.substring(0, 100).replace(/\n/g, '\\n') 
+                                : 'N/A';
+                            this.terminal.write(`[读取文件] 读取成功，内容长度: ${contentLength}, 预览: ${contentPreview}...\n`);
+                        }
                         return content;
                     } else {
-                        this.terminal.write(`[读取文件] 响应数据中没有 content 字段，数据键: ${JSON.stringify(Object.keys(result.data))}\n`);
-                        this.terminal.write(`[读取文件] 完整响应数据: ${JSON.stringify(result.data).substring(0, 500)}\n`);
+                        if (!silent) {
+                            this.terminal.write(`[读取文件] 响应数据中没有 content 字段，数据键: ${JSON.stringify(Object.keys(result.data))}\n`);
+                            this.terminal.write(`[读取文件] 完整响应数据: ${JSON.stringify(result.data).substring(0, 500)}\n`);
+                        }
                     }
                 } else {
-                    this.terminal.write(`[读取文件] PHP 服务返回失败: ${result.message || '未知错误'}\n`);
-                    if (result.data) {
-                        this.terminal.write(`[读取文件] 错误数据: ${JSON.stringify(result.data).substring(0, 300)}\n`);
+                    // 如果是文件不存在且为静默模式，直接返回 null
+                    if (result.status === 'error' && result.message && result.message.includes('不存在') && silent) {
+                        return null;
+                    }
+                    
+                    if (!silent) {
+                        this.terminal.write(`[读取文件] PHP 服务返回失败: ${result.message || '未知错误'}\n`);
+                        if (result.data) {
+                            this.terminal.write(`[读取文件] 错误数据: ${JSON.stringify(result.data).substring(0, 300)}\n`);
+                        }
                     }
                 }
                 
                 return null;
             } catch (error) {
-                this.terminal.write(`[读取文件] 异常: ${error.message}\n`);
-                if (error.stack) {
-                    this.terminal.write(`[读取文件] 堆栈: ${error.stack.substring(0, 500)}\n`);
+                // 如果是静默模式，不输出错误信息
+                if (!silent) {
+                    this.terminal.write(`[读取文件] 异常: ${error.message}\n`);
+                    if (error.stack) {
+                        this.terminal.write(`[读取文件] 堆栈: ${error.stack.substring(0, 500)}\n`);
+                    }
                 }
                 return null;
             }
@@ -1219,32 +1300,22 @@
         _executeSetup: async function(tempDir) {
             const setupPath = `${tempDir}/setup.js`;
 
-            // 检查文件是否存在
+            // 检查文件是否存在（静默检查，不输出到控制台）
             try {
-                this.terminal.write(`检查 setup.js 文件: ${setupPath}\n`);
-                
                 // 等待一下，确保文件系统同步
                 await new Promise(resolve => setTimeout(resolve, 200));
                 
-                const content = await this._readFile(setupPath);
+                // 静默读取文件（不输出调试信息）
+                const content = await this._readFile(setupPath, true);  // 第二个参数表示静默模式
                 if (!content) {
-                    this.terminal.write(`警告: setup.js 文件不存在或无法读取: ${setupPath}\n`);
-                    // 尝试列出目录，看看文件是否真的存在
-                    try {
-                        const files = await this._listFiles(tempDir);
-                        const hasSetup = files.some(f => f.toLowerCase().endsWith('setup.js'));
-                        if (hasSetup) {
-                            this.terminal.write(`注意: 目录列表中包含 setup.js，但读取失败，可能是文件系统同步问题\n`);
-                        } else {
-                            this.terminal.write(`确认: 目录列表中未找到 setup.js\n`);
-                        }
-                    } catch (e) {
-                        // 忽略列表错误
-                    }
+                    // setup.js 不存在是正常情况，静默返回
                     return false;  // 文件不存在
                 }
                 
-                this.terminal.write(`setup.js 文件读取成功，内容长度: ${content.length} 字符\n`);
+                // setup.js 存在，继续执行
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.debug("ZOMInstall", `setup.js 文件读取成功，内容长度: ${content.length} 字符`);
+                }
 
                 // 尝试解析 application.json 获取程序名称
                 let programName = null;

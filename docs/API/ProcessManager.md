@@ -444,8 +444,13 @@ const allProcesses = ProcessManager.getProcessInfo();
 - `FileSystem.list` - 列出目录（需要 `KERNEL_DISK_LIST` 权限）
 - `Notification.create` - 创建通知（需要 `SYSTEM_NOTIFICATION` 权限）
 - `Notification.remove` - 移除通知（需要 `SYSTEM_NOTIFICATION` 权限）
-- `Network.request` - 网络请求（需要 `NETWORK_ACCESS` 权限）
-- `Network.fetch` - 网络获取（需要 `NETWORK_ACCESS` 权限）
+- `Network.request` - 网络请求（需要 `NETWORK_ACCESS` 权限，普通权限，自动授予）
+- `Network.fetch` - 网络获取（需要 `NETWORK_ACCESS` 权限，普通权限，自动授予）
+- `Network.Port.register` - 注册 TCP 端口监听（需要 `NETWORK_ACCESS` 权限，普通权限，自动授予）
+- `Network.Port.unregister` - 取消 TCP 端口监听（需要 `NETWORK_ACCESS` 权限，普通权限，自动授予）
+- `Network.Port.getStatus` - 获取端口状态（需要 `NETWORK_ACCESS` 权限，普通权限，自动授予）
+- `Network.Port.list` - 列出所有已注册的端口（需要 `NETWORK_ACCESS` 权限，普通权限，自动授予）
+- `Network.Port.send` - 向端口发送数据（需要 `NETWORK_ACCESS` 权限，普通权限，自动授予）
 - `GUI.createWindow` - 创建窗口（需要 `GUI_WINDOW_CREATE` 权限）
 - `GUI.manageWindow` - 管理窗口（需要 `GUI_WINDOW_MANAGE` 权限）
 - `Storage.read` - 读取系统存储（需要 `SYSTEM_STORAGE_READ` 权限）

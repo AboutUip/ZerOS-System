@@ -5,12 +5,8 @@
 (function() {
     'use strict';
     
-    // 检查 KernelLogger 是否可用
-    if (typeof KernelLogger !== 'undefined') {
-        KernelLogger.info("NetworkManager", "模块初始化");
-    } else {
-        console.log('[内核][NetworkManager] 模块初始化');
-    }
+    // 内核日志模块时刻可用，直接使用
+    KernelLogger.info("NetworkManager", "模块初始化");
     
     class NetworkManager {
         constructor() {
@@ -42,6 +38,12 @@
             this.networkEnabled = true; // 网络是否启用（默认启用）
             this.networkEnabledListeners = []; // 网络启用状态监听器列表
             
+            // TCP 端口管理
+            this.registeredPorts = new Map(); // 已注册的端口映射 port -> {pid, programName, status, ...}
+            this.portCheckIntervals = new Map(); // 端口检查定时器映射 port -> intervalId
+            this.portDataListeners = new Map(); // 端口数据监听器映射 port -> [listeners]
+            this.portConnectionListeners = new Map(); // 端口连接监听器映射 port -> [listeners]
+            
             // 初始化 Service Worker
             this._initServiceWorker();
             
@@ -63,11 +65,7 @@
             // 检查 Service Worker 支持
             if (!('serviceWorker' in navigator)) {
                 const error = 'Service Worker 不支持';
-                if (typeof KernelLogger !== 'undefined') {
-                    KernelLogger.warn("NetworkManager", error);
-                } else {
-                    console.warn(`[内核][NetworkManager] ${error}`);
-                }
+                KernelLogger.warn("NetworkManager", error);
                 return;
             }
             
@@ -75,11 +73,7 @@
             const protocol = window.location.protocol;
             if (protocol === 'file:' || protocol === 'null:' || !protocol) {
                 const error = `Service Worker 不支持当前协议: ${protocol || 'null'}，将使用降级模式`;
-                if (typeof KernelLogger !== 'undefined') {
-                    KernelLogger.warn("NetworkManager", error);
-                } else {
-                    console.warn(`[内核][NetworkManager] ${error}`);
-                }
+                KernelLogger.warn("NetworkManager", error);
                 // 降级模式：不使用 Service Worker，但提供基本功能
                 this._initFallbackMode();
                 return;
@@ -133,11 +127,7 @@
                         newWorker.addEventListener('statechange', () => {
                             if (newWorker.state === 'activated') {
                                 this.serviceWorker = newWorker;
-                                if (typeof KernelLogger !== 'undefined') {
-                                    KernelLogger.info("NetworkManager", "Service Worker 已更新");
-                                } else {
-                                    console.log('[内核][NetworkManager] Service Worker 已更新');
-                                }
+                                KernelLogger.info("NetworkManager", "Service Worker 已更新");
                             }
                         });
                     }
@@ -165,11 +155,7 @@
                 
                 this.isRegistered = true;
                 
-                if (typeof KernelLogger !== 'undefined') {
-                    KernelLogger.info("NetworkManager", "Service Worker 注册成功");
-                } else {
-                    console.log('[内核][NetworkManager] Service Worker 注册成功');
-                }
+                KernelLogger.info("NetworkManager", "Service Worker 注册成功");
                 
             } catch (error) {
                 // 详细错误处理
@@ -198,11 +184,7 @@
                 
                 const fullMessage = `Service Worker 注册失败: ${errorMessage}${suggestions.length > 0 ? '\n建议:\n' + suggestions.join('\n') : ''}，将使用降级模式`;
                 
-                if (typeof KernelLogger !== 'undefined') {
-                    KernelLogger.warn("NetworkManager", fullMessage, error);
-                } else {
-                    console.warn(`[内核][NetworkManager] ${fullMessage}`, error);
-                }
+                KernelLogger.warn("NetworkManager", fullMessage, error);
                 
                 // 降级模式：不使用 Service Worker，但提供基本功能
                 this._initFallbackMode();
@@ -221,11 +203,7 @@
             // 拦截 XMLHttpRequest
             this._interceptXMLHttpRequest();
             
-            if (typeof KernelLogger !== 'undefined') {
-                KernelLogger.info("NetworkManager", "已启用降级模式：网络请求拦截（fetch 和 XMLHttpRequest）。功能完整，无需 Service Worker。");
-            } else {
-                console.log('[内核][NetworkManager] 已启用降级模式：网络请求拦截（fetch 和 XMLHttpRequest）。功能完整，无需 Service Worker。');
-            }
+            KernelLogger.info("NetworkManager", "已启用降级模式：网络请求拦截（fetch 和 XMLHttpRequest）。功能完整，无需 Service Worker。");
         }
         
         /**
@@ -1419,6 +1397,366 @@
         }
         
         /**
+         * 注册 TCP 端口监听
+         * @param {number} port - 端口号（1-65535）
+         * @param {number} pid - 进程 ID
+         * @param {string} programName - 程序名称
+         * @param {Object} options - 选项
+         * @param {Function} onData - 数据接收回调函数
+         * @param {Function} onConnection - 新连接回调函数
+         * @returns {Promise<Object>} 注册结果
+         */
+        async registerPort(port, pid, programName, options = {}) {
+            if (!Number.isInteger(port) || port < 1 || port > 65535) {
+                throw new Error('端口号必须是 1-65535 之间的整数');
+            }
+            
+            if (this.registeredPorts.has(port)) {
+                throw new Error(`端口 ${port} 已被注册`);
+            }
+            
+            try {
+                // 调用 PHP 服务注册端口
+                const response = await fetch(`/system/service/networkDirve.php?action=register&port=${port}&pid=${pid}&programName=${encodeURIComponent(programName)}`, {
+                    method: 'GET'
+                });
+                
+                const result = await response.json();
+                
+                if (result.status === 'success') {
+                    // 保存端口信息
+                    this.registeredPorts.set(port, {
+                        port: port,
+                        pid: pid,
+                        programName: programName,
+                        status: 'listening',
+                        created: Date.now(),
+                        options: options
+                    });
+                    
+                    // 初始化监听器列表
+                    this.portDataListeners.set(port, []);
+                    this.portConnectionListeners.set(port, []);
+                    
+                    // 添加数据监听器
+                    if (options.onData && typeof options.onData === 'function') {
+                        this.addPortDataListener(port, options.onData);
+                    }
+                    
+                    // 添加连接监听器
+                    if (options.onConnection && typeof options.onConnection === 'function') {
+                        this.addPortConnectionListener(port, options.onConnection);
+                    }
+                    
+                    // 启动端口检查定时器（每 500ms 检查一次）
+                    const checkInterval = setInterval(() => {
+                        this._checkPort(port);
+                    }, 500);
+                    
+                    this.portCheckIntervals.set(port, checkInterval);
+                    
+                    KernelLogger.info("NetworkManager", `端口 ${port} 注册成功 (PID: ${pid}, 程序: ${programName})`);
+                    
+                    return {
+                        success: true,
+                        port: port,
+                        message: result.message
+                    };
+                } else {
+                    throw new Error(result.message || '端口注册失败');
+                }
+            } catch (error) {
+                KernelLogger.error("NetworkManager", `端口 ${port} 注册失败: ${error.message}`, error);
+                throw error;
+            }
+        }
+        
+        /**
+         * 取消 TCP 端口监听
+         * @param {number} port - 端口号
+         * @returns {Promise<Object>} 取消结果
+         */
+        async unregisterPort(port) {
+            if (!this.registeredPorts.has(port)) {
+                throw new Error(`端口 ${port} 未注册`);
+            }
+            
+            try {
+                // 调用 PHP 服务取消端口
+                const response = await fetch(`/system/service/networkDirve.php?action=unregister&port=${port}`, {
+                    method: 'GET'
+                });
+                
+                const result = await response.json();
+                
+                if (result.status === 'success') {
+                    // 清理定时器
+                    const intervalId = this.portCheckIntervals.get(port);
+                    if (intervalId) {
+                        clearInterval(intervalId);
+                        this.portCheckIntervals.delete(port);
+                    }
+                    
+                    // 清理监听器
+                    this.portDataListeners.delete(port);
+                    this.portConnectionListeners.delete(port);
+                    
+                    // 删除端口信息
+                    this.registeredPorts.delete(port);
+                    
+                    KernelLogger.info("NetworkManager", `端口 ${port} 已取消注册`);
+                    
+                    return {
+                        success: true,
+                        message: result.message
+                    };
+                } else {
+                    throw new Error(result.message || '端口取消注册失败');
+                }
+            } catch (error) {
+                KernelLogger.error("NetworkManager", `端口 ${port} 取消注册失败: ${error.message}`, error);
+                throw error;
+            }
+        }
+        
+        /**
+         * 检查端口（接受新连接并读取数据）
+         * @param {number} port - 端口号
+         * @returns {Promise<Object>} 检查结果
+         */
+        async _checkPort(port) {
+            if (!this.registeredPorts.has(port)) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/system/service/networkDirve.php?action=check&port=${port}`, {
+                    method: 'GET'
+                });
+                
+                const result = await response.json();
+                
+                if (result.status === 'success' && result.data) {
+                    // 处理新连接
+                    if (result.data.newConnections && result.data.newConnections.length > 0) {
+                        const listeners = this.portConnectionListeners.get(port) || [];
+                        result.data.newConnections.forEach(connection => {
+                            listeners.forEach(listener => {
+                                try {
+                                    listener(connection);
+                                } catch (error) {
+                                    KernelLogger.error("NetworkManager", `端口 ${port} 连接监听器执行失败: ${error.message}`, error);
+                                }
+                            });
+                        });
+                    }
+                    
+                    // 处理接收到的数据
+                    if (result.data.dataReceived && result.data.dataReceived.length > 0) {
+                        const listeners = this.portDataListeners.get(port) || [];
+                        result.data.dataReceived.forEach(data => {
+                            listeners.forEach(listener => {
+                                try {
+                                    listener(data);
+                                } catch (error) {
+                                    KernelLogger.error("NetworkManager", `端口 ${port} 数据监听器执行失败: ${error.message}`, error);
+                                }
+                            });
+                        });
+                    }
+                }
+            } catch (error) {
+                // 静默处理错误，避免日志过多
+                KernelLogger.debug("NetworkManager", `端口 ${port} 检查失败: ${error.message}`);
+            }
+        }
+        
+        /**
+         * 获取端口状态
+         * @param {number} port - 端口号
+         * @returns {Promise<Object>} 端口状态
+         */
+        async getPortStatus(port) {
+            try {
+                const response = await fetch(`/system/service/networkDirve.php?action=status&port=${port}`, {
+                    method: 'GET'
+                });
+                
+                const result = await response.json();
+                
+                if (result.status === 'success') {
+                    return result.data;
+                } else {
+                    // 端口未注册是正常情况，不应该记录为错误
+                    const errorMessage = result.message || '获取端口状态失败';
+                    if (errorMessage.includes('未注册')) {
+                        // 端口未注册是正常的业务逻辑，使用调试日志
+                        KernelLogger.debug("NetworkManager", `端口 ${port} 未注册（正常情况）`);
+                    } else {
+                        // 其他错误（如配置文件损坏）才记录为错误
+                        KernelLogger.error("NetworkManager", `获取端口 ${port} 状态失败: ${errorMessage}`);
+                    }
+                    throw new Error(errorMessage);
+                }
+            } catch (error) {
+                // 只有在不是"未注册"错误时才记录为错误
+                if (!error.message || !error.message.includes('未注册')) {
+                    KernelLogger.error("NetworkManager", `获取端口 ${port} 状态失败: ${error.message}`, error);
+                }
+                throw error;
+            }
+        }
+        
+        /**
+         * 列出所有已注册的端口
+         * @returns {Promise<Array>} 端口列表
+         */
+        async listPorts() {
+            try {
+                const response = await fetch(`/system/service/networkDirve.php?action=list`, {
+                    method: 'GET'
+                });
+                
+                const result = await response.json();
+                
+                if (result.status === 'success') {
+                    return result.data || [];
+                } else {
+                    throw new Error(result.message || '获取端口列表失败');
+                }
+            } catch (error) {
+                KernelLogger.error("NetworkManager", `获取端口列表失败: ${error.message}`, error);
+                throw error;
+            }
+        }
+        
+        /**
+         * 向端口发送数据（作为客户端）
+         * @param {string} host - 主机地址
+         * @param {number} port - 端口号
+         * @param {string|ArrayBuffer|Blob} data - 要发送的数据
+         * @returns {Promise<Object>} 发送结果
+         */
+        async sendDataToPort(host, port, data) {
+            if (!Number.isInteger(port) || port < 1 || port > 65535) {
+                throw new Error('端口号必须是 1-65535 之间的整数');
+            }
+            
+            // 将数据转换为字符串
+            let dataString;
+            if (typeof data === 'string') {
+                dataString = data;
+            } else if (data instanceof ArrayBuffer) {
+                dataString = String.fromCharCode.apply(null, new Uint8Array(data));
+            } else if (data instanceof Blob) {
+                dataString = await data.text();
+            } else {
+                dataString = String(data);
+            }
+            
+            try {
+                const response = await fetch(`/system/service/networkDirve.php?action=send&host=${encodeURIComponent(host || '127.0.0.1')}&port=${port}&data=${encodeURIComponent(dataString)}`, {
+                    method: 'GET'
+                });
+                
+                const result = await response.json();
+                
+                if (result.status === 'success') {
+                    return result.data || {};
+                } else {
+                    throw new Error(result.message || '发送数据失败');
+                }
+            } catch (error) {
+                KernelLogger.error("NetworkManager", `向 ${host}:${port} 发送数据失败: ${error.message}`, error);
+                throw error;
+            }
+        }
+        
+        /**
+         * 添加端口数据监听器
+         * @param {number} port - 端口号
+         * @param {Function} listener - 监听器函数
+         * @returns {Function} 取消监听的函数
+         */
+        addPortDataListener(port, listener) {
+            if (typeof listener !== 'function') {
+                throw new Error('监听器必须是函数');
+            }
+            
+            if (!this.portDataListeners.has(port)) {
+                this.portDataListeners.set(port, []);
+            }
+            
+            const listeners = this.portDataListeners.get(port);
+            listeners.push(listener);
+            
+            // 返回取消监听的函数
+            return () => {
+                const index = listeners.indexOf(listener);
+                if (index > -1) {
+                    listeners.splice(index, 1);
+                }
+            };
+        }
+        
+        /**
+         * 移除端口数据监听器
+         * @param {number} port - 端口号
+         * @param {Function} listener - 要移除的监听器函数
+         */
+        removePortDataListener(port, listener) {
+            const listeners = this.portDataListeners.get(port);
+            if (listeners) {
+                const index = listeners.indexOf(listener);
+                if (index > -1) {
+                    listeners.splice(index, 1);
+                }
+            }
+        }
+        
+        /**
+         * 添加端口连接监听器
+         * @param {number} port - 端口号
+         * @param {Function} listener - 监听器函数
+         * @returns {Function} 取消监听的函数
+         */
+        addPortConnectionListener(port, listener) {
+            if (typeof listener !== 'function') {
+                throw new Error('监听器必须是函数');
+            }
+            
+            if (!this.portConnectionListeners.has(port)) {
+                this.portConnectionListeners.set(port, []);
+            }
+            
+            const listeners = this.portConnectionListeners.get(port);
+            listeners.push(listener);
+            
+            // 返回取消监听的函数
+            return () => {
+                const index = listeners.indexOf(listener);
+                if (index > -1) {
+                    listeners.splice(index, 1);
+                }
+            };
+        }
+        
+        /**
+         * 移除端口连接监听器
+         * @param {number} port - 端口号
+         * @param {Function} listener - 要移除的监听器函数
+         */
+        removePortConnectionListener(port, listener) {
+            const listeners = this.portConnectionListeners.get(port);
+            if (listeners) {
+                const index = listeners.indexOf(listener);
+                if (index > -1) {
+                    listeners.splice(index, 1);
+                }
+            }
+        }
+        
+        /**
          * 清理资源
          */
         destroy() {
@@ -1428,9 +1766,20 @@
                 this.networkStateUpdateInterval = null;
             }
             
+            // 清理所有端口检查定时器
+            this.portCheckIntervals.forEach((intervalId, port) => {
+                clearInterval(intervalId);
+            });
+            this.portCheckIntervals.clear();
+            
             // 清理监听器
             this.networkStateListeners = [];
             this.connectionStateListeners = [];
+            this.portDataListeners.clear();
+            this.portConnectionListeners.clear();
+            
+            // 清理已注册的端口
+            this.registeredPorts.clear();
         }
     }
     
@@ -1479,11 +1828,7 @@
         }
     }
     
-    if (typeof KernelLogger !== 'undefined') {
-        KernelLogger.info("NetworkManager", "模块加载完成");
-    } else {
-        console.log('[内核][NetworkManager] 模块加载完成');
-    }
+    KernelLogger.info("NetworkManager", "模块加载完成");
     
 })(typeof window !== 'undefined' ? window : globalThis);
 

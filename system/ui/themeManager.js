@@ -3297,11 +3297,8 @@ if (typeof POOL !== 'undefined' && typeof POOL.__ADD__ === 'function') {
     try {
         await ThemeManager.init();
     } catch (e) {
-        if (typeof KernelLogger !== 'undefined') {
-            KernelLogger.error("ThemeManager", `自动初始化失败: ${e.message}`);
-        } else {
-            console.error("[ThemeManager] 自动初始化失败:", e);
-        }
+        // 内核日志模块时刻可用，直接使用
+        KernelLogger.error("ThemeManager", `自动初始化失败: ${e.message}`, e);
     }
 })();
 

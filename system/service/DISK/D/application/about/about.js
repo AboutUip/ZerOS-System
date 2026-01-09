@@ -90,7 +90,9 @@
                         }
                     }
                 } catch (e) {
-                    console.warn('[About] 内存初始化失败:', e);
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.warn('About', '内存初始化失败', e);
+                    }
                 }
             }
         },
@@ -511,7 +513,9 @@
                 try {
                     this._heap.clear();
                 } catch (e) {
-                    console.warn('[About] 清理堆内存失败:', e);
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.warn('About', '清理堆内存失败', e);
+                    }
                 }
             }
             
@@ -519,7 +523,9 @@
                 try {
                     this._shed.clear();
                 } catch (e) {
-                    console.warn('[About] 清理栈内存失败:', e);
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.warn('About', '清理栈内存失败', e);
+                    }
                 }
             }
         }

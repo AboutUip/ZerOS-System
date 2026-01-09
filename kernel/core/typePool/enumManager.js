@@ -20,11 +20,7 @@ const EnumManager = (() => {
      */
     const createEnum = (enumName, enumDefinition) => {
         if (enumRegistry.has(enumName)) {
-            if (typeof KernelLogger !== 'undefined') {
-                KernelLogger.warn("EnumManager", `枚举 ${enumName} 已存在，将覆盖`);
-            } else {
-                console.warn(`[内核][EnumManager] 枚举 ${enumName} 已存在，将覆盖`);
-            }
+            KernelLogger.warn("EnumManager", `枚举 ${enumName} 已存在，将覆盖`);
         }
         
         const enumObj = {};

@@ -111,7 +111,9 @@
                 if (typeof KernelLogger !== 'undefined') {
                     KernelLogger.error('SparkAI', `初始化失败: ${error.message}`, error);
                 } else {
-                    console.error('[SparkAI] 初始化失败:', error);
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.error('SparkAI', '初始化失败', error);
+                    }
                 }
                 if (this.window && this.window.parentElement) {
                     this.window.parentElement.removeChild(this.window);
@@ -1120,7 +1122,9 @@
                 if (typeof KernelLogger !== 'undefined') {
                     KernelLogger.error('SparkAI', `清理资源失败: ${error.message}`, error);
                 } else {
-                    console.error('[SparkAI] 清理资源失败:', error);
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.error('SparkAI', '清理资源失败', error);
+                    }
                 }
             }
         }

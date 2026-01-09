@@ -1,12 +1,33 @@
 {
   "system": {
     "permissionManager.permissions": {
+      "uninstall": [
+        "SYSTEM_STORAGE_WRITE"
+      ],
       "zominstall": [
         "KERNEL_DISK_READ",
         "APPLICATION_INSTALL"
       ],
+      "setup": [
+        "GUI_WINDOW_CREATE"
+      ],
       "settings": [
         "SYSTEM_STORAGE_READ"
+      ],
+      "vim": [
+        "KERNEL_DISK_READ",
+        "KERNEL_DISK_LIST",
+        "EVENT_LISTENER"
+      ],
+      "permissioncontrol": [
+        "GUI_WINDOW_CREATE",
+        "EVENT_LISTENER",
+        "SYSTEM_STORAGE_READ",
+        "SYSTEM_STORAGE_READ_PERMISSION_CONTROL",
+        "SYSTEM_STORAGE_WRITE",
+        "SYSTEM_STORAGE_WRITE_PERMISSION_CONTROL",
+        "PROCESS_MANAGE",
+        "SYSTEM_LOG_READ"
       ]
     },
     "system.style": "macos",
@@ -485,6 +506,12 @@
         "name": "wallpaper_community_409819.mp4",
         "description": "本地视频: D:/cache/wallpaper_community_409819.mp4（静音循环播放）",
         "path": "D:/cache/wallpaper_community_409819.mp4"
+      },
+      {
+        "id": "local_D__cache_random_anime_bg_1767900096653_jpg",
+        "name": "random_anime_bg_1767900096653.jpg",
+        "description": "本地图片: D:/cache/random_anime_bg_1767900096653.jpg",
+        "path": "D:/cache/random_anime_bg_1767900096653.jpg"
       }
     ],
     "taskbarPosition": "bottom",
@@ -517,14 +544,14 @@
         "password": "61b249bf6d604d14120821f43625e84e",
         "avatar": "avatar_root_1766272534753.jpg",
         "createdAt": 1766271155991,
-        "lastLogin": 1767899353564
+        "lastLogin": 1767965376712
       },
       "TestUser": {
         "level": "USER",
         "password": null,
         "avatar": null,
         "createdAt": 1766271155991,
-        "lastLogin": 1767723187058
+        "lastLogin": 1767959091734
       },
       "yan": {
         "level": "ADMIN",

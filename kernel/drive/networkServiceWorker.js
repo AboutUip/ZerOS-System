@@ -5,6 +5,8 @@ const CACHE_NAME = 'zeros-network-cache-v1';
 const requestHandlers = new Map();
 
 // Service Worker 安装事件
+// 注意：Service Worker 运行在独立上下文中，无法直接访问 KernelLogger
+// 这些 console 调用会在主线程的控制台中显示，会绕过日志级别设置
 self.addEventListener('install', (event) => {
     console.log('[NetworkServiceWorker] Service Worker 安装中...');
     self.skipWaiting(); // 立即激活
@@ -173,24 +175,30 @@ self.addEventListener('message', (event) => {
         case 'REGISTER_HANDLER':
             // 注意：Service Worker 中不能直接存储函数
             // 这里只存储模式，实际处理逻辑需要在主线程中实现
+            // 注意：Service Worker 运行在独立上下文中，无法直接访问 KernelLogger
             console.log(`[NetworkServiceWorker] 注册处理器: ${data.pattern}`);
             break;
             
         case 'UNREGISTER_HANDLER':
             requestHandlers.delete(data.pattern);
+            // 注意：Service Worker 运行在独立上下文中，无法直接访问 KernelLogger
             console.log(`[NetworkServiceWorker] 注销处理器: ${data.pattern}`);
             break;
             
         case 'NETWORK_ENABLED':
             // 更新网络启用状态
             networkEnabled = data.enabled !== false;
+            // 注意：Service Worker 运行在独立上下文中，无法直接访问 KernelLogger
             console.log(`[NetworkServiceWorker] 网络状态已更新: ${networkEnabled ? '启用' : '禁用'}`);
             break;
             
         default:
+            // 注意：Service Worker 运行在独立上下文中，无法直接访问 KernelLogger
             console.warn(`[NetworkServiceWorker] 未知消息类型: ${type}`);
     }
 });
 
+// 注意：Service Worker 运行在独立上下文中，无法直接访问 KernelLogger
+// 这些 console 调用会在主线程的控制台中显示，会绕过日志级别设置
 console.log('[NetworkServiceWorker] Service Worker 已加载');
 

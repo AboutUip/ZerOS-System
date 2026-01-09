@@ -143,7 +143,9 @@
                 }
                 
             } catch (error) {
-                console.error('[ZeroIDE] 初始化失败:', error);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('ZeroIDE', '初始化失败', error);
+                }
                 this._showError('初始化失败: ' + error.message);
             }
         },
@@ -686,7 +688,9 @@
                 try {
                     this.hljs = await DynamicManager.loadModule('highlight');
                 } catch (e) {
-                    console.warn('[ZeroIDE] 无法加载 Highlight.js，将仅使用 Ace Editor 的高亮:', e);
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.warn('ZeroIDE', '无法加载 Highlight.js，将仅使用 Ace Editor 的高亮', e);
+                    }
                     this.hljs = null;
                 }
             } else {
@@ -752,10 +756,14 @@
                 if (langTools) {
                     this._applyCompleters(langTools);
                 } else {
-                    console.warn('[ZeroIDE] 无法加载 language_tools 扩展，代码补全可能不可用');
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.warn('ZeroIDE', '无法加载 language_tools 扩展，代码补全可能不可用');
+                    }
                 }
             } catch (e) {
-                console.warn('[ZeroIDE] 代码补全设置失败:', e);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.warn('ZeroIDE', '代码补全设置失败', e);
+                }
             }
         },
         
@@ -797,7 +805,9 @@
                                         return;
                                     }
                                 } catch (e) {
-                                    console.warn('[ZeroIDE] language_tools 加载后无法通过 require 获取:', e);
+                                    if (typeof KernelLogger !== 'undefined') {
+                                        KernelLogger.warn('ZeroIDE', 'language_tools 加载后无法通过 require 获取', e);
+                                    }
                                 }
                             }
                             
@@ -820,13 +830,17 @@
                     };
                     
                     script.onerror = () => {
-                        console.warn('[ZeroIDE] 加载 ext-language_tools.js 失败');
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('ZeroIDE', '加载 ext-language_tools.js 失败');
+                        }
                         resolve(null);
                     };
                     
                     document.head.appendChild(script);
                 } catch (e) {
-                    console.warn('[ZeroIDE] 加载 language_tools 时出错:', e);
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.warn('ZeroIDE', '加载 language_tools 时出错', e);
+                    }
                     resolve(null);
                 }
             });
@@ -859,12 +873,18 @@
                     });
                 } catch (e) {
                     // 如果设置选项失败，记录警告但不影响其他功能
-                    console.warn('[ZeroIDE] 设置自动补全选项时出现警告:', e);
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.warn('ZeroIDE', '设置自动补全选项时出现警告', e);
+                    }
                 }
                 
-                console.log('[ZeroIDE] 代码补全已启用');
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.info('ZeroIDE', '代码补全已启用');
+                }
             } catch (e) {
-                console.warn('[ZeroIDE] 应用补全器失败:', e);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.warn('ZeroIDE', '应用补全器失败', e);
+                }
             }
         },
         
@@ -1033,7 +1053,9 @@
                 }
             } catch (e) {
                 // 如果 language_tools 未加载，忽略错误
-                console.warn('[ZeroIDE] 无法设置代码补全选项:', e);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.warn('ZeroIDE', '无法设置代码补全选项', e);
+                }
             }
             
             // 设置语言模式（根据文件扩展名）
@@ -1115,7 +1137,9 @@
                                     completers.push(jsCompleter);
                                 }
                             } catch (e) {
-                                console.warn('[ZeroIDE] 无法创建 JavaScript 补全器:', e);
+                                if (typeof KernelLogger !== 'undefined') {
+                                    KernelLogger.warn('ZeroIDE', '无法创建 JavaScript 补全器', e);
+                                }
                             }
                         } else if (mode === 'css') {
                             // CSS 模式：使用 CSS 补全器
@@ -1125,7 +1149,9 @@
                                     completers.push(cssCompleter);
                                 }
                             } catch (e) {
-                                console.warn('[ZeroIDE] 无法创建 CSS 补全器:', e);
+                                if (typeof KernelLogger !== 'undefined') {
+                                    KernelLogger.warn('ZeroIDE', '无法创建 CSS 补全器', e);
+                                }
                             }
                         }
                         
@@ -1133,7 +1159,9 @@
                     }
                 }
             } catch (e) {
-                console.warn('[ZeroIDE] 更新补全器失败:', e);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.warn('ZeroIDE', '更新补全器失败', e);
+                }
             }
         },
         
@@ -2135,7 +2163,9 @@
             
             // 验证保存成功
             if (result.data && result.data.path) {
-                console.log(`[ZeroIDE] 文件保存成功: ${result.data.path}`);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.info('ZeroIDE', `文件保存成功: ${result.data.path}`);
+                }
             }
         },
         
@@ -2798,7 +2828,9 @@
             try {
                 localStorage.setItem('zeroide_settings', JSON.stringify(this.settings));
             } catch (e) {
-                console.error('保存设置失败:', e);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('ZeroIDE', '保存设置失败', e);
+                }
             }
             
             // 应用设置
@@ -2815,7 +2847,9 @@
                     this.settings = { ...this.settings, ...JSON.parse(saved) };
                 }
             } catch (e) {
-                console.error('加载设置失败:', e);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('ZeroIDE', '加载设置失败', e);
+                }
             }
         },
         

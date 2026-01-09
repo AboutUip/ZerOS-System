@@ -1178,7 +1178,9 @@
                         }
                     }
                 }
-                console.error('终止进程失败:', e);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('TaskManager', '终止进程失败', e);
+                }
             }
         },
         
@@ -4307,7 +4309,9 @@
                     this._heap = result.heap;
                     this._shed = result.shed;
                 } catch (e) {
-                    console.error('TaskManager: Error allocating memory', e);
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.error('TaskManager', 'Error allocating memory', e);
+                    }
                 }
             }
         },

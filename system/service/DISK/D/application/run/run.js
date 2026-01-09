@@ -102,7 +102,9 @@
                         }
                     }
                 } catch (e) {
-                    console.warn('[Run] 内存初始化失败:', e);
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.warn('Run', '内存初始化失败', e);
+                    }
                 }
             }
         },
@@ -481,7 +483,9 @@
                     // 按字母顺序排序
                     this.allPrograms.sort();
                 } catch (e) {
-                    console.warn('[Run] 获取程序列表失败:', e);
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.warn('Run', '获取程序列表失败', e);
+                    }
                     this.allPrograms = [];
                 }
             } else {
@@ -724,7 +728,9 @@
             }
             POOL.__ADD__("APPLICATION_SOP", "RUN", RUN);
         } catch (e) {
-            console.warn('[Run] 注册到 POOL 失败:', e);
+            if (typeof KernelLogger !== 'undefined') {
+                KernelLogger.warn('Run', '注册到 POOL 失败', e);
+            }
         }
     }
     

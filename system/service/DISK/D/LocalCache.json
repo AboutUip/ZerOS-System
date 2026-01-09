@@ -1,11 +1,11 @@
 {
   "system": {
     "system.dailyQuote": {
-      "value": "我虽然讨厌被嘲笑，但是不会停止说这件事。因为比起被嘲笑，我更讨厌说不出口。",
+      "value": "不管发生什么绝对不要碰我哦，说好了哦。",
       "expiresAt": 0,
-      "createdAt": 1767899549795,
-      "updatedAt": 1767899549795,
-      "size": 113
+      "createdAt": 1767965373971,
+      "updatedAt": 1767965373971,
+      "size": 59
     }
   },
   "programs": {
@@ -45,6 +45,18 @@
         "createdAt": 1766148289293,
         "updatedAt": 1766148289293,
         "size": 161
+      },
+      "random_anime_bg:random_anime_bg_1767900096653.jpg": {
+        "value": {
+          "filePath": "D:/cache/random_anime_bg_1767900096653.jpg",
+          "fileName": "random_anime_bg_1767900096653.jpg",
+          "timestamp": 1767900096653,
+          "source": "uapis.cn"
+        },
+        "expiresAt": 0,
+        "createdAt": 1767900096728,
+        "updatedAt": 1767900096728,
+        "size": 150
       }
     }
   }

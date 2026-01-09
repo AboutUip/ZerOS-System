@@ -46,11 +46,7 @@ async function init() {
                 
                 const retryInit = () => {
                     if (retryCount >= maxRetries) {
-                        if (typeof KernelLogger !== 'undefined') {
-                            KernelLogger.error("FSInit", "磁盘初始化重试次数超限，停止重试");
-                        } else {
-                            console.error("[内核][FSInit] 磁盘初始化重试次数超限");
-                        }
+                        KernelLogger.error("FSInit", "磁盘初始化重试次数超限，停止重试");
                         return;
                     }
                     
@@ -201,10 +197,6 @@ if (typeof document !== 'undefined') {
 } else {
     // 非浏览器环境，直接初始化
     init().catch(e => {
-        if (typeof KernelLogger !== 'undefined') {
-            KernelLogger.error("FSInit", `初始化失败: ${e.message}`, e);
-        } else {
-            console.error("[内核][FSInit] 初始化失败", e);
-        }
+        KernelLogger.error("FSInit", `初始化失败: ${e.message}`, e);
     });
 }

@@ -19,7 +19,7 @@
     
     class KernelLogger {
         // 日志级别（默认 DEBUG，显示所有日志）
-        static level = LOG_LEVEL.DEBUG;
+        static level = LOG_LEVEL.ERROR;
         // locale, e.g. 'en' or 'zh-CN'
         static locale = 'zh-CN';
         // whether to include call stack in debug logs
@@ -35,6 +35,31 @@
         static _maxErrors = 50;  // 最多显示50个错误，之后抑制
         static _errorResetTime = 0;
         static _errorResetInterval = 10000;  // 10秒后重置错误计数
+        
+        // ==================== 日志收集和分类功能 ====================
+        
+        // 日志存储（内存中，不进行文件备份和永久存储）
+        static _logBuffer = [];
+        static _maxBufferSize = 10000;  // 最多存储10000条日志
+        static _enableCollection = true;  // 是否启用日志收集
+        
+        // 日志分类索引（内存中）
+        static _logIndex = {
+            byLevel: { DEBUG: [], INFO: [], WARN: [], ERROR: [] },
+            bySubsystem: {},  // { subsystem: [logEntry, ...] }
+            byTime: [],  // 按时间排序的日志
+            byDate: {},  // { 'YYYY-MM-DD': [logEntry, ...] }
+            bySourceFile: {}  // { 'filename.js': [logEntry, ...] }
+        };
+        
+        // 统计信息
+        static _statistics = {
+            total: 0,
+            byLevel: { DEBUG: 0, INFO: 0, WARN: 0, ERROR: 0 },
+            bySubsystem: {},
+            oldestTimestamp: null,
+            newestTimestamp: null
+        };
 
         static setLevel(lvl) {
             KernelLogger.level = lvl;
@@ -50,19 +75,6 @@
         }
         static setMaxMetaLength(n) {
             KernelLogger.maxMetaLength = Number(n) || KernelLogger.maxMetaLength;
-        }
-
-        static _ts() {
-            const now = new Date();
-            // 统一使用本地时间格式：YYYY-MM-DD HH:mm:ss.SSS
-            const year = now.getFullYear();
-            const month = String(now.getMonth() + 1).padStart(2, '0');
-            const day = String(now.getDate()).padStart(2, '0');
-            const hours = String(now.getHours()).padStart(2, '0');
-            const minutes = String(now.getMinutes()).padStart(2, '0');
-            const seconds = String(now.getSeconds()).padStart(2, '0');
-            const milliseconds = String(now.getMilliseconds()).padStart(3, '0');
-            return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}.${milliseconds}`;
         }
 
         static _labels() {
@@ -92,6 +104,22 @@
             if (!str) return '';
             if (str.length <= KernelLogger.maxMetaLength) return str;
             return str.slice(0, KernelLogger.maxMetaLength) + '... <truncated>';
+        }
+
+        /**
+         * 生成时间戳字符串（本地时间格式：YYYY-MM-DD HH:mm:ss.SSS）
+         * @returns {string} 格式化的时间戳
+         */
+        static _ts() {
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const seconds = String(now.getSeconds()).padStart(2, '0');
+            const milliseconds = String(now.getMilliseconds()).padStart(3, '0');
+            return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}.${milliseconds}`;
         }
 
         /**
@@ -179,22 +207,16 @@
         }
 
         static debug(subsystem, message, meta) {
-            if (KernelLogger.level >= LOG_LEVEL.DEBUG) {
-                const out = KernelLogger._format(LOG_LEVEL_NAME.DEBUG, subsystem, message, meta);
-                console.log(out);
-            }
+            // 总是收集日志，但只在级别足够时才输出到控制台
+            KernelLogger.log(LOG_LEVEL_NAME.DEBUG, subsystem, message, meta);
         }
         static info(subsystem, message, meta) {
-            if (KernelLogger.level >= LOG_LEVEL.INFO) {
-                const out = KernelLogger._format(LOG_LEVEL_NAME.INFO, subsystem, message, meta);
-                console.log(out);
-            }
+            // 总是收集日志，但只在级别足够时才输出到控制台
+            KernelLogger.log(LOG_LEVEL_NAME.INFO, subsystem, message, meta);
         }
         static warn(subsystem, message, meta) {
-            if (KernelLogger.level >= LOG_LEVEL.INFO) {
-                const out = KernelLogger._format(LOG_LEVEL_NAME.WARN, subsystem, message, meta);
-                console.warn(out);
-            }
+            // 总是收集日志，但只在级别足够时才输出到控制台
+            KernelLogger.log(LOG_LEVEL_NAME.WARN, subsystem, message, meta);
         }
         static error(subsystem, message, meta) {
             // 使用log方法，以便应用错误抑制机制
@@ -219,12 +241,147 @@
             }
         }
 
+        /**
+         * 解析日志格式，提取结构化信息
+         * @param {string} levelName 日志级别
+         * @param {string} subsystem 子系统名称
+         * @param {string} message 日志消息
+         * @param {any} meta 元数据
+         * @returns {Object} 解析后的日志条目
+         */
+        static _parseLogEntry(levelName, subsystem, message, meta) {
+            const timestamp = KernelLogger._ts();
+            const timestampMs = Date.now();
+            const sourceFile = KernelLogger._getSourceFile();
+            const date = timestamp.split(' ')[0];  // 提取日期部分
+            
+            return {
+                id: `log_${timestampMs}_${Math.random().toString(36).substr(2, 9)}`,  // 唯一ID
+                level: levelName,
+                subsystem: subsystem || 'Unknown',
+                message: typeof message === 'string' ? message : KernelLogger._safeStringify(message),
+                meta: meta,
+                timestamp: timestamp,
+                timestampMs: timestampMs,
+                date: date,
+                sourceFile: sourceFile,
+                formatted: null  // 将在 _format 中填充
+            };
+        }
+        
+        /**
+         * 将日志条目添加到索引
+         * @param {Object} entry 日志条目
+         */
+        static _addToIndex(entry) {
+            if (!entry || !entry.id) return;
+            
+            // 按级别索引
+            if (KernelLogger._logIndex.byLevel[entry.level]) {
+                KernelLogger._logIndex.byLevel[entry.level].push(entry);
+            }
+            
+            // 按子系统索引
+            if (!KernelLogger._logIndex.bySubsystem[entry.subsystem]) {
+                KernelLogger._logIndex.bySubsystem[entry.subsystem] = [];
+            }
+            KernelLogger._logIndex.bySubsystem[entry.subsystem].push(entry);
+            
+            // 按时间索引（已排序）
+            const timeIndex = KernelLogger._logIndex.byTime;
+            // 使用二分查找插入位置，保持时间顺序
+            let insertIndex = timeIndex.length;
+            for (let i = timeIndex.length - 1; i >= 0; i--) {
+                if (timeIndex[i].timestampMs <= entry.timestampMs) {
+                    insertIndex = i + 1;
+                    break;
+                }
+            }
+            timeIndex.splice(insertIndex, 0, entry);
+            
+            // 按日期索引
+            if (!KernelLogger._logIndex.byDate[entry.date]) {
+                KernelLogger._logIndex.byDate[entry.date] = [];
+            }
+            KernelLogger._logIndex.byDate[entry.date].push(entry);
+            
+            // 按源文件索引
+            if (entry.sourceFile) {
+                if (!KernelLogger._logIndex.bySourceFile[entry.sourceFile]) {
+                    KernelLogger._logIndex.bySourceFile[entry.sourceFile] = [];
+                }
+                KernelLogger._logIndex.bySourceFile[entry.sourceFile].push(entry);
+            }
+            
+            // 更新统计信息
+            KernelLogger._statistics.total++;
+            KernelLogger._statistics.byLevel[entry.level] = (KernelLogger._statistics.byLevel[entry.level] || 0) + 1;
+            KernelLogger._statistics.bySubsystem[entry.subsystem] = (KernelLogger._statistics.bySubsystem[entry.subsystem] || 0) + 1;
+            
+            if (!KernelLogger._statistics.oldestTimestamp || entry.timestampMs < KernelLogger._statistics.oldestTimestamp) {
+                KernelLogger._statistics.oldestTimestamp = entry.timestampMs;
+            }
+            if (!KernelLogger._statistics.newestTimestamp || entry.timestampMs > KernelLogger._statistics.newestTimestamp) {
+                KernelLogger._statistics.newestTimestamp = entry.timestampMs;
+            }
+        }
+        
+        /**
+         * 清理旧日志（当缓冲区满时）
+         */
+        static _cleanupOldLogs() {
+            if (KernelLogger._logBuffer.length <= KernelLogger._maxBufferSize) {
+                return;
+            }
+            
+            // 删除最旧的 10% 的日志
+            const removeCount = Math.floor(KernelLogger._maxBufferSize * 0.1);
+            const removedEntries = KernelLogger._logBuffer.splice(0, removeCount);
+            
+            // 从索引中移除
+            for (const entry of removedEntries) {
+                // 从级别索引中移除
+                const levelIndex = KernelLogger._logIndex.byLevel[entry.level];
+                if (levelIndex) {
+                    const idx = levelIndex.findIndex(e => e.id === entry.id);
+                    if (idx >= 0) levelIndex.splice(idx, 1);
+                }
+                
+                // 从子系统索引中移除
+                const subsystemIndex = KernelLogger._logIndex.bySubsystem[entry.subsystem];
+                if (subsystemIndex) {
+                    const idx = subsystemIndex.findIndex(e => e.id === entry.id);
+                    if (idx >= 0) subsystemIndex.splice(idx, 1);
+                }
+                
+                // 从时间索引中移除
+                const timeIdx = KernelLogger._logIndex.byTime.findIndex(e => e.id === entry.id);
+                if (timeIdx >= 0) KernelLogger._logIndex.byTime.splice(timeIdx, 1);
+                
+                // 从日期索引中移除
+                const dateIndex = KernelLogger._logIndex.byDate[entry.date];
+                if (dateIndex) {
+                    const idx = dateIndex.findIndex(e => e.id === entry.id);
+                    if (idx >= 0) dateIndex.splice(idx, 1);
+                }
+                
+                // 从源文件索引中移除
+                if (entry.sourceFile) {
+                    const fileIndex = KernelLogger._logIndex.bySourceFile[entry.sourceFile];
+                    if (fileIndex) {
+                        const idx = fileIndex.findIndex(e => e.id === entry.id);
+                        if (idx >= 0) fileIndex.splice(idx, 1);
+                    }
+                }
+            }
+        }
+
         static log(levelName, subsystem, message, meta) {
             // 直接调用内部格式化方法，避免递归调用
             const level = LOG_LEVEL[levelName] || LOG_LEVEL.INFO;
-            if (level > KernelLogger.level) return;
-
-            // 错误抑制检查
+            
+            // 错误抑制检查（仅针对 ERROR 级别）
+            let shouldOutput = true;  // 是否应该输出到控制台
             if (levelName === LOG_LEVEL_NAME.ERROR) {
                 const now = Date.now();
                 
@@ -241,7 +398,7 @@
                         KernelLogger._errorSuppressed = true;
                         console.error(`[内核][KernelLogger] [错误] 错误过多，已抑制错误输出（已记录 ${KernelLogger._errorCount} 个错误）`);
                     }
-                    return;  // 不输出错误
+                    shouldOutput = false;  // 不输出错误，但仍收集
                 }
                 
                 KernelLogger._errorCount++;
@@ -250,13 +407,37 @@
             try {
                 const formatted = KernelLogger._format(levelName, subsystem, message, meta);
                 
-                // 根据级别选择输出方式
-                if (levelName === LOG_LEVEL_NAME.ERROR) {
-                    console.error(formatted);
-                } else if (levelName === LOG_LEVEL_NAME.WARN) {
-                    console.warn(formatted);
-                } else {
-                    console.log(formatted);
+                // 收集日志（如果启用）- 总是收集，不受级别限制
+                if (KernelLogger._enableCollection) {
+                    try {
+                        const entry = KernelLogger._parseLogEntry(levelName, subsystem, message, meta);
+                        entry.formatted = formatted;
+                        
+                        // 添加到缓冲区
+                        KernelLogger._logBuffer.push(entry);
+                        
+                        // 添加到索引
+                        KernelLogger._addToIndex(entry);
+                        
+                        // 清理旧日志
+                        KernelLogger._cleanupOldLogs();
+                    } catch (e) {
+                        // 日志收集失败不应该影响正常日志输出
+                        // 静默失败，避免循环依赖
+                    }
+                }
+                
+                // 输出到控制台（受级别限制和错误抑制影响）
+                // 检查级别：只有级别足够时才输出
+                if (shouldOutput && level <= KernelLogger.level) {
+                    // 根据级别选择输出方式
+                    if (levelName === LOG_LEVEL_NAME.ERROR) {
+                        console.error(formatted);
+                    } else if (levelName === LOG_LEVEL_NAME.WARN) {
+                        console.warn(formatted);
+                    } else {
+                        console.log(formatted);
+                    }
                 }
             } catch (e) {
                 // 如果格式化失败，使用最简单的输出方式
@@ -286,6 +467,240 @@
                 WARN: LOG_LEVEL_NAME.WARN,
                 ERROR: LOG_LEVEL_NAME.ERROR,
             };
+        }
+        
+        // ==================== 日志查询API ====================
+        
+        /**
+         * 获取日志统计信息
+         * @returns {Object} 统计信息
+         */
+        static getStatistics() {
+            return {
+                total: KernelLogger._statistics.total,
+                byLevel: { ...KernelLogger._statistics.byLevel },
+                bySubsystem: { ...KernelLogger._statistics.bySubsystem },
+                oldestTimestamp: KernelLogger._statistics.oldestTimestamp,
+                newestTimestamp: KernelLogger._statistics.newestTimestamp,
+                bufferSize: KernelLogger._logBuffer.length,
+                maxBufferSize: KernelLogger._maxBufferSize
+            };
+        }
+        
+        /**
+         * 查询日志（支持多种过滤条件）
+         * @param {Object} options 查询选项
+         * @param {string|Array<string>} options.level 日志级别（可选：'DEBUG', 'INFO', 'WARN', 'ERROR'）
+         * @param {string|Array<string>} options.subsystem 子系统名称（可选）
+         * @param {string} options.sourceFile 源文件名（可选）
+         * @param {number} options.startTime 开始时间戳（毫秒，可选）
+         * @param {number} options.endTime 结束时间戳（毫秒，可选）
+         * @param {string} options.date 日期（格式：'YYYY-MM-DD'，可选）
+         * @param {string} options.keyword 关键词搜索（在消息中搜索，可选）
+         * @param {number} options.limit 返回数量限制（默认：100，最大：1000）
+         * @param {number} options.offset 偏移量（用于分页，默认：0）
+         * @param {boolean} options.reverse 是否反向排序（默认：false，从旧到新）
+         * @returns {Array<Object>} 日志条目数组
+         */
+        static queryLogs(options = {}) {
+            if (!KernelLogger._enableCollection) {
+                return [];
+            }
+            
+            const {
+                level = null,
+                subsystem = null,
+                sourceFile = null,
+                startTime = null,
+                endTime = null,
+                date = null,
+                keyword = null,
+                limit = 100,
+                offset = 0,
+                reverse = false
+            } = options;
+            
+            // 限制查询数量
+            const maxLimit = Math.min(limit, 1000);
+            const actualOffset = Math.max(0, offset);
+            
+            // 确定查询的起始集合
+            let candidates = [];
+            
+            // 如果指定了日期，使用日期索引
+            if (date) {
+                candidates = KernelLogger._logIndex.byDate[date] || [];
+            } else {
+                // 否则使用时间索引（已排序）
+                candidates = KernelLogger._logIndex.byTime;
+            }
+            
+            // 如果指定了级别，过滤
+            if (level) {
+                const levels = Array.isArray(level) ? level : [level];
+                candidates = candidates.filter(entry => levels.includes(entry.level));
+            }
+            
+            // 如果指定了子系统，过滤
+            if (subsystem) {
+                const subsystems = Array.isArray(subsystem) ? subsystem : [subsystem];
+                candidates = candidates.filter(entry => subsystems.includes(entry.subsystem));
+            }
+            
+            // 如果指定了源文件，过滤
+            if (sourceFile) {
+                candidates = candidates.filter(entry => entry.sourceFile === sourceFile);
+            }
+            
+            // 如果指定了时间范围，过滤
+            if (startTime !== null) {
+                candidates = candidates.filter(entry => entry.timestampMs >= startTime);
+            }
+            if (endTime !== null) {
+                candidates = candidates.filter(entry => entry.timestampMs <= endTime);
+            }
+            
+            // 如果指定了关键词，过滤
+            if (keyword) {
+                const keywordLower = keyword.toLowerCase();
+                candidates = candidates.filter(entry => {
+                    const messageLower = entry.message.toLowerCase();
+                    const subsystemLower = entry.subsystem.toLowerCase();
+                    return messageLower.includes(keywordLower) || subsystemLower.includes(keywordLower);
+                });
+            }
+            
+            // 排序（如果需要反向）
+            if (reverse) {
+                candidates = candidates.slice().reverse();
+            }
+            
+            // 分页
+            const result = candidates.slice(actualOffset, actualOffset + maxLimit);
+            
+            return result;
+        }
+        
+        /**
+         * 按级别获取日志
+         * @param {string} level 日志级别
+         * @param {number} limit 返回数量限制
+         * @param {number} offset 偏移量
+         * @returns {Array<Object>} 日志条目数组
+         */
+        static getLogsByLevel(level, limit = 100, offset = 0) {
+            return KernelLogger.queryLogs({ level, limit, offset });
+        }
+        
+        /**
+         * 按子系统获取日志
+         * @param {string} subsystem 子系统名称
+         * @param {number} limit 返回数量限制
+         * @param {number} offset 偏移量
+         * @returns {Array<Object>} 日志条目数组
+         */
+        static getLogsBySubsystem(subsystem, limit = 100, offset = 0) {
+            return KernelLogger.queryLogs({ subsystem, limit, offset });
+        }
+        
+        /**
+         * 按日期获取日志
+         * @param {string} date 日期（格式：'YYYY-MM-DD'）
+         * @param {number} limit 返回数量限制
+         * @param {number} offset 偏移量
+         * @returns {Array<Object>} 日志条目数组
+         */
+        static getLogsByDate(date, limit = 100, offset = 0) {
+            return KernelLogger.queryLogs({ date, limit, offset });
+        }
+        
+        /**
+         * 按时间范围获取日志
+         * @param {number} startTime 开始时间戳（毫秒）
+         * @param {number} endTime 结束时间戳（毫秒）
+         * @param {number} limit 返回数量限制
+         * @param {number} offset 偏移量
+         * @returns {Array<Object>} 日志条目数组
+         */
+        static getLogsByTimeRange(startTime, endTime, limit = 100, offset = 0) {
+            return KernelLogger.queryLogs({ startTime, endTime, limit, offset });
+        }
+        
+        /**
+         * 搜索日志（关键词搜索）
+         * @param {string} keyword 关键词
+         * @param {number} limit 返回数量限制
+         * @param {number} offset 偏移量
+         * @returns {Array<Object>} 日志条目数组
+         */
+        static searchLogs(keyword, limit = 100, offset = 0) {
+            return KernelLogger.queryLogs({ keyword, limit, offset });
+        }
+        
+        /**
+         * 获取最近的日志
+         * @param {number} count 数量（默认：100）
+         * @returns {Array<Object>} 日志条目数组
+         */
+        static getRecentLogs(count = 100) {
+            return KernelLogger.queryLogs({ limit: count, reverse: true });
+        }
+        
+        /**
+         * 获取所有可用的子系统列表
+         * @returns {Array<string>} 子系统名称数组
+         */
+        static getSubsystems() {
+            return Object.keys(KernelLogger._logIndex.bySubsystem);
+        }
+        
+        /**
+         * 获取所有可用的日期列表
+         * @returns {Array<string>} 日期数组
+         */
+        static getDates() {
+            return Object.keys(KernelLogger._logIndex.byDate).sort().reverse();
+        }
+        
+        /**
+         * 清空日志缓冲区（谨慎使用）
+         */
+        static clearLogs() {
+            KernelLogger._logBuffer = [];
+            KernelLogger._logIndex = {
+                byLevel: { DEBUG: [], INFO: [], WARN: [], ERROR: [] },
+                bySubsystem: {},
+                byTime: [],
+                byDate: {},
+                bySourceFile: {}
+            };
+            KernelLogger._statistics = {
+                total: 0,
+                byLevel: { DEBUG: 0, INFO: 0, WARN: 0, ERROR: 0 },
+                bySubsystem: {},
+                oldestTimestamp: null,
+                newestTimestamp: null
+            };
+        }
+        
+        /**
+         * 设置日志收集是否启用
+         * @param {boolean} enabled 是否启用
+         */
+        static setCollectionEnabled(enabled) {
+            KernelLogger._enableCollection = !!enabled;
+        }
+        
+        /**
+         * 设置日志缓冲区大小
+         * @param {number} size 缓冲区大小
+         */
+        static setMaxBufferSize(size) {
+            KernelLogger._maxBufferSize = Math.max(100, Math.min(100000, size));
+            // 如果当前缓冲区超过新的大小，清理旧日志
+            if (KernelLogger._logBuffer.length > KernelLogger._maxBufferSize) {
+                KernelLogger._cleanupOldLogs();
+            }
         }
     }
 
@@ -346,55 +761,4 @@
             setTimeout(tryRegisterToPool, 0);
         }
     }
-    
-    // 在模块加载时立即输出一个测试日志，验证时间格式
-    // 使用立即执行函数确保在模块加载时执行（在导出到全局之后）
-    (function() {
-        // 延迟执行，确保 KernelLogger 已经导出到全局
-        setTimeout(function() {
-            try {
-                // 直接调用 _ts 方法测试时间格式
-                const now = new Date();
-                const year = now.getFullYear();
-                const month = String(now.getMonth() + 1).padStart(2, '0');
-                const day = String(now.getDate()).padStart(2, '0');
-                const hours = String(now.getHours()).padStart(2, '0');
-                const minutes = String(now.getMinutes()).padStart(2, '0');
-                const seconds = String(now.getSeconds()).padStart(2, '0');
-                const milliseconds = String(now.getMilliseconds()).padStart(3, '0');
-                const testTime = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}.${milliseconds}`;
-                
-                // 输出明显的测试日志（使用多种方式确保可见）
-                console.log('%c═══════════════════════════════════════════════════════════', 'color: #00ff00; font-weight: bold; font-size: 14px;');
-                console.log('%c[KernelLogger] 时间格式修复验证 v2', 'color: #00ff00; font-weight: bold; font-size: 16px;');
-                console.log(`%c直接格式化测试: ${testTime}`, 'color: #00ff00; font-weight: bold;');
-                console.log(`%c预期格式: YYYY-MM-DD HH:mm:ss.SSS (本地时间)`, 'color: #00ff00;');
-                console.log(`%c旧格式示例: 2025-12-04T09:29:05.249Z (UTC时间)`, 'color: #ff9900;');
-                console.log('%c═══════════════════════════════════════════════════════════', 'color: #00ff00; font-weight: bold; font-size: 14px;');
-                
-                // 测试 KernelLogger._ts() 方法
-                if (typeof KernelLogger !== 'undefined' && typeof KernelLogger._ts === 'function') {
-                    const loggerTime = KernelLogger._ts();
-                    console.log(`%c[KernelLogger._ts()] 方法测试: ${loggerTime}`, 'color: #00ff00; font-weight: bold;');
-                    
-                    // 验证格式是否正确
-                    const isCorrectFormat = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}$/.test(loggerTime);
-                    const isOldFormat = loggerTime.includes('T') && loggerTime.endsWith('Z');
-                    
-                    if (isCorrectFormat && !isOldFormat) {
-                        console.log('%c✓ 时间格式正确！使用本地时间格式。', 'color: #00ff00; font-weight: bold; font-size: 14px;');
-                    } else if (isOldFormat) {
-                        console.error('%c✗ 错误：仍在使用旧的 UTC 格式！', 'color: #ff0000; font-weight: bold; font-size: 14px;');
-                        console.error('%c这可能是因为浏览器缓存了旧文件。请强制刷新页面（Ctrl+Shift+R）', 'color: #ff0000; font-weight: bold;');
-                    } else {
-                        console.warn('%c? 时间格式异常，请检查代码。', 'color: #ff9900; font-weight: bold;');
-                    }
-                } else {
-                    console.warn('%c[KernelLogger] KernelLogger 类尚未定义，无法测试 _ts() 方法', 'color: #ff9900;');
-                }
-            } catch (e) {
-                console.error('%c[KernelLogger] 时间格式测试失败:', 'color: #ff0000; font-weight: bold;', e);
-            }
-        }, 0);
-    })();
 })(typeof window !== 'undefined' ? window : globalThis);

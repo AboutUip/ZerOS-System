@@ -68,7 +68,9 @@
                             Howl = await ProcessManager.requestDynamicModule(pid, 'howler');
                         } catch (pmError) {
                             // ProcessManager 请求失败，继续尝试从全局作用域获取
-                            console.debug('[AudioPlayer] ProcessManager.requestDynamicModule 失败，将从全局作用域获取:', pmError.message);
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.debug('AudioPlayer', `ProcessManager.requestDynamicModule 失败，将从全局作用域获取: ${pmError.message}`);
+                            }
                         }
                     }
                     
@@ -91,7 +93,9 @@
                 if (typeof KernelLogger !== 'undefined') {
                     KernelLogger.error('AudioPlayer', `加载 Howler 库失败: ${error.message}`, error);
                 } else {
-                    console.error('[AudioPlayer] 加载 Howler 库失败:', error);
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.error('AudioPlayer', '加载 Howler 库失败', error);
+                    }
                 }
                 // 加载音频库失败，使用通知提示（不打断用户）
                 if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
@@ -186,7 +190,9 @@
                 }
                 
             } catch (error) {
-                console.error('音频播放器初始化失败:', error);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('AudioPlayer', '音频播放器初始化失败', error);
+                }
                 if (this.window && this.window.parentElement) {
                     this.window.parentElement.removeChild(this.window);
                 }
@@ -702,13 +708,9 @@
                 const extension = fileName.split('.').pop()?.toLowerCase() || '';
                 const format = extension || undefined;  // Howler 会根据扩展名自动检测格式
                 
-                console.log('[AudioPlayer] 加载音频:', {
-                    resolvedPath,
-                    audioUrl,
-                    fileName,
-                    extension,
-                    format
-                });
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.debug('AudioPlayer', `加载音频: ${fileName} (${extension})`, { resolvedPath, audioUrl, fileName, extension, format });
+                }
                 
                 // 创建 Howl 实例
                 // 如果之前使用 HTML5 Audio 失败，或者这是重试，使用 HTML5 Audio
@@ -722,15 +724,21 @@
                     volume: this.volume,
                     loop: this.loopMode,  // 设置循环播放
                     onload: () => {
-                        console.log('[AudioPlayer] 音频加载成功', useHtml5 ? '(HTML5 Audio)' : '(Web Audio API)');
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.info('AudioPlayer', `音频加载成功 ${useHtml5 ? '(HTML5 Audio)' : '(Web Audio API)'}`);
+                        }
                         this._onAudioLoaded();
                     },
                     onloaderror: (id, error) => {
-                        console.error('[AudioPlayer] 音频加载错误:', id, error);
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.error('AudioPlayer', `音频加载错误: ${id}`, error);
+                        }
                         
                         // 如果是解码错误且当前使用的是 Web Audio API，尝试切换到 HTML5 Audio
                         if (!useHtml5 && error && (typeof error === 'string' && (error.includes('Decoding') || error.includes('decode')))) {
-                            console.log('[AudioPlayer] Web Audio API 解码失败，尝试使用 HTML5 Audio');
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.info('AudioPlayer', 'Web Audio API 解码失败，尝试使用 HTML5 Audio');
+                            }
                             this.useHtml5Audio = true;
                             
                             // 清理当前实例
@@ -738,7 +746,9 @@
                                 try {
                                     this.currentSound.unload();
                                 } catch (e) {
-                                    console.warn('[AudioPlayer] 清理音频实例失败:', e);
+                                    if (typeof KernelLogger !== 'undefined') {
+                                        KernelLogger.warn('AudioPlayer', '清理音频实例失败', e);
+                                    }
                                 }
                                 this.currentSound = null;
                             }
@@ -827,7 +837,9 @@
             if (typeof KernelLogger !== 'undefined') {
                 KernelLogger.error('AudioPlayer', `音频加载失败: ${errorMsg}`, errorInfo);
             } else {
-                console.error('[AudioPlayer] 音频加载失败:', errorInfo);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('AudioPlayer', '音频加载失败', errorInfo);
+                }
             }
             
             if (this.fileInfo) {
@@ -842,7 +854,9 @@
                     if (typeof KernelLogger !== 'undefined') {
                         KernelLogger.warn('AudioPlayer', `清理音频实例失败: ${e.message}`, e);
                     } else {
-                        console.warn('[AudioPlayer] 清理音频实例失败:', e);
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('AudioPlayer', '清理音频实例失败', e);
+                        }
                     }
                 }
                 this.currentSound = null;
@@ -1235,7 +1249,9 @@
                                 if (typeof KernelLogger !== 'undefined') {
                                     KernelLogger.error('AudioPlayer', `加载音频文件失败: ${error.message}`, error);
                                 } else {
-                                    console.error('[AudioPlayer] 加载音频文件失败:', error);
+                                    if (typeof KernelLogger !== 'undefined') {
+                                        KernelLogger.error('AudioPlayer', '加载音频文件失败', error);
+                                    }
                                 }
                                 // 调用 _onAudioLoadError 显示通知
                                 this._onAudioLoadError(error);
@@ -1248,7 +1264,9 @@
                 if (typeof KernelLogger !== 'undefined') {
                     KernelLogger.error('AudioPlayer', `打开文件对话框失败: ${error.message}`, error);
                 } else {
-                    console.error('[AudioPlayer] 打开文件对话框失败:', error);
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.error('AudioPlayer', '打开文件对话框失败', error);
+                    }
                 }
                 // 打开文件对话框失败，使用通知提示（不打断用户）
                 if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
@@ -1301,7 +1319,9 @@
                         this.currentSound.stop();
                         this.currentSound.unload();
                     } catch (e) {
-                        console.warn('[AudioPlayer] 停止音频失败:', e);
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('AudioPlayer', '停止音频失败', e);
+                        }
                     }
                     this.currentSound = null;
                 }
@@ -1324,13 +1344,17 @@
                             GUIManager.unregisterWindow(this.pid);
                         }
                     } catch (e) {
-                        console.warn('[AudioPlayer] 注销 GUIManager 窗口失败:', e);
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('AudioPlayer', '注销 GUIManager 窗口失败', e);
+                        }
                         // 如果注销失败，手动移除 DOM
                         if (this.window && this.window.parentElement) {
                             try {
                                 this.window.parentElement.removeChild(this.window);
                             } catch (domError) {
-                                console.warn('[AudioPlayer] 手动移除窗口 DOM 失败:', domError);
+                                if (typeof KernelLogger !== 'undefined') {
+                                    KernelLogger.warn('AudioPlayer', '手动移除窗口 DOM 失败', domError);
+                                }
                             }
                         }
                     }
@@ -1340,7 +1364,9 @@
                         try {
                             this.window.parentElement.removeChild(this.window);
                         } catch (e) {
-                            console.warn('[AudioPlayer] 移除窗口 DOM 失败:', e);
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.warn('AudioPlayer', '移除窗口 DOM 失败', e);
+                            }
                         }
                     }
                 }
@@ -1362,7 +1388,9 @@
                 this.windowId = null;
                 
             } catch (error) {
-                console.error('[AudioPlayer] 退出时发生错误:', error);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('AudioPlayer', '退出时发生错误', error);
+                }
                 // 即使出错，也尝试强制清理
                 try {
                     if (this.currentSound) {
@@ -1391,7 +1419,9 @@
                         } catch (e) {}
                     }
                 } catch (cleanupError) {
-                    console.error('[AudioPlayer] 清理资源时发生错误:', cleanupError);
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.error('AudioPlayer', '清理资源时发生错误', cleanupError);
+                    }
                 }
             }
         },

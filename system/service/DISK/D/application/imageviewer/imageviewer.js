@@ -108,7 +108,9 @@
                 }
                 
             } catch (error) {
-                console.error('图片查看器初始化失败:', error);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('ImageViewer', '图片查看器初始化失败', error);
+                }
                 if (this.window && this.window.parentElement) {
                     this.window.parentElement.removeChild(this.window);
                 }
@@ -749,7 +751,9 @@
                 }
                 
             } catch (error) {
-                console.error('加载图片失败:', error);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('ImageViewer', '加载图片失败', error);
+                }
                 this._onImageError();
                 // 加载图片失败，使用通知提示（不打断用户）
                 if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
@@ -853,7 +857,9 @@
                     try {
                         this.resizeObserver.disconnect();
                     } catch (e) {
-                        console.warn('[ImageViewer] 断开 ResizeObserver 失败:', e);
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('ImageViewer', '断开 ResizeObserver 失败', e);
+                        }
                     }
                     this.resizeObserver = null;
                 }
@@ -863,7 +869,9 @@
                     try {
                         window.removeEventListener('resize', this.windowResizeHandler);
                     } catch (e) {
-                        console.warn('[ImageViewer] 移除窗口大小变化监听失败:', e);
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('ImageViewer', '移除窗口大小变化监听失败', e);
+                        }
                     }
                     this.windowResizeHandler = null;
                 }
@@ -873,7 +881,9 @@
                     try {
                         ContextMenuManager.unregisterContextMenu(this.pid);
                     } catch (e) {
-                        console.warn('[ImageViewer] 注销右键菜单失败:', e);
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('ImageViewer', '注销右键菜单失败', e);
+                        }
                     }
                 }
                 
@@ -889,13 +899,17 @@
                             GUIManager.unregisterWindow(this.pid);
                         }
                     } catch (e) {
-                        console.warn('[ImageViewer] 注销 GUIManager 窗口失败:', e);
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('ImageViewer', '注销 GUIManager 窗口失败', e);
+                        }
                         // 如果注销失败，手动移除 DOM
                         if (this.window && this.window.parentElement) {
                             try {
                                 this.window.parentElement.removeChild(this.window);
                             } catch (domError) {
-                                console.warn('[ImageViewer] 手动移除窗口 DOM 失败:', domError);
+                                if (typeof KernelLogger !== 'undefined') {
+                                    KernelLogger.warn('ImageViewer', '手动移除窗口 DOM 失败', domError);
+                                }
                             }
                         }
                     }
@@ -909,7 +923,9 @@
                                 this.window.parentNode.removeChild(this.window);
                             }
                         } catch (e) {
-                            console.warn('[ImageViewer] 移除窗口 DOM 失败:', e);
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.warn('ImageViewer', '移除窗口 DOM 失败', e);
+                            }
                         }
                     }
                 }
@@ -930,7 +946,9 @@
                 this.offsetY = 0;
                 
             } catch (error) {
-                console.error('[ImageViewer] 退出时发生错误:', error);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('ImageViewer', '退出时发生错误', error);
+                }
                 // 即使出错，也尝试强制清理
                 try {
                     // 清理定时器
@@ -977,11 +995,15 @@
                                 this.window.parentNode.removeChild(this.window);
                             }
                         } catch (e) {
-                            console.error('[ImageViewer] 强制移除窗口失败:', e);
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.error('ImageViewer', '强制移除窗口失败', e);
+                            }
                         }
                     }
                 } catch (cleanupError) {
-                    console.error('[ImageViewer] 清理资源时发生错误:', cleanupError);
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.error('ImageViewer', '清理资源时发生错误', cleanupError);
+                    }
                 }
             }
         },

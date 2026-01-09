@@ -102,7 +102,10 @@ class PermissionManager {
         
         // 应用程序管理权限（危险权限，仅管理员可授予）
         APPLICATION_INSTALL: 'APPLICATION_INSTALL',         // 安装应用程序
-        APPLICATION_UNINSTALL: 'APPLICATION_UNINSTALL'       // 卸载应用程序
+        APPLICATION_UNINSTALL: 'APPLICATION_UNINSTALL',     // 卸载应用程序
+        
+        // 日志权限
+        SYSTEM_LOG_READ: 'SYSTEM_LOG_READ'                  // 读取系统日志（特殊权限，需要用户确认）
     };
     
     /**
@@ -125,6 +128,7 @@ class PermissionManager {
         [PermissionManager.PERMISSION.GUI_WINDOW_CREATE]: PermissionManager.PERMISSION_LEVEL.NORMAL,
         [PermissionManager.PERMISSION.THEME_READ]: PermissionManager.PERMISSION_LEVEL.NORMAL,
         [PermissionManager.PERMISSION.SYSTEM_NOTIFICATION]: PermissionManager.PERMISSION_LEVEL.NORMAL, // 通知权限（普通权限，自动授予）
+        [PermissionManager.PERMISSION.NETWORK_ACCESS]: PermissionManager.PERMISSION_LEVEL.NORMAL, // 网络访问权限（普通权限，自动授予）
         
         // 特殊权限（需要用户确认）
         [PermissionManager.PERMISSION.KERNEL_DISK_WRITE]: PermissionManager.PERMISSION_LEVEL.SPECIAL,
@@ -132,7 +136,6 @@ class PermissionManager {
         [PermissionManager.PERMISSION.KERNEL_DISK_DELETE]: PermissionManager.PERMISSION_LEVEL.SPECIAL,
         [PermissionManager.PERMISSION.KERNEL_MEMORY_READ]: PermissionManager.PERMISSION_LEVEL.SPECIAL,
         [PermissionManager.PERMISSION.KERNEL_MEMORY_WRITE]: PermissionManager.PERMISSION_LEVEL.SPECIAL,
-        [PermissionManager.PERMISSION.NETWORK_ACCESS]: PermissionManager.PERMISSION_LEVEL.SPECIAL,
         [PermissionManager.PERMISSION.GUI_WINDOW_MANAGE]: PermissionManager.PERMISSION_LEVEL.SPECIAL,
         [PermissionManager.PERMISSION.SYSTEM_STORAGE_READ]: PermissionManager.PERMISSION_LEVEL.NORMAL, // 基础权限，自动授予，但仅可读取非敏感键
         [PermissionManager.PERMISSION.SYSTEM_STORAGE_WRITE]: PermissionManager.PERMISSION_LEVEL.NORMAL, // 基础权限，自动授予，但仅可写入非敏感键
@@ -193,6 +196,9 @@ class PermissionManager {
         // 应用程序管理权限（危险权限，仅管理员可授予）
         [PermissionManager.PERMISSION.APPLICATION_INSTALL]: PermissionManager.PERMISSION_LEVEL.DANGEROUS,
         [PermissionManager.PERMISSION.APPLICATION_UNINSTALL]: PermissionManager.PERMISSION_LEVEL.DANGEROUS,
+        
+        // 日志权限（特殊权限，需要用户确认）
+        [PermissionManager.PERMISSION.SYSTEM_LOG_READ]: PermissionManager.PERMISSION_LEVEL.SPECIAL,
         
         // 系统存储细粒度权限（危险权限，仅管理员可授予）
         [PermissionManager.PERMISSION.SYSTEM_STORAGE_WRITE_USER_CONTROL]: PermissionManager.PERMISSION_LEVEL.DANGEROUS,
@@ -1508,6 +1514,10 @@ class PermissionManager {
             [PermissionManager.PERMISSION.APPLICATION_UNINSTALL]: {
                 name: '卸载应用程序',
                 description: '允许程序卸载已安装的应用程序（危险操作，需要管理员授权）'
+            },
+            [PermissionManager.PERMISSION.SYSTEM_LOG_READ]: {
+                name: '读取系统日志',
+                description: '允许程序读取系统日志信息（可能包含敏感信息，需要用户确认）'
             }
         };
         

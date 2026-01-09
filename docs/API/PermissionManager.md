@@ -397,6 +397,7 @@ PermissionManager.clearAuditLog(true);
 - `GUI_WINDOW_CREATE` - 创建窗口
 - `THEME_READ` - 读取主题
 - `SYSTEM_NOTIFICATION` - 系统通知
+- `NETWORK_ACCESS` - 网络访问（普通权限，自动授予）
 - `EVENT_LISTENER` - 事件监听
 - `CACHE_READ` - 读取缓存
 - `CACHE_WRITE` - 写入缓存
@@ -414,7 +415,6 @@ PermissionManager.clearAuditLog(true);
 - `KERNEL_DISK_DELETE` - 删除文件
 - `KERNEL_MEMORY_READ` - 读取内存
 - `KERNEL_MEMORY_WRITE` - 写入内存
-- `NETWORK_ACCESS` - 网络访问
 - `GUI_WINDOW_MANAGE` - 管理窗口
 - `SYSTEM_STORAGE_READ` - 读取系统存储
 - `SYSTEM_STORAGE_WRITE` - 写入系统存储（基础权限，仅可写入非敏感键）

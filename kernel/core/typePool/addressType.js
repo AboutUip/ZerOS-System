@@ -4,7 +4,7 @@
 
 // 检查 EnumManager 是否已加载
 if (typeof EnumManager === 'undefined') {
-    console.error("[内核][AddressType] EnumManager 未加载，请确保 enumManager.js 在 addressType.js 之前加载");
+    KernelLogger.error("AddressType", "EnumManager 未加载，请确保 enumManager.js 在 addressType.js 之前加载");
     throw new Error("EnumManager is required but not loaded");
 }
 
@@ -45,9 +45,5 @@ if (typeof POOL !== 'undefined' && typeof POOL.__ADD__ === 'function') {
 DependencyConfig.publishSignal("../kernel/core/typePool/addressType.js");
 
 // 初始化完成后，如果 KernelLogger 已加载，记录日志
-if (typeof KernelLogger !== 'undefined') {
-    KernelLogger.info("AddressType", "模块初始化完成");
-} else {
-    console.log("[内核][AddressType] 模块初始化完成");
-}
+KernelLogger.info("AddressType", "模块初始化完成");
 

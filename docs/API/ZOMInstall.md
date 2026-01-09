@@ -18,6 +18,8 @@ zominstall <zom文件路径>
 zominstall -h
 ```
 
+**重要**：只有管理员用户可以安装程序。非管理员用户尝试安装程序时，`zominstall` 会显示权限不足错误并退出。
+
 ### 安装流程
 
 1. **解压文件**：将 `.zom` 文件解压到 `D:/cache/temp/` 临时目录
@@ -28,6 +30,11 @@ zominstall -h
 
 ### 权限要求
 
+**用户权限**：
+- **需要管理员用户权限**：只有管理员用户（`ADMIN` 或 `DEFAULT_ADMIN`）可以安装程序，普通用户（`USER`）禁止安装程序
+- 非管理员用户尝试安装程序时，`zominstall` 会显示错误并退出
+
+**程序权限**：
 安装程序需要以下权限：
 - `APPLICATION_INSTALL`：安装应用程序（危险权限，需要管理员授权）
 - `KERNEL_DISK_READ`：读取文件
@@ -35,7 +42,11 @@ zominstall -h
 - `KERNEL_DISK_CREATE`：创建文件/目录
 - `KERNEL_DISK_DELETE`：删除文件
 
-**注意**：只有管理员用户可以安装程序。
+**安全策略**：
+- 权限检查在多个层面进行：
+  1. **UI 层**：文件管理器在启动 `zominstall` 前会检查管理员权限，非管理员用户会看到权限不足提示
+  2. **程序层**：`zominstall` 程序在开始安装前会检查管理员权限，非管理员用户会看到错误提示并退出
+  3. **内核层**：`LStorage.installApplication()` 会验证管理员权限和 `APPLICATION_INSTALL` 权限
 
 ### 特性
 
@@ -458,6 +469,16 @@ const apps = await Process.callKernelAPI('Application.list', []);
 await Process.callKernelAPI('Application.uninstall', ['myapp']);
 ```
 
+**权限要求**：
+- **需要管理员用户权限**：只有管理员用户（`ADMIN` 或 `DEFAULT_ADMIN`）可以卸载程序，普通用户（`USER`）禁止卸载程序
+- 需要 `APPLICATION_UNINSTALL` 权限（危险权限，仅管理员可授予）
+
+**安全策略**：
+- 非管理员用户尝试卸载程序时，会抛出错误：`安全策略：普通用户不允许卸载应用程序，需要管理员权限`
+- 权限检查在多个层面进行：
+  1. **UI 层**：设置程序在调用卸载前会检查管理员权限，非管理员用户会看到权限不足提示
+  2. **内核层**：`LStorage.uninstallApplication()` 会验证管理员权限和 `APPLICATION_UNINSTALL` 权限
+
 **卸载流程**：
 
 1. 验证权限（管理员权限和 `APPLICATION_UNINSTALL` 权限）
@@ -570,6 +591,7 @@ await Process.callKernelAPI('Application.uninstall', ['myapp']);
 **注意**：
 - 卸载程序会删除 `D:/application/<程序名>/` 目录下的所有文件
 - 静态程序（注册在 `applicationAssets.js` 中）不允许卸载
+- **只有管理员用户可以卸载程序**：普通用户（`USER`）禁止卸载程序，需要管理员用户权限（`ADMIN` 或 `DEFAULT_ADMIN`）
 - 卸载需要 `APPLICATION_UNINSTALL` 权限和管理员权限
 
 ## 与 LStorage 的交互

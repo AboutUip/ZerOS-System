@@ -4990,6 +4990,34 @@
                 return;
             }
             
+            // 检查管理员权限（卸载程序需要管理员权限）
+            if (typeof UserControl !== 'undefined') {
+                try {
+                    await UserControl.ensureInitialized();
+                    const isAdmin = UserControl.isAdmin();
+                    if (!isAdmin) {
+                        await GUIManager.showAlert('权限不足：卸载程序需要管理员权限', '错误', 'error');
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('SETTINGS', '非管理员用户尝试卸载程序，已拒绝');
+                        }
+                        return;
+                    }
+                } catch (e) {
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.error('SETTINGS', `检查用户权限失败: ${e.message}`, e);
+                    }
+                    await GUIManager.showAlert('无法验证用户权限，拒绝卸载', '错误', 'error');
+                    return;
+                }
+            } else {
+                // UserControl 未加载，为了安全起见，拒绝执行
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('SETTINGS', 'UserControl 未加载，无法验证用户权限，拒绝卸载程序');
+                }
+                await GUIManager.showAlert('无法验证用户权限，拒绝卸载', '错误', 'error');
+                return;
+            }
+            
             // 确认卸载
             const confirmed = await GUIManager.showConfirm(
                 `确定要卸载程序 "${programName}" 吗？此操作将删除程序的所有文件，且无法撤销。`,

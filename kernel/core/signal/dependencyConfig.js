@@ -5,9 +5,9 @@
 (function() {
     'use strict';
     
-    // 检查 KernelLogger 是否已加载
+    // KernelLogger 时刻可用，直接使用
+    // 如果 KernelLogger 未定义，说明加载顺序有问题
     if (typeof KernelLogger === 'undefined') {
-        console.error("[内核][DependencyConfig] KernelLogger 未加载，请确保在 HTML 中先加载 kernelLogger.js");
         throw new Error("KernelLogger is required for DependencyConfig");
     }
 
@@ -231,20 +231,12 @@ if (typeof window !== 'undefined') {
                     const tempDependency = new DependencyConfig();
                     return tempDependency.waitLoadedSync(name, options);
                 } else {
-                    if (typeof KernelLogger !== 'undefined') {
-                        KernelLogger.warn("DependencyConfig", "无法同步等待依赖，DependencyConfig 未加载");
-                    } else {
-                        console.warn("[内核][DependencyConfig] 无法同步等待依赖，DependencyConfig 未加载");
-                    }
+                    KernelLogger.warn("DependencyConfig", "无法同步等待依赖，DependencyConfig 未加载");
                     return false;
                 }
             }
         } catch (e) {
-            if (typeof KernelLogger !== 'undefined') {
-                KernelLogger.error("DependencyConfig", `同步等待依赖失败: ${name}`, String(e));
-            } else {
-                console.error(`[内核][DependencyConfig] 同步等待依赖失败: ${name}`, e);
-            }
+            KernelLogger.error("DependencyConfig", `同步等待依赖失败: ${name}`, String(e));
             return false;
         }
     };

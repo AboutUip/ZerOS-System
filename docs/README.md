@@ -115,6 +115,7 @@
 | API | 描述 | 状态 |
 |-----|------|------|
 | [NetworkManager](./API/NetworkManager.md) | HTTP 请求、WebSocket | ✅ |
+| [NetworkPort](./API/NetworkPort.md) | TCP 端口监听和管理 | ✅ |
 
 #### 🛠️ 工具与辅助 API
 

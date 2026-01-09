@@ -560,6 +560,8 @@ await LStorage.setEnvironmentVariable('CUSTOM_VAR', 'custom_value');
 
 ### 应用程序管理
 
+**重要安全策略**：只有管理员用户可以安装和卸载程序。普通用户（`USER`）禁止安装和卸载程序，需要管理员用户权限（`ADMIN` 或 `DEFAULT_ADMIN`）。
+
 #### `installApplication(programName, asset, sourceFiles)`
 
 安装应用程序到 `ApplicationTable`（动态程序注册表）。
@@ -572,8 +574,15 @@ await LStorage.setEnvironmentVariable('CUSTOM_VAR', 'custom_value');
 **返回值**: `Promise<boolean>` - 是否成功
 
 **权限要求**: 
+- **需要管理员用户权限**：只有管理员用户（`ADMIN` 或 `DEFAULT_ADMIN`）可以安装程序，普通用户（`USER`）禁止安装程序
 - 需要 `APPLICATION_INSTALL` 权限（危险权限，仅管理员可授予）
-- 需要管理员用户权限
+
+**安全策略**：
+- 非管理员用户尝试安装程序时，会抛出错误：`安全策略：普通用户不允许安装应用程序，需要管理员权限`
+- 该检查在多个层面进行：
+  1. **UI 层**：文件管理器在启动 `zominstall` 前会检查管理员权限
+  2. **程序层**：`zominstall` 程序在开始安装前会检查管理员权限
+  3. **内核层**：`LStorage.installApplication()` 会验证管理员权限和 `APPLICATION_INSTALL` 权限
 
 **存储位置**:
 - `ApplicationTable` 存储在 `D:/ApplicationTable.json` 文件中（**不是** `D:/LocalSData.json`）
@@ -610,6 +619,7 @@ await ProcessManager.callKernelAPI(pid, 'Application.install', [
 ```
 
 **注意**:
+- **只有管理员用户可以安装程序**：普通用户（`USER`）禁止安装程序，需要管理员用户权限（`ADMIN` 或 `DEFAULT_ADMIN`）
 - 安装后，`ApplicationAssetManager` 会自动刷新，新程序会立即出现在开始菜单中（需要关闭并重新打开开始菜单）
 - 静态程序（注册在 `applicationAssets.js` 中）不需要通过此 API 安装
 - 如果动态安装的程序与静态程序同名，动态程序会覆盖静态程序（在 `ApplicationAssetManager` 中，动态程序优先）
@@ -624,8 +634,14 @@ await ProcessManager.callKernelAPI(pid, 'Application.install', [
 **返回值**: `Promise<boolean>` - 是否成功
 
 **权限要求**: 
+- **需要管理员用户权限**：只有管理员用户（`ADMIN` 或 `DEFAULT_ADMIN`）可以卸载程序，普通用户（`USER`）禁止卸载程序
 - 需要 `APPLICATION_UNINSTALL` 权限（危险权限，仅管理员可授予）
-- 需要管理员用户权限
+
+**安全策略**：
+- 非管理员用户尝试卸载程序时，会抛出错误：`安全策略：普通用户不允许卸载应用程序，需要管理员权限`
+- 该检查在多个层面进行：
+  1. **UI 层**：设置程序在调用卸载前会检查管理员权限
+  2. **内核层**：`LStorage.uninstallApplication()` 会验证管理员权限和 `APPLICATION_UNINSTALL` 权限
 
 **功能**:
 1. 验证权限（管理员权限和 `APPLICATION_UNINSTALL` 权限）
@@ -649,6 +665,9 @@ await ProcessManager.callKernelAPI(pid, 'Application.install', [
 3. **清理其他残留数据**：删除程序创建的其他数据文件（但不包括程序资源文件，因为系统会自动处理）
 
 **重要**：`uninstall.js` **不应该**删除程序资源文件（如脚本、样式、图标等），因为这些文件会在 `uninstall.js` 执行完成后由系统自动删除。
+
+**注意**:
+- **只有管理员用户可以卸载程序**：普通用户（`USER`）禁止卸载程序，需要管理员用户权限（`ADMIN` 或 `DEFAULT_ADMIN`）
 
 **uninstall.js 程序结构**：
 

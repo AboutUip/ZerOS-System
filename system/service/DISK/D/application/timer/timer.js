@@ -142,7 +142,9 @@
          */
         _create3DScene: async function() {
             if (!this.THREE) {
-                console.error('Three.js未加载');
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('Timer', 'Three.js未加载');
+                }
                 return;
             }
             
@@ -189,9 +191,13 @@
                     });
                     // WebGPURenderer 需要异步初始化
                     await this.renderer.init();
-                    console.log('[Timer] 使用 WebGPURenderer');
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.info('Timer', '使用 WebGPURenderer');
+                    }
                 } catch (e) {
-                    console.warn('[Timer] WebGPURenderer 初始化失败，回退到 WebGLRenderer:', e);
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.warn('Timer', 'WebGPURenderer 初始化失败，回退到 WebGLRenderer', e);
+                    }
                     this.renderer = null;
                 }
             }
@@ -202,7 +208,9 @@
                     antialias: true,
                     alpha: true
                 });
-                console.log('[Timer] 使用 WebGLRenderer');
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.info('Timer', '使用 WebGLRenderer');
+                }
             }
             
             this.renderer.setSize(width, height);
@@ -1053,7 +1061,9 @@
                 if (typeof KernelLogger !== 'undefined') {
                     KernelLogger.error('TIMER', `清理资源失败: ${error.message}`, error);
                 } else {
-                    console.error('清理资源失败:', error);
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.error('Timer', '清理资源失败', error);
+                    }
                 }
             }
         },

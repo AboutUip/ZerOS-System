@@ -63,7 +63,9 @@
         // 初始化内存管理
         _initMemory(pid) {
             if (!pid) {
-                console.error('Vim: PID not available');
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('Vim', 'PID not available');
+                }
                 return;
             }
             
@@ -78,11 +80,15 @@
                     MemoryMgr = window.POOL.__GET__('KERNEL_GLOBAL_POOL', 'MemoryManager');
                 }
             } catch (e) {
-                console.error('Vim: Error accessing MemoryManager', e);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('Vim', 'Error accessing MemoryManager', e);
+                }
             }
             
             if (!MemoryMgr) {
-                console.error('Vim: MemoryManager not available');
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('Vim', 'MemoryManager not available');
+                }
                 return;
             }
             
@@ -90,14 +96,18 @@
             try {
                 MemoryMgr.allocateMemory(-1, 1, -1, pid);
             } catch (e) {
-                console.error('Vim: Error allocating stack memory', e);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('Vim', 'Error allocating stack memory', e);
+                }
             }
             
             // 分配堆内存用于存储文件内容（增大堆内存以支持更大的文件）
             try {
                 MemoryMgr.allocateMemory(1, -1, 50000, pid);
             } catch (e) {
-                console.error('Vim: Error allocating heap memory', e);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('Vim', 'Error allocating heap memory', e);
+                }
             }
             
             // 注册程序名称（如果还未注册）
@@ -117,7 +127,9 @@
                     this._shed = appSpace.sheds ? appSpace.sheds.get(1) : null;
                 }
             } catch (e) {
-                console.error('Vim: Error getting memory references', e);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('Vim', 'Error getting memory references', e);
+                }
             }
         }
         
@@ -136,7 +148,9 @@
                     HeapClass = window.POOL.__GET__('KERNEL_GLOBAL_POOL', 'Heap');
                 }
             } catch (e) {
-                console.error('Vim: Error accessing Heap', e);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('Vim', 'Error accessing Heap', e);
+                }
             }
             
             if (!HeapClass || typeof HeapClass.addressing !== 'function') {
@@ -146,7 +160,9 @@
                         return this._heap.readString(addr, this._heap.heapSize);
                     }
                 } catch (e) {
-                    console.error('Vim: Error reading string from heap (fallback)', e);
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.error('Vim', 'Error reading string from heap (fallback)', e);
+                    }
                 }
                 return null;
             }
@@ -173,7 +189,9 @@
                     return str;
                 }
             } catch (e) {
-                console.error('Vim: Error reading string from heap', e);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('Vim', 'Error reading string from heap', e);
+                }
                 return null;
             }
         }
@@ -193,11 +211,15 @@
                     HeapClass = window.POOL.__GET__('KERNEL_GLOBAL_POOL', 'Heap');
                 }
             } catch (e) {
-                console.error('Vim: Error accessing Heap', e);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('Vim', 'Error accessing Heap', e);
+                }
             }
             
             if (!HeapClass || typeof HeapClass.addressing !== 'function') {
-                console.error('Vim: Heap.addressing not available');
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('Vim', 'Heap.addressing not available');
+                }
                 return null;
             }
             
@@ -223,7 +245,9 @@
                 
                 return addr;
             } catch (e) {
-                console.error('Vim: Error writing string to heap', e);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('Vim', 'Error writing string to heap', e);
+                }
                 return null;
             }
         }
@@ -243,11 +267,15 @@
                     HeapClass = window.POOL.__GET__('KERNEL_GLOBAL_POOL', 'Heap');
                 }
             } catch (e) {
-                console.error('Vim: Error accessing Heap', e);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('Vim', 'Error accessing Heap', e);
+                }
             }
             
             if (!HeapClass || typeof HeapClass.addressing !== 'function') {
-                console.error('Vim: Heap.addressing not available');
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('Vim', 'Heap.addressing not available');
+                }
                 return false;
             }
             
@@ -277,7 +305,9 @@
                         try {
                             this._heap.free(addr, oldLength + 1);
                         } catch (e) {
-                            console.error('Vim: Error freeing old memory', e);
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.error('Vim', 'Error freeing old memory', e);
+                            }
                         }
                     }
                     // 分配新内存并写入
@@ -285,7 +315,9 @@
                     return newAddr ? newAddr : false;
                 }
             } catch (e) {
-                console.error('Vim: Error updating string in heap', e);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('Vim', 'Error updating string in heap', e);
+                }
                 return false;
             }
         }
@@ -305,7 +337,9 @@
                     MemoryMgr = window.POOL.__GET__('KERNEL_GLOBAL_POOL', 'MemoryManager');
                 }
             } catch (e) {
-                console.error('Vim: Error accessing MemoryManager', e);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('Vim', 'Error accessing MemoryManager', e);
+                }
             }
             
             if (!MemoryMgr) return;
@@ -360,7 +394,9 @@
                 this._shed.writeResourceLink('viewRows', String(this.viewRows));
                 this._shed.writeResourceLink('viewCols', String(this.viewCols));
             } catch (e) {
-                console.error('Vim: Error saving state to stack', e);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('Vim', 'Error saving state to stack', e);
+                }
             }
         }
         
@@ -396,7 +432,9 @@
                 const viewColsStr = this._shed.readResourceLink('viewCols');
                 if (viewColsStr) this.viewCols = parseInt(viewColsStr) || 80;
             } catch (e) {
-                console.error('Vim: Error loading state from stack', e);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('Vim', 'Error loading state from stack', e);
+                }
             }
         }
 
@@ -421,14 +459,18 @@
                     // 相对路径，需要解析
                     resolved = this._resolvePath(this.terminalEnv.cwd, filepath);
                 }
-                console.log(`Vim: openFile - cwd: ${this.terminalEnv.cwd}, filepath: ${filepath}, resolved: ${resolved}`);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.debug('Vim', `openFile - cwd: ${this.terminalEnv.cwd}, filepath: ${filepath}, resolved: ${resolved}`);
+                }
                 
                 const parts = resolved.split('/');
                 const root = parts[0];
                 const fileName = parts[parts.length - 1];
                 const parentPath = parts.slice(0, -1).join('/') || root;
                 
-                console.log(`Vim: Path parts - root: ${root}, fileName: ${fileName}, parentPath: ${parentPath}`);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.debug('Vim', `Path parts - root: ${root}, fileName: ${fileName}, parentPath: ${parentPath}`);
+                }
                 
                 // 确保路径格式正确
                 let phpPath = parentPath;
@@ -436,7 +478,9 @@
                     phpPath = phpPath + '/';
                 }
                 
-                console.log(`Vim: Final phpPath: ${phpPath}`);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.debug('Vim', `Final phpPath: ${phpPath}`);
+                }
                 
                 // 从 PHP 服务读取文件
                 try {
@@ -449,8 +493,10 @@
                     url.searchParams.set('path', phpPath);
                     url.searchParams.set('fileName', fileName);
                     
-                    console.log(`Vim: Reading file - resolved: ${resolved}, phpPath: ${phpPath}, fileName: ${fileName}`);
-                    console.log(`Vim: Request URL: ${url.toString()}`);
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.debug('Vim', `Reading file - resolved: ${resolved}, phpPath: ${phpPath}, fileName: ${fileName}`);
+                        KernelLogger.debug('Vim', `Request URL: ${url.toString()}`);
+                    }
                     
                     const response = await fetch(url.toString());
                     
@@ -464,7 +510,9 @@
                             // 忽略 JSON 解析错误
                         }
                         
-                        console.error(`Vim: HTTP error ${response.status}: ${errorMessage}`);
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.error('Vim', `HTTP error ${response.status}: ${errorMessage}`);
+                        }
                         
                         // 文件不存在，创建新文件
                         if (response.status === 404) {
@@ -484,13 +532,17 @@
                     
                     const result = await response.json();
                     
-                    console.log(`Vim: Response status: ${result.status}, has data: ${!!result.data}, has content: ${!!(result.data && result.data.content !== undefined)}`);
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.debug('Vim', `Response status: ${result.status}, has data: ${!!result.data}, has content: ${!!(result.data && result.data.content !== undefined)}`);
+                    }
                     
                     // 检查响应状态
                     if (result.status !== 'success') {
                         // 真正的错误：PHP 返回了错误状态
                         const errorMsg = result.message || '文件读取失败';
-                        console.error(`Vim: File read failed: ${errorMsg}`);
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.error('Vim', `File read failed: ${errorMsg}`);
+                        }
                         this.terminalWrite(`Vim: Error reading file: ${errorMsg}`);
                         return;
                     }
@@ -498,7 +550,9 @@
                     // 检查数据结构
                     if (!result.data) {
                         // 数据格式错误：缺少 data 字段
-                        console.error(`Vim: File read failed: 服务器返回数据格式错误（缺少 data 字段）`);
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.error('Vim', 'File read failed: 服务器返回数据格式错误（缺少 data 字段）');
+                        }
                         this.terminalWrite(`Vim: Error reading file: 服务器返回数据格式错误`);
                         return;
                     }
@@ -508,19 +562,25 @@
                     
                     // 如果 content 是 undefined（而不是空字符串或 null），说明数据格式有问题
                     if (content === undefined) {
-                        console.error(`Vim: File read failed: 服务器返回数据格式错误（缺少 content 字段）`);
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.error('Vim', 'File read failed: 服务器返回数据格式错误（缺少 content 字段）');
+                        }
                         this.terminalWrite(`Vim: Error reading file: 服务器返回数据格式错误`);
                         return;
                     }
                     
                     // 调试信息
-                    console.log(`Vim: Reading file ${resolved}, content type: ${typeof content}, length: ${content ? content.length : 0}`);
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.debug('Vim', `Reading file ${resolved}, content type: ${typeof content}, length: ${content ? content.length : 0}`);
+                    }
                     
                     // 确保 content 是字符串类型
                     const contentStr = typeof content === 'string' ? content : String(content || '');
                     
                     // 调试信息
-                    console.log(`Vim: File content length: ${contentStr.length}, first 100 chars: ${contentStr.substring(0, 100)}`);
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.debug('Vim', `File content length: ${contentStr.length}, first 100 chars: ${contentStr.substring(0, 100)}`);
+                    }
                     
                     // 解析文件内容到堆内存
                     this._loadContentToHeap(contentStr);
@@ -529,13 +589,17 @@
                     this.unsavedChanges = false;
                     
                     // 调试信息
-                    console.log(`Vim: Loaded ${this.lines.length} lines from file`);
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.debug('Vim', `Loaded ${this.lines.length} lines from file`);
+                    }
                     
                     this.cursorRow = 0;
                     this.cursorCol = 0;
                 } catch (e) {
                     this.terminalWrite(`Vim: Error opening file: ${e.message || e}`);
-                    console.error('Vim: Error opening file', e);
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.error('Vim', 'Error opening file', e);
+                    }
                 }
             }
 
@@ -548,7 +612,9 @@
             const contentStr = typeof content === 'string' ? content : String(content || '');
             
             // 调试信息
-            console.log(`Vim: _loadContentToHeap - content length: ${contentStr.length}, first 200 chars: ${contentStr.substring(0, 200)}`);
+            if (typeof KernelLogger !== 'undefined') {
+                KernelLogger.debug('Vim', `_loadContentToHeap - content length: ${contentStr.length}, first 200 chars: ${contentStr.substring(0, 200)}`);
+            }
             
             if (!this._heap) {
                 // 降级：直接使用数组
@@ -561,7 +627,9 @@
                 if (this.lines.length === 0) {
                     this.lines = [''];
                 }
-                console.log(`Vim: _loadContentToHeap (no heap) - loaded ${this.lines.length} lines`);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.debug('Vim', `_loadContentToHeap (no heap) - loaded ${this.lines.length} lines`);
+                }
                 return;
             }
 
@@ -593,7 +661,9 @@
                 }
             }
             
-            console.log(`Vim: _loadContentToHeap (with heap) - loaded ${this.lines.length} lines`);
+            if (typeof KernelLogger !== 'undefined') {
+                KernelLogger.debug('Vim', `_loadContentToHeap (with heap) - loaded ${this.lines.length} lines`);
+            }
         }
         
         // 从堆内存读取指定行的内容
@@ -669,7 +739,9 @@
                             this._heap.free(addr, line.length + 1);
                         }
                     } catch (e) {
-                        console.error('Vim: Error freeing line', e);
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.error('Vim', 'Error freeing line', e);
+                        }
                     }
                 }
             }
@@ -720,7 +792,9 @@
                         }
                     }
                 } catch (e) {
-                    console.error('Vim: Error checking file existence', e);
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.error('Vim', 'Error checking file existence', e);
+                    }
                 }
 
                 // 如果文件不存在，需要创建
@@ -814,7 +888,9 @@
                     MemoryMgr = window.POOL.__GET__('KERNEL_GLOBAL_POOL', 'MemoryManager');
                 }
             } catch (e) {
-                console.error('Vim: Error accessing MemoryManager', e);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('Vim', 'Error accessing MemoryManager', e);
+                }
             }
 
             if (!MemoryMgr) {
@@ -863,7 +939,9 @@
         handleKey(key, ctrlKey, shiftKey) {
             // 输入验证
             if (!key || typeof key !== 'string') {
-                console.warn('Vim: Invalid key input:', key);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.warn('Vim', 'Invalid key input', key);
+                }
                 return;
             }
             
@@ -896,13 +974,17 @@
                         this._handleVisualMode(key, ctrlKey, shiftKey);
                         break;
                     default:
-                        console.warn('Vim: Unknown mode:', this.mode);
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('Vim', 'Unknown mode', this.mode);
+                        }
                         // 降级到 Normal 模式
                         this.mode = MODE_NORMAL;
                         this._handleNormalMode(key, ctrlKey, shiftKey);
                 }
             } catch (error) {
-                console.error('Vim: Error handling key input:', error);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('Vim', 'Error handling key input', error);
+                }
                 this.terminalWrite(`Vim Error: ${error.message || error}`);
                 // 确保状态一致
                 this._validateState();
@@ -1173,7 +1255,9 @@
             
             // 未处理的按键（用于调试）
             if (this._shouldLogUnhandledKey(key)) {
-                console.warn('Vim Insert Mode: 未处理的按键:', key, 'ctrlKey:', ctrlKey, 'shiftKey:', shiftKey, 'actualChar:', actualChar);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.warn('Vim', `Insert Mode: 未处理的按键: ${key}, ctrlKey: ${ctrlKey}, shiftKey: ${shiftKey}, actualChar: ${actualChar}`);
+                }
             }
         }
         
@@ -1347,7 +1431,9 @@
                         }, 200);
                         return true;
                     } catch (error) {
-                        console.error('Vim: Error saving file in :wq command:', error);
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.error('Vim', 'Error saving file in :wq command', error);
+                        }
                         this.terminalWrite(`Vim: Error saving file: ${error.message || error}`);
                         this._resetCommandMode();
                         return false;
@@ -1395,7 +1481,9 @@
                         await this.saveFile();
                         this._resetCommandMode();
                     } catch (error) {
-                        console.error('Vim: Error saving file:', error);
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.error('Vim', 'Error saving file', error);
+                        }
                         this.terminalWrite(`Vim: Error saving file: ${error.message || error}`);
                         this._resetCommandMode();
                     }
@@ -1419,7 +1507,9 @@
                         }
                     }
                 } catch (error) {
-                    console.error('Vim: Error executing command:', error);
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.error('Vim', 'Error executing command', error);
+                    }
                     this.terminalWrite(`Vim Error: ${error.message || error}`);
                     this._resetCommandMode();
                 }
@@ -1549,7 +1639,9 @@
                     try {
                         this._heap.free(nextAddr, nextLine.length + 1);
                     } catch (e) {
-                        console.error('Vim: Error freeing line', e);
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.error('Vim', 'Error freeing line', e);
+                        }
                     }
                 }
                 
@@ -1582,7 +1674,9 @@
                     try {
                         this._heap.free(currentAddr, currentLine.length + 1);
                     } catch (e) {
-                        console.error('Vim: Error freeing line', e);
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.error('Vim', 'Error freeing line', e);
+                        }
                     }
                 }
                 
@@ -1605,7 +1699,9 @@
                         try {
                             this._heap.free(addr, line.length + 1);
                         } catch (e) {
-                            console.error('Vim: Error freeing line', e);
+                            if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.error('Vim', 'Error freeing line', e);
+                        }
                         }
                     }
                 }
@@ -1638,7 +1734,9 @@
                             this._heap.free(this.yankBufferAddr, oldBuf.length + 1);
                         }
                     } catch (e) {
-                        console.error('Vim: Error freeing yank buffer', e);
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.error('Vim', 'Error freeing yank buffer', e);
+                        }
                     }
                 }
                 // 分配新的缓冲区
@@ -1661,7 +1759,9 @@
                             this._heap.free(this.yankBufferAddr, oldBuf.length + 1);
                         }
                     } catch (e) {
-                        console.error('Vim: Error freeing yank buffer', e);
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.error('Vim', 'Error freeing yank buffer', e);
+                        }
                     }
                 }
                 // 分配新的缓冲区
@@ -1742,7 +1842,9 @@
                         this._pasteText(text);
                     }
                 }).catch(err => {
-                    console.error('Vim: Failed to read clipboard', err);
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.error('Vim', 'Failed to read clipboard', err);
+                    }
                     // 降级：尝试使用DOM方式
                     this._pasteTextDOM();
                 });
@@ -1769,7 +1871,9 @@
                         this._pasteText(pastedText);
                     }
                 } catch (e) {
-                    console.error('Vim: Failed to read clipboard via DOM', e);
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.error('Vim', 'Failed to read clipboard via DOM', e);
+                    }
                 } finally {
                     document.body.removeChild(tempTextarea);
                 }
@@ -1856,33 +1960,45 @@
                         ProcessMgr = window.POOL.__GET__('KERNEL_GLOBAL_POOL', 'ProcessManager');
                     }
                 } catch (e) {
-                    console.error('Vim: Error accessing ProcessManager', e);
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.error('Vim', 'Error accessing ProcessManager', e);
+                    }
                 }
                 
                 // 调用ProcessManager.killProgram来正确终止进程
                 if (ProcessMgr && typeof ProcessMgr.killProgram === 'function') {
                     ProcessMgr.killProgram(pid, false).then((success) => {
                         if (success) {
-                            console.log(`[Vim] 进程 ${pid} 已通过ProcessManager终止`);
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.info('Vim', `进程 ${pid} 已通过ProcessManager终止`);
+                            }
                         } else {
-                            console.warn(`[Vim] 进程 ${pid} 终止失败，强制退出`);
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.warn('Vim', `进程 ${pid} 终止失败，强制退出`);
+                            }
                         }
                         // 无论成功与否，都执行退出逻辑
                         this._doExit();
                     }).catch((error) => {
-                        console.error(`[Vim] 终止进程 ${pid} 时出错:`, error);
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.error('Vim', `终止进程 ${pid} 时出错`, error);
+                        }
                         // 即使出错，也执行退出逻辑
                         this._doExit();
                     });
                 } else {
                     // ProcessManager不可用，降级处理
-                    console.warn('[Vim] ProcessManager不可用，直接退出');
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.warn('Vim', 'ProcessManager不可用，直接退出');
+                    }
                     // 清理内存（如果pid可用）
                     if (pid && typeof MemoryManager !== 'undefined') {
                         try {
                             MemoryManager.freeMemory(pid);
                         } catch (e) {
-                            console.error('Vim: Error freeing memory', e);
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.error('Vim', 'Error freeing memory', e);
+                            }
                         }
                     }
                     // 直接执行退出逻辑
@@ -2370,7 +2486,9 @@
                         }
                     }, 50);
                 }).catch(e => {
-                    console.error('Vim: Error opening file', e);
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.error('Vim', 'Error opening file', e);
+                    }
                 });
             } else {
                 // 如果没有提供文件名，打开空文件
@@ -2412,7 +2530,9 @@
                     }
                 }
             } catch (e) {
-                console.error('[Vim] 获取终端实例失败:', e);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('Vim', '获取终端实例失败', e);
+                }
             }
             
             // 降级：通过全局对象查找
@@ -2426,7 +2546,9 @@
                     terminal._vimInstance.onExit();
                 }
             } else {
-                console.warn(`[Vim] 未找到活动的vim实例 (PID: ${pid})`);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.warn('Vim', `未找到活动的vim实例 (PID: ${pid})`);
+                }
             }
         }
     };

@@ -243,7 +243,9 @@
             try {
                 new URL(url);
             } catch (e) {
-                console.error('[Browser] 无效的URL:', url);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('Browser', '无效的URL', url);
+                }
                 this._showError('无效的URL: ' + url);
                 return;
             }
@@ -322,7 +324,9 @@
                 try {
                     this.iframe.contentWindow.history.back();
                 } catch (e) {
-                    console.warn('[Browser] 无法后退:', e);
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.warn('Browser', '无法后退', e);
+                    }
                 }
             }
         },
@@ -339,7 +343,9 @@
                 try {
                     this.iframe.contentWindow.history.forward();
                 } catch (e) {
-                    console.warn('[Browser] 无法前进:', e);
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.warn('Browser', '无法前进', e);
+                    }
                 }
             }
         },
@@ -448,7 +454,9 @@
                     await this._saveBookmarksData();
                 }
             } catch (error) {
-                console.error('[Browser] 加载书签失败:', error);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('Browser', '加载书签失败', error);
+                }
                 // 使用默认书签
                 this.bookmarks = [
                     { name: "必应", url: "https://www.bing.com" },
@@ -474,7 +482,9 @@
                 // 保存到LStorage
                 await LStorage.setSystemStorage('browser.bookmarks', this.bookmarks);
             } catch (error) {
-                console.error('[Browser] 保存书签失败:', error);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('Browser', '保存书签失败', error);
+                }
             }
         },
         
@@ -656,7 +666,9 @@
                     });
                 } catch (e) {
                     // 如果无法重定义（某些浏览器可能不允许），记录警告但继续
-                    console.warn('[Browser] 无法增强安全性（拦截 window.top）:', e);
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.warn('Browser', '无法增强安全性（拦截 window.top）', e);
+                    }
                 }
                 
                 // 同源，可以注入脚本
@@ -704,7 +716,9 @@
                                         const currentUrl = new URL(iframeWindow.location.href);
                                         targetUrl = currentUrl.origin + href;
                                     } catch (e) {
-                                        console.warn('[Browser] 无法解析相对URL:', href);
+                                        if (typeof KernelLogger !== 'undefined') {
+                                            KernelLogger.warn('Browser', '无法解析相对URL', href);
+                                        }
                                         return;
                                     }
                                 } else if (!href.startsWith('http://') && !href.startsWith('https://') && !href.startsWith('javascript:') && !href.startsWith('mailto:') && !href.startsWith('tel:')) {
@@ -713,7 +727,9 @@
                                         const currentUrl = new URL(iframeWindow.location.href);
                                         targetUrl = new URL(href, currentUrl.href).href;
                                     } catch (e) {
-                                        console.warn('[Browser] 无法解析相对URL:', href);
+                                        if (typeof KernelLogger !== 'undefined') {
+                                            KernelLogger.warn('Browser', '无法解析相对URL', href);
+                                        }
                                         return;
                                     }
                                 } else if (href.startsWith('javascript:') || href.startsWith('mailto:') || href.startsWith('tel:')) {
@@ -761,11 +777,15 @@
                         });
                     } catch (e) {
                         // location 属性不可配置，跳过
-                        console.debug('[Browser] 无法拦截 location 属性');
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.debug('Browser', '无法拦截 location 属性');
+                        }
                     }
                 } catch (e) {
                     // Proxy 不可用或 location 不可代理
-                    console.debug('[Browser] 无法代理 location 对象');
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.debug('Browser', '无法代理 location 对象');
+                    }
                 }
                 
                 // 拦截表单提交
@@ -789,7 +809,9 @@
                             self._navigateTo(url.href);
                         } else {
                             // POST 请求，显示提示（因为无法在iframe内提交POST）
-                            console.warn('[Browser] POST 表单提交需要在浏览器内处理');
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.warn('Browser', 'POST 表单提交需要在浏览器内处理');
+                            }
                             self._navigateTo(action);
                         }
                     });
@@ -813,7 +835,9 @@
                 
             } catch (e) {
                 // 跨域或其他错误，无法注入
-                console.debug('[Browser] 无法注入导航拦截脚本（可能是跨域页面）:', e.message);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.debug('Browser', `无法注入导航拦截脚本（可能是跨域页面）: ${e.message}`);
+                }
             }
         },
         

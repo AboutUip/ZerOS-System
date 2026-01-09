@@ -304,25 +304,6 @@ const APPLICATION_ASSETS = {
         }
     },
     
-    // 愤怒的小鸟游戏
-    // 注意：路径是 D: 盘下的真实路径
-    "angrybirds": {
-        script: "D:/application/angrybirds/angrybirds.js",
-        styles: ["D:/application/angrybirds/angrybirds.css"],
-        icon: "D:/application/angrybirds/angrybirds.svg",
-        metadata: {
-            autoStart: false,
-            priority: 9,
-            description: "愤怒的小鸟",
-            version: "1.0.0",
-            type: "GUI",
-            alwaysShowInTaskbar: false,
-            allowMultipleInstances: false,
-            supportsPreview: true,  // 支持窗口预览快照
-            category: "other"  // 其他应用
-        }
-    },
-    
     // ZeroIDE 代码编辑器
     // 注意：路径是 D: 盘下的真实路径
     "zeroide": {
