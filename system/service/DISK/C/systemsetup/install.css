@@ -1,0 +1,722 @@
+/* ZerOS 系统安装界面样式 - Windows风格 */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', 'Microsoft YaHei UI', 'Microsoft JhengHei', 'PingFang SC', 'Hiragino Sans GB', 'Arial', sans-serif;
+    background: linear-gradient(135deg, #f5f7fa 0%, #e8ecf1 100%);
+    color: #323130;
+    overflow: hidden;
+    height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+/* 加载动画 */
+.loading-screen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(135deg, #f5f7fa 0%, #e8ecf1 100%);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    z-index: 10000;
+    opacity: 1;
+    transition: opacity 0.5s ease;
+}
+
+.loading-screen.hidden {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.loading-logo {
+    width: 100px;
+    height: 100px;
+    margin-bottom: 30px;
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+    50% {
+        transform: scale(1.05);
+        opacity: 0.8;
+    }
+}
+
+.loading-spinner {
+    width: 50px;
+    height: 50px;
+    border: 4px solid #e8ecf1;
+    border-top-color: #0078d4;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-bottom: 20px;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.loading-text {
+    font-size: 16px;
+    color: #605e5c;
+    font-weight: 500;
+}
+
+/* 自动切换状态提示 */
+.auto-next-hint {
+    background: #e8f4f8;
+    border: 1px solid #0078d4;
+    border-radius: 4px;
+    padding: 16px;
+    margin-top: 24px;
+    text-align: center;
+    color: #323130;
+    font-size: 14px;
+}
+
+.auto-next-hint .countdown {
+    font-weight: 600;
+    color: #0078d4;
+    font-size: 18px;
+    margin: 0 4px;
+}
+
+.install-container {
+    width: 800px;
+    max-width: 90vw;
+    background: #ffffff;
+    border-radius: 8px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.08);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    max-height: 90vh;
+}
+
+.install-header {
+    background: linear-gradient(135deg, #0078d4 0%, #106ebe 100%);
+    color: #ffffff;
+    padding: 40px 40px 30px;
+    text-align: center;
+    position: relative;
+}
+
+.install-header::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.install-logo {
+    width: 80px;
+    height: 80px;
+    margin: 0 auto 20px;
+    display: block;
+    filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.2));
+}
+
+.install-title {
+    font-size: 28px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: #ffffff;
+}
+
+.install-subtitle {
+    font-size: 14px;
+    color: rgba(255, 255, 255, 0.9);
+    font-weight: 400;
+}
+
+.install-content {
+    flex: 1;
+    padding: 40px;
+    overflow-y: auto;
+    background: #ffffff;
+}
+
+.step-title {
+    font-size: 24px;
+    font-weight: 600;
+    color: #323130;
+    margin-bottom: 12px;
+}
+
+.step-description {
+    color: #605e5c;
+    margin-bottom: 32px;
+    line-height: 1.6;
+    font-size: 14px;
+}
+
+/* 协议内容 */
+.agreement-content {
+    background: #faf9f8;
+    border: 1px solid #edebe9;
+    border-radius: 4px;
+    padding: 20px;
+    max-height: 400px;
+    overflow-y: auto;
+    margin-bottom: 24px;
+    font-size: 13px;
+    line-height: 1.8;
+    color: #323130;
+}
+
+.agreement-content h3 {
+    color: #0078d4;
+    margin: 16px 0 8px;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.agreement-content h4 {
+    color: #0078d4;
+    margin: 12px 0 6px;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.agreement-content p {
+    margin-bottom: 10px;
+}
+
+.agreement-content ul {
+    margin-left: 24px;
+    margin-bottom: 12px;
+}
+
+.agreement-content ul li {
+    margin-bottom: 6px;
+}
+
+.agreement-checkbox {
+    display: flex;
+    align-items: flex-start;
+    margin: 24px 0;
+    padding: 16px;
+    background: #faf9f8;
+    border: 1px solid #edebe9;
+    border-radius: 4px;
+}
+
+.agreement-checkbox input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    margin-right: 12px;
+    margin-top: 2px;
+    cursor: pointer;
+    accent-color: #0078d4;
+}
+
+.agreement-checkbox label {
+    cursor: pointer;
+    flex: 1;
+    line-height: 1.5;
+    font-size: 14px;
+}
+
+/* 环境选择 */
+.env-selection {
+    margin-bottom: 32px;
+}
+
+.env-options {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.env-option {
+    flex: 1;
+    padding: 20px;
+    background: #faf9f8;
+    border: 2px solid #edebe9;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.env-option:hover {
+    border-color: #0078d4;
+    background: #f3f2f1;
+}
+
+.env-option.selected {
+    border-color: #0078d4;
+    background: #e8f4f8;
+    box-shadow: 0 2px 8px rgba(0, 120, 212, 0.15);
+}
+
+.env-option input[type="radio"] {
+    margin-right: 10px;
+    accent-color: #0078d4;
+}
+
+.env-option label {
+    font-size: 15px;
+    font-weight: 500;
+    color: #323130;
+    cursor: pointer;
+}
+
+.env-port-input {
+    margin-top: 24px;
+}
+
+.env-port-input label {
+    display: block;
+    margin-bottom: 8px;
+    color: #605e5c;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.env-port-input input {
+    width: 200px;
+    padding: 8px 12px;
+    background: #ffffff;
+    border: 1px solid #8a8886;
+    border-radius: 2px;
+    color: #323130;
+    font-family: inherit;
+    font-size: 14px;
+    transition: border-color 0.2s ease;
+}
+
+.env-port-input input:focus {
+    outline: none;
+    border-color: #0078d4;
+    box-shadow: 0 0 0 2px rgba(0, 120, 212, 0.1);
+}
+
+/* 进度条 */
+.progress-container {
+    margin: 32px 0;
+}
+
+.progress-bar {
+    width: 100%;
+    height: 24px;
+    background: #edebe9;
+    border-radius: 12px;
+    overflow: hidden;
+    position: relative;
+    border: 1px solid #c8c6c4;
+}
+
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #0078d4, #106ebe);
+    width: 0%;
+    transition: width 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #ffffff;
+    font-weight: 500;
+    font-size: 12px;
+}
+
+.progress-text {
+    margin-top: 12px;
+    text-align: center;
+    color: #605e5c;
+    font-size: 13px;
+}
+
+.progress-status {
+    margin-top: 24px;
+    padding: 16px;
+    background: #faf9f8;
+    border: 1px solid #edebe9;
+    border-radius: 4px;
+    font-size: 13px;
+    line-height: 1.8;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.progress-status .status-item {
+    margin: 6px 0;
+    color: #605e5c;
+}
+
+.progress-status .status-item.success {
+    color: #107c10;
+}
+
+.progress-status .status-item.error {
+    color: #d13438;
+}
+
+/* 磁盘分区 */
+.partition-manager {
+    margin-bottom: 32px;
+}
+
+.partition-info {
+    background: #faf9f8;
+    border: 1px solid #edebe9;
+    border-radius: 4px;
+    padding: 20px;
+    margin-bottom: 24px;
+    font-size: 14px;
+    line-height: 1.8;
+}
+
+.partition-info div {
+    margin: 4px 0;
+}
+
+.partition-list {
+    margin-top: 24px;
+}
+
+.partition-item {
+    display: flex;
+    align-items: center;
+    padding: 16px;
+    background: #faf9f8;
+    border: 1px solid #edebe9;
+    border-radius: 4px;
+    margin-bottom: 12px;
+}
+
+.partition-item.system {
+    border-color: #0078d4;
+    background: #e8f4f8;
+}
+
+.partition-name {
+    font-weight: 600;
+    color: #0078d4;
+    min-width: 60px;
+    font-size: 14px;
+}
+
+.partition-size {
+    flex: 1;
+    margin: 0 20px;
+    display: flex;
+    align-items: center;
+}
+
+.partition-size input {
+    width: 150px;
+    padding: 6px 10px;
+    background: #ffffff;
+    border: 1px solid #8a8886;
+    border-radius: 2px;
+    color: #323130;
+    font-family: inherit;
+    font-size: 13px;
+}
+
+.partition-size input:disabled {
+    background: #f3f2f1;
+    color: #a19f9d;
+    cursor: not-allowed;
+}
+
+.partition-size-label {
+    margin-left: 12px;
+    color: #605e5c;
+    font-size: 12px;
+}
+
+.partition-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.add-partition-section {
+    margin-top: 24px;
+    padding: 20px;
+    background: #faf9f8;
+    border: 1px solid #edebe9;
+    border-radius: 4px;
+}
+
+.add-partition-section h4 {
+    color: #323130;
+    margin-bottom: 16px;
+    font-size: 15px;
+    font-weight: 600;
+}
+
+.add-partition-form {
+    display: flex;
+    gap: 12px;
+    align-items: flex-end;
+}
+
+.add-partition-form .form-group {
+    flex: 1;
+}
+
+.add-partition-form label {
+    display: block;
+    margin-bottom: 6px;
+    color: #605e5c;
+    font-size: 13px;
+    font-weight: 500;
+}
+
+.add-partition-form input,
+.add-partition-form select {
+    width: 100%;
+    padding: 8px 12px;
+    background: #ffffff;
+    border: 1px solid #8a8886;
+    border-radius: 2px;
+    color: #323130;
+    font-family: inherit;
+    font-size: 13px;
+}
+
+.add-partition-form select {
+    cursor: pointer;
+}
+
+.add-partition-form input:focus,
+.add-partition-form select:focus {
+    outline: none;
+    border-color: #0078d4;
+    box-shadow: 0 0 0 2px rgba(0, 120, 212, 0.1);
+}
+
+/* 用户设置 */
+.user-form {
+    margin-bottom: 32px;
+}
+
+.form-group {
+    margin-bottom: 24px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 8px;
+    color: #605e5c;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.form-group input {
+    width: 100%;
+    padding: 8px 12px;
+    background: #ffffff;
+    border: 1px solid #8a8886;
+    border-radius: 2px;
+    color: #323130;
+    font-family: inherit;
+    font-size: 14px;
+    transition: border-color 0.2s ease;
+}
+
+.form-group input:focus {
+    outline: none;
+    border-color: #0078d4;
+    box-shadow: 0 0 0 2px rgba(0, 120, 212, 0.1);
+}
+
+.form-group .form-hint {
+    margin-top: 6px;
+    font-size: 12px;
+    color: #8a8886;
+}
+
+/* 按钮 */
+.btn-container {
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+    margin-top: 32px;
+    padding-top: 24px;
+    border-top: 1px solid #edebe9;
+}
+
+.btn {
+    padding: 8px 20px;
+    border: none;
+    border-radius: 2px;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    min-width: 80px;
+}
+
+.btn-primary {
+    background: #0078d4;
+    color: #ffffff;
+}
+
+.btn-primary:hover:not(:disabled) {
+    background: #106ebe;
+    box-shadow: 0 2px 8px rgba(0, 120, 212, 0.3);
+}
+
+.btn-primary:active:not(:disabled) {
+    background: #005a9e;
+}
+
+.btn-secondary {
+    background: #ffffff;
+    color: #323130;
+    border: 1px solid #8a8886;
+}
+
+.btn-secondary:hover:not(:disabled) {
+    background: #f3f2f1;
+    border-color: #605e5c;
+}
+
+.btn-danger {
+    background: #d13438;
+    color: #ffffff;
+}
+
+.btn-danger:hover:not(:disabled) {
+    background: #a4262c;
+}
+
+.btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.btn-small {
+    padding: 4px 12px;
+    font-size: 12px;
+    min-width: 60px;
+}
+
+/* 完成页面 */
+.completion-message {
+    text-align: center;
+    padding: 40px 20px;
+}
+
+.completion-icon {
+    font-size: 64px;
+    color: #107c10;
+    margin-bottom: 24px;
+}
+
+.completion-title {
+    font-size: 28px;
+    font-weight: 600;
+    color: #323130;
+    margin-bottom: 16px;
+}
+
+.completion-description {
+    color: #605e5c;
+    line-height: 1.8;
+    margin-bottom: 32px;
+    font-size: 14px;
+}
+
+.completion-info {
+    background: #faf9f8;
+    border: 1px solid #edebe9;
+    border-radius: 4px;
+    padding: 24px;
+    margin: 24px 0;
+    text-align: left;
+}
+
+.completion-info h4 {
+    color: #323130;
+    margin-bottom: 12px;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.completion-info p {
+    color: #605e5c;
+    margin: 8px 0;
+    line-height: 1.6;
+    font-size: 14px;
+}
+
+/* 滚动条样式 */
+.agreement-content::-webkit-scrollbar,
+.progress-status::-webkit-scrollbar,
+.install-content::-webkit-scrollbar {
+    width: 8px;
+}
+
+.agreement-content::-webkit-scrollbar-track,
+.progress-status::-webkit-scrollbar-track,
+.install-content::-webkit-scrollbar-track {
+    background: #f3f2f1;
+    border-radius: 4px;
+}
+
+.agreement-content::-webkit-scrollbar-thumb,
+.progress-status::-webkit-scrollbar-thumb,
+.install-content::-webkit-scrollbar-thumb {
+    background: #c8c6c4;
+    border-radius: 4px;
+}
+
+.agreement-content::-webkit-scrollbar-thumb:hover,
+.progress-status::-webkit-scrollbar-thumb:hover,
+.install-content::-webkit-scrollbar-thumb:hover {
+    background: #8a8886;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+    .install-container {
+        width: 100%;
+        max-width: 100%;
+        max-height: 100vh;
+        border-radius: 0;
+    }
+    
+    .install-header {
+        padding: 30px 20px 20px;
+    }
+    
+    .install-content {
+        padding: 24px;
+    }
+    
+    .env-options {
+        flex-direction: column;
+    }
+    
+    .btn-container {
+        flex-direction: column-reverse;
+    }
+    
+    .btn {
+        width: 100%;
+    }
+}
