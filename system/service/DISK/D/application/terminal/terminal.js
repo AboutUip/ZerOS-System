@@ -1377,6 +1377,8 @@
             
             // 创建终端实例（传入终端容器元素引用和pid）
             const terminalInstance = new TerminalInstance(tabId, outputEl, promptEl, cmdEl, terminalInstanceEl, this.pid);
+            // 保存输入行引用，用于隐藏整个输入行
+            terminalInstance.inputLineEl = inputLineEl;
             
             // 保存标签页信息
             const tab = {
@@ -1442,6 +1444,17 @@
                         // 禁用非活动标签页的输入框，防止接收键盘事件
                         activeTab.terminalInstance.cmdEl.setAttribute('tabindex', '-1');
                         activeTab.terminalInstance.cmdEl.setAttribute('contenteditable', 'false');
+                        // 如果标签页处于 busy 状态，确保命令输入保持隐藏
+                        if (activeTab.terminalInstance.busy) {
+                            if (activeTab.terminalInstance.inputLineEl) {
+                                activeTab.terminalInstance.inputLineEl.style.display = 'none';
+                            } else {
+                                activeTab.terminalInstance.cmdEl.style.display = 'none';
+                                if (activeTab.terminalInstance.promptEl) {
+                                    activeTab.terminalInstance.promptEl.style.display = 'none';
+                                }
+                            }
+                        }
                     }
                     
                     activeTab.element.classList.remove('active');
@@ -1457,10 +1470,33 @@
                 tab.terminalElement.classList.add('active');
                 this.activeTabId = tabId;
                 
-                // 启用活动标签页的输入框
+                // 启用活动标签页的输入框（只有在非 busy 状态下才显示）
                 if (tab.terminalInstance && tab.terminalInstance.cmdEl) {
                     tab.terminalInstance.cmdEl.setAttribute('tabindex', '0');
-                    tab.terminalInstance.cmdEl.setAttribute('contenteditable', 'true');
+                    // 只有在非 busy 状态下才启用输入框
+                    if (!tab.terminalInstance.busy) {
+                        // 显示整个输入行
+                        if (tab.terminalInstance.inputLineEl) {
+                            tab.terminalInstance.inputLineEl.style.display = '';
+                        } else {
+                            tab.terminalInstance.cmdEl.style.display = '';
+                            if (tab.terminalInstance.promptEl) {
+                                tab.terminalInstance.promptEl.style.display = '';
+                            }
+                        }
+                        tab.terminalInstance.cmdEl.setAttribute('contenteditable', 'true');
+                    } else {
+                        // busy 状态下保持隐藏
+                        if (tab.terminalInstance.inputLineEl) {
+                            tab.terminalInstance.inputLineEl.style.display = 'none';
+                        } else {
+                            tab.terminalInstance.cmdEl.style.display = 'none';
+                            if (tab.terminalInstance.promptEl) {
+                                tab.terminalInstance.promptEl.style.display = 'none';
+                            }
+                        }
+                        tab.terminalInstance.cmdEl.setAttribute('contenteditable', 'false');
+                    }
                 }
                 
                 // 先设置 activeTabId，再调用 _setActive，确保焦点正确
@@ -1727,6 +1763,8 @@ function escapeHtml(s){
             this.terminalElement = terminalElement; // 保存终端容器元素引用
             this.pid = pid;  // 存储进程ID，用于标记DOM元素
             this.isActive = false;
+            // 保存当前运行的 CLI 程序 PID（用于 Ctrl+C 中断）
+            this._currentCliPid = null;
             
             this.env = {
                 user: 'root',
@@ -1892,10 +1930,33 @@ function escapeHtml(s){
                     this.terminalElement.classList.add('active');
                 }
                 
-                // 确保输入框已启用
+                // 确保输入框已启用（只有在非 busy 状态下才显示）
                 if (this.cmdEl) {
                     this.cmdEl.setAttribute('tabindex', '0');
-                    this.cmdEl.setAttribute('contenteditable', 'true');
+                    // 只有在非 busy 状态下才启用输入框
+                    if (!this.busy) {
+                        // 显示整个输入行
+                        if (this.inputLineEl) {
+                            this.inputLineEl.style.display = '';
+                        } else {
+                            this.cmdEl.style.display = '';
+                            if (this.promptEl) {
+                                this.promptEl.style.display = '';
+                            }
+                        }
+                        this.cmdEl.setAttribute('contenteditable', 'true');
+                    } else {
+                        // busy 状态下保持隐藏
+                        if (this.inputLineEl) {
+                            this.inputLineEl.style.display = 'none';
+                        } else {
+                            this.cmdEl.style.display = 'none';
+                            if (this.promptEl) {
+                                this.promptEl.style.display = 'none';
+                            }
+                        }
+                        this.cmdEl.setAttribute('contenteditable', 'false');
+                    }
                 }
                 
                 // 延迟获取焦点，确保 DOM 已更新且元素可见
@@ -2079,6 +2140,7 @@ function escapeHtml(s){
                     const bashWindowClickId = `terminal-bash-window-click-${this.pid}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
                     bashWindow.dataset.eventId = bashWindowClickId;
                     EventManager.registerEventHandler(this.pid, 'click', (e) => {
+                        // 检查事件目标是否在 bashWindow 内（选择器已经确保这一点，但双重检查更安全）
                         if (bashWindow === e.target || bashWindow.contains(e.target)) {
                             // 如果点击的不是输入框、按钮、链接、标签页或窗口控制按钮，聚焦到活动标签页
                             const target = e.target;
@@ -2114,7 +2176,7 @@ function escapeHtml(s){
                     }, {
                         priority: 100,
                         selector: `[data-event-id="${bashWindowClickId}"]`,
-                        useCapture: true
+                        useCapture: false  // 改为 false，使用冒泡阶段，确保能捕获到子元素的事件
                     });
                 } else {
                     // 降级方案
@@ -3735,20 +3797,90 @@ function escapeHtml(s){
             if(this.busy){
                 this.cmdEl.setAttribute('contenteditable','false');
                 this.cmdEl.classList.add('disabled');
-                this.promptEl.textContent = `${this.env.user}@${this.env.host}:${this.env.cwd}# [running]`;
+                // 隐藏整个输入行（包括提示符和命令输入）
+                if (this.inputLineEl) {
+                    this.inputLineEl.style.display = 'none';
+                } else {
+                    // 降级方案：只隐藏命令输入和提示符
+                    this.cmdEl.style.display = 'none';
+                    this.promptEl.style.display = 'none';
+                }
             }else{
-                this.cmdEl.setAttribute('contenteditable','true');
-                this.cmdEl.classList.remove('disabled');
-                this._updatePrompt();
+                // 只有在活动标签页时才显示命令输入
                 if (this.isActive) {
-                this.focus();
+                    // 显示整个输入行
+                    if (this.inputLineEl) {
+                        this.inputLineEl.style.display = '';
+                    } else {
+                        // 降级方案：显示命令输入和提示符
+                        this.cmdEl.style.display = '';
+                        this.promptEl.style.display = '';
+                    }
+                    this.cmdEl.setAttribute('contenteditable','true');
+                    this.cmdEl.classList.remove('disabled');
+                    this._updatePrompt();
+                    this.focus();
+                } else {
+                    // 非活动标签页保持隐藏，但更新状态
+                    if (this.inputLineEl) {
+                        this.inputLineEl.style.display = 'none';
+                    } else {
+                        this.cmdEl.style.display = 'none';
+                        this.promptEl.style.display = 'none';
+                    }
+                    this.cmdEl.setAttribute('contenteditable','false');
+                    this.cmdEl.classList.remove('disabled');
+                    this._updatePrompt();
                 }
             }
         }
 
         // cancel current command (sets cancel token and attempts to notify listeners)
         cancelCurrent(){
-            if(!this.busy) return;
+            // 只在活动标签页且 busy 状态下处理 Ctrl+C
+            if(!this.busy || !this.isActive) return;
+            
+            // 优先使用保存的 CLI 程序 PID
+            if (this._currentCliPid && typeof ProcessManager !== 'undefined') {
+                const ProcessMgr = ProcessManager;
+                const processInfo = ProcessMgr.PROCESS_TABLE.get(this._currentCliPid);
+                if (processInfo && processInfo.status === 'running') {
+                    // 尝试终止 CLI 程序
+                    ProcessMgr.killProgram(this._currentCliPid, false).catch(e => {
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('Terminal', `终止 CLI 程序失败 (PID: ${this._currentCliPid}): ${e.message}`);
+                        }
+                    });
+                    // 清除保存的 PID
+                    this._currentCliPid = null;
+                    // visually emulate Ctrl+C
+                    this.write('\n^C\n');
+                    this._setBusy(false);
+                    return;
+                }
+            }
+            
+            // 如果没有保存的 PID，查找与当前终端关联的正在运行的 CLI 程序
+            if (typeof ProcessManager !== 'undefined') {
+                const ProcessMgr = ProcessManager;
+                // 查找与当前终端关联的正在运行的 CLI 程序
+                for (const [pid, info] of ProcessMgr.PROCESS_TABLE) {
+                    if (info.terminalPid === this.pid && info.isCLI && info.status === 'running') {
+                        // 尝试终止 CLI 程序
+                        ProcessMgr.killProgram(pid, false).catch(e => {
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.warn('Terminal', `终止 CLI 程序失败 (PID: ${pid}): ${e.message}`);
+                            }
+                        });
+                        // visually emulate Ctrl+C
+                        this.write('\n^C\n');
+                        this._setBusy(false);
+                        return;
+                    }
+                }
+            }
+            
+            // 处理其他类型的命令取消
             if(this._currentCancel){
                 this._currentCancel.cancelled = true;
                 if(typeof this._currentCancel.fn === 'function'){
@@ -3756,7 +3888,7 @@ function escapeHtml(s){
                 }
             }
             // visually emulate Ctrl+C
-            this.write('^C');
+            this.write('\n^C\n');
             this._setBusy(false);
         }
 
@@ -8342,6 +8474,9 @@ function escapeHtml(s){
                             return;
                         }
                         
+                        // 立即设置 busy 状态，隐藏命令输入
+                        terminalInstance._setBusy(true);
+                        
                         // 异步启动程序
                         ProcessMgr.startProgram(programName, {
                             terminal: terminalInstance,
@@ -8350,8 +8485,31 @@ function escapeHtml(s){
                             cwd: payload.env.cwd
                         }).then((pid) => {
                             // 程序启动成功
-                            payload.write(`[CLI] 程序 ${programName} 已启动 (PID: ${pid})`);
+                            // 注意：不输出启动消息，让程序自己输出
+                            // payload.write(`[CLI] 程序 ${programName} 已启动 (PID: ${pid})`);
+                            
+                            // 保存当前运行的 CLI 程序 PID，用于 Ctrl+C 中断
+                            terminalInstance._currentCliPid = pid;
+                            
+                            // 监听程序退出，自动恢复 busy 状态
+                            const checkProgramStatus = setInterval(() => {
+                                const processInfo = ProcessMgr.PROCESS_TABLE.get(pid);
+                                if (!processInfo || processInfo.status !== 'running') {
+                                    clearInterval(checkProgramStatus);
+                                    // 程序已退出，恢复 busy 状态
+                                    if (terminalInstance.busy) {
+                                        terminalInstance._setBusy(false);
+                                    }
+                                    // 清除保存的 PID
+                                    if (terminalInstance._currentCliPid === pid) {
+                                        terminalInstance._currentCliPid = null;
+                                    }
+                                }
+                            }, 100);
                         }).catch((error) => {
+                            // 启动失败，恢复 busy 状态
+                            terminalInstance._setBusy(false);
+                            terminalInstance._currentCliPid = null;
                             // 程序启动失败
                             if (typeof KernelLogger !== 'undefined') {
                                 KernelLogger.error('Terminal', `启动程序 ${programName} 失败`, error);

@@ -764,12 +764,8 @@ class EventManager {
                     try {
                         const matchedElement = e.target.closest(selector);
                         if (!matchedElement) {
-                            // 调试日志：对于 mousedown 事件，记录选择器不匹配
-                            if (eventType === 'mousedown' && e.button === 0) {
-                                KernelLogger.debug("EventManager", 
-                                    `处理程序 ${handlerInfo.handlerId} (priority: ${handlerInfo.priority}) 被跳过：选择器不匹配，selector: ${selector}, target: ${e.target?.tagName || 'unknown'}`
-                                );
-                            }
+                            // 选择器不匹配是正常情况（事件可能发生在其他元素上），不需要记录日志
+                            // 这样可以避免控制台被大量调试日志淹没
                             continue; // 选择器不匹配，跳过此处理程序
                         }
                     } catch (err) {

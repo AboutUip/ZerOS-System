@@ -1723,7 +1723,11 @@ class ProcessManager {
                 if (terminalInstance) {
                     launchedFromTerminal = true;
                     processInfo.launchedFromTerminal = true;
-                    ProcessManager._log(2, `CLI程序 ${programName} 从终端内启动，使用现有终端实例`);
+                    // 设置关联的终端 PID（如果 terminalInstance 有 pid 属性）
+                    if (terminalInstance.pid) {
+                        processInfo.terminalPid = terminalInstance.pid;
+                    }
+                    ProcessManager._log(2, `CLI程序 ${programName} 从终端内启动，使用现有终端实例 (终端PID: ${processInfo.terminalPid || 'N/A'})`);
                 } else {
                     // 从GUI启动，需要创建独立的终端实例（无标签页）
                     ProcessManager._log(2, `CLI程序 ${programName} 从GUI启动，创建独立终端实例`);
@@ -2122,12 +2126,20 @@ class ProcessManager {
             }
             
             // 如果是CLI程序且创建了独立终端，先关闭终端
-            if (processInfo.isCLI && processInfo.terminalPid) {
-                ProcessManager._log(2, `CLI程序 ${processInfo.programName} 退出，关闭关联终端 (PID: ${processInfo.terminalPid})`);
-                try {
-                    await ProcessManager.killProgram(processInfo.terminalPid, force);
-                } catch (e) {
-                    ProcessManager._log(1, `关闭关联终端失败: ${e.message}`);
+            // 注意：只有 isCLITerminal = true 的终端才是程序创建的，应该关闭
+            // 从现有终端启动的程序（launchedFromTerminal = true）不应该关闭终端
+            if (processInfo.isCLI && processInfo.terminalPid && !processInfo.launchedFromTerminal) {
+                // 检查关联的终端是否是程序创建的独立终端
+                const terminalProcessInfo = ProcessManager.PROCESS_TABLE.get(processInfo.terminalPid);
+                if (terminalProcessInfo && terminalProcessInfo.isCLITerminal) {
+                    ProcessManager._log(2, `CLI程序 ${processInfo.programName} 退出，关闭关联的独立终端 (PID: ${processInfo.terminalPid})`);
+                    try {
+                        await ProcessManager.killProgram(processInfo.terminalPid, force);
+                    } catch (e) {
+                        ProcessManager._log(1, `关闭关联终端失败: ${e.message}`);
+                    }
+                } else {
+                    ProcessManager._log(2, `CLI程序 ${processInfo.programName} 从现有终端启动，不关闭终端 (终端PID: ${processInfo.terminalPid})`);
                 }
             }
             
@@ -2448,12 +2460,20 @@ class ProcessManager {
             }
             
             // 如果是CLI程序且创建了独立终端，先关闭终端
-            if (processInfo.isCLI && processInfo.terminalPid) {
-                ProcessManager._log(2, `CLI程序 ${processInfo.programName} 退出，关闭关联终端 (PID: ${processInfo.terminalPid})`);
-                try {
-                    await ProcessManager.killProgram(processInfo.terminalPid, true);
-                } catch (e) {
-                    ProcessManager._log(1, `关闭关联终端失败: ${e.message}`);
+            // 注意：只有 isCLITerminal = true 的终端才是程序创建的，应该关闭
+            // 从现有终端启动的程序（launchedFromTerminal = true）不应该关闭终端
+            if (processInfo.isCLI && processInfo.terminalPid && !processInfo.launchedFromTerminal) {
+                // 检查关联的终端是否是程序创建的独立终端
+                const terminalProcessInfo = ProcessManager.PROCESS_TABLE.get(processInfo.terminalPid);
+                if (terminalProcessInfo && terminalProcessInfo.isCLITerminal) {
+                    ProcessManager._log(2, `CLI程序 ${processInfo.programName} 退出，关闭关联的独立终端 (PID: ${processInfo.terminalPid})`);
+                    try {
+                        await ProcessManager.killProgram(processInfo.terminalPid, true);
+                    } catch (e) {
+                        ProcessManager._log(1, `关闭关联终端失败: ${e.message}`);
+                    }
+                } else {
+                    ProcessManager._log(2, `CLI程序 ${processInfo.programName} 从现有终端启动，不关闭终端 (终端PID: ${processInfo.terminalPid})`);
                 }
             }
             

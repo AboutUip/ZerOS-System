@@ -1062,6 +1062,10 @@ class TaskbarManager {
         const batteryDisplay = TaskbarManager._createBatteryDisplay();
         rightContainer.appendChild(batteryDisplay);
         
+        // 添加亮度组件（在电池之后）
+        const brightnessDisplay = TaskbarManager._createBrightnessDisplay();
+        rightContainer.appendChild(brightnessDisplay);
+        
         // 添加天气组件（在时间之前，根据设置决定是否显示）
         const weatherEnabled = await TaskbarManager._isWeatherComponentEnabled();
         if (weatherEnabled) {
@@ -1132,6 +1136,7 @@ class TaskbarManager {
             { id: 'taskbar-weather-panel', method: '_hideWeatherPanel', hasParam: false },
             { id: 'taskbar-network-panel', method: '_hideNetworkPanel', hasParam: false },
             { id: 'taskbar-battery-panel', method: '_hideBatteryPanel', hasParam: false },
+            { id: 'taskbar-brightness-panel', method: '_hideBrightnessPanel', hasParam: false },
             { id: 'taskbar-power-menu', method: '_hidePowerMenu', hasParam: true }
         ];
         
@@ -6705,6 +6710,623 @@ class TaskbarManager {
         TaskbarManager._registerBatteryEventListeners();
         
         return batteryContainer;
+    }
+    
+    /**
+     * 创建亮度显示组件
+     * @returns {HTMLElement} 亮度显示元素
+     */
+    static _createBrightnessDisplay() {
+        const brightnessContainer = document.createElement('div');
+        brightnessContainer.className = 'taskbar-brightness-display';
+        
+        // 获取任务栏位置，根据位置调整样式
+        const position = TaskbarManager._taskbarPosition || 'bottom';
+        
+        // 基础样式
+        let baseStyle = `
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            user-select: none;
+            position: relative;
+            flex-shrink: 0;
+        `;
+        
+        // 根据任务栏位置调整样式
+        if (position === 'left' || position === 'right') {
+            // 侧边任务栏：垂直布局，全宽
+            baseStyle += `
+                padding: 8px 4px;
+                min-width: 48px;
+                width: 100%;
+                height: 48px;
+            `;
+        } else {
+            // 顶部/底部任务栏：水平布局
+            baseStyle += `
+                padding: 0 12px;
+                min-width: 48px;
+                height: 48px;
+            `;
+        }
+        
+        brightnessContainer.style.cssText = baseStyle;
+        
+        // 亮度图标（使用风格相关的图标）
+        const brightnessIcon = document.createElement('div');
+        brightnessIcon.className = 'taskbar-brightness-icon';
+        // 延迟加载风格相关的图标（等待ThemeManager初始化）
+        TaskbarManager._loadSystemIconWithRetry('brightness', brightnessIcon).catch(e => {
+            KernelLogger.warn("TaskbarManager", `加载亮度图标失败: ${e.message}，使用默认图标`);
+            // 降级：使用内联SVG（太阳图标）
+            brightnessIcon.innerHTML = `
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="12" cy="12" r="5" stroke="currentColor" stroke-width="1.5" fill="none" opacity="0.9"/>
+                    <path d="M12 2v3M12 19v3M22 12h-3M5 12H2M19.07 4.93l-2.12 2.12M7.05 16.95l-2.12 2.12M19.07 19.07l-2.12-2.12M7.05 7.05L4.93 4.93" 
+                          stroke="currentColor" stroke-width="1.5" stroke-linecap="round" opacity="0.9"/>
+                </svg>
+            `;
+        });
+        brightnessIcon.style.cssText = `
+            width: var(--style-icon-size-medium, 24px);
+            height: var(--style-icon-size-medium, 24px);
+            color: rgba(215, 224, 221, 0.9);
+            transition: var(--style-icon-transition, all 0.3s ease);
+        `;
+        
+        brightnessContainer.appendChild(brightnessIcon);
+        
+        // 悬停效果
+        brightnessContainer.addEventListener('mouseenter', () => {
+            brightnessContainer.style.background = 'rgba(139, 92, 246, 0.15)';
+            brightnessIcon.style.color = 'rgba(139, 92, 246, 1)';
+            brightnessIcon.style.transform = 'scale(1.1)';
+        });
+        
+        brightnessContainer.addEventListener('mouseleave', () => {
+            brightnessContainer.style.background = 'transparent';
+            brightnessIcon.style.color = 'rgba(215, 224, 221, 0.9)';
+            brightnessIcon.style.transform = 'scale(1)';
+        });
+        
+        // 点击事件：显示亮度面板
+        brightnessContainer.addEventListener('click', (e) => {
+            e.stopPropagation();
+            TaskbarManager._toggleBrightnessPanel(brightnessContainer);
+        });
+        
+        // 初始化亮度显示
+        TaskbarManager._updateBrightnessDisplay(brightnessContainer);
+        
+        return brightnessContainer;
+    }
+    
+    /**
+     * 更新亮度显示
+     * @param {HTMLElement} brightnessContainer 亮度容器元素
+     */
+    static async _updateBrightnessDisplay(brightnessContainer) {
+        if (!brightnessContainer) return;
+        
+        // 从注册表读取亮度值
+        let brightness = 100; // 默认100%
+        try {
+            if (typeof LStorage !== 'undefined') {
+                const registry = await LStorage.getSystemStorage('registry');
+                if (registry && registry.brightness !== undefined) {
+                    brightness = registry.brightness;
+                    // 如果旧值小于70，调整到70（兼容旧数据）
+                    if (brightness < 70) {
+                        brightness = 70;
+                    }
+                    // 如果旧值大于100，调整到100
+                    if (brightness > 100) {
+                        brightness = 100;
+                    }
+                }
+            }
+        } catch (e) {
+            KernelLogger.warn("TaskbarManager", `读取亮度值失败: ${e.message}`);
+        }
+        
+        // 更新工具提示
+        brightnessContainer.title = `屏幕亮度: ${brightness}%`;
+        
+        // 根据亮度值调整图标透明度（可选）
+        // 将70-100映射到0.5-1.0的透明度
+        const brightnessIcon = brightnessContainer.querySelector('.taskbar-brightness-icon');
+        if (brightnessIcon) {
+            const opacity = 0.5 + ((brightness - 70) / 30) * 0.5; // 70%对应0.5，100%对应1.0
+            brightnessIcon.style.opacity = opacity.toString();
+        }
+    }
+    
+    /**
+     * 切换亮度面板（显示/隐藏）
+     * @param {HTMLElement} brightnessContainer 亮度显示容器
+     */
+    static _toggleBrightnessPanel(brightnessContainer) {
+        // 检查是否已存在亮度面板
+        let brightnessPanel = document.getElementById('taskbar-brightness-panel');
+        
+        if (brightnessPanel && brightnessPanel.classList.contains('visible')) {
+            // 如果已显示，则隐藏
+            TaskbarManager._hideBrightnessPanel(brightnessPanel);
+        } else {
+            // 如果未显示，先关闭其他所有弹出组件，然后显示
+            TaskbarManager._closeAllTaskbarPopups('taskbar-brightness-panel');
+            if (!brightnessPanel) {
+                brightnessPanel = TaskbarManager._createBrightnessPanel();
+            }
+            TaskbarManager._showBrightnessPanel(brightnessPanel, brightnessContainer);
+        }
+    }
+    
+    /**
+     * 创建亮度面板
+     * @returns {HTMLElement} 亮度面板元素
+     */
+    static _createBrightnessPanel() {
+        const panel = document.createElement('div');
+        panel.id = 'taskbar-brightness-panel';
+        panel.className = 'taskbar-brightness-panel';
+        
+        // 应用主题背景色
+        const themeManager = typeof POOL !== 'undefined' && typeof POOL.__GET__ === 'function' 
+            ? POOL.__GET__("KERNEL_GLOBAL_POOL", "ThemeManager")
+            : (typeof ThemeManager !== 'undefined' ? ThemeManager : null);
+        if (themeManager) {
+            try {
+                const currentTheme = themeManager.getCurrentTheme();
+                if (currentTheme && currentTheme.colors) {
+                    const panelBg = currentTheme.colors.backgroundElevated || currentTheme.colors.backgroundSecondary || currentTheme.colors.background;
+                    panel.style.backgroundColor = panelBg;
+                    panel.style.borderColor = currentTheme.colors.border || (currentTheme.colors.primary ? currentTheme.colors.primary + '33' : 'rgba(108, 142, 255, 0.2)');
+                }
+            } catch (e) {
+                KernelLogger.warn("TaskbarManager", `应用主题到亮度面板失败: ${e.message}`);
+            }
+        }
+        
+        // 创建内容容器
+        const content = document.createElement('div');
+        content.className = 'taskbar-brightness-panel-content';
+        
+        // 创建标题
+        const title = document.createElement('div');
+        title.className = 'brightness-panel-title';
+        title.textContent = '屏幕亮度';
+        content.appendChild(title);
+        
+        // 创建亮度滑块容器
+        const sliderContainer = document.createElement('div');
+        sliderContainer.className = 'brightness-slider-container';
+        
+        // 创建亮度图标（左侧）
+        const iconContainer = document.createElement('div');
+        iconContainer.className = 'brightness-icon-container';
+        const brightnessIcon = document.createElement('div');
+        brightnessIcon.className = 'brightness-panel-icon';
+        TaskbarManager._loadSystemIconWithRetry('brightness', brightnessIcon).catch(e => {
+            // 降级：使用内联SVG
+            brightnessIcon.innerHTML = `
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="12" cy="12" r="5" stroke="currentColor" stroke-width="1.5" fill="none"/>
+                    <path d="M12 2v3M12 19v3M22 12h-3M5 12H2M19.07 4.93l-2.12 2.12M7.05 16.95l-2.12 2.12M19.07 19.07l-2.12-2.12M7.05 7.05L4.93 4.93" 
+                          stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                </svg>
+            `;
+        });
+        iconContainer.appendChild(brightnessIcon);
+        sliderContainer.appendChild(iconContainer);
+        
+        // 创建滑块
+        const sliderWrapper = document.createElement('div');
+        sliderWrapper.className = 'brightness-slider-wrapper';
+        
+        const slider = document.createElement('input');
+        slider.type = 'range';
+        slider.min = '70';  // 最小亮度70%（不是纯黑）
+        slider.max = '100';
+        slider.value = '100';
+        slider.step = '1';
+        slider.className = 'brightness-slider';
+        slider.id = 'brightness-slider';
+        
+        // 创建亮度值显示
+        const valueDisplay = document.createElement('div');
+        valueDisplay.className = 'brightness-value-display';
+        valueDisplay.textContent = '100%';
+        valueDisplay.id = 'brightness-value-display';
+        
+        sliderWrapper.appendChild(slider);
+        sliderWrapper.appendChild(valueDisplay);
+        sliderContainer.appendChild(sliderWrapper);
+        
+        content.appendChild(sliderContainer);
+        
+        // 加载保存的亮度值
+        TaskbarManager._loadBrightnessValue(slider, valueDisplay);
+        
+        // 滑块事件处理
+        let updateTimeout = null;
+        slider.addEventListener('input', (e) => {
+            const value = parseInt(e.target.value);
+            valueDisplay.textContent = `${value}%`;
+            
+            // 实时更新屏幕亮度（通过CSS变量）
+            // 将70-100映射到0.3-1.0的亮度值（70%对应0.3，100%对应1.0）
+            // 公式：brightness = 0.3 + (value - 70) / 30 * 0.7
+            const brightnessValue = 0.3 + ((value - 70) / 30) * 0.7;
+            document.documentElement.style.setProperty('--screen-brightness', brightnessValue.toString());
+            
+            // 同时直接应用到 sandbox-container 和 gui-container（确保立即生效）
+            const sandboxContainer = document.getElementById('sandbox-container') || document.querySelector('.sandbox-container');
+            const guiContainer = document.getElementById('gui-container') || document.querySelector('.gui-container');
+            
+            if (sandboxContainer) {
+                sandboxContainer.style.filter = `brightness(${brightnessValue})`;
+            }
+            if (guiContainer) {
+                guiContainer.style.filter = `brightness(${brightnessValue})`;
+            }
+            
+            // 应用到所有视频背景元素
+            const videoBackgrounds = document.querySelectorAll('.desktop-background-video');
+            videoBackgrounds.forEach(video => {
+                video.style.filter = `brightness(${brightnessValue})`;
+            });
+            
+            // 防抖保存到注册表（延迟500ms）
+            if (updateTimeout) {
+                clearTimeout(updateTimeout);
+            }
+            updateTimeout = setTimeout(() => {
+                TaskbarManager._saveBrightnessValue(value);
+            }, 500);
+        });
+        
+        panel.appendChild(content);
+        
+        // 将面板添加到body（确保在最上层）
+        document.body.appendChild(panel);
+        
+        return panel;
+    }
+    
+    /**
+     * 加载亮度值
+     * @param {HTMLElement} slider 滑块元素
+     * @param {HTMLElement} valueDisplay 值显示元素
+     */
+    static async _loadBrightnessValue(slider, valueDisplay) {
+        try {
+            if (typeof LStorage !== 'undefined') {
+                const registry = await LStorage.getSystemStorage('registry');
+                if (registry && registry.brightness !== undefined) {
+                    let brightness = registry.brightness;
+                    // 如果旧值小于70，调整到70（兼容旧数据）
+                    if (brightness < 70) {
+                        brightness = 70;
+                    }
+                    // 如果旧值大于100，调整到100
+                    if (brightness > 100) {
+                        brightness = 100;
+                    }
+                    slider.value = brightness;
+                    valueDisplay.textContent = `${brightness}%`;
+                    // 应用亮度：将70-100映射到0.3-1.0
+                    const brightnessValue = 0.3 + ((brightness - 70) / 30) * 0.7;
+                    document.documentElement.style.setProperty('--screen-brightness', brightnessValue.toString());
+                    
+                    // 同时直接应用到容器（确保立即生效，包括视频背景）
+                    const sandboxContainer = document.getElementById('sandbox-container') || document.querySelector('.sandbox-container');
+                    const guiContainer = document.getElementById('gui-container') || document.querySelector('.gui-container');
+                    
+                    if (sandboxContainer) {
+                        sandboxContainer.style.filter = `brightness(${brightnessValue})`;
+                    }
+                    if (guiContainer) {
+                        guiContainer.style.filter = `brightness(${brightnessValue})`;
+                    }
+                    
+                    // 应用到所有视频背景元素（确保视频背景也受亮度影响）
+                    const videoBackgrounds = document.querySelectorAll('.desktop-background-video');
+                    videoBackgrounds.forEach(video => {
+                        video.style.filter = `brightness(${brightnessValue})`;
+                    });
+                }
+            }
+        } catch (e) {
+            KernelLogger.warn("TaskbarManager", `加载亮度值失败: ${e.message}`);
+        }
+    }
+    
+    /**
+     * 保存亮度值到注册表
+     * @param {number} brightness 亮度值（0-100）
+     */
+    static async _saveBrightnessValue(brightness) {
+        try {
+            if (typeof LStorage !== 'undefined') {
+                // 获取注册表
+                let registry = await LStorage.getSystemStorage('registry');
+                if (!registry || typeof registry !== 'object') {
+                    registry = {};
+                }
+                
+                // 设置亮度值
+                registry.brightness = brightness;
+                
+                // 保存注册表
+                await LStorage.setSystemStorage('registry', registry);
+                
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.info("TaskbarManager", `亮度值已保存到注册表: ${brightness}%`);
+                }
+            }
+        } catch (e) {
+            if (typeof KernelLogger !== 'undefined') {
+                KernelLogger.error("TaskbarManager", `保存亮度值失败: ${e.message}`, e);
+            }
+        }
+    }
+    
+    /**
+     * 显示亮度面板（带蒙版层）
+     * @param {HTMLElement} panel 亮度面板元素
+     * @param {HTMLElement} brightnessContainer 亮度显示容器
+     */
+    static _showBrightnessPanel(panel, brightnessContainer) {
+        if (!panel || !brightnessContainer) return;
+        
+        // 关闭通知栏（互斥显示）
+        if (typeof NotificationManager !== 'undefined' && typeof NotificationManager._hideNotificationContainer === 'function') {
+            NotificationManager._hideNotificationContainer();
+        }
+        
+        // 清除之前的隐藏定时器（如果存在）
+        if (panel._hideTimeout) {
+            clearTimeout(panel._hideTimeout);
+            panel._hideTimeout = null;
+        }
+        
+        // 创建或获取蒙版层
+        let mask = document.getElementById('taskbar-popup-mask');
+        if (!mask) {
+            mask = document.createElement('div');
+            mask.id = 'taskbar-popup-mask';
+            mask.className = 'taskbar-popup-mask';
+            document.body.appendChild(mask);
+        }
+        
+        // 显示蒙版层（带动画）
+        mask.classList.add('visible');
+        
+        // 重置内联样式（确保之前强制隐藏的样式被清除）
+        panel.style.display = '';
+        panel.style.opacity = '';
+        panel.style.visibility = '';
+        
+        // 获取任务栏位置
+        const position = TaskbarManager._taskbarPosition || 'bottom';
+        const containerRect = brightnessContainer.getBoundingClientRect();
+        const viewportWidth = window.innerWidth;
+        const viewportHeight = window.innerHeight;
+        const padding = 20;
+        const panelWidth = 320;
+        const panelHeight = 200; // 估算高度
+        
+        // 重置所有位置样式
+        panel.style.left = '';
+        panel.style.right = '';
+        panel.style.top = '';
+        panel.style.bottom = '';
+        
+        // 先显示元素以获取实际尺寸
+        panel.classList.add('visible');
+        
+        // 等待DOM更新后获取实际尺寸并调整位置
+        setTimeout(() => {
+            const panelRect = panel.getBoundingClientRect();
+            const actualWidth = panelRect.width || panelWidth;
+            const actualHeight = panelRect.height || panelHeight;
+            
+            // 声明变量
+            let panelLeft;
+            let panelTop;
+            
+            switch (position) {
+                case 'top':
+                    // 任务栏在顶部，面板显示在下方
+                    panelLeft = containerRect.right - actualWidth;
+                    
+                    // 检查左边界
+                    if (panelLeft < padding) {
+                        panelLeft = padding;
+                    }
+                    
+                    // 检查右边界
+                    if (panelLeft + actualWidth > viewportWidth - padding) {
+                        panelLeft = viewportWidth - actualWidth - padding;
+                    }
+                    
+                    // 检查下边界（确保不溢出屏幕）
+                    panelTop = containerRect.bottom + 10;
+                    if (panelTop + actualHeight > viewportHeight - padding) {
+                        panelTop = Math.max(padding, viewportHeight - actualHeight - padding);
+                    }
+                    
+                    panel.style.left = `${panelLeft}px`;
+                    panel.style.top = `${panelTop}px`;
+                    break;
+                    
+                case 'bottom':
+                    // 任务栏在底部，面板显示在上方（默认）
+                    panelLeft = containerRect.right - actualWidth;
+                    
+                    // 检查左边界
+                    if (panelLeft < padding) {
+                        panelLeft = padding;
+                    }
+                    
+                    // 检查右边界
+                    if (panelLeft + actualWidth > viewportWidth - padding) {
+                        panelLeft = viewportWidth - actualWidth - padding;
+                    }
+                    
+                    panel.style.left = `${panelLeft}px`;
+                    panel.style.bottom = `${viewportHeight - containerRect.top + 10}px`;
+                    break;
+                    
+                case 'left':
+                    // 任务栏在左侧，面板显示在右侧
+                    panelTop = containerRect.top;
+                    
+                    // 检查上边界
+                    if (panelTop < padding) {
+                        panelTop = padding;
+                    }
+                    
+                    // 检查下边界（确保不溢出屏幕）
+                    if (panelTop + actualHeight > viewportHeight - padding) {
+                        panelTop = Math.max(padding, viewportHeight - actualHeight - padding);
+                    }
+                    
+                    // 检查右边界（确保不溢出屏幕）
+                    panelLeft = containerRect.right + 10;
+                    if (panelLeft + actualWidth > viewportWidth - padding) {
+                        panelLeft = viewportWidth - actualWidth - padding;
+                    }
+                    
+                    panel.style.left = `${panelLeft}px`;
+                    panel.style.top = `${panelTop}px`;
+                    break;
+                    
+                case 'right':
+                    // 任务栏在右侧，面板显示在左侧
+                    panelTop = containerRect.top;
+                    
+                    // 检查上边界
+                    if (panelTop < padding) {
+                        panelTop = padding;
+                    }
+                    
+                    // 检查下边界（确保不溢出屏幕）
+                    if (panelTop + actualHeight > viewportHeight - padding) {
+                        panelTop = Math.max(padding, viewportHeight - actualHeight - padding);
+                    }
+                    
+                    // 检查左边界（确保不溢出屏幕）
+                    panelLeft = containerRect.left - actualWidth - 10;
+                    if (panelLeft < padding) {
+                        panelLeft = padding;
+                    }
+                    
+                    panel.style.left = `${panelLeft}px`;
+                    panel.style.top = `${panelTop}px`;
+                    break;
+            }
+        }, 0);
+        
+        // 使用 AnimateManager 添加打开动画
+        if (typeof AnimateManager !== 'undefined') {
+            AnimateManager.addAnimationClasses(panel, 'PANEL', 'OPEN');
+        }
+        
+        // 注册点击外部关闭
+        const closeOnClickOutside = (e) => {
+            if (!panel.contains(e.target) && !brightnessContainer.contains(e.target)) {
+                TaskbarManager._hideBrightnessPanel(panel);
+            }
+        };
+        
+        // 蒙版层点击关闭
+        mask.addEventListener('click', closeOnClickOutside);
+        panel._maskCloseHandler = closeOnClickOutside;
+        
+        if (typeof EventManager !== 'undefined' && typeof EventManager.registerMenu === 'function') {
+            EventManager.registerMenu(
+                'brightness-panel',
+                panel,
+                () => {
+                    TaskbarManager._hideBrightnessPanel(panel);
+                },
+                ['.taskbar-brightness-display']
+            );
+        } else {
+            // 降级方案
+            setTimeout(() => {
+                document.addEventListener('click', closeOnClickOutside, true);
+                document.addEventListener('mousedown', closeOnClickOutside, true);
+            }, 0);
+            panel._closeOnClickOutside = closeOnClickOutside;
+        }
+    }
+    
+    /**
+     * 隐藏亮度面板
+     * @param {HTMLElement} panel 亮度面板元素
+     */
+    static _hideBrightnessPanel(panel, immediate = false) {
+        if (!panel) return;
+        
+        // 清除之前的隐藏定时器
+        if (panel._hideTimeout) {
+            clearTimeout(panel._hideTimeout);
+            panel._hideTimeout = null;
+        }
+        
+        // 隐藏蒙版层
+        const mask = document.getElementById('taskbar-popup-mask');
+        if (mask) {
+            mask.classList.remove('visible');
+        }
+        
+        // 清理事件监听器
+        if (panel._closeOnClickOutside) {
+            document.removeEventListener('click', panel._closeOnClickOutside, true);
+            document.removeEventListener('mousedown', panel._closeOnClickOutside, true);
+            panel._closeOnClickOutside = null;
+        }
+        
+        if (panel._maskCloseHandler && mask) {
+            mask.removeEventListener('click', panel._maskCloseHandler);
+            panel._maskCloseHandler = null;
+        }
+        
+        if (immediate) {
+            // 立即隐藏
+            panel.classList.remove('visible');
+            panel.style.display = 'none';
+            panel.style.opacity = '0';
+            panel.style.visibility = 'hidden';
+            if (typeof AnimateManager !== 'undefined') {
+                AnimateManager.stopAnimation(panel);
+                AnimateManager.removeAnimationClasses(panel);
+            }
+        } else {
+            // 使用 AnimateManager 添加关闭动画
+            if (typeof AnimateManager !== 'undefined') {
+                AnimateManager.addAnimationClasses(panel, 'PANEL', 'CLOSE');
+                // 等待动画完成后隐藏
+                panel._hideTimeout = setTimeout(() => {
+                    panel.classList.remove('visible');
+                    panel.style.display = 'none';
+                    panel.style.opacity = '0';
+                    panel.style.visibility = 'hidden';
+                    AnimateManager.removeAnimationClasses(panel);
+                }, 300);
+            } else {
+                // 降级：直接隐藏
+                panel.classList.remove('visible');
+                panel.style.display = 'none';
+            }
+        }
     }
     
     /**
