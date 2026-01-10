@@ -2,7 +2,7 @@
 
 ## 概述
 
-`LStorage` 是 ZerOS 内核的本地存储管理器，负责本地数据的管理、注册等操作。系统依赖的本地数据和程序的本地数据存储在 `D:/LocalSData.json` 文件中，而动态安装的应用程序注册表存储在 `D:/ApplicationTable.json` 文件中。
+`LStorage` 是 ZerOS 内核的本地存储管理器，负责本地数据的管理、注册等操作。系统依赖的本地数据和程序的本地数据存储在 `{partition}/LocalSData.json` 文件中（优先使用 D: 系统盘，如果 D: 不存在则使用第一个可用分区），而动态安装的应用程序注册表存储在 `{partition}/ApplicationTable.json` 文件中（使用相同的分区）。系统支持 A-Z 所有分区，但默认优先使用 D: 系统盘。
 
 ## 依赖
 
@@ -480,9 +480,10 @@ await LStorage.setEnvironmentVariable('CUSTOM_VAR', 'custom_value');
 
 ## 存储文件
 
-- **路径**: `D:/LocalSData.json`
+- **路径**: `{partition}/LocalSData.json`（优先使用 D: 系统盘，如果 D: 不存在则使用第一个可用分区）
 - **格式**: JSON
 - **自动保存**: 每次写入操作后自动保存到文件
+- **多分区支持**: 系统支持 A-Z 所有分区，但默认优先使用 D: 系统盘
 
 ## 权限与安全
 
@@ -585,14 +586,16 @@ await LStorage.setEnvironmentVariable('CUSTOM_VAR', 'custom_value');
   3. **内核层**：`LStorage.installApplication()` 会验证管理员权限和 `APPLICATION_INSTALL` 权限
 
 **存储位置**:
-- `ApplicationTable` 存储在 `D:/ApplicationTable.json` 文件中（**不是** `D:/LocalSData.json`）
+- `ApplicationTable` 存储在 `{partition}/ApplicationTable.json` 文件中（**不是** `LocalSData.json`）
+- 使用与 `LocalSData.json` 相同的分区（优先使用 D: 系统盘，如果 D: 不存在则使用第一个可用分区）
 - 该文件独立于系统存储，专门用于管理动态安装的应用程序
+- 系统支持 A-Z 所有分区，但默认优先使用 D: 系统盘
 
 **功能**:
 1. 验证权限（管理员权限和 `APPLICATION_INSTALL` 权限）
-2. 如果提供了 `sourceFiles`，复制文件到 `D:/application/<程序名>/` 目录
+2. 如果提供了 `sourceFiles`，复制文件到 `{partition}/application/<程序名>/` 目录（使用系统分区）
 3. 更新 `asset` 中的路径为绝对路径
-4. 注册程序到 `ApplicationTable`（写入 `D:/ApplicationTable.json`）
+4. 注册程序到 `ApplicationTable`（写入 `{partition}/ApplicationTable.json`）
 5. **自动刷新 `ApplicationAssetManager`**（使新程序立即可用）
 
 **示例**:
@@ -661,7 +664,7 @@ await ProcessManager.callKernelAPI(pid, 'Application.install', [
 `uninstall.js` 应该负责以下任务：
 
 1. **清理注册表数据**：删除程序在注册表中注册的数据（如配置、缓存键等）
-2. **删除缓存文件**：删除程序创建的缓存文件（如 `D:/cache/<程序名>/` 目录下的文件）
+2. **删除缓存文件**：删除程序创建的缓存文件（如 `{partition}/cache/<程序名>/` 目录下的文件，使用缓存分区）
 3. **清理其他残留数据**：删除程序创建的其他数据文件（但不包括程序资源文件，因为系统会自动处理）
 
 **重要**：`uninstall.js` **不应该**删除程序资源文件（如脚本、样式、图标等），因为这些文件会在 `uninstall.js` 执行完成后由系统自动删除。
@@ -860,11 +863,12 @@ console.log('已安装的程序:', names);
    - 图标路径会被正确转换，可以在开始菜单中正确显示
 
 4. **权限控制**：
-   - `ApplicationTable` 存储在独立的文件 `D:/ApplicationTable.json` 中（**不是** `D:/LocalSData.json`）
+   - `ApplicationTable` 存储在独立的文件 `{partition}/ApplicationTable.json` 中（**不是** `LocalSData.json`）
+   - 使用与 `LocalSData.json` 相同的分区（优先使用 D: 系统盘，如果 D: 不存在则使用第一个可用分区）
    - `applicationTable` 键受到特殊保护，只能通过 `installApplication()` 和 `uninstallApplication()` 修改
    - 直接调用 `setSystemStorage('applicationTable', ...)` 会被拒绝
-   - 读取 `ApplicationTable` 使用 `getSystemStorage('applicationTable')`，会从 `D:/ApplicationTable.json` 读取
-   - 写入 `ApplicationTable` 使用 `setSystemStorage('applicationTable', ...)`，会写入到 `D:/ApplicationTable.json`
+   - 读取 `ApplicationTable` 使用 `getSystemStorage('applicationTable')`，会从 `{partition}/ApplicationTable.json` 读取
+   - 写入 `ApplicationTable` 使用 `setSystemStorage('applicationTable', ...)`，会写入到 `{partition}/ApplicationTable.json`
 
 ## 相关文档
 

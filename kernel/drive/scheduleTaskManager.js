@@ -162,6 +162,23 @@ class ScheduleTaskManager {
         }
         
         ScheduleTaskManager._systemStarted = true;
+        
+        // 检查是否处于安全模式（安全模式下不执行计划任务）
+        let isSafeMode = false;
+        try {
+            if (typeof sessionStorage !== 'undefined') {
+                const safeModeFlag = sessionStorage.getItem('__ZEROS_SAFE_MODE__');
+                isSafeMode = safeModeFlag === 'true';
+            }
+        } catch (e) {
+            // sessionStorage可能不可用，忽略错误
+        }
+        
+        if (isSafeMode) {
+            KernelLogger.info("ScheduleTaskManager", "安全模式已启用，跳过计划任务执行");
+            return;
+        }
+        
         KernelLogger.info("ScheduleTaskManager", "系统启动完成，执行启动任务");
         
         // 执行所有系统启动任务

@@ -52,8 +52,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 // 基础路径配置
 define('DISK_BASE_PATH', __DIR__ . '/DISK');
-define('DISK_C_PATH', DISK_BASE_PATH . '/C');
-define('DISK_D_PATH', DISK_BASE_PATH . '/D');
+
+/**
+ * 获取分区物理路径
+ * @param string $diskLetter 分区字母 (A-Z)
+ * @return string|null 分区路径，如果分区不存在则返回null
+ */
+function getPartitionPath($diskLetter) {
+    if (!preg_match('/^[A-Z]$/', $diskLetter)) {
+        return null;
+    }
+    $path = DISK_BASE_PATH . '/' . $diskLetter;
+    // 不主动创建分区目录，如果不存在则返回null
+    return $path;
+}
+
+/**
+ * 检查分区是否存在
+ * @param string $diskLetter 分区字母 (A-Z)
+ * @return bool
+ */
+function partitionExists($diskLetter) {
+    $path = getPartitionPath($diskLetter);
+    return $path !== null && is_dir($path);
+}
 
 /**
  * 响应函数
@@ -80,8 +102,8 @@ function validatePath($path) {
     // 移除开头的斜杠
     $path = ltrim($path, '/');
     
-    // 检查路径格式：应该是 C:、C:/...、D: 或 D:/...
-    if (!preg_match('/^[CD]:(\/|$)/', $path)) {
+    // 检查路径格式：应该是 A-Z:、A-Z:/...（支持A-Z所有分区）
+    if (!preg_match('/^[A-Z]:(\/|$)/', $path)) {
         return false;
     }
     
@@ -90,8 +112,8 @@ function validatePath($path) {
     $disk = $parts[0];
     $relativePath = isset($parts[1]) ? ltrim($parts[1], '/') : '';
     
-    // 验证盘符
-    if (!in_array($disk, ['C', 'D'])) {
+    // 验证盘符格式（A-Z）
+    if (!preg_match('/^[A-Z]$/', $disk)) {
         return false;
     }
     
@@ -115,7 +137,15 @@ function getRealPath($virtualPath) {
     $disk = $validated['disk'];
     $relativePath = $validated['path'];
     
-    $basePath = $disk === 'C' ? DISK_C_PATH : DISK_D_PATH;
+    $basePath = getPartitionPath($disk);
+    if ($basePath === null) {
+        return null;
+    }
+    
+    // 检查分区目录是否存在（不主动创建）
+    if (!is_dir($basePath)) {
+        return null; // 分区不存在
+    }
     
     // 如果相对路径为空，直接返回基础路径（根目录）
     if (empty($relativePath)) {

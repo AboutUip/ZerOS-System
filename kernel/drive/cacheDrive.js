@@ -1,17 +1,129 @@
 ﻿// 缓存驱动
 // 负责整个 ZerOS 系统的缓存管理
 // 统一管理内核、系统和应用程序的缓存
+// 所有缓存都必须从系统磁盘D加载
 // 默认缓存目录：D:/cache/
 // 默认缓存管理文件：D:/LocalCache.json
 
 KernelLogger.info("CacheDrive", "模块初始化");
 
 class CacheDrive {
-    // 缓存目录路径
+    // 缓存分区（始终使用系统盘D:）
+    static _cachePartition = "D:";
+    
+    // 缓存目录路径（始终使用系统盘D:）
     static CACHE_DIR = "D:/cache/";
     
-    // 缓存管理文件路径
+    // 缓存管理文件路径（始终使用系统盘D:）
     static CACHE_METADATA_FILE = "D:/LocalCache.json";
+    
+    /**
+     * 获取缓存分区路径（始终返回系统盘D:）
+     * @returns {string} 分区路径（始终为 "D:"）
+     */
+    static _getCachePartition() {
+        return CacheDrive._cachePartition;
+    }
+    
+    /**
+     * 等待分区可用（用于等待 D: 分区初始化完成）
+     * @param {string} partitionName 分区名称（如 "D:"）
+     * @param {number} maxRetries 最大重试次数（默认 200，约 20 秒）
+     * @param {number} retryDelay 重试延迟（毫秒，默认 100）
+     * @returns {Promise<boolean>} 分区是否可用
+     */
+    static async _waitForPartition(partitionName, maxRetries = 200, retryDelay = 100) {
+        if (typeof Disk === 'undefined') {
+            KernelLogger.debug("CacheDrive", "Disk 模块未加载，等待加载...");
+            // 如果 Disk 模块未加载，等待一段时间后重试
+            for (let i = 0; i < 50; i++) {
+                await new Promise(resolve => setTimeout(resolve, 50));
+                if (typeof Disk !== 'undefined') {
+                    break;
+                }
+            }
+            if (typeof Disk === 'undefined') {
+                KernelLogger.warn("CacheDrive", "Disk 模块仍未加载，无法检查分区");
+                return false;
+            }
+        }
+        
+        // 首先等待 Disk 初始化完成
+        let diskInitialized = false;
+        for (let i = 0; i < 100; i++) {
+            try {
+                if (Disk.canUsed) {
+                    diskInitialized = true;
+                    break;
+                }
+            } catch (e) {
+                // 忽略错误，继续等待
+            }
+            await new Promise(resolve => setTimeout(resolve, 50));
+        }
+        
+        if (!diskInitialized) {
+            KernelLogger.debug("CacheDrive", "Disk 初始化未完成，但继续检查分区");
+        }
+        
+        // 然后检查分区是否存在
+        for (let i = 0; i < maxRetries; i++) {
+            try {
+                const diskMap = Disk.diskSeparateMap;
+                const diskSize = Disk.diskSeparateSize;
+                const hasPartition = (diskMap && diskMap.has(partitionName)) || 
+                                   (diskSize && diskSize.has(partitionName));
+                if (hasPartition) {
+                    if (i > 0 || !diskInitialized) {
+                        KernelLogger.info("CacheDrive", `分区 ${partitionName} 已可用（重试 ${i + 1} 次后）`);
+                    } else {
+                        KernelLogger.debug("CacheDrive", `分区 ${partitionName} 已可用`);
+                    }
+                    return true;
+                }
+            } catch (e) {
+                KernelLogger.debug("CacheDrive", `检查分区 ${partitionName} 时出错: ${e.message}`);
+            }
+            
+            if (i < maxRetries - 1) {
+                await new Promise(resolve => setTimeout(resolve, retryDelay));
+            }
+        }
+        
+        // 如果分区仍然不可用，检查所有可用分区
+        try {
+            const diskMap = Disk.diskSeparateMap;
+            const diskSize = Disk.diskSeparateSize;
+            const availablePartitions = diskMap && diskMap.size > 0 
+                ? Array.from(diskMap.keys()).join(', ')
+                : (diskSize && diskSize.size > 0 
+                    ? Array.from(diskSize.keys()).join(', ')
+                    : '无');
+            KernelLogger.warn("CacheDrive", `分区 ${partitionName} 在 ${maxRetries} 次重试（约 ${(maxRetries * retryDelay) / 1000} 秒）后仍不可用（可用分区: ${availablePartitions}）`);
+        } catch (e) {
+            KernelLogger.warn("CacheDrive", `分区 ${partitionName} 在 ${maxRetries} 次重试（约 ${(maxRetries * retryDelay) / 1000} 秒）后仍不可用`);
+        }
+        
+        return false;
+    }
+    
+    /**
+     * 检测并设置缓存分区
+     * 始终使用系统盘 D: 分区（所有缓存都应该从系统磁盘D加载）
+     * @returns {Promise<string>} 分区路径（始终返回 "D:"）
+     */
+    static async _detectCachePartition() {
+        // 始终使用系统盘 D: 分区
+        CacheDrive._cachePartition = 'D:';
+        CacheDrive.CACHE_DIR = 'D:/cache/';
+        CacheDrive.CACHE_METADATA_FILE = 'D:/LocalCache.json';
+        KernelLogger.info("CacheDrive", `使用系统盘缓存分区: D:`);
+        
+        // 不等待 D: 分区（因为这是代码问题，不是时序问题）
+        // 如果 D: 分区不可用，init() 方法会抛出错误
+        
+        return 'D:';
+    }
     
     // PHP 服务地址
     static PHP_SERVICE_URL = "/system/service/FSDirve.php";
@@ -27,7 +139,7 @@ class CacheDrive {
             return path;
         }
         // 如果路径是 "D:" 或 "C:" 这种格式，保持不变
-        if (/^[CD]:$/.test(path)) {
+        if (/^[A-Z]:$/.test(path)) {
             return path;
         }
         // 去掉末尾的斜杠
@@ -104,6 +216,33 @@ class CacheDrive {
         KernelLogger.info("CacheDrive", "初始化缓存驱动");
         
         try {
+            // 强制使用系统盘 D: 分区（所有缓存都必须从系统磁盘D加载）
+            CacheDrive._cachePartition = 'D:';
+            CacheDrive.CACHE_DIR = 'D:/cache/';
+            CacheDrive.CACHE_METADATA_FILE = 'D:/LocalCache.json';
+            
+            // 检测并设置缓存分区（始终使用D:系统盘）
+            await CacheDrive._detectCachePartition();
+            
+            // 验证 D: 分区是否可用（不等待，因为这是代码问题，不是时序问题）
+            if (typeof Disk !== 'undefined') {
+                const diskMap = Disk.diskSeparateMap;
+                const diskSize = Disk.diskSeparateSize;
+                const hasPartition = (diskMap && diskMap.has('D:')) || 
+                                   (diskSize && diskSize.has('D:'));
+                if (!hasPartition) {
+                    const availablePartitions = diskMap && diskMap.size > 0 
+                        ? Array.from(diskMap.keys()).join(', ')
+                        : (diskSize && diskSize.size > 0 
+                            ? Array.from(diskSize.keys()).join(', ')
+                            : '无');
+                    KernelLogger.error("CacheDrive", `系统盘 D: 分区不可用（可用分区: ${availablePartitions}）`);
+                    KernelLogger.error("CacheDrive", "这是一个代码问题：D: 分区在 Disk 初始化时没有被正确创建。");
+                    KernelLogger.error("CacheDrive", "请检查 Disk 初始化日志，确保 DiskData.json 中的 D: 分区配置被正确读取和初始化。");
+                    throw new Error(`系统盘 D: 分区不可用（可用分区: ${availablePartitions}）。所有系统资源都必须从系统磁盘D加载。这是一个代码问题：D: 分区在 Disk 初始化时没有被正确创建，请检查 Disk 初始化日志。`);
+                }
+            }
+            
             // 确保缓存目录存在
             await CacheDrive._ensureCacheDirectory();
             
@@ -114,7 +253,12 @@ class CacheDrive {
             KernelLogger.info("CacheDrive", "缓存驱动初始化完成");
         } catch (error) {
             KernelLogger.error("CacheDrive", `初始化失败: ${error.message}`, error);
-            // 初始化失败时使用空数据结构
+            // 如果是分区不存在错误，不标记为已初始化，让后续调用可以重试
+            if (error.message && error.message.includes('分区不可用')) {
+                CacheDrive._initialized = false;
+                throw error; // 重新抛出错误，阻止初始化完成
+            }
+            // 其他错误：初始化失败时使用空数据结构
             CacheDrive._cacheMetadata = {
                 system: {},
                 programs: {}
@@ -1088,7 +1232,8 @@ class CacheDrive {
     /**
      * 获取缓存统计信息
      * @param {Object} options 选项
-     * @param {number} options.pid 程序 PID（可选）
+     * @param {number} options.pid 程序 PID（可选，会自动转换为程序名称）
+     * @param {string} options.programName 程序名称（可选，优先级高于 pid）
      * @returns {Promise<Object>} 统计信息
      */
     static async getStats(options = {}) {
@@ -1111,7 +1256,15 @@ class CacheDrive {
             };
         }
         
-        const { pid = null } = options;
+        const { pid = null, programName = null } = options;
+        
+        // 确定程序名称：优先使用 programName，如果没有则从 pid 获取
+        let finalProgramName = null;
+        if (programName && typeof programName === 'string') {
+            finalProgramName = programName;
+        } else if (pid !== null && typeof pid === 'number') {
+            finalProgramName = CacheDrive._getProgramNameFromPid(pid);
+        }
         
         // 重新加载元数据
         await CacheDrive._loadCacheMetadata(true);

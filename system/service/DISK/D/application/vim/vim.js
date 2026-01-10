@@ -474,7 +474,7 @@
                 
                 // 确保路径格式正确
                 let phpPath = parentPath;
-                if (/^[CD]:$/.test(phpPath)) {
+                if (/^[A-Z]:$/.test(phpPath)) {
                     phpPath = phpPath + '/';
                 }
                 
@@ -769,7 +769,7 @@
 
                 // 确保路径格式正确
                 let phpPath = parentPath;
-                if (/^[CD]:$/.test(phpPath)) {
+                if (/^[A-Z]:$/.test(phpPath)) {
                     phpPath = phpPath + '/';
                 }
 

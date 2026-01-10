@@ -40,6 +40,22 @@ KernelLogger.info("LockScreen", "模块初始化");
                 return;
             }
             
+            // 检查是否处于安全模式（安全模式下不初始化锁屏）
+            let isSafeMode = false;
+            try {
+                if (typeof sessionStorage !== 'undefined') {
+                    const safeModeFlag = sessionStorage.getItem('__ZEROS_SAFE_MODE__');
+                    isSafeMode = safeModeFlag === 'true';
+                }
+            } catch (e) {
+                // sessionStorage可能不可用，忽略错误
+            }
+            
+            if (isSafeMode) {
+                KernelLogger.info("LockScreen", "安全模式已启用，跳过锁屏界面初始化");
+                return;
+            }
+            
             LockScreen._initialized = true;
             KernelLogger.info("LockScreen", "初始化锁屏界面");
             
@@ -93,13 +109,11 @@ KernelLogger.info("LockScreen", "模块初始化");
                         const savedBg = await LStorage.getSystemStorage('system.lockscreenBackground');
                         if (savedBg) {
                             // 检查是否是本地路径，如果是则转换为 PHP 服务路径
-                            if (savedBg.startsWith('C:') || savedBg.startsWith('D:')) {
-                                // 转换为 PHP 服务 URL
-                                if (savedBg.startsWith('C:')) {
-                                    bgPath = '/system/service/DISK/C' + savedBg.substring(2).replace(/\\/g, '/');
-                                } else if (savedBg.startsWith('D:')) {
-                                    bgPath = '/system/service/DISK/D' + savedBg.substring(2).replace(/\\/g, '/');
-                                }
+                            // 支持所有分区 A-Z
+                            const partitionMatch = savedBg.match(/^([A-Z]):/);
+                            if (partitionMatch) {
+                                const diskLetter = partitionMatch[1];
+                                bgPath = '/system/service/DISK/' + diskLetter + savedBg.substring(2).replace(/\\/g, '/');
                             } else {
                                 // 已经是网络路径或服务路径，直接使用
                                 bgPath = savedBg;
@@ -2101,6 +2115,21 @@ KernelLogger.info("LockScreen", "模块初始化");
          * 检查内核加载状态并初始化锁屏（降级方案，如果 BootLoader 未调用 init）
          */
         static checkAndInit() {
+            // 检查是否处于安全模式（安全模式下不初始化锁屏）
+            let isSafeMode = false;
+            try {
+                if (typeof sessionStorage !== 'undefined') {
+                    const safeModeFlag = sessionStorage.getItem('__ZEROS_SAFE_MODE__');
+                    isSafeMode = safeModeFlag === 'true';
+                }
+            } catch (e) {
+                // sessionStorage可能不可用，忽略错误
+            }
+            
+            if (isSafeMode) {
+                return true; // 安全模式下，停止检查
+            }
+            
             // 检查内核是否已加载完成
             const kernelContent = document.getElementById('kernel-content');
             const kernelLoading = document.getElementById('kernel-loading');
@@ -2140,6 +2169,22 @@ KernelLogger.info("LockScreen", "模块初始化");
          * 开始检查内核加载状态（降级方案，如果 BootLoader 未调用 init）
          */
         static startChecking() {
+            // 检查是否处于安全模式（安全模式下不启动检查）
+            let isSafeMode = false;
+            try {
+                if (typeof sessionStorage !== 'undefined') {
+                    const safeModeFlag = sessionStorage.getItem('__ZEROS_SAFE_MODE__');
+                    isSafeMode = safeModeFlag === 'true';
+                }
+            } catch (e) {
+                // sessionStorage可能不可用，忽略错误
+            }
+            
+            if (isSafeMode) {
+                KernelLogger.debug("LockScreen", "安全模式已启用，跳过锁屏检查");
+                return;
+            }
+            
             if (LockScreen._checkInterval) {
                 return; // 已经在检查
             }
@@ -2182,6 +2227,22 @@ KernelLogger.info("LockScreen", "模块初始化");
     // 监听内核引导完成事件（主要方式）
     if (typeof document !== 'undefined' && document.body) {
         document.body.addEventListener('kernelBootComplete', () => {
+            // 检查是否处于安全模式（安全模式下不初始化锁屏）
+            let isSafeMode = false;
+            try {
+                if (typeof sessionStorage !== 'undefined') {
+                    const safeModeFlag = sessionStorage.getItem('__ZEROS_SAFE_MODE__');
+                    isSafeMode = safeModeFlag === 'true';
+                }
+            } catch (e) {
+                // sessionStorage可能不可用，忽略错误
+            }
+            
+            if (isSafeMode) {
+                KernelLogger.debug("LockScreen", "安全模式已启用，跳过自动初始化锁屏界面");
+                return;
+            }
+            
             // BootLoader 应该已经调用了 LockScreen.init()，这里只作为降级方案
             if (!LockScreen._initialized && !document.getElementById('lockscreen')) {
                 KernelLogger.debug("LockScreen", "通过 kernelBootComplete 事件初始化锁屏界面（降级方案）");

@@ -4,7 +4,7 @@
 
 `FSDirve` 是 ZerOS 内核的文件系统驱动服务，提供文件和目录操作接口。系统支持 **PHP** 和 **SpringBoot** 两种后端实现，可通过 `SystemInformation` 动态切换。
 
-所有文件实际存储在 `system/service/DISK/C/` 和 `system/service/DISK/D/` 目录下，与 `kernel/filesystem/` 协同工作。
+所有文件实际存储在 `system/service/DISK/{分区字母}/` 目录下（支持 A-Z 共 26 个分区），与 `kernel/filesystem/` 协同工作。
 
 ## 后端服务支持
 
@@ -64,11 +64,12 @@ Body: { "content": "..." }
 ## 路径格式
 
 所有路径使用虚拟路径格式：
-- 磁盘根目录：`C:` 或 `D:`
-- 子目录：`C:/path/to/dir` 或 `D:/path/to/dir`
+- 磁盘根目录：`A:` 到 `Z:`（支持 A-Z 共 26 个分区）
+- 子目录：`C:/path/to/dir` 或 `D:/path/to/dir` 等
 - 路径会自动转换为实际文件系统路径：
   - `C:` → `system/service/DISK/C/`
-  - `D:` → `system/service/DISK/D/`
+  - `D:` → `system/service/DISK/D/`（D: 是系统盘）
+  - `E:` → `system/service/DISK/E/`
   - `D:/application` → `system/service/DISK/D/application/`
 
 ## 目录操作
@@ -553,13 +554,13 @@ const result = await response.json();
 **操作名**: `get_disk_info`
 
 **参数**:
-- `disk` (string, 必需): 磁盘名称，必须是 `C` 或 `D`
+- `disk` (string, 必需): 磁盘名称，支持 A-Z 所有分区
 
 **示例**:
 ```javascript
 const url = new URL('/system/service/FSDirve.php', window.location.origin);
 url.searchParams.set('action', 'get_disk_info');
-url.searchParams.set('disk', 'D');
+url.searchParams.set('disk', 'D'); // D: 是系统盘
 
 const response = await fetch(url.toString());
 const result = await response.json();
@@ -612,10 +613,11 @@ const result = await response.json();
 
 ## 安全特性
 
-1. **路径验证**: 所有路径都经过验证，只允许 `C:` 和 `D:` 盘符
+1. **路径验证**: 所有路径都经过验证，支持 A-Z 所有分区盘符
 2. **目录遍历防护**: 自动过滤 `..` 路径，防止目录遍历攻击
 3. **文件名验证**: 文件名不能包含 `/` 或 `\` 字符
 4. **CORS 支持**: 支持跨域请求（开发环境）
+5. **系统盘保护**: D: 是系统盘，优先使用，但系统支持使用其他分区
 
 ## 使用示例
 

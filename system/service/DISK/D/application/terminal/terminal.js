@@ -2232,31 +2232,64 @@ function escapeHtml(s){
             // 使用 EventManager 注册键盘事件
             if (typeof EventManager !== 'undefined' && this.pid) {
                 EventManager.registerEventHandler(this.pid, 'keydown', (ev) => {
-                    // 检查事件是否发生在 cmdEl 内
-                    if (this.cmdEl !== ev.target && !this.cmdEl.contains(ev.target)) {
-                        return;
-                    }
-                    
                     // 只在活动标签页时处理键盘事件
                     if (!this.isActive) {
-                        // 如果非活动标签页的输入框获得了焦点，阻止事件并切换到该标签页
-                        if (ev.target === this.cmdEl || this.cmdEl.contains(ev.target)) {
-                            ev.preventDefault();
-                            ev.stopPropagation();
-                            if (typeof tabManager !== 'undefined' && tabManager) {
-                                tabManager.switchTab(this.tabId);
-                                // 延迟获取焦点，确保标签页切换完成
-                                setTimeout(() => {
-                                    if (this.isActive && this.cmdEl) {
-                                        this.focus();
-                                    }
-                                }, 50);
+                        // 检查事件是否发生在 cmdEl 内（非活动标签页只在 cmdEl 内处理）
+                        if (this.cmdEl === ev.target || this.cmdEl.contains(ev.target)) {
+                            // 如果非活动标签页的输入框获得了焦点，阻止事件并切换到该标签页
+                            if (ev.target === this.cmdEl || this.cmdEl.contains(ev.target)) {
+                                ev.preventDefault();
+                                ev.stopPropagation();
+                                if (typeof tabManager !== 'undefined' && tabManager) {
+                                    tabManager.switchTab(this.tabId);
+                                    // 延迟获取焦点，确保标签页切换完成
+                                    setTimeout(() => {
+                                        if (this.isActive && this.cmdEl) {
+                                            this.focus();
+                                        }
+                                    }, 50);
+                                }
                             }
                         }
                         return;
                     }
                     
+                    // 活动标签页：处理快捷键（Ctrl+C 等），即使在输入框被隐藏时也要处理
+                    if (ev.ctrlKey || ev.metaKey) {
+                        // Ctrl+C: 取消当前命令（在 busy 状态下也需要处理）
+                        if (ev.key === 'c' || ev.key === 'C') {
+                            if (this.busy) {
+                                ev.preventDefault();
+                                ev.stopPropagation();
+                                this.cancelCurrent();
+                                // 尝试聚焦输入框（即使被隐藏）
+                                if (this.cmdEl) {
+                                    this.cmdEl.focus();
+                                }
+                                return;
+                            }
+                        }
+                    }
+                    
+                    // 检查事件是否发生在 cmdEl 内（普通输入需要）
+                    if (this.cmdEl !== ev.target && !this.cmdEl.contains(ev.target)) {
+                        return;
+                    }
+                    
+                    // 键盘快捷键支持（在检查 contenteditable 之前处理，允许在 busy 状态下使用）
+                    if (ev.ctrlKey || ev.metaKey) {
+                        // Ctrl+L 或 Cmd+L: 清屏
+                        if (ev.key === 'l' || ev.key === 'L') {
+                            ev.preventDefault();
+                            ev.stopPropagation();
+                            this.clear();
+                            this.focus();
+                            return;
+                        }
+                    }
+                    
                     // 额外检查：确保输入框是可编辑的（活动标签页）
+                    // 注意：Ctrl+C 等快捷键已经在上面处理，这里只检查普通输入
                     if (this.cmdEl.getAttribute('contenteditable') !== 'true' || 
                         this.cmdEl.getAttribute('tabindex') === '-1') {
                         ev.preventDefault();
@@ -2318,7 +2351,6 @@ function escapeHtml(s){
                         if (this.busy) {
                             ev.preventDefault();
                             this.cancelCurrent();
-                            this.write('\n^C');
                             this.focus();
                             return;
                         }
@@ -2612,7 +2644,7 @@ function escapeHtml(s){
                                 
                                 // 确保路径格式正确
                                 let phpPath = dirToList;
-                                if (/^[CD]:$/.test(phpPath)) {
+                                if (/^[A-Z]:$/.test(phpPath)) {
                                     phpPath = phpPath + '/';
                                 }
                                 
@@ -2673,18 +2705,24 @@ function escapeHtml(s){
                         // 处理选择导航
                         if(ev.key === 'ArrowDown'){
                             this._moveCompletion(1);
+                            return;
                         }else if(ev.key === 'ArrowUp'){
                             this._moveCompletion(-1);
+                            return;
                         }else if(ev.key === 'Enter'){
+                            // 接受补全后，继续执行命令（不返回，让事件继续处理）
                             this._acceptCompletion();
+                            // 注意：不返回，让 Enter 键的后续处理逻辑执行命令
                         }else if(ev.key === 'Escape'){
                             this._clearCompletions();
+                            return;
                         }
-                        return;
+                        // Enter 键继续执行，不返回
+                    }else{
+                        // 若用户继续输入其他字符，则关闭面板
+                        // Allow normal typing to proceed — but clear completions
+                        if(ev.key.length === 1 || ev.key === 'Backspace' || ev.key === 'Delete'){ this._clearCompletions(); }
                     }
-                    // 若用户继续输入其他字符，则关闭面板
-                    // Allow normal typing to proceed — but clear completions
-                    if(ev.key.length === 1 || ev.key === 'Backspace' || ev.key === 'Delete'){ this._clearCompletions(); }
                 }
                 // Allow simple navigation keys normally (no extra features)
                 }, {
@@ -2748,7 +2786,6 @@ function escapeHtml(s){
                             if (this.busy) {
                                 ev.preventDefault();
                                 this.cancelCurrent();
-                                this.write('\n^C');
                                 this.focus();
                                 return;
                             }
@@ -2984,7 +3021,7 @@ function escapeHtml(s){
                                     const dirToList = resolvePath(this.env.cwd, dirPart || '.');
                                     
                                     let phpPath = dirToList;
-                                    if (/^[CD]:$/.test(phpPath)) {
+                                    if (/^[A-Z]:$/.test(phpPath)) {
                                         phpPath = phpPath + '/';
                                     }
                                     
@@ -3040,17 +3077,23 @@ function escapeHtml(s){
                             ev.preventDefault();
                             if(ev.key === 'ArrowDown'){
                                 this._moveCompletion(1);
+                                return;
                             }else if(ev.key === 'ArrowUp'){
                                 this._moveCompletion(-1);
+                                return;
                             }else if(ev.key === 'Enter'){
+                                // 接受补全后，继续执行命令（不返回，让事件继续处理）
                                 this._acceptCompletion();
+                                // 注意：不返回，让 Enter 键的后续处理逻辑执行命令
                             }else if(ev.key === 'Escape'){
                                 this._clearCompletions();
+                                return;
                             }
-                            return;
-                        }
-                        if(ev.key.length === 1 || ev.key === 'Backspace' || ev.key === 'Delete'){ 
-                            this._clearCompletions(); 
+                            // Enter 键继续执行，不返回
+                        }else{
+                            if(ev.key.length === 1 || ev.key === 'Backspace' || ev.key === 'Delete'){ 
+                                this._clearCompletions(); 
+                            }
                         }
                     }
                 });
@@ -3844,8 +3887,9 @@ function escapeHtml(s){
             if (this._currentCliPid && typeof ProcessManager !== 'undefined') {
                 const ProcessMgr = ProcessManager;
                 const processInfo = ProcessMgr.PROCESS_TABLE.get(this._currentCliPid);
-                if (processInfo && processInfo.status === 'running') {
-                    // 尝试终止 CLI 程序
+                // 检查进程是否存在且未退出（包括 'loading', 'starting', 'running' 状态）
+                if (processInfo && processInfo.status !== 'exited') {
+                    // 尝试终止 CLI 程序（killProgram 可以处理所有非 'exited' 状态）
                     ProcessMgr.killProgram(this._currentCliPid, false).catch(e => {
                         if (typeof KernelLogger !== 'undefined') {
                             KernelLogger.warn('Terminal', `终止 CLI 程序失败 (PID: ${this._currentCliPid}): ${e.message}`);
@@ -3863,10 +3907,10 @@ function escapeHtml(s){
             // 如果没有保存的 PID，查找与当前终端关联的正在运行的 CLI 程序
             if (typeof ProcessManager !== 'undefined') {
                 const ProcessMgr = ProcessManager;
-                // 查找与当前终端关联的正在运行的 CLI 程序
+                // 查找与当前终端关联的正在运行的 CLI 程序（包括 'loading', 'starting', 'running' 状态）
                 for (const [pid, info] of ProcessMgr.PROCESS_TABLE) {
-                    if (info.terminalPid === this.pid && info.isCLI && info.status === 'running') {
-                        // 尝试终止 CLI 程序
+                    if (info.terminalPid === this.pid && info.isCLI && info.status !== 'exited') {
+                        // 尝试终止 CLI 程序（killProgram 可以处理所有非 'exited' 状态）
                         ProcessMgr.killProgram(pid, false).catch(e => {
                             if (typeof KernelLogger !== 'undefined') {
                                 KernelLogger.warn('Terminal', `终止 CLI 程序失败 (PID: ${pid}): ${e.message}`);
@@ -5094,7 +5138,8 @@ function escapeHtml(s){
                 'login',      // 切换用户（可能提权）
                 'su',         // 切换用户（可能提权）
                 'groupadd',   // 创建用户组
-                'groupmod'    // 修改用户组
+                'groupmod',   // 修改用户组
+                'tcpdump'     // 网络数据包捕获（敏感操作，需要管理员权限）
             ];
             
             // 检查命令是否需要管理员权限
@@ -5115,9 +5160,11 @@ function escapeHtml(s){
         
         // 检查系统盘D:访问权限
         const checkSystemDiskAccess = (path, payload) => {
-            // 检查路径是否在系统盘D:
+            // 检查路径是否在系统盘（支持所有分区，但通常D:是系统盘）
             const normalizedPath = path.replace(/\\/g, '/');
-            if (normalizedPath.startsWith('D:') || normalizedPath.startsWith('D:/')) {
+            const partitionMatch = normalizedPath.match(/^([A-Z]):/);
+            // 注意：这里可以扩展为检查多个系统分区，目前保持D:为系统盘
+            if (partitionMatch && partitionMatch[1] === 'D') {
                 if (typeof UserControl === 'undefined') {
                     payload.write('权限检查失败: UserControl 未加载');
                     return false;
@@ -5665,9 +5712,9 @@ function escapeHtml(s){
                                 return;
                             }
                             
-                            // 确保路径格式正确：如果是 D: 或 C:，转换为 D:/ 或 C:/
+                            // 确保路径格式正确：如果是 A: 到 Z:，转换为 A:/ 到 Z:/（支持所有分区A-Z）
                             let phpPath = resolved;
-                            if (/^[CD]:$/.test(phpPath)) {
+                            if (/^[A-Z]:$/.test(phpPath)) {
                                 phpPath = phpPath + '/';
                             }
                             
@@ -5840,9 +5887,9 @@ function escapeHtml(s){
                             }
 
                             // 从 PHP 服务获取目录列表
-                            // 确保路径格式正确：如果是 D: 或 C:，转换为 D:/ 或 C:/
+                            // 确保路径格式正确：如果是 A: 到 Z:，转换为 A:/ 到 Z:/（支持所有分区A-Z）
                             let phpPath = targetPath;
-                            if (/^[CD]:$/.test(phpPath)) {
+                            if (/^[A-Z]:$/.test(phpPath)) {
                                 phpPath = phpPath + '/';
                             }
                             const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
@@ -6016,9 +6063,9 @@ function escapeHtml(s){
                         const fname = parts.pop();
                         const parent = parts.join('/') || parts[0];
                         
-                        // 确保路径格式正确
+                        // 确保路径格式正确（支持所有分区A-Z）
                         let phpPath = parent;
-                        if (/^[CD]:$/.test(phpPath)) {
+                        if (/^[A-Z]:$/.test(phpPath)) {
                             phpPath = phpPath + '/';
                         }
                         
@@ -6551,7 +6598,7 @@ function escapeHtml(s){
                             const getDirectoryList = async (path) => {
                                 // 确保路径格式正确：如果是 D: 或 C:，转换为 D:/ 或 C:/
                                 let phpPath = path;
-                                if (/^[CD]:$/.test(phpPath)) {
+                                if (/^[A-Z]:$/.test(phpPath)) {
                                     phpPath = phpPath + '/';
                                 }
                                 const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
@@ -7625,7 +7672,7 @@ function escapeHtml(s){
                             // 递归计算目录大小（从 PHP 服务获取）
                             const calculateDirSize = async (dirPath) => {
                                 let phpPath = dirPath;
-                                if (/^[CD]:$/.test(phpPath)) {
+                                if (/^[A-Z]:$/.test(phpPath)) {
                                     phpPath = phpPath + '/';
                                 }
                                 
@@ -7669,7 +7716,7 @@ function escapeHtml(s){
                             // 递归收集所有文件和目录（从 PHP 服务获取）
                             const collectItems = async (path, items) => {
                                 let phpPath = path;
-                                if (/^[CD]:$/.test(phpPath)) {
+                                if (/^[A-Z]:$/.test(phpPath)) {
                                     phpPath = phpPath + '/';
                                 }
                                 
@@ -8153,6 +8200,9 @@ function escapeHtml(s){
                                                     }
                                                 };
                                                 
+                                                // 立即设置 busy 状态，隐藏命令输入
+                                                terminalInstance._setBusy(true);
+                                                
                                                 // 尝试启动程序（异步）
                                                 try {
                                                     const pid = await ProcessMgr.startProgram(cmd, {
@@ -8162,10 +8212,33 @@ function escapeHtml(s){
                                                         cwd: payload.env.cwd,
                                                         tempAsset: tempAsset
                                                     });
-                                                    // 启动成功，输出信息并返回
-                                                    payload.write(`[D:/bin] 程序 ${cmd} 已启动 (PID: ${pid})`);
+                                                    // 启动成功
+                                                    // 保存当前运行的 CLI 程序 PID，用于 Ctrl+C 中断
+                                                    terminalInstance._currentCliPid = pid;
+                                                    
+                                                    // 监听程序退出，自动恢复 busy 状态
+                                                    const checkProgramStatus = setInterval(() => {
+                                                        const processInfo = ProcessMgr.PROCESS_TABLE.get(pid);
+                                                        if (!processInfo || processInfo.status !== 'running') {
+                                                            clearInterval(checkProgramStatus);
+                                                            // 程序已退出，恢复 busy 状态
+                                                            if (terminalInstance.busy) {
+                                                                terminalInstance._setBusy(false);
+                                                            }
+                                                            // 清除保存的 PID
+                                                            if (terminalInstance._currentCliPid === pid) {
+                                                                terminalInstance._currentCliPid = null;
+                                                            }
+                                                        }
+                                                    }, 100);
+                                                    
+                                                    // 注意：不输出启动消息，让程序自己输出
                                                     return;
                                                 } catch (error) {
+                                                    // 启动失败，恢复 busy 状态
+                                                    terminalInstance._setBusy(false);
+                                                    terminalInstance._currentCliPid = null;
+                                                    
                                                     // 启动失败，检查进程是否已经被创建
                                                     // 如果进程已经被创建（即使初始化失败），不应该继续查找
                                                     let processCreated = false;
@@ -8378,6 +8451,9 @@ function escapeHtml(s){
                                             // 使用文件路径作为程序名（去掉扩展名）
                                             const programNameFromPath = fileName.replace(/\.js$/, '');
                                             
+                                            // 立即设置 busy 状态，隐藏命令输入
+                                            terminalInstance._setBusy(true);
+                                            
                                             ProcessMgr.startProgram(programNameFromPath, {
                                                 terminal: terminalInstance,
                                                 args: payload.args.slice(1),
@@ -8385,8 +8461,32 @@ function escapeHtml(s){
                                                 cwd: payload.env.cwd,
                                                 tempAsset: tempAsset
                                             }).then((pid) => {
-                                                payload.write(`[ENV] 程序 ${programNameFromPath} (来自环境变量 ${cmd}=${envValueTrimmed}) 已启动 (PID: ${pid})`);
+                                                // 启动成功
+                                                // 保存当前运行的 CLI 程序 PID，用于 Ctrl+C 中断
+                                                terminalInstance._currentCliPid = pid;
+                                                
+                                                // 监听程序退出，自动恢复 busy 状态
+                                                const checkProgramStatus = setInterval(() => {
+                                                    const processInfo = ProcessMgr.PROCESS_TABLE.get(pid);
+                                                    if (!processInfo || processInfo.status !== 'running') {
+                                                        clearInterval(checkProgramStatus);
+                                                        // 程序已退出，恢复 busy 状态
+                                                        if (terminalInstance.busy) {
+                                                            terminalInstance._setBusy(false);
+                                                        }
+                                                        // 清除保存的 PID
+                                                        if (terminalInstance._currentCliPid === pid) {
+                                                            terminalInstance._currentCliPid = null;
+                                                        }
+                                                    }
+                                                }, 100);
+                                                
+                                                // 注意：不输出启动消息，让程序自己输出
                                             }).catch((error) => {
+                                                // 启动失败，恢复 busy 状态
+                                                terminalInstance._setBusy(false);
+                                                terminalInstance._currentCliPid = null;
+                                                
                                                 if (typeof KernelLogger !== 'undefined') {
                                                 KernelLogger.error('Terminal', `启动程序 ${programNameFromPath} 失败`, error);
                                             }
@@ -8413,6 +8513,9 @@ function escapeHtml(s){
                                             }
                                         }
                                         
+                                        // 立即设置 busy 状态，隐藏命令输入
+                                        terminalInstance._setBusy(true);
+                                        
                                         // 尝试启动环境变量值对应的程序
                                         ProcessMgr.startProgram(envProgramName, {
                                             terminal: terminalInstance,
@@ -8420,8 +8523,32 @@ function escapeHtml(s){
                                             env: payload.env,
                                             cwd: payload.env.cwd
                                         }).then((pid) => {
-                                            payload.write(`[ENV] 程序 ${envProgramName} (来自环境变量 ${cmd}) 已启动 (PID: ${pid})`);
+                                            // 启动成功
+                                            // 保存当前运行的 CLI 程序 PID，用于 Ctrl+C 中断
+                                            terminalInstance._currentCliPid = pid;
+                                            
+                                            // 监听程序退出，自动恢复 busy 状态
+                                            const checkProgramStatus = setInterval(() => {
+                                                const processInfo = ProcessMgr.PROCESS_TABLE.get(pid);
+                                                if (!processInfo || processInfo.status !== 'running') {
+                                                    clearInterval(checkProgramStatus);
+                                                    // 程序已退出，恢复 busy 状态
+                                                    if (terminalInstance.busy) {
+                                                        terminalInstance._setBusy(false);
+                                                    }
+                                                    // 清除保存的 PID
+                                                    if (terminalInstance._currentCliPid === pid) {
+                                                        terminalInstance._currentCliPid = null;
+                                                    }
+                                                }
+                                            }, 100);
+                                            
+                                            // 注意：不输出启动消息，让程序自己输出
                                         }).catch((error) => {
+                                            // 启动失败，恢复 busy 状态
+                                            terminalInstance._setBusy(false);
+                                            terminalInstance._currentCliPid = null;
+                                            
                                             if (typeof KernelLogger !== 'undefined') {
                                                 KernelLogger.error('Terminal', `启动程序 ${envProgramName} 失败`, error);
                                             }

@@ -1297,7 +1297,7 @@
             path = path.replace(/\/+/g, '/');
             
             // 移除尾部斜杠（但保留根路径，如 C:/）
-            if (path.length > 3 && path.endsWith('/') && !path.match(/^[CD]:\/$/)) {
+            if (path.length > 3 && path.endsWith('/') && !path.match(/^[A-Z]:\/$/)) {
                 path = path.slice(0, -1);
             }
             
@@ -1887,7 +1887,7 @@
             const parentPath = pathParts.slice(0, -1).join('/') || (filePath.split(':')[0] + ':');
             
             let phpPath = this._normalizePath(parentPath);
-            if (/^[CD]:$/.test(phpPath)) {
+            if (/^[A-Z]:$/.test(phpPath)) {
                 phpPath = phpPath + '/';
             }
             
@@ -2128,7 +2128,7 @@
             const parentPath = pathParts.slice(0, -1).join('/') || (filePath.split(':')[0] + ':');
             
             let phpPath = this._normalizePath(parentPath);
-            if (/^[CD]:$/.test(phpPath)) {
+            if (/^[A-Z]:$/.test(phpPath)) {
                 phpPath = phpPath + '/';
             }
             
@@ -3088,7 +3088,7 @@
                     const fileName = pathParts[pathParts.length - 1];
                     const parentPath = pathParts.slice(0, -1).join('/') || (itemPath.split(':')[0] + ':');
                     let phpPath = this._normalizePath(parentPath);
-                    if (/^[CD]:$/.test(phpPath)) {
+                    if (/^[A-Z]:$/.test(phpPath)) {
                         phpPath = phpPath + '/';
                     }
                     
@@ -3141,7 +3141,7 @@
                 const pathParts = itemPath.split('/');
                 const parentPath = pathParts.slice(0, -1).join('/') || (itemPath.split(':')[0] + ':');
                 let phpPath = this._normalizePath(parentPath);
-                if (/^[CD]:$/.test(phpPath)) {
+                if (/^[A-Z]:$/.test(phpPath)) {
                     phpPath = phpPath + '/';
                 }
                 

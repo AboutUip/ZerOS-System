@@ -678,12 +678,16 @@
                     audioUrl = resolvedPath;
                 } else if (typeof ProcessManager !== 'undefined' && ProcessManager.convertVirtualPathToUrl) {
                     audioUrl = ProcessManager.convertVirtualPathToUrl(resolvedPath);
-                } else if (resolvedPath.startsWith('D:/') || resolvedPath.startsWith('C:/')) {
-                    const relativePath = resolvedPath.substring(3);
-                    const disk = resolvedPath.startsWith('D:/') ? 'D' : 'C';
-                    audioUrl = `/system/service/DISK/${disk}/${relativePath}`;
                 } else if (resolvedPath.startsWith('/')) {
                     audioUrl = resolvedPath;
+                }else{
+                    // 支持所有分区 A-Z
+                    const partitionMatch = resolvedPath.match(/^([A-Z]):\//);
+                    if (partitionMatch) {
+                        const disk = partitionMatch[1];
+                        const relativePath = resolvedPath.substring(3);
+                        audioUrl = `/system/service/DISK/${disk}/${relativePath}`;
+                    }
                 }
                 
                 this.currentAudioPath = resolvedPath;

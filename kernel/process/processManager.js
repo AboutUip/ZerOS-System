@@ -20,8 +20,8 @@ class ProcessManager {
         if (!path || typeof path !== 'string') {
             return path;
         }
-        // 如果路径是 "D:" 或 "C:" 这种格式，保持不变
-        if (/^[CD]:$/.test(path)) {
+        // 如果路径是 "A:" 到 "Z:" 这种格式，保持不变（支持所有分区A-Z）
+        if (/^[A-Z]:$/.test(path)) {
             return path;
         }
         // 去掉末尾的斜杠
@@ -683,6 +683,25 @@ class ProcessManager {
     static async startAutoStartPrograms() {
         ProcessManager._log(2, "检查需要自动启动的程序");
         
+        // 检查是否处于安全模式（安全模式下不启动自动启动程序）
+        let isSafeMode = false;
+        try {
+            if (typeof sessionStorage !== 'undefined') {
+                const safeModeFlag = sessionStorage.getItem('__ZEROS_SAFE_MODE__');
+                isSafeMode = safeModeFlag === 'true';
+            }
+        } catch (e) {
+            // sessionStorage可能不可用，忽略错误
+        }
+        
+        if (isSafeMode) {
+            ProcessManager._log(2, "安全模式已启用，跳过自动启动程序");
+            if (typeof KernelLogger !== 'undefined') {
+                KernelLogger.info("ProcessManager", "安全模式已启用，跳过自动启动程序");
+            }
+            return;
+        }
+        
         // 检查系统加载标志位是否已删除（确保系统加载完成且用户已登录）
         if (typeof POOL !== 'undefined' && typeof POOL.__IS_SYSTEM_LOADING__ === 'function') {
             if (POOL.__IS_SYSTEM_LOADING__()) {
@@ -793,20 +812,22 @@ class ProcessManager {
                 return path;
             }
             // 检查是否是相对路径（不以 / 开头，但也不是 D:/ 或 C:/）
-            if (!path.match(/^[CD]:\//)) {
+            // 检查是否是分区路径格式（A-Z:/path）
+            if (!path.match(/^[A-Z]:\//)) {
                 return path;
             }
         }
         
-        // 处理虚拟路径 D:/ 或 C:/
-        if (path.startsWith('D:/')) {
-            // 将 D:/application/xxx.js 转换为 /system/service/DISK/D/application/xxx.js
-            const relativePath = path.substring(3); // 移除 "D:/"
-            return `/system/service/DISK/D/${relativePath}`;
-        } else if (path.startsWith('C:/')) {
-            // 将 C:/xxx.js 转换为 /system/service/DISK/C/xxx.js
-            const relativePath = path.substring(3); // 移除 "C:/"
-            return `/system/service/DISK/C/${relativePath}`;
+        // 处理虚拟路径（支持 A-Z 所有分区）
+        // 匹配格式：X:/path 或 X:（其中X是A-Z的单个字母）
+        const partitionMatch = path.match(/^([A-Z]):(\/.*)?$/);
+        if (partitionMatch) {
+            const diskLetter = partitionMatch[1]; // 分区字母 (A-Z)
+            const relativePath = partitionMatch[2] || ''; // 相对路径（如果有）
+            // 将 X:/path 转换为 /system/service/DISK/X/path
+            // 移除开头的斜杠（如果有）
+            const normalizedPath = relativePath.replace(/^\/+/, '');
+            return `/system/service/DISK/${diskLetter}${normalizedPath ? '/' + normalizedPath : ''}`;
         }
         
         // 其他情况直接返回原路径
@@ -3584,11 +3605,11 @@ class ProcessManager {
                     
                     // 规范化路径：去掉末尾斜杠，避免 SpringBoot 后端路径拼接时出现双斜杠
                     let phpPath = parentPath;
-                    // 如果路径以斜杠结尾（除了根路径 "D:" 或 "C:"），去掉末尾斜杠
-                    if (phpPath && phpPath.endsWith('/') && !/^[CD]:\/$/.test(phpPath)) {
+                    // 如果路径以斜杠结尾（除了根路径 "A:" 到 "Z:"），去掉末尾斜杠（支持所有分区A-Z）
+                    if (phpPath && phpPath.endsWith('/') && !/^[A-Z]:\/$/.test(phpPath)) {
                         phpPath = phpPath.replace(/\/+$/, '');
                     }
-                    // 如果路径是根路径 "D:" 或 "C:"，保持原样（SpringBoot 会正确拼接）
+                    // 如果路径是根路径 "A:" 到 "Z:"，保持原样（SpringBoot 会正确拼接）
                     
                     // 使用 PHP 服务创建
                     const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
@@ -3828,9 +3849,9 @@ class ProcessManager {
                     const itemName = pathParts[pathParts.length - 1];
                     const parentPath = pathParts.slice(0, -1).join('/') || (path.split(':')[0] + ':');
                     
-                    // 规范化路径
+                    // 规范化路径（支持所有分区A-Z）
                     let phpPath = parentPath;
-                    if (/^[CD]:$/.test(phpPath)) {
+                    if (/^[A-Z]:$/.test(phpPath)) {
                         phpPath = phpPath + '/';
                     }
                     
@@ -3946,8 +3967,8 @@ class ProcessManager {
                 
                 try {
                     // 解析路径：格式为 "盘符/路径" 或 "盘符"
-                    // 处理可能的双斜杠情况：C://path -> C:/path
-                    let normalizedPath = path.replace(/([CD]:)\/\/+/g, '$1/');
+                    // 处理可能的双斜杠情况：A://path -> A:/path（支持所有分区A-Z）
+                    let normalizedPath = path.replace(/([A-Z]:)\/\/+/g, '$1/');
                     const parts = normalizedPath.split('/');
                     const diskName = parts[0];
                     const dirPath = normalizedPath;

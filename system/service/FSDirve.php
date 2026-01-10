@@ -2,7 +2,7 @@
 /**
  * ZerOS 文件系统驱动服务
  * 与 kernel/filesystem/ 协同工作，处理所有文件目录操作
- * 所有文件实际存储在 service/DISK/C/ 和 service/DISK/D/ 下
+ * 所有文件实际存储在 service/DISK/{分区字母}/ 下（支持 A-Z 所有分区）
  * 
  * 访问地址: http://localhost:8089/system/service/FSDirve.php?action=xxx&...
  */
@@ -21,15 +21,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 // 基础路径配置
 define('DISK_BASE_PATH', __DIR__ . '/DISK');
-define('DISK_C_PATH', DISK_BASE_PATH . '/C');
-define('DISK_D_PATH', DISK_BASE_PATH . '/D');
 
-// 确保磁盘目录存在
-if (!is_dir(DISK_C_PATH)) {
-    mkdir(DISK_C_PATH, 0755, true);
+/**
+ * 获取分区物理路径
+ * @param string $diskLetter 分区字母 (A-Z)
+ * @return string|null 分区路径，如果分区不存在则返回null
+ */
+function getPartitionPath($diskLetter) {
+    if (!preg_match('/^[A-Z]$/', $diskLetter)) {
+        return null;
+    }
+    $path = DISK_BASE_PATH . '/' . $diskLetter;
+    // 不主动创建分区目录，如果不存在则返回null
+    return $path;
 }
-if (!is_dir(DISK_D_PATH)) {
-    mkdir(DISK_D_PATH, 0755, true);
+
+/**
+ * 检查分区是否存在
+ * @param string $diskLetter 分区字母 (A-Z)
+ * @return bool
+ */
+function partitionExists($diskLetter) {
+    $path = getPartitionPath($diskLetter);
+    return $path !== null && is_dir($path);
 }
 
 /**
@@ -57,8 +71,8 @@ function validatePath($path) {
     // 移除开头的斜杠
     $path = ltrim($path, '/');
     
-    // 检查路径格式：应该是 C:、C:/...、D: 或 D:/...
-    if (!preg_match('/^[CD]:(\/|$)/', $path)) {
+    // 检查路径格式：应该是 A-Z:、A-Z:/...（支持A-Z所有分区）
+    if (!preg_match('/^[A-Z]:(\/|$)/', $path)) {
         return false;
     }
     
@@ -67,8 +81,8 @@ function validatePath($path) {
     $disk = $parts[0];
     $relativePath = isset($parts[1]) ? ltrim($parts[1], '/') : '';
     
-    // 验证盘符
-    if (!in_array($disk, ['C', 'D'])) {
+    // 验证盘符格式（A-Z）
+    if (!preg_match('/^[A-Z]$/', $disk)) {
         return false;
     }
     
@@ -92,7 +106,15 @@ function getRealPath($virtualPath) {
     $disk = $validated['disk'];
     $relativePath = $validated['path'];
     
-    $basePath = $disk === 'C' ? DISK_C_PATH : DISK_D_PATH;
+    $basePath = getPartitionPath($disk);
+    if ($basePath === null) {
+        return null;
+    }
+    
+    // 检查分区目录是否存在（不主动创建）
+    if (!is_dir($basePath)) {
+        return null; // 分区不存在
+    }
     
     // 如果相对路径为空，直接返回基础路径（根目录）
     if (empty($relativePath)) {
@@ -118,8 +140,8 @@ function normalizePath($path) {
     if (empty($path)) {
         return $path;
     }
-    // 如果路径是 "D:" 或 "C:" 这种格式，保持不变
-    if (preg_match('/^[CD]:$/', $path)) {
+    // 如果路径是 "A:" 到 "Z:" 这种格式，保持不变
+    if (preg_match('/^[A-Z]:$/', $path)) {
         return $path;
     }
     // 去掉末尾的斜杠
@@ -138,7 +160,15 @@ function getDirPath($virtualPath) {
     $disk = $validated['disk'];
     $relativePath = $validated['path'];
     
-    $basePath = $disk === 'C' ? DISK_C_PATH : DISK_D_PATH;
+    $basePath = getPartitionPath($disk);
+    if ($basePath === null) {
+        return null;
+    }
+    
+    // 检查分区目录是否存在（不主动创建）
+    if (!is_dir($basePath)) {
+        return null; // 分区不存在
+    }
     
     // 如果相对路径为空，直接返回基础路径（根目录）
     if (empty($relativePath)) {
@@ -888,10 +918,14 @@ function checkPathExists($path) {
  * 获取磁盘信息
  */
 function getDiskInfo($disk) {
-    $basePath = $disk === 'C' ? DISK_C_PATH : DISK_D_PATH;
+    // 验证分区字母格式
+    if (!preg_match('/^[A-Z]$/', $disk)) {
+        sendResponse(false, '无效的分区名称: ' . $disk, null, 400);
+    }
     
-    if (!is_dir($basePath)) {
-        sendResponse(false, '磁盘目录不存在: ' . $disk, null, 404);
+    $basePath = getPartitionPath($disk);
+    if ($basePath === null || !is_dir($basePath)) {
+        sendResponse(false, '分区不存在: ' . $disk . ':', null, 404);
     }
     
     // 计算磁盘使用情况
@@ -1118,8 +1152,8 @@ switch ($action) {
         
     case 'get_disk_info':
         $disk = $_GET['disk'] ?? '';
-        if (empty($disk) || !in_array($disk, ['C', 'D'])) {
-            sendResponse(false, '缺少必要参数: disk (必须是 C 或 D)', null, 400);
+        if (empty($disk) || !preg_match('/^[A-Z]$/', $disk)) {
+            sendResponse(false, '缺少必要参数: disk (必须是 A-Z 的单个字母)', null, 400);
         }
         getDiskInfo($disk);
         break;

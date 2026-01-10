@@ -1778,18 +1778,16 @@
                 card.appendChild(activeBadge);
             }
             
-            // 处理预览图URL（支持本地路径和网络路径）
+            // 处理预览图URL（支持本地路径和网络路径，支持所有分区 A-Z）
             let previewUrl = background.path;
-            const isLocalPath = background.path.startsWith('C:') || 
-                               background.path.startsWith('D:') || 
-                               background.path.includes('/system/service/DISK/');
+            const partitionMatch = background.path.match(/^([A-Z]):/);
+            const isLocalPath = partitionMatch !== null || background.path.includes('/system/service/DISK/');
             
             if (isLocalPath) {
                 // 转换为 PHP 服务 URL
-                if (background.path.startsWith('C:')) {
-                    previewUrl = '/system/service/DISK/C' + background.path.substring(2).replace(/\\/g, '/');
-                } else if (background.path.startsWith('D:')) {
-                    previewUrl = '/system/service/DISK/D' + background.path.substring(2).replace(/\\/g, '/');
+                if (partitionMatch) {
+                    const diskLetter = partitionMatch[1];
+                    previewUrl = '/system/service/DISK/' + diskLetter + background.path.substring(2).replace(/\\/g, '/');
                 } else if (background.path.includes('/system/service/DISK/')) {
                     previewUrl = background.path;
                 }
@@ -1889,10 +1887,10 @@
                     throw new Error('LockScreen 不可用');
                 }
                 
-                // 处理背景路径（支持本地路径和网络路径）
+                // 处理背景路径（支持本地路径和网络路径，支持所有分区 A-Z）
                 let backgroundUrl = background.path;
-                const isLocalPath = background.path.startsWith('C:') || 
-                                   background.path.startsWith('D:');
+                const partitionMatch = background.path.match(/^([A-Z]):/);
+                const isLocalPath = partitionMatch !== null;
                 
                 if (isLocalPath) {
                     // 转换为 PHP 服务 URL
@@ -1903,11 +1901,8 @@
                     // 移除开头的斜杠（如果有）
                     relativePath = relativePath.replace(/^\/+/, '');
                     
-                    if (background.path.startsWith('C:')) {
-                        backgroundUrl = '/system/service/DISK/C/' + relativePath;
-                    } else if (background.path.startsWith('D:')) {
-                        backgroundUrl = '/system/service/DISK/D/' + relativePath;
-                    }
+                    const diskLetter = partitionMatch[1];
+                    backgroundUrl = '/system/service/DISK/' + diskLetter + '/' + relativePath;
                 } else if (background.path.includes('/system/service/DISK/')) {
                     // 已经是服务路径，直接使用
                     backgroundUrl = background.path;
@@ -2475,10 +2470,10 @@
                 // 检查每个背景文件是否存在，过滤掉已删除的文件
                 const validBackgrounds = [];
                 for (const background of backgrounds) {
-                    // 检查是否是本地文件路径
+                    // 检查是否是本地文件路径（支持所有分区 A-Z）
+                    const partitionMatch = background.path ? background.path.match(/^([A-Z]):/) : null;
                     const isLocalPath = background.path && (
-                        background.path.startsWith('C:') || 
-                        background.path.startsWith('D:') || 
+                        partitionMatch !== null || 
                         background.path.includes('/system/service/DISK/')
                     );
                     
@@ -2519,22 +2514,22 @@
          */
         _checkFileExists: async function(filePath) {
             try {
-                // 转换为 PHP 服务路径
+                // 转换为 PHP 服务路径（支持所有分区 A-Z）
                 let phpPath = filePath;
-                if (filePath.startsWith('C:')) {
-                    phpPath = 'C:' + filePath.substring(2).replace(/\\/g, '/');
-                } else if (filePath.startsWith('D:')) {
-                    phpPath = 'D:' + filePath.substring(2).replace(/\\/g, '/');
+                const partitionMatch = filePath.match(/^([A-Z]):/);
+                if (partitionMatch) {
+                    const diskLetter = partitionMatch[1];
+                    phpPath = diskLetter + ':' + filePath.substring(2).replace(/\\/g, '/');
                 } else if (filePath.includes('/system/service/DISK/')) {
-                    // 已经是服务路径，提取实际路径
-                    const match = filePath.match(/\/service\/DISK\/([CD])\/(.+)/);
+                    // 已经是服务路径，提取实际路径（支持所有分区 A-Z）
+                    const match = filePath.match(/\/service\/DISK\/([A-Z])\/(.+)/);
                     if (match) {
                         phpPath = `${match[1]}:/${match[2]}`;
                     }
                 }
                 
-                // 确保路径格式正确
-                if (/^[CD]:$/.test(phpPath)) {
+                // 确保路径格式正确（支持所有分区 A-Z）
+                if (/^[A-Z]:$/.test(phpPath)) {
                     phpPath = phpPath + '/';
                 }
                 
@@ -2592,18 +2587,16 @@
             // 背景预览（支持图片和视频）
             const preview = document.createElement('div');
             
-            // 处理本地文件路径（转换为 PHP 服务 URL）
+            // 处理本地文件路径（转换为 PHP 服务 URL，支持所有分区 A-Z）
             let previewUrl = background.path;
-            const isLocalPath = background.path.startsWith('C:') || 
-                               background.path.startsWith('D:') || 
-                               background.path.includes('/system/service/DISK/');
+            const partitionMatch = background.path.match(/^([A-Z]):/);
+            const isLocalPath = partitionMatch !== null || background.path.includes('/system/service/DISK/');
             
             if (isLocalPath) {
                 // 转换为 PHP 服务 URL
-                if (background.path.startsWith('C:')) {
-                    previewUrl = '/system/service/DISK/C' + background.path.substring(2).replace(/\\/g, '/');
-                } else if (background.path.startsWith('D:')) {
-                    previewUrl = '/system/service/DISK/D' + background.path.substring(2).replace(/\\/g, '/');
+                if (partitionMatch) {
+                    const diskLetter = partitionMatch[1];
+                    previewUrl = '/system/service/DISK/' + diskLetter + background.path.substring(2).replace(/\\/g, '/');
                 } else if (background.path.includes('/system/service/DISK/')) {
                     previewUrl = background.path;
                 }
@@ -2915,10 +2908,9 @@
                     throw new Error('背景信息不完整');
                 }
                 
-                // 检查是否是本地文件路径
-                const isLocalPath = background.path.startsWith('C:') || 
-                                   background.path.startsWith('D:') || 
-                                   background.path.includes('/system/service/DISK/');
+                // 检查是否是本地文件路径（支持所有分区 A-Z）
+                const partitionMatch = background.path.match(/^([A-Z]):/);
+                const isLocalPath = partitionMatch !== null || background.path.includes('/system/service/DISK/');
                 
                 if (!isLocalPath) {
                     throw new Error('只能发送本地背景到锁屏');
@@ -2968,7 +2960,7 @@
                 
                 if (background.path.includes('/system/service/DISK/')) {
                     // 从服务路径提取实际路径：/system/service/DISK/C/path/to/file
-                    const match = background.path.match(/\/service\/DISK\/([CD])\/(.+)/);
+                    const match = background.path.match(/\/service\/DISK\/([A-Z])\/(.+)/);
                     if (match) {
                         const disk = match[1];
                         const relativePath = match[2];
@@ -2986,34 +2978,36 @@
                             dirPath = `${disk}:`;
                         }
                     }
-                } else if (background.path.startsWith('C:') || background.path.startsWith('D:')) {
-                    // 处理 Windows 路径格式：C:/path 或 C:\path
-                    const disk = background.path.substring(0, 1);
-                    let relativePath = background.path.substring(2);
-                    
-                    // 替换反斜杠为正斜杠
-                    relativePath = relativePath.replace(/\\/g, '/');
-                    
-                    // 移除开头的多个斜杠
-                    relativePath = relativePath.replace(/^\/+/, '');
-                    
-                    // 拆分路径和文件名
-                    const pathParts = relativePath.split('/').filter(p => p);
-                    if (pathParts.length > 0) {
-                        fileName = pathParts.pop() || '';
+                } else {
+                    // 处理分区路径格式（支持所有分区 A-Z）：X:/path 或 X:\path
+                    const partitionMatch = background.path.match(/^([A-Z]):/);
+                    if (partitionMatch) {
+                        const disk = partitionMatch[1];
+                        let relativePath = background.path.substring(2);
+                        
+                        // 替换反斜杠为正斜杠
+                        relativePath = relativePath.replace(/\\/g, '/');
+                        
+                        // 移除开头的多个斜杠
+                        relativePath = relativePath.replace(/^\/+/, '');
+                        
+                        // 拆分路径和文件名
+                        const pathParts = relativePath.split('/').filter(p => p);
                         if (pathParts.length > 0) {
-                            dirPath = `${disk}:/${pathParts.join('/')}`;
+                            fileName = pathParts.pop() || '';
+                            if (pathParts.length > 0) {
+                                dirPath = `${disk}:/${pathParts.join('/')}`;
+                            } else {
+                                dirPath = `${disk}:`;
+                            }
                         } else {
-                            dirPath = `${disk}:`;
+                            // 如果路径只有盘符，无法确定文件名
+                            throw new Error('无法从路径中提取文件名');
                         }
                     } else {
-                        // 如果路径只有盘符，无法确定文件名
-                        throw new Error('无法从路径中提取文件名');
+                        throw new Error('不支持的路径格式');
                     }
-                } else {
-                    throw new Error('不支持的路径格式');
                 }
-                
                 if (!dirPath || !fileName) {
                     throw new Error('无法解析文件路径');
                 }
@@ -3237,10 +3231,9 @@
                     throw new Error('ProcessManager 不可用');
                 }
                 
-                // 检查是否是本地文件路径（只有本地文件才能删除）
-                const isLocalPath = backgroundPath.startsWith('C:') || 
-                                   backgroundPath.startsWith('D:') || 
-                                   backgroundPath.includes('/system/service/DISK/');
+                // 检查是否是本地文件路径（只有本地文件才能删除，支持所有分区 A-Z）
+                const partitionMatch = backgroundPath.match(/^([A-Z]):/);
+                const isLocalPath = partitionMatch !== null || backgroundPath.includes('/system/service/DISK/');
                 
                 if (!isLocalPath) {
                     throw new Error('只能删除本地锁屏背景');
@@ -4378,17 +4371,18 @@
                     await ProcessManager.setDesktopBackground('default', this.pid);
                 }
                 
-                // 2. 删除文件
-                if (background.path && (background.path.startsWith('C:') || background.path.startsWith('D:'))) {
+                // 2. 删除文件（支持所有分区 A-Z）
+                const partitionMatch = background.path ? background.path.match(/^([A-Z]):/) : null;
+                if (background.path && partitionMatch) {
                     try {
                         // 解析路径：分离父目录路径和文件名
                         const pathParts = background.path.split('/');
                         const fileName = pathParts[pathParts.length - 1];
                         const parentPath = pathParts.slice(0, -1).join('/') || (background.path.split(':')[0] + ':');
                         
-                        // 确保路径格式正确
+                        // 确保路径格式正确（支持所有分区 A-Z）
                         let phpPath = parentPath;
-                        if (/^[CD]:$/.test(phpPath)) {
+                        if (/^[A-Z]:$/.test(phpPath)) {
                             phpPath = phpPath + '/';
                         }
                         

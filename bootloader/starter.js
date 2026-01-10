@@ -1317,23 +1317,118 @@
                     loadingEl.style.display = 'none';
                 }
                 
-                // 确保内核内容容器保持隐藏（等待锁屏界面和用户登录）
-                const contentEl = document.getElementById('kernel-content');
-                if (contentEl) {
-                    contentEl.style.display = 'none';
+                // 检查是否处于安全模式
+                let isSafeMode = false;
+                try {
+                    if (typeof sessionStorage !== 'undefined') {
+                        const safeModeFlag = sessionStorage.getItem('__ZEROS_SAFE_MODE__');
+                        isSafeMode = safeModeFlag === 'true';
+                    }
+                } catch (e) {
+                    // sessionStorage可能不可用，忽略错误
                 }
                 
-                // 初始化锁屏界面（如果 LockScreen 已加载）
-                if (typeof LockScreen !== 'undefined' && typeof LockScreen.init === 'function') {
-                    try {
-                        KernelLogger.info("BootLoader", "内核加载完成，显示锁屏界面");
-                        // 延迟初始化锁屏界面，确保所有依赖已加载
-                        setTimeout(async () => {
-                            await LockScreen.init();
-                        }, 300);
-                    } catch (e) {
-                        KernelLogger.warn("BootLoader", `锁屏界面初始化失败: ${e.message}`);
-                        // 如果锁屏界面初始化失败，降级到直接显示桌面
+                // 如果处于安全模式，按需加载BIOS模块
+                if (isSafeMode) {
+                    KernelLogger.info("BootLoader", "检测到安全模式，按需加载BIOS模块");
+                    
+                    // 确保内核内容容器保持隐藏
+                    const contentEl = document.getElementById('kernel-content');
+                    if (contentEl) {
+                        contentEl.style.display = 'none';
+                    }
+                    
+                    // 显示安全模式容器和BIOS加载动画
+                    const safeModeContainer = document.getElementById('safe-mode-container');
+                    const biosLoading = document.getElementById('bios-loading');
+                    if (safeModeContainer) {
+                        safeModeContainer.style.display = 'flex';
+                    }
+                    if (biosLoading) {
+                        biosLoading.style.display = 'flex';
+                    }
+                    
+                    // 按需加载BIOS模块（需要等待LStorage加载完成）
+                    setTimeout(async () => {
+                        try {
+                            // 等待LStorage初始化完成
+                            if (typeof LStorage !== 'undefined') {
+                                let retries = 0;
+                                while (retries < 50 && (!LStorage._initialized || typeof LStorage.getSystemStorage !== 'function')) {
+                                    await new Promise(resolve => setTimeout(resolve, 100));
+                                    retries++;
+                                }
+                            }
+                            
+                            // 加载BIOS CSS（如果还未加载）
+                            if (!document.querySelector('link[href*="bios.css"]')) {
+                                const link = document.createElement('link');
+                                link.rel = 'stylesheet';
+                                link.href = '../bootloader/BIOS/bios.css';
+                                document.head.appendChild(link);
+                                // 等待CSS加载
+                                await new Promise(resolve => setTimeout(resolve, 100));
+                            }
+                            
+                            // 动态加载BIOS管理器脚本
+                            await loadScript('../bootloader/BIOS/biosManager.js');
+                            
+                            // 初始化BIOS管理器
+                            if (typeof BIOSManager !== 'undefined' && typeof BIOSManager.init === 'function') {
+                                await BIOSManager.init();
+                                
+                                // 隐藏加载动画
+                                if (biosLoading) {
+                                    biosLoading.style.display = 'none';
+                                }
+                                
+                                KernelLogger.info("BootLoader", "BIOS模块加载并初始化完成");
+                            } else {
+                                KernelLogger.error("BootLoader", "BIOSManager初始化失败");
+                            }
+                        } catch (error) {
+                            KernelLogger.error("BootLoader", `BIOS模块加载失败: ${error.message}`, error);
+                            // 显示错误信息
+                            if (biosLoading) {
+                                biosLoading.innerHTML = `
+                                    <div class="bios-loading-terminal">
+                                        <div class="bios-loading-line" style="color: #ff0000;">Error: Failed to load BIOS</div>
+                                        <div class="bios-loading-line" style="color: #ff0000;">${error.message}</div>
+                                    </div>
+                                `;
+                            }
+                        }
+                    }, 300);
+                } else {
+                    // 正常模式：初始化锁屏界面
+                    // 确保内核内容容器保持隐藏（等待锁屏界面和用户登录）
+                    const contentEl = document.getElementById('kernel-content');
+                    if (contentEl) {
+                        contentEl.style.display = 'none';
+                    }
+                    
+                    // 初始化锁屏界面（如果 LockScreen 已加载）
+                    if (typeof LockScreen !== 'undefined' && typeof LockScreen.init === 'function') {
+                        try {
+                            KernelLogger.info("BootLoader", "内核加载完成，显示锁屏界面");
+                            // 延迟初始化锁屏界面，确保所有依赖已加载
+                            setTimeout(async () => {
+                                await LockScreen.init();
+                            }, 300);
+                        } catch (e) {
+                            KernelLogger.warn("BootLoader", `锁屏界面初始化失败: ${e.message}`);
+                            // 如果锁屏界面初始化失败，降级到直接显示桌面
+                            if (contentEl) {
+                                contentEl.style.display = 'flex';
+                                contentEl.style.opacity = '0';
+                                contentEl.style.transition = 'opacity 0.5s ease-in';
+                                void contentEl.offsetWidth;
+                                contentEl.style.opacity = '1';
+                            }
+                        }
+                    } else {
+                        KernelLogger.warn("BootLoader", "LockScreen 未加载，直接显示桌面");
+                        // 如果锁屏界面未加载，直接显示桌面（降级方案）
                         if (contentEl) {
                             contentEl.style.display = 'flex';
                             contentEl.style.opacity = '0';
@@ -1341,16 +1436,6 @@
                             void contentEl.offsetWidth;
                             contentEl.style.opacity = '1';
                         }
-                    }
-                } else {
-                    KernelLogger.warn("BootLoader", "LockScreen 未加载，直接显示桌面");
-                    // 如果锁屏界面未加载，直接显示桌面（降级方案）
-                    if (contentEl) {
-                        contentEl.style.display = 'flex';
-                        contentEl.style.opacity = '0';
-                        contentEl.style.transition = 'opacity 0.5s ease-in';
-                        void contentEl.offsetWidth;
-                        contentEl.style.opacity = '1';
                     }
                 }
             }
@@ -1414,6 +1499,8 @@
             waitForCoreModules: waitForCoreModules,
             // 启动内核
             start: start_init,
+            // 执行内核自检
+            performKernelSelfCheck: performKernelSelfCheck,
         };
     }
 })();

@@ -1,21 +1,114 @@
 ﻿// 本地存储管理器
 // 负责本地数据的管理、注册等操作
-// 所有系统依赖的本地数据和程序的本地数据都存储在 D:/LocalSData.json 文件中
+// 所有系统依赖的本地数据和程序的本地数据都存储在 {partition}/LocalSData.json 文件中（支持A-Z所有分区）
 // 通过 PHP 服务 (FSDirve.php) 进行文件读写操作
 
 KernelLogger.info("LStorage", "模块初始化");
 
 class LStorage {
-    // 存储文件路径
-    static STORAGE_FILE_PATH = "D:/"
+    // 存储文件路径（支持A-Z所有分区，默认D:，如果D:不存在则使用第一个可用分区）
+    static _storagePartition = "D:";
+    static STORAGE_FILE_PATH = "D:/"; // 向后兼容，通过 getter 动态获取
     
     // 当前调用上下文 PID（由 ProcessManager 设置）
     static _currentContextPid = null;;
     static STORAGE_FILE_NAME = "LocalSData.json";
     
-    // ApplicationTable 文件路径（独立文件）
-    static APPLICATION_TABLE_FILE_PATH = "D:/";
+    // ApplicationTable 文件路径（独立文件，使用相同的分区）
+    static APPLICATION_TABLE_FILE_PATH = "D:/"; // 向后兼容，通过 getter 动态获取
     static APPLICATION_TABLE_FILE_NAME = "ApplicationTable.json";
+    
+    /**
+     * 获取存储分区路径（支持A-Z所有分区）
+     * 优先使用D:，如果D:不存在则使用第一个可用分区
+     * @returns {string} 分区路径（如 "D:"）
+     */
+    static _getStoragePartition() {
+        return LStorage._storagePartition;
+    }
+    
+    /**
+     * 检测并设置存储分区（支持A-Z所有分区）
+     * 优先使用D:，如果D:不存在则使用第一个可用分区
+     * @returns {Promise<string>} 检测到的分区路径
+     */
+    static async _detectStoragePartition() {
+        try {
+            // 尝试从 Disk API 获取分区列表
+            if (typeof Disk !== 'undefined' && Disk.diskSeparateMap) {
+                const diskMap = Disk.diskSeparateMap;
+                if (diskMap && diskMap.size > 0) {
+                    // 优先使用 D:
+                    if (diskMap.has('D:')) {
+                        LStorage._storagePartition = 'D:';
+                        LStorage.STORAGE_FILE_PATH = 'D:/';
+                        LStorage.APPLICATION_TABLE_FILE_PATH = 'D:/';
+                        KernelLogger.info("LStorage", `检测到存储分区: D:`);
+                        return 'D:';
+                    }
+                    
+                    // 如果 D: 不存在，使用第一个可用分区
+                    const partitions = Array.from(diskMap.keys()).sort();
+                    if (partitions.length > 0) {
+                        const firstPartition = partitions[0];
+                        LStorage._storagePartition = firstPartition;
+                        LStorage.STORAGE_FILE_PATH = `${firstPartition}/`;
+                        LStorage.APPLICATION_TABLE_FILE_PATH = `${firstPartition}/`;
+                        KernelLogger.info("LStorage", `D: 分区不存在，使用第一个可用分区: ${firstPartition}`);
+                        return firstPartition;
+                    }
+                }
+            }
+            
+            // 如果 Disk API 不可用，尝试通过 POOL 检测
+            if (typeof POOL !== 'undefined' && typeof POOL.__GET__ === 'function') {
+                // 优先检查 D:
+                try {
+                    const dPartition = POOL.__GET__("KERNEL_GLOBAL_POOL", "D:");
+                    if (dPartition) {
+                        LStorage._storagePartition = 'D:';
+                        LStorage.STORAGE_FILE_PATH = 'D:/';
+                        LStorage.APPLICATION_TABLE_FILE_PATH = 'D:/';
+                        KernelLogger.info("LStorage", `从 POOL 检测到存储分区: D:`);
+                        return 'D:';
+                    }
+                } catch (e) {
+                    // D: 不存在，继续检测其他分区
+                }
+                
+                // 检查所有可能的分区（A-Z）
+                for (let i = 0; i < 26; i++) {
+                    const partitionLetter = String.fromCharCode(65 + i); // A-Z
+                    const partitionName = `${partitionLetter}:`;
+                    try {
+                        const partition = POOL.__GET__("KERNEL_GLOBAL_POOL", partitionName);
+                        if (partition) {
+                            LStorage._storagePartition = partitionName;
+                            LStorage.STORAGE_FILE_PATH = `${partitionName}/`;
+                            LStorage.APPLICATION_TABLE_FILE_PATH = `${partitionName}/`;
+                            KernelLogger.info("LStorage", `从 POOL 检测到存储分区: ${partitionName}`);
+                            return partitionName;
+                        }
+                    } catch (e) {
+                        // 分区不存在，继续检测
+                    }
+                }
+            }
+            
+            // 如果都不可用，使用默认的 D:（向后兼容）
+            KernelLogger.warn("LStorage", "无法检测分区，使用默认分区: D:");
+            LStorage._storagePartition = 'D:';
+            LStorage.STORAGE_FILE_PATH = 'D:/';
+            LStorage.APPLICATION_TABLE_FILE_PATH = 'D:/';
+            return 'D:';
+        } catch (error) {
+            KernelLogger.warn("LStorage", `检测分区失败: ${error.message}，使用默认分区: D:`);
+            LStorage._storagePartition = 'D:';
+            LStorage.STORAGE_FILE_PATH = 'D:/';
+            LStorage.APPLICATION_TABLE_FILE_PATH = 'D:/';
+            return 'D:';
+        }
+    }
     
     // PHP 服务地址（已废弃，使用 SystemInformation.getFSDirvePath() 替代）
     static PHP_SERVICE_URL = "/system/service/FSDirve.php";
@@ -53,7 +146,7 @@ class LStorage {
             return path;
         }
         // 如果路径是 "D:" 或 "C:" 这种格式，保持不变
-        if (/^[CD]:$/.test(path)) {
+        if (/^[A-Z]:$/.test(path)) {
             return path;
         }
         // 去掉末尾的斜杠
@@ -959,6 +1052,9 @@ class LStorage {
         // 检查是否为内核模块调用
         const isKernelModuleCall = LStorage._isKernelModuleCall();
         
+        // 检查是否处于BIOS模式（BIOS享有最高权限，可以访问所有系统存储）
+        const isBIOSMode = LStorage._isBIOSMode();
+        
         // 获取调用栈（用于系统加载期间的检查）
         let fullCallStack = '';
         try {
@@ -1269,7 +1365,10 @@ class LStorage {
             }
         } else {
             // 非敏感键
-            if (isKernelModuleCall) {
+            if (isBIOSMode) {
+                // BIOS模式：享有最高权限，直接允许，不需要 PID 检查和权限验证
+                KernelLogger.debug("LStorage", `BIOS模式，允许读取非敏感系统存储键 ${key}（最高权限）`);
+            } else if (isKernelModuleCall) {
                 // 内核模块调用：直接允许，不需要 PID 检查
                 KernelLogger.debug("LStorage", `内核模块调用，允许读取非敏感系统存储键 ${key}`);
             } else {
@@ -1313,6 +1412,23 @@ class LStorage {
             KernelLogger.error("LStorage", `读取系统存储失败: ${error.message}`, error);
             throw error;
         }
+    }
+    
+    /**
+     * 检查是否处于BIOS模式（BIOS享有最高权限）
+     * @returns {boolean} 是否处于BIOS模式
+     * @private
+     */
+    static _isBIOSMode() {
+        try {
+            if (typeof POOL !== 'undefined' && typeof POOL.__GET__ === 'function') {
+                const biosMode = POOL.__GET__("KERNEL_GLOBAL_POOL", "__BIOS_MODE__");
+                return biosMode === true;
+            }
+        } catch (e) {
+            // 忽略错误
+        }
+        return false;
     }
     
     /**
@@ -1509,6 +1625,9 @@ class LStorage {
         
         // 检查是否来自内核模块（内核模块是可信的，可以写入敏感键）
         const isKernelModuleCall = LStorage._isKernelModuleCall();
+        
+        // 检查是否处于BIOS模式（BIOS享有最高权限，可以写入所有系统存储）
+        const isBIOSMode = LStorage._isBIOSMode();
         
         // 定义危险存储键及其所需权限（需要危险权限，仅管理员可授予）
         const DANGEROUS_KEY_PERMISSIONS = {};
@@ -1969,18 +2088,25 @@ class LStorage {
             return {};
         }
         
+        // 检查是否处于BIOS模式（BIOS享有最高权限，可以访问所有系统存储）
+        const isBIOSMode = LStorage._isBIOSMode();
+        
         // 检查是否为内核模块调用
         const isKernelModuleCall = LStorage._isKernelModuleCall();
         
-        if (!isKernelModuleCall) {
+        if (!isBIOSMode && !isKernelModuleCall) {
             // 用户程序调用：拒绝访问（安全策略）
             const currentPid = LStorage._getCurrentPid();
             KernelLogger.error("LStorage", `安全拒绝：用户程序尝试枚举所有系统存储键（PID: ${currentPid || 'unknown'}）`);
             throw new Error(`安全策略：不允许用户程序枚举所有系统存储键`);
         }
         
-        // 内核模块调用：允许访问
-        KernelLogger.debug("LStorage", `内核模块调用，允许获取所有系统存储数据`);
+        // BIOS模式或内核模块调用：允许访问
+        if (isBIOSMode) {
+            KernelLogger.debug("LStorage", `BIOS模式调用，允许获取所有系统存储数据`);
+        } else {
+            KernelLogger.debug("LStorage", `内核模块调用，允许获取所有系统存储数据`);
+        }
         return LStorage._storageData.system || {};
     }
     
@@ -3106,12 +3232,13 @@ class LStorage {
                 if (typeof asset === 'object' && asset !== null) {
                     // 更新 script 路径
                     if (asset.script) {
-                        // 如果 script 是相对路径，更新为绝对路径
-                        if (!asset.script.startsWith('D:/') && !asset.script.startsWith('C:/')) {
+                        // 如果 script 是相对路径，更新为绝对路径（检查是否是分区路径格式 A-Z:/）
+                        if (!asset.script.match(/^[A-Z]:\//)) {
                             asset.script = `${targetBasePath}/${asset.script}`;
                         }
                     } else if (asset.path) {
-                        if (!asset.path.startsWith('D:/') && !asset.path.startsWith('C:/')) {
+                        // 检查是否是分区路径格式 A-Z:/
+                        if (!asset.path.match(/^[A-Z]:\//)) {
                             asset.path = `${targetBasePath}/${asset.path}`;
                         }
                     } else {
@@ -3131,7 +3258,8 @@ class LStorage {
                     // 更新 styles 路径
                     if (Array.isArray(asset.styles)) {
                         asset.styles = asset.styles.map(style => {
-                            if (!style.startsWith('D:/') && !style.startsWith('C:/')) {
+                            // 检查是否是分区路径格式 A-Z:/
+                            if (!style.match(/^[A-Z]:\//)) {
                                 return `${targetBasePath}/${style}`;
                             }
                             return style;
@@ -3139,13 +3267,13 @@ class LStorage {
                     }
                     
                     // 更新 icon 路径
-                    if (asset.icon && !asset.icon.startsWith('D:/') && !asset.icon.startsWith('C:/')) {
+                    if (asset.icon && !asset.icon.match(/^[A-Z]:\//)) {
                         // 确保路径正确拼接（避免重复斜杠）
                         const iconPath = asset.icon.startsWith('/') ? asset.icon.substring(1) : asset.icon;
                         asset.icon = `${targetBasePath}/${iconPath}`.replace(/\/+/g, '/');
                         KernelLogger.debug("LStorage", `图标路径已更新: ${asset.icon}`);
-                    } else if (asset.icon && (asset.icon.startsWith('D:/') || asset.icon.startsWith('C:/'))) {
-                        // 如果已经是绝对路径，确保格式正确
+                    } else if (asset.icon && asset.icon.match(/^[A-Z]:\//)) {
+                        // 如果已经是绝对路径（分区路径格式），确保格式正确
                         asset.icon = asset.icon.replace(/\/+/g, '/');
                         KernelLogger.debug("LStorage", `图标路径（绝对路径）: ${asset.icon}`);
                     }
@@ -3153,15 +3281,16 @@ class LStorage {
                     // 更新 assets 路径
                     if (Array.isArray(asset.assets)) {
                         asset.assets = asset.assets.map(assetPath => {
-                            if (!assetPath.startsWith('D:/') && !assetPath.startsWith('C:/')) {
+                            // 检查是否是分区路径格式 A-Z:/
+                            if (!assetPath.match(/^[A-Z]:\//)) {
                                 return `${targetBasePath}/${assetPath}`;
                             }
                             return assetPath;
                         });
-                    } else if (typeof asset.assets === 'string' && !asset.assets.startsWith('D:/') && !asset.assets.startsWith('C:/')) {
+                    } else if (typeof asset.assets === 'string' && !asset.assets.match(/^[A-Z]:\//)) {
                         asset.assets = `${targetBasePath}/${asset.assets}`;
                     }
-                } else if (typeof asset === 'string' && !asset.startsWith('D:/') && !asset.startsWith('C:/')) {
+                } else if (typeof asset === 'string' && !asset.match(/^[A-Z]:\//)) {
                     // 简单格式：更新路径
                     asset = `${targetBasePath}/${asset}`;
                 }

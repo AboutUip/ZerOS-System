@@ -5,6 +5,7 @@
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <link rel="stylesheet" href="core.css">
+        <link rel="stylesheet" href="../bootloader/BIOS/bios.css">
     </head>
     <body>
         <!-- 沙盒环境：仅包含内核引导，不包含任何应用程序 -->
@@ -38,8 +39,63 @@
             </div>
             <!-- 锁屏界面（将在内核加载完成后显示） -->
             <div id="lockscreen-container"></div>
+            <!-- 安全模式界面（仅在安全模式下显示） -->
+            <div id="safe-mode-container" class="safe-mode-container" style="display: none;">
+                <!-- BIOS加载动画（命令行风格） -->
+                <div id="bios-loading" class="bios-loading" style="display: none;">
+                    <div class="bios-loading-terminal">
+                        <div class="bios-loading-line">Loading BIOS...</div>
+                        <div class="bios-loading-progress">
+                            <span class="bios-loading-dot"></span>
+                            <span class="bios-loading-dot"></span>
+                            <span class="bios-loading-dot"></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
 
+        <!-- F2按键监听：在加载阶段检测安全模式 -->
+        <script>
+            (function() {
+                'use strict';
+                
+                // 页面加载时，清除之前的安全模式标志（确保每次启动都需要重新按F2才能进入安全模式）
+                try {
+                    if (typeof sessionStorage !== 'undefined') {
+                        sessionStorage.removeItem('__ZEROS_SAFE_MODE__');
+                    }
+                } catch (err) {
+                    // 忽略错误
+                }
+                
+                let f2Pressed = false;
+                
+                // 监听F2按键（在load界面阶段）
+                document.addEventListener('keydown', function(e) {
+                    // 只在内核加载界面显示时监听F2
+                    const loadingEl = document.getElementById('kernel-loading');
+                    if (loadingEl && loadingEl.style.display !== 'none' && !f2Pressed) {
+                        if (e.key === 'F2' || e.code === 'F2' || (e.keyCode === 113 && !e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey)) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            f2Pressed = true;
+                            
+                            // 启用安全模式（存储到sessionStorage）
+                            try {
+                                if (typeof sessionStorage !== 'undefined') {
+                                    sessionStorage.setItem('__ZEROS_SAFE_MODE__', 'true');
+                                    console.log('[SafeMode] F2按键检测到，安全模式已启用');
+                                }
+                            } catch (err) {
+                                console.error('[SafeMode] 无法设置安全模式标志:', err);
+                            }
+                        }
+                    }
+                }, { capture: true, once: false });
+            })();
+        </script>
+        
         <!-- 基础核心模块（按顺序加载） -->
         <!-- 1. 日志系统（最基础，无依赖） -->
         <script src="../kernel/core/logger/kernelLogger.js"></script>

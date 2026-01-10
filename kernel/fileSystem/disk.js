@@ -1,8 +1,16 @@
 KernelLogger.info("Disk", "module init");
 
 class Disk {
-    // diskSize = [long] 描述磁盘大小（常量，不需要存储）
-    static diskSize = 1024 * 1024 * 1024 * 3; // 3GB
+    // diskSize = [long] 描述磁盘大小（从 DiskData.json 读取，默认为 3GB）
+    static _diskSize = 1024 * 1024 * 1024 * 3; // 3GB 默认值
+    
+    static get diskSize() {
+        return Disk._diskSize;
+    }
+    
+    static set diskSize(value) {
+        Disk._diskSize = value;
+    }
     
     // 注意：以下数据存储在Exploit内存中
     // diskSeparateMap = [Map<String,NodeTreeCollection>] 描述磁盘分区映射表
@@ -319,6 +327,73 @@ class Disk {
     static _fallbackDiskUsedMap = null;
     static _fallbackCanUsed = undefined;
 
+    /**
+     * 从DiskData.json加载分区配置（异步）
+     * @returns {Promise<Map<string, number>>} 分区名称到大小的映射
+     */
+    static async _loadPartitionConfig() {
+        try {
+            // 直接使用fetch读取DiskData.json（不依赖diskSeparateMap，因为此时可能还未初始化）
+            // DiskData.json存储在D:分区，如果D:不存在则从第一个可用分区读取
+            // 优先尝试从D:读取（系统盘）
+            let configUrl = '/system/service/DISK/D/DiskData.json';
+            let response = await fetch(configUrl);
+            
+            // 如果D:不存在，尝试从其他分区读取（A-Z）
+            if (!response.ok) {
+                for (let i = 0; i < 26; i++) {
+                    const letter = String.fromCharCode(65 + i); // A-Z
+                    configUrl = `/system/service/DISK/${letter}/DiskData.json`;
+                    response = await fetch(configUrl);
+                    if (response.ok) {
+                        KernelLogger.debug("Disk", `从分区 ${letter}: 读取DiskData.json`);
+                        break;
+                    }
+                }
+            }
+            
+            if (response.ok) {
+                const data = await response.json();
+                if (data && data.partitions && typeof data.partitions === 'object') {
+                    const partitionMap = new Map();
+                    // 首先提取所有分区配置
+                    const partitionEntries = [];
+                    for (const [partitionName, size] of Object.entries(data.partitions)) {
+                        // 确保分区名称格式正确（以:结尾）
+                        const normalizedName = partitionName.endsWith(':') ? partitionName : partitionName + ':';
+                        partitionEntries.push([normalizedName, parseInt(size, 10)]);
+                    }
+                    // 排序：D: 分区优先（系统盘），然后按字母顺序
+                    partitionEntries.sort((a, b) => {
+                        const nameA = a[0];
+                        const nameB = b[0];
+                        // D: 分区始终排在第一位
+                        if (nameA === 'D:') return -1;
+                        if (nameB === 'D:') return 1;
+                        // 其他分区按字母顺序
+                        return nameA.localeCompare(nameB);
+                    });
+                    // 按照排序后的顺序添加到 Map（Map 保持插入顺序）
+                    for (const [partitionName, size] of partitionEntries) {
+                        partitionMap.set(partitionName, size);
+                    }
+                    if (data.totalSize) {
+                        Disk.diskSize = parseInt(data.totalSize, 10);
+                    }
+                    KernelLogger.info("Disk", `从DiskData.json加载了 ${partitionMap.size} 个分区配置（按优先级排序）: ${Array.from(partitionMap.keys()).join(', ')}`);
+                    return partitionMap;
+                }
+            } else {
+                KernelLogger.debug("Disk", `无法读取DiskData.json: ${response.status} ${response.statusText}`);
+            }
+        } catch (e) {
+            KernelLogger.debug("Disk", `从DiskData.json加载配置失败: ${e.message}`);
+        }
+        
+        // 返回null表示使用默认配置
+        return null;
+    }
+    
     static init() {
         // 初始化磁盘分区
         KernelLogger.info("Disk", "initializing partitions");
@@ -354,6 +429,106 @@ class Disk {
                 }
             }
             
+            // 初始化分区的内部函数
+            const initializePartitions = async (partitionConfig) => {
+                Disk.canUsed = true;
+                
+                // 如果提供了分区配置，使用配置；否则使用默认配置
+                if (partitionConfig && partitionConfig.size > 0) {
+                    KernelLogger.info("Disk", `使用配置的分区: ${Array.from(partitionConfig.keys()).join(', ')}`);
+                    for (const [partitionName, size] of partitionConfig) {
+                        // 检查分区是否已存在（检查diskSeparateSize，因为这是持久化的）
+                        const diskSeparateSize = Disk.diskSeparateSize;
+                        const existingSize = diskSeparateSize.get(partitionName);
+                        
+                        if (existingSize === undefined) {
+                            // 分区不存在，创建新分区
+                            KernelLogger.info("Disk", `初始化新分区: ${partitionName} (${size} 字节)`);
+                            try {
+                                await Disk.format(partitionName, size);
+                                // 验证分区是否创建成功
+                                const diskSeparateSizeAfter = Disk.diskSeparateSize;
+                                if (!diskSeparateSizeAfter.has(partitionName)) {
+                                    const errorMsg = `分区 ${partitionName} 创建失败（可能空间不足）`;
+                                    if (partitionName === 'D:') {
+                                        KernelLogger.error("Disk", `${errorMsg}。D: 是系统盘，必须创建！请检查 DiskData.json 中的分区大小配置，确保分区大小总和不超过 totalSize。`);
+                                        throw new Error(`${errorMsg}。D: 是系统盘，必须创建！`);
+                                    } else {
+                                        KernelLogger.warn("Disk", errorMsg);
+                                    }
+                                }
+                            } catch (error) {
+                                if (partitionName === 'D:') {
+                                    KernelLogger.error("Disk", `D: 分区创建失败: ${error.message}。D: 是系统盘，所有系统资源都必须从 D: 加载，必须创建！`);
+                                    throw error; // 重新抛出错误，因为 D: 必须创建
+                                } else {
+                                    KernelLogger.warn("Disk", `分区 ${partitionName} 创建失败: ${error.message}`);
+                                }
+                            }
+                        } else {
+                            // 分区已存在，但需要确保大小信息正确（从DiskData.json更新）
+                            if (existingSize !== size) {
+                                KernelLogger.info("Disk", `更新分区 ${partitionName} 大小: ${existingSize} -> ${size}`);
+                                Disk.setMap("diskSeparateSize", partitionName, size);
+                                // 重新计算空闲空间
+                                const used = (Disk.diskUsedMap && Disk.diskUsedMap.get(partitionName)) || 0;
+                                const free = size - used;
+                                Disk.setMap("diskFreeMap", partitionName, free);
+                            } else {
+                                KernelLogger.debug("Disk", `分区 ${partitionName} 已存在且大小正确 (${size} 字节)，跳过`);
+                            }
+                            
+                            // 确保diskSeparateMap中有对应的NodeTreeCollection
+                            // 如果不存在，需要从POOL获取或创建新的
+                            let coll = Disk.diskSeparateMap.get(partitionName);
+                            if (!coll && typeof POOL !== 'undefined' && typeof POOL.__GET__ === 'function') {
+                                try {
+                                    coll = POOL.__GET__("KERNEL_GLOBAL_POOL", partitionName);
+                                    if (coll) {
+                                        Disk.diskSeparateMap.set(partitionName, coll);
+                                        Disk._diskSeparateMapCache = Disk.diskSeparateMap;
+                                    }
+                                } catch (e) {
+                                    // POOL中没有，需要创建新的NodeTreeCollection
+                                    if (typeof NodeTreeCollection !== 'undefined') {
+                                        KernelLogger.info("Disk", `为已存在的分区 ${partitionName} 创建NodeTreeCollection`);
+                                        // 确保物理目录存在
+                                        await Disk._ensurePartitionDirectoryExists(partitionName);
+                                        coll = new NodeTreeCollection(partitionName);
+                                        Disk.diskSeparateMap.set(partitionName, coll);
+                                        Disk._diskSeparateMapCache = Disk.diskSeparateMap;
+                                        Disk._saveDiskSeparateMap(Disk.diskSeparateMap);
+                                        
+                                        // 注册到POOL
+                                        if (typeof POOL.__ADD__ === 'function') {
+                                            if (!POOL.__HAS__("KERNEL_GLOBAL_POOL")) {
+                                                POOL.__INIT__("KERNEL_GLOBAL_POOL");
+                                            }
+                                            POOL.__ADD__("KERNEL_GLOBAL_POOL", partitionName, coll);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    // 默认配置：C: 1GB, D: 2GB（向后兼容）
+                    KernelLogger.info("Disk", "使用默认分区配置: C: (1GB), D: (2GB)");
+                    const diskSeparateSize = Disk.diskSeparateSize;
+                    const existingC = diskSeparateSize.get("C:");
+                    const existingD = diskSeparateSize.get("D:");
+                    if (!existingC) {
+                        await Disk.format("C:", 1024 * 1024 * 1024 * 1); // 1GB
+                    }
+                    if (!existingD) {
+                        await Disk.format("D:", 1024 * 1024 * 1024 * 2); // 2GB
+                    }
+                }
+                
+                Disk.update();
+                KernelLogger.info("Disk", "initialization complete");
+            };
+            
             // 如果 Dependency 可用，等待 nodeTree 加载
             if (Dependency && typeof Dependency.waitLoaded === 'function') {
                 KernelLogger.debug("Disk", "等待 nodeTree 模块加载");
@@ -361,23 +536,18 @@ class Disk {
                     interval: 50,
                     timeout: 1000,
                 })
-                .then(() => {
+                .then(async () => {
                     KernelLogger.debug("Disk", "nodeTree 模块已加载，开始初始化");
-                    Disk.canUsed = true;
-                    Disk.format("C:", 1024 * 1024 * 1024 * 1); // 1GB
-                    Disk.format("D:", 1024 * 1024 * 1024 * 2); // 2GB
-                    Disk.update();
-                    KernelLogger.info("Disk", "initialization complete");
+                    // 尝试加载分区配置
+                    const partitionConfig = await Disk._loadPartitionConfig();
+                    await initializePartitions(partitionConfig);
                 })
-                .catch((e) => {
+                .catch(async (e) => {
                     KernelLogger.warn("Disk", "等待 nodeTree 超时，直接初始化", String(e));
                     // 即使失败也尝试初始化
                     try {
-                        Disk.canUsed = true;
-                        Disk.format("C:", 1024 * 1024 * 1024 * 1);
-                        Disk.format("D:", 1024 * 1024 * 1024 * 2);
-                        Disk.update();
-                        KernelLogger.info("Disk", "initialization complete (without nodeTree)");
+                        const partitionConfig = await Disk._loadPartitionConfig();
+                        await initializePartitions(partitionConfig);
                     } catch (e2) {
                         KernelLogger.error("Disk", "fallback initialization failed", { e: String(e2) });
                     }
@@ -385,27 +555,53 @@ class Disk {
             } else {
                 // 如果 Dependency 不可用，直接尝试初始化（Disk 不强制依赖 nodeTree）
                 KernelLogger.debug("Disk", "Dependency 不可用，直接初始化（不等待 nodeTree）");
-                try {
-                    Disk.canUsed = true;
-                    Disk.format("C:", 1024 * 1024 * 1024 * 1); // 1GB
-                    Disk.format("D:", 1024 * 1024 * 1024 * 2); // 2GB
-                    Disk.update();
-                    KernelLogger.info("Disk", "initialization complete");
-                } catch (e) {
-                    KernelLogger.error("Disk", "initialization error", { e: String(e) });
-                }
+                (async () => {
+                    try {
+                        const partitionConfig = await Disk._loadPartitionConfig();
+                        await initializePartitions(partitionConfig);
+                    } catch (e) {
+                        KernelLogger.error("Disk", "initialization error", { e: String(e) });
+                    }
+                })();
             }
         } catch (e) {
             KernelLogger.error("Disk", "初始化失败", String(e));
             // 尝试直接初始化
-            try {
-                Disk.canUsed = true;
-                Disk.format("C:", 1024 * 1024 * 1024 * 1);
-                Disk.format("D:", 1024 * 1024 * 1024 * 2);
-                Disk.update();
-            } catch (e2) {
-                KernelLogger.error("Disk", "fallback initialization failed", { e: String(e2) });
-            }
+            (async () => {
+                try {
+                    Disk.canUsed = true;
+                    const partitionConfig = await Disk._loadPartitionConfig();
+                    if (!partitionConfig || partitionConfig.size === 0) {
+                        // 使用默认配置
+                        const diskSeparateSize = Disk.diskSeparateSize;
+                        const existingC = diskSeparateSize.get("C:");
+                        const existingD = diskSeparateSize.get("D:");
+                        if (!existingC) {
+                            await Disk.format("C:", 1024 * 1024 * 1024 * 1);
+                        }
+                        if (!existingD) {
+                            await Disk.format("D:", 1024 * 1024 * 1024 * 2);
+                        }
+                    } else {
+                        const diskSeparateSize = Disk.diskSeparateSize;
+                        for (const [partitionName, size] of partitionConfig) {
+                            const existingSize = diskSeparateSize.get(partitionName);
+                            if (existingSize === undefined) {
+                                await Disk.format(partitionName, size);
+                            } else if (existingSize !== size) {
+                                // 更新大小
+                                Disk.setMap("diskSeparateSize", partitionName, size);
+                                const used = (Disk.diskUsedMap && Disk.diskUsedMap.get(partitionName)) || 0;
+                                const free = size - used;
+                                Disk.setMap("diskFreeMap", partitionName, free);
+                            }
+                        }
+                    }
+                    Disk.update();
+                } catch (e2) {
+                    KernelLogger.error("Disk", "fallback initialization failed", { e: String(e2) });
+                }
+            })();
         }
     }
 
@@ -504,8 +700,74 @@ class Disk {
         });
     }
 
+    /**
+     * 确保分区物理目录存在（通过 DISKMANAGER API 创建）
+     * @param {string} partitionName 分区名称（如 "B:"）
+     * @returns {Promise<boolean>} 是否成功
+     */
+    static async _ensurePartitionDirectoryExists(partitionName) {
+        try {
+            // 提取分区字母
+            const diskLetter = partitionName.replace(':', '');
+            if (!/^[A-Z]$/.test(diskLetter)) {
+                KernelLogger.warn("Disk", `无效的分区名称: ${partitionName}`);
+                return false;
+            }
+            
+            // D: 是系统盘，应该已经存在，跳过创建
+            if (diskLetter === 'D') {
+                return true;
+            }
+            
+            // 通过 DISKMANAGER API 检查分区是否存在
+            const origin = (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                ? SystemInformation.getOrigin()
+                : (typeof window !== 'undefined' && window.location) ? window.location.origin : 'http://localhost:8089';
+            const diskManagerUrl = new URL('/system/service/DISKMANAGER.php', origin);
+            
+            // 先检查分区是否存在
+            const checkUrl = new URL(diskManagerUrl);
+            checkUrl.searchParams.set('action', 'check');
+            checkUrl.searchParams.set('partition', partitionName);
+            
+            const checkResponse = await fetch(checkUrl.toString());
+            if (checkResponse.ok) {
+                const checkResult = await checkResponse.json();
+                if (checkResult.status === 'success' && checkResult.data && checkResult.data.exists) {
+                    KernelLogger.debug("Disk", `分区 ${partitionName} 物理目录已存在`);
+                    return true;
+                }
+            }
+            
+            // 分区不存在，创建分区
+            const createUrl = new URL(diskManagerUrl);
+            createUrl.searchParams.set('action', 'create');
+            createUrl.searchParams.set('partition', partitionName);
+            
+            KernelLogger.info("Disk", `创建分区物理目录: ${partitionName}`);
+            const createResponse = await fetch(createUrl.toString());
+            
+            if (createResponse.ok) {
+                const createResult = await createResponse.json();
+                if (createResult.status === 'success') {
+                    KernelLogger.info("Disk", `分区 ${partitionName} 物理目录创建成功`);
+                    return true;
+                } else {
+                    KernelLogger.warn("Disk", `创建分区 ${partitionName} 物理目录失败: ${createResult.message}`);
+                    return false;
+                }
+            } else {
+                KernelLogger.warn("Disk", `创建分区 ${partitionName} 物理目录失败: HTTP ${createResponse.status}`);
+                return false;
+            }
+        } catch (e) {
+            KernelLogger.warn("Disk", `创建分区 ${partitionName} 物理目录时出错: ${e.message}`);
+            return false;
+        }
+    }
+    
     // 分卷格式化
-    static format(separateName, size) {
+    static async format(separateName, size) {
         if (!Disk.canUsed) {
             KernelLogger.warn("Disk", "format on uninitialized disk");
             return;
@@ -521,6 +783,10 @@ class Disk {
         if (size <= diskFreeSize) {
             // 进行格式化
             KernelLogger.info("Disk", `格式化分区 ${separateName}，大小: ${size} 字节`);
+            
+            // 确保物理目录存在（在创建 NodeTreeCollection 之前）
+            await Disk._ensurePartitionDirectoryExists(separateName);
+            
             Disk.setMap("diskSeparateSize", separateName, size);
             const nodeTree = new NodeTreeCollection(separateName);
             

@@ -2345,7 +2345,7 @@
                             
                             // 规范化路径
                             let phpPath = parentPath;
-                            if (/^[CD]:$/.test(phpPath)) {
+                            if (/^[A-Z]:$/.test(phpPath)) {
                                 phpPath = phpPath + '/';
                             }
                             

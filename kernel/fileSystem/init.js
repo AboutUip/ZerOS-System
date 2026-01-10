@@ -108,7 +108,9 @@ async function cleanupExpiredCache() {
         const EXPIRY_TIME = 24 * 60 * 60 * 1000;
         const now = Date.now();
         
-        // 列出 D:/cache/ 目录下的所有文件
+        // 列出缓存目录下的所有文件（尝试从D:/cache，如果不存在则从第一个可用分区的cache目录）
+        // 注意：这里保持使用D:/cache作为默认缓存目录（向后兼容），但可以扩展为支持其他分区
+        let cachePath = 'D:/cache';
         const listUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
             ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
             : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
@@ -116,7 +118,7 @@ async function cleanupExpiredCache() {
                 : window.location.origin);
         listUrl.searchParams.set('action', 'list_dir');
         // 规范化路径，去掉末尾斜杠，避免 SpringBoot 后端路径拼接时出现双斜杠
-        listUrl.searchParams.set('path', 'D:/cache');
+        listUrl.searchParams.set('path', cachePath);
         
         const listResponse = await fetch(listUrl.toString());
         if (!listResponse.ok) {
@@ -155,7 +157,7 @@ async function cleanupExpiredCache() {
                 ? SystemInformation.getOrigin()
                 : window.location.origin);
                 deleteUrl.searchParams.set('action', 'delete_file');
-                deleteUrl.searchParams.set('path', 'D:/cache/');
+                deleteUrl.searchParams.set('path', cachePath);
                 deleteUrl.searchParams.set('fileName', file.name);
                 
                 const deleteResponse = await fetch(deleteUrl.toString());

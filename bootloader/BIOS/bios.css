@@ -1,0 +1,111 @@
+/* BIOS界面样式 - UEFI/BIOS风格 */
+
+#bios-container,
+.bios-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: #000000;
+    color: #00ff00;
+    font-family: 'Courier New', 'Consolas', 'Monaco', monospace;
+    z-index: 20002; /* 高于安全模式界面(20001)和锁屏(20000) */
+    display: flex;
+    flex-direction: column;
+    padding: 20px;
+    box-sizing: border-box;
+    overflow: hidden;
+    /* 隐藏鼠标光标（BIOS风格） */
+    cursor: none !important;
+    /* 禁止所有鼠标交互（点击、悬停等），但保留键盘事件 */
+    pointer-events: none;
+}
+
+/* BIOS容器内的所有元素也隐藏鼠标光标 */
+#bios-container *,
+.bios-container * {
+    cursor: none !important;
+}
+
+.bios-header {
+    font-size: 24px;
+    font-weight: bold;
+    color: #00ff00;
+    text-align: center;
+    padding: 20px 0;
+    border-bottom: 2px solid #00ff00;
+    margin-bottom: 30px;
+    text-shadow: 0 0 10px rgba(0, 255, 0, 0.5);
+}
+
+.bios-menu {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 20px;
+    overflow-y: auto;
+}
+
+.bios-menu-item {
+    font-size: 18px;
+    color: #00ff00;
+    padding: 12px 20px;
+    border: 1px solid transparent;
+    background: rgba(0, 255, 0, 0.05);
+}
+
+.bios-menu-item.selected {
+    background: rgba(0, 255, 0, 0.2);
+    border-color: #00ff00;
+    box-shadow: 
+        0 0 10px rgba(0, 255, 0, 0.5),
+        inset 0 0 10px rgba(0, 255, 0, 0.1);
+    color: #00ffff;
+    text-shadow: 0 0 5px rgba(0, 255, 255, 0.8);
+}
+
+.bios-menu-item.checked {
+    color: #00ffff;
+}
+
+.bios-help {
+    font-size: 14px;
+    color: rgba(0, 255, 0, 0.7);
+    text-align: center;
+    padding: 15px 0;
+    border-top: 1px solid rgba(0, 255, 0, 0.3);
+    margin-top: 20px;
+}
+
+/* 滚动条样式 */
+.bios-menu::-webkit-scrollbar {
+    width: 10px;
+}
+
+.bios-menu::-webkit-scrollbar-track {
+    background: rgba(0, 255, 0, 0.05);
+}
+
+.bios-menu::-webkit-scrollbar-thumb {
+    background: rgba(0, 255, 0, 0.3);
+    border-radius: 5px;
+}
+
+/* BIOS模式下禁用滚动条hover效果 */
+
+/* 动画效果 */
+@keyframes biosFadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+.bios-container {
+    animation: biosFadeIn 0.3s ease-in;
+}
+

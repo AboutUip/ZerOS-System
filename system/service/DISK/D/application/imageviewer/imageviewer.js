@@ -711,17 +711,20 @@
                 } else if (typeof ProcessManager !== 'undefined' && ProcessManager.convertVirtualPathToUrl) {
                     // 使用 ProcessManager 转换路径
                     imageUrl = ProcessManager.convertVirtualPathToUrl(imagePath);
-                } else if (imagePath.startsWith('D:/') || imagePath.startsWith('C:/')) {
-                    // 手动转换虚拟路径
-                    const relativePath = imagePath.substring(3);
-                    const disk = imagePath.startsWith('D:/') ? 'D' : 'C';
-                    imageUrl = `/system/service/DISK/${disk}/${relativePath}`;
-                } else if (imagePath.startsWith('/')) {
-                    // 已经是相对URL路径
-                    imageUrl = imagePath;
                 } else {
-                    // 相对路径，尝试从当前工作目录解析
-                    imageUrl = imagePath;
+                    // 支持所有分区 A-Z
+                    const partitionMatch = imagePath.match(/^([A-Z]):\//);
+                    if (partitionMatch) {
+                        const disk = partitionMatch[1];
+                        const relativePath = imagePath.substring(3);
+                        imageUrl = `/system/service/DISK/${disk}/${relativePath}`;
+                    } else if (imagePath.startsWith('/')) {
+                        // 已经是相对URL路径
+                        imageUrl = imagePath;
+                    } else {
+                        // 相对路径，尝试从当前工作目录解析
+                        imageUrl = imagePath;
+                    }
                 }
                 
                 this.currentImagePath = imagePath;

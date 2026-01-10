@@ -25,10 +25,10 @@
 
 ### 默认路径
 
-- **缓存目录**：`D:/cache/`
-- **缓存元数据文件**：`D:/LocalCache.json`
+- **缓存目录**：`D:/cache/`（始终使用系统盘 D:）
+- **缓存元数据文件**：`D:/LocalCache.json`（始终使用系统盘 D:）
 
-缓存数据存储在 `LocalCache.json` 文件中，不在 `LocalSData.json` 中存放。
+缓存数据存储在 `LocalCache.json` 文件中，不在 `LocalSData.json` 中存放。**所有系统资源（包括缓存）都必须从系统磁盘 D: 加载**，CacheDrive 始终使用 D: 分区，不会使用其他分区。
 
 ## 权限要求
 
@@ -108,7 +108,6 @@ await ProcessManager.callKernelAPI(
 - `defaultValue` (any, 默认 `null`): 默认值（如果缓存不存在或已过期）
 - `options` (Object, 可选): 选项
   - `pid` (number, 可选): 程序 PID（会自动转换为程序名称）
-  - `programName` (string, 可选): 程序名称（优先级高于 pid）（会自动转换为程序名称）
   - `programName` (string, 可选): 程序名称（优先级高于 pid），不提供则从系统缓存获取
 
 **返回值**: `Promise<any>` - 缓存值或默认值

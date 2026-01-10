@@ -403,7 +403,7 @@
                 let normalizedPath = folderPath;
                 if (normalizedPath) {
                     // 处理 C://test 这种情况，转换为 C:/test
-                    normalizedPath = normalizedPath.replace(/([CD]:)\/\/+/g, '$1/');
+                    normalizedPath = normalizedPath.replace(/([A-Z]:)\/\/+/g, '$1/');
                     // 处理其他双斜杠情况
                     normalizedPath = normalizedPath.replace(/\/\/+/g, '/');
                 }
@@ -477,12 +477,12 @@
                 if (normalizedPath) {
                     // 生成所有可能的路径变体
                     // 1. 单斜杠格式：C:/test
-                    const singleSlash = normalizedPath.replace(/([CD]:)\/\/+/g, '$1/').replace(/\/\/+/g, '/');
+                    const singleSlash = normalizedPath.replace(/([A-Z]:)\/\/+/g, '$1/').replace(/\/\/+/g, '/');
                     pathVariants.push(singleSlash);
                     
                     // 2. 双斜杠格式：C://test（如果原始路径是双斜杠）
                     if (normalizedPath.includes('//')) {
-                        const doubleSlash = normalizedPath.replace(/([CD]:)\/\/+/g, '$1//').replace(/([^:])\/\/+/g, '$1/');
+                        const doubleSlash = normalizedPath.replace(/([A-Z]:)\/\/+/g, '$1//').replace(/([^:])\/\/+/g, '$1/');
                         if (doubleSlash !== singleSlash) {
                             pathVariants.push(doubleSlash);
                         }
@@ -566,7 +566,7 @@
                         indexPath = `${normalizedPath}${separator}${indexFile.name}`;
                     }
                     // 规范化返回的路径
-                    indexPath = indexPath.replace(/([CD]:)\/\/+/g, '$1/').replace(/\/\/+/g, '/');
+                    indexPath = indexPath.replace(/([A-Z]:)\/\/+/g, '$1/').replace(/\/\/+/g, '/');
                     
                     if (typeof KernelLogger !== 'undefined') {
                         KernelLogger.info('WebViewer', `找到index.html: ${indexPath}`);
@@ -609,14 +609,17 @@
                 
                 if (typeof ProcessManager !== 'undefined' && ProcessManager.convertVirtualPathToUrl) {
                     htmlUrl = ProcessManager.convertVirtualPathToUrl(indexHtmlPath);
-                } else if (indexHtmlPath.startsWith('D:/') || indexHtmlPath.startsWith('C:/')) {
-                    // 手动转换虚拟路径
-                    const relativePath = indexHtmlPath.substring(3);
-                    const disk = indexHtmlPath.startsWith('D:/') ? 'D' : 'C';
-                    htmlUrl = `/system/service/DISK/${disk}/${relativePath}`;
-                } else if (!indexHtmlPath.startsWith('http://') && !indexHtmlPath.startsWith('https://') && !indexHtmlPath.startsWith('/')) {
-                    // 相对路径，保持原样
-                    htmlUrl = indexHtmlPath;
+                } else {
+                    // 支持所有分区 A-Z
+                    const partitionMatch = indexHtmlPath.match(/^([A-Z]):\//);
+                    if (partitionMatch) {
+                        const disk = partitionMatch[1];
+                        const relativePath = indexHtmlPath.substring(3);
+                        htmlUrl = `/system/service/DISK/${disk}/${relativePath}`;
+                    } else if (!indexHtmlPath.startsWith('http://') && !indexHtmlPath.startsWith('https://') && !indexHtmlPath.startsWith('/')) {
+                        // 相对路径，保持原样
+                        htmlUrl = indexHtmlPath;
+                    }
                 }
                 
                 // 设置iframe源（直接使用URL，这样HTML中的相对路径资源可以正确加载）

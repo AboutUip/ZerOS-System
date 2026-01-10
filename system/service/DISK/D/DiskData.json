@@ -1,0 +1,8 @@
+{
+    "totalSize": 3221225472,
+    "partitionCount": 2,
+    "partitions": {
+        "C:": 1073741824,
+        "D:": 2147483648
+    }
+}

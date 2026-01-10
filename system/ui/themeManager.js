@@ -2496,10 +2496,9 @@ class ThemeManager {
             return;
         }
         
-        // 检查是否是本地图片路径（以 C: 或 D: 开头，或包含 /system/service/DISK/）
-        const isLocalPath = background.path.startsWith('C:') || 
-                           background.path.startsWith('D:') || 
-                           background.path.includes('/system/service/DISK/');
+        // 检查是否是本地图片路径（分区路径格式 A-Z: 或包含 /system/service/DISK/）
+        const partitionMatch = background.path.match(/^([A-Z]):/);
+        const isLocalPath = partitionMatch !== null || background.path.includes('/system/service/DISK/');
         
         let imageUrl = background.path;
         
@@ -2516,13 +2515,11 @@ class ThemeManager {
                 return;
             }
             
-            // 转换为 PHP 服务 URL
-            // 例如: C:/path/to/image.jpg -> /system/service/DISK/C/path/to/image.jpg
-            // 例如: D:/path/to/image.jpg -> /system/service/DISK/D/path/to/image.jpg
-            if (background.path.startsWith('C:')) {
-                imageUrl = '/system/service/DISK/C' + background.path.substring(2).replace(/\\/g, '/');
-            } else if (background.path.startsWith('D:')) {
-                imageUrl = '/system/service/DISK/D' + background.path.substring(2).replace(/\\/g, '/');
+            // 转换为 PHP 服务 URL（支持所有分区 A-Z）
+            // 例如: X:/path/to/image.jpg -> /system/service/DISK/X/path/to/image.jpg
+            if (partitionMatch) {
+                const diskLetter = partitionMatch[1]; // 分区字母 (A-Z)
+                imageUrl = '/system/service/DISK/' + diskLetter + background.path.substring(2).replace(/\\/g, '/');
             } else if (background.path.includes('/system/service/DISK/')) {
                 imageUrl = background.path;
             }
@@ -2677,14 +2674,15 @@ class ThemeManager {
         try {
             // 转换为 PHP 服务路径
             let phpPath = imagePath;
-            if (imagePath.startsWith('C:')) {
-                phpPath = 'C:' + imagePath.substring(2).replace(/\\/g, '/');
-            } else if (imagePath.startsWith('D:')) {
-                phpPath = 'D:' + imagePath.substring(2).replace(/\\/g, '/');
+            // 支持所有分区 A-Z
+            const partitionMatch = imagePath.match(/^([A-Z]):/);
+            if (partitionMatch) {
+                const diskLetter = partitionMatch[1];
+                phpPath = diskLetter + ':' + imagePath.substring(2).replace(/\\/g, '/');
             }
             
-            // 确保路径格式正确
-            if (/^[CD]:$/.test(phpPath)) {
+            // 确保路径格式正确（支持所有分区 A-Z）
+            if (/^[A-Z]:$/.test(phpPath)) {
                 phpPath = phpPath + '/';
             }
             

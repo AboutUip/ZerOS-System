@@ -876,17 +876,21 @@
                 }
             }
             
-            // 如果 Disk API 不可用，尝试从 POOL 获取
+            // 如果 Disk API 不可用，尝试从 POOL 获取（降级方案，向后兼容）
+            // 注意：这是一个降级方案，实际应该通过Disk API获取所有分区
+            // 检查所有可能的分区（A-Z），支持多分区
             if (disks.length === 0 && typeof POOL !== 'undefined' && typeof POOL.__GET__ === 'function') {
-                const knownDisks = ['C:', 'D:'];
-                for (const diskName of knownDisks) {
+                // 按字母顺序检查所有分区（A-Z）
+                for (let i = 0; i < 26; i++) {
+                    const letter = String.fromCharCode(65 + i); // A-Z
+                    const diskName = `${letter}:`;
                     try {
                         const coll = POOL.__GET__("KERNEL_GLOBAL_POOL", diskName);
                         if (coll && typeof coll === 'object') {
                             disks.push(diskName);
                         }
                     } catch (e) {
-                        // 忽略
+                        // 分区不存在，继续检查下一个
                     }
                 }
             }
@@ -1163,7 +1167,7 @@
             
             // 处理盘符（如 C:）
             const diskPart = pathParts[0];
-            if (/^[CD]:$/.test(diskPart)) {
+            if (/^[A-Z]:$/.test(diskPart)) {
                 const diskItem = document.createElement('span');
                 diskItem.className = 'breadcrumb-item';
                 diskItem.textContent = diskPart;
@@ -1772,7 +1776,7 @@
                     
                     // 统计目录中的文件和子目录数量（从 PHP 服务获取）
                     let phpPath = item.path;
-                    if (/^[CD]:$/.test(phpPath)) {
+                    if (/^[A-Z]:$/.test(phpPath)) {
                         phpPath = phpPath + '/';
                     }
                     
@@ -1838,17 +1842,17 @@
                 // 如果路径为空或只有盘符，确保格式为 C: 或 D:
                 if (!dirPath || dirPath === '') {
                     // 从完整路径中提取盘符
-                    const match = filePath.match(/^([CD]):/);
-                    dirPath = match ? match[1] + ':' : 'C:';
+                    const match = filePath.match(/^([A-Z]):/);
+                    dirPath = match ? match[1] + ':' : 'D:';  // D盘是系统盘，使用D作为默认值
                 } else {
                     // 规范化路径：移除多余的斜杠
                     dirPath = dirPath.replace(/\/+/g, '/');
                     // 移除尾部斜杠（但保留根路径格式 C:/）
-                    if (dirPath.endsWith('/') && !dirPath.match(/^[CD]:\/$/)) {
+                    if (dirPath.endsWith('/') && !dirPath.match(/^[A-Z]:\/$/)) {
                         dirPath = dirPath.slice(0, -1);
                     }
                     // 确保根路径格式为 C: 而不是 C:/
-                    if (dirPath.match(/^[CD]:\/$/)) {
+                    if (dirPath.match(/^[A-Z]:\/$/)) {
                         dirPath = dirPath.slice(0, -1); // 移除尾部斜杠，变成 C:
                     }
                 }
@@ -1994,9 +1998,11 @@
                 // 方法2：如果方法1没有结果，尝试从POOL直接获取
                 // 注意：即使方法1有结果，也检查方法2，确保所有磁盘都被列出
                 if (typeof POOL !== 'undefined' && typeof POOL.__GET__ === 'function') {
-                    // 尝试获取已知的分区
-                    const knownDisks = ['C:', 'D:'];
-                    for (const diskName of knownDisks) {
+                    // 尝试获取所有分区（A-Z），支持多分区（降级方案，向后兼容）
+                    // 按字母顺序检查所有分区（A-Z）
+                    for (let i = 0; i < 26; i++) {
+                        const letter = String.fromCharCode(65 + i); // A-Z
+                        const diskName = `${letter}:`;
                         // 检查是否已经在列表中
                         const alreadyInList = fileList.some(item => item.name === diskName);
                         if (alreadyInList) {
@@ -2135,7 +2141,7 @@
                 
                 // 确保路径格式正确
                 let phpPath = path;
-                if (/^[CD]:$/.test(phpPath)) {
+                if (/^[A-Z]:$/.test(phpPath)) {
                     phpPath = phpPath + '/';
                 }
                 
@@ -3095,7 +3101,8 @@
                 
                 // 获取当前路径（用于cwd）
                 const currentPath = this._getCurrentPath();
-                const cwd = currentPath || 'C:';
+                // D: 是系统盘，优先使用 D:，如果当前路径为空则使用 D:
+                const cwd = currentPath || 'D:';
                 
                 // 启动视频播放器程序，传递视频路径
                 await ProcessManager.startProgram('videoplayer', {
@@ -3175,7 +3182,8 @@
                 
                 // 获取当前路径（用于cwd）
                 const currentPath = this._getCurrentPath();
-                const cwd = currentPath || 'C:';
+                // D: 是系统盘，优先使用 D:，如果当前路径为空则使用 D:
+                const cwd = currentPath || 'D:';
                 
                 // 启动音频播放器程序，传递音频路径
                 await ProcessManager.startProgram('audioplayer', {
@@ -3255,7 +3263,8 @@
                 
                 // 获取当前路径（用于cwd）
                 const currentPath = this._getCurrentPath();
-                const cwd = currentPath || 'C:';
+                // D: 是系统盘，优先使用 D:，如果当前路径为空则使用 D:
+                const cwd = currentPath || 'D:';
                 
                 // 启动 WebViewer 程序，传递文件路径
                 await ProcessManager.startProgram('webviewer', {
@@ -3335,7 +3344,8 @@
                 
                 // 获取当前路径（用于cwd）
                 const currentPath = this._getCurrentPath();
-                const cwd = currentPath || 'C:';
+                // D: 是系统盘，优先使用 D:，如果当前路径为空则使用 D:
+                const cwd = currentPath || 'D:';
                 
                 // 启动图片查看器程序，传递图片路径
                 await ProcessManager.startProgram('imageviewer', {
@@ -3415,7 +3425,8 @@
                 
                 // 获取当前路径（用于cwd）
                 const currentPath = this._getCurrentPath();
-                const cwd = currentPath || 'C:';
+                // D: 是系统盘，优先使用 D:，如果当前路径为空则使用 D:
+                const cwd = currentPath || 'D:';
                 
                 // 启动 ziper 程序，传递 ZIP 文件路径作为参数
                 await ProcessManager.startProgram('ziper', {
@@ -3564,9 +3575,10 @@
                 
                 // 获取当前路径（用于cwd）
                 const currentPath = this._getCurrentPath();
-                const cwd = currentPath || 'C:';
+                // D: 是系统盘，优先使用 D:，如果当前路径为空则使用 D:
+                const cwd = currentPath || 'D:';
                 
-                // 尝试从 D:/bin/ 目录加载 zominstall.js
+                // 尝试从 D:/bin/ 目录加载 zominstall.js（D: 是系统盘）
                 let tempAsset = null;
                 try {
                     // 获取 SystemInformation（用于构建 FSDirve URL）
@@ -3594,8 +3606,38 @@
                             url = new URL('/system/service/FSDirve.php', origin);
                         }
                         url.searchParams.set('action', 'read_file');
-                        url.searchParams.set('path', 'D:/bin');
-                        url.searchParams.set('fileName', 'zominstall.js');
+                        // D: 是系统盘，优先从 D:/bin 读取 zominstall.js
+                        // 如果 D: 不存在，尝试从第一个可用分区的 bin 目录读取
+                        let zominstallPath = 'D:/bin';
+                        let zominstallFileName = 'zominstall.js';
+                        
+                        // 检查 D: 分区是否存在（通过尝试列出目录）
+                        try {
+                            const checkUrl = new URL(url.toString());
+                            checkUrl.searchParams.set('action', 'list');
+                            checkUrl.searchParams.set('path', 'D:');
+                            const checkResponse = await fetch(checkUrl.toString());
+                            if (!checkResponse.ok) {
+                                // D: 不存在，尝试从其他分区查找
+                                // 按字母顺序检查所有分区（A-Z）
+                                for (let i = 0; i < 26; i++) {
+                                    const letter = String.fromCharCode(65 + i); // A-Z
+                                    if (letter === 'D') continue; // 跳过 D，已经检查过
+                                    const testPath = `${letter}:/bin`;
+                                    checkUrl.searchParams.set('path', testPath);
+                                    const testResponse = await fetch(checkUrl.toString());
+                                    if (testResponse.ok) {
+                                        zominstallPath = testPath;
+                                        break;
+                                    }
+                                }
+                            }
+                        } catch (e) {
+                            // 检查失败，使用默认的 D:/bin
+                        }
+                        
+                        url.searchParams.set('path', zominstallPath);
+                        url.searchParams.set('fileName', zominstallFileName);
                         
                         // 读取文件
                         const response = await fetch(url.toString());
@@ -3666,7 +3708,7 @@
                 
                 // 确保路径格式正确
                 let phpPath = parentPath;
-                if (/^[CD]:$/.test(phpPath)) {
+                if (/^[A-Z]:$/.test(phpPath)) {
                     phpPath = phpPath + '/';
                 }
                 
@@ -3757,7 +3799,7 @@
                 
                 // 确保路径格式正确
                 let phpPath = parentPath;
-                if (/^[CD]:$/.test(phpPath)) {
+                if (/^[A-Z]:$/.test(phpPath)) {
                     phpPath = phpPath + '/';
                 }
                 
@@ -3957,7 +3999,8 @@
                 
                 // 获取当前路径（用于cwd）
                 const currentPath = this._getCurrentPath();
-                const cwd = currentPath || 'C:';
+                // D: 是系统盘，优先使用 D:，如果当前路径为空则使用 D:
+                const cwd = currentPath || 'D:';
                 
                 // 启动 vim 程序，传递终端实例
                 await ProcessManager.startProgram('vim', {
@@ -4255,7 +4298,7 @@
                 
                 // 确保路径格式正确
                 let phpPath = currentPath;
-                if (/^[CD]:$/.test(phpPath)) {
+                if (/^[A-Z]:$/.test(phpPath)) {
                     phpPath = phpPath + '/';
                 }
                 
@@ -4394,15 +4437,15 @@
                 // 规范化路径（移除双斜杠等）
                 let phpPath = currentPath;
                 // 处理 Windows 盘符后的双斜杠（如 C:// -> C:/）
-                phpPath = phpPath.replace(/^([CD]):\/\//, '$1:/');
+                phpPath = phpPath.replace(/^([A-Z]):\/\//, '$1:/');
                 // 将其他多个连续斜杠替换为单个斜杠
                 phpPath = phpPath.replace(/\/+/g, '/');
-                // 移除尾部斜杠（但保留根路径，如 C:/）
-                if (phpPath.length > 3 && phpPath.endsWith('/') && !phpPath.match(/^[CD]:\/$/)) {
+                // 移除尾部斜杠（但保留根路径，如 A:/ 到 Z:/）（支持所有分区A-Z）
+                if (phpPath.length > 3 && phpPath.endsWith('/') && !phpPath.match(/^[A-Z]:\/$/)) {
                     phpPath = phpPath.slice(0, -1);
                 }
                 // 确保根路径格式正确
-                if (/^[CD]:$/.test(phpPath)) {
+                if (/^[A-Z]:$/.test(phpPath)) {
                     phpPath = phpPath + '/';
                 }
                 
@@ -4615,14 +4658,14 @@
                     // 统一使用正斜杠
                     let normalized = path.replace(/\\/g, '/');
                     // 移除多个连续斜杠（但保留盘符后的双斜杠，如 C:// -> C:/）
-                    normalized = normalized.replace(/([CD]:)\/\/+/g, '$1/');
+                    normalized = normalized.replace(/([A-Z]:)\/\/+/g, '$1/');
                     normalized = normalized.replace(/\/+/g, '/');
                     // 移除尾部斜杠（但保留根路径，如 C:/）
-                    if (normalized.length > 3 && normalized.endsWith('/') && !normalized.match(/^[CD]:\/$/)) {
+                    if (normalized.length > 3 && normalized.endsWith('/') && !normalized.match(/^[A-Z]:\/$/)) {
                         normalized = normalized.slice(0, -1);
                     }
-                    // 确保根路径格式正确
-                    if (/^[CD]:$/.test(normalized)) {
+                    // 确保根路径格式正确（支持所有分区A-Z）
+                    if (/^[A-Z]:$/.test(normalized)) {
                         normalized = normalized + '/';
                     }
                     return normalized;
@@ -5282,14 +5325,14 @@
                                 // 统一使用正斜杠
                                 let normalized = path.replace(/\\/g, '/');
                                 // 移除多个连续斜杠（但保留盘符后的双斜杠，如 C:// -> C:/）
-                                normalized = normalized.replace(/([CD]:)\/\/+/g, '$1/');
+                                normalized = normalized.replace(/([A-Z]:)\/\/+/g, '$1/');
                                 normalized = normalized.replace(/\/+/g, '/');
                                 // 移除尾部斜杠（但保留根路径，如 C:/）
-                                if (normalized.length > 3 && normalized.endsWith('/') && !normalized.match(/^[CD]:\/$/)) {
+                                if (normalized.length > 3 && normalized.endsWith('/') && !normalized.match(/^[A-Z]:\/$/)) {
                                     normalized = normalized.slice(0, -1);
                                 }
-                                // 确保根路径格式正确
-                                if (/^[CD]:$/.test(normalized)) {
+                                // 确保根路径格式正确（支持所有分区A-Z）
+                                if (/^[A-Z]:$/.test(normalized)) {
                                     normalized = normalized + '/';
                                 }
                                 return normalized;
@@ -5646,7 +5689,7 @@
                 
                 // 确保路径格式正确
                 let phpPath = parentPath;
-                if (/^[CD]:$/.test(phpPath)) {
+                if (/^[A-Z]:$/.test(phpPath)) {
                     phpPath = phpPath + '/';
                 }
                 
@@ -5779,7 +5822,7 @@
                 
                 // 确保路径格式正确
                 let phpPath = parentPath;
-                if (/^[CD]:$/.test(phpPath)) {
+                if (/^[A-Z]:$/.test(phpPath)) {
                     phpPath = phpPath + '/';
                 }
                 
@@ -6025,7 +6068,7 @@
             try {
                 // 确保目标路径格式正确
                 let targetPath = currentPath;
-                if (/^[CD]:$/.test(targetPath)) {
+                if (/^[A-Z]:$/.test(targetPath)) {
                     targetPath = targetPath + '/';
                 }
                 
@@ -6037,7 +6080,7 @@
                     
                     // 确保源路径格式正确
                     let sourcePath = sourceParentPath;
-                    if (/^[CD]:$/.test(sourcePath)) {
+                    if (/^[A-Z]:$/.test(sourcePath)) {
                         sourcePath = sourcePath + '/';
                     }
                     
@@ -6714,7 +6757,7 @@
                 
                 // 确保路径格式正确
                 let phpPath = parentPath;
-                if (/^[CD]:$/.test(phpPath)) {
+                if (/^[A-Z]:$/.test(phpPath)) {
                     phpPath = phpPath + '/';
                 }
                 

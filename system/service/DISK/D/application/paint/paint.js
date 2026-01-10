@@ -355,10 +355,10 @@
                                 throw new Error('未获取到有效目录');
                             }
                             folderPath = folderPath.replace(/\\/g, '/');
-                            if (folderPath.endsWith('/') && !folderPath.match(/^[CD]:\/$/)) {
+                            if (folderPath.endsWith('/') && !folderPath.match(/^[A-Z]:\/$/)) {
                                 folderPath = folderPath.slice(0, -1);
                             }
-                            if (/^[CD]:$/.test(folderPath)) {
+                            if (/^[A-Z]:$/.test(folderPath)) {
                                 folderPath += '/';
                             }
 

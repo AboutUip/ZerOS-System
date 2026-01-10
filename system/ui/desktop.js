@@ -2305,20 +2305,20 @@ class DesktopManager {
             // 获取目录路径
             let dirPath = pathParts.join('/');
             
-            // 如果路径为空或只有盘符，确保格式为 C: 或 D:
+            // 如果路径为空或只有盘符，确保格式为分区格式（支持A-Z所有分区）
             if (!dirPath || dirPath === '') {
-                // 从完整路径中提取盘符
-                const match = filePath.match(/^([CD]):/);
-                dirPath = match ? match[1] + ':' : 'C:';
+                // 从完整路径中提取盘符（支持A-Z所有分区）
+                const match = filePath.match(/^([A-Z]):/);
+                dirPath = match ? match[1] + ':' : 'D:'; // 默认使用D:系统盘
             } else {
                 // 规范化路径：移除多余的斜杠
                 dirPath = dirPath.replace(/\/+/g, '/');
                 // 移除尾部斜杠（但保留根路径格式 C:/）
-                if (dirPath.endsWith('/') && !dirPath.match(/^[CD]:\/$/)) {
+                if (dirPath.endsWith('/') && !dirPath.match(/^[A-Z]:\/$/)) {
                     dirPath = dirPath.slice(0, -1);
                 }
                 // 确保根路径格式为 C: 而不是 C:/
-                if (dirPath.match(/^[CD]:\/$/)) {
+                if (dirPath.match(/^[A-Z]:\/$/)) {
                     dirPath = dirPath.slice(0, -1); // 移除尾部斜杠，变成 C:
                 }
             }

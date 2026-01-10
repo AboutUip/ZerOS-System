@@ -1,27 +1,15 @@
 {
   "system": {
     "system.dailyQuote": {
-      "value": "一开始我只要看著他就满足了，可是不知不觉间我便开始追逐著他",
+      "value": "我们的生命太短，来不及见证那些遥远到令人恍惚的词语。",
       "expiresAt": 0,
-      "createdAt": 1768029179325,
-      "updatedAt": 1768029179325,
-      "size": 89
+      "createdAt": 1768069902138,
+      "updatedAt": 1768069902138,
+      "size": 80
     }
   },
   "programs": {
     "themeanimator": {
-      "random_anime_bg:random_anime_bg_1765983395242.jpg": {
-        "value": {
-          "filePath": "D:/cache/random_anime_bg_1765983395242.jpg",
-          "fileName": "random_anime_bg_1765983395242.jpg",
-          "timestamp": 1765983395242,
-          "source": "api-v1.cenguigui.cn"
-        },
-        "expiresAt": 0,
-        "createdAt": 1765983395265,
-        "updatedAt": 1765983395265,
-        "size": 161
-      },
       "random_anime_bg:random_anime_bg_1766148286160.jpg": {
         "value": {
           "filePath": "D:/cache/random_anime_bg_1766148286160.jpg",
@@ -45,18 +33,6 @@
         "createdAt": 1766148289293,
         "updatedAt": 1766148289293,
         "size": 161
-      },
-      "random_anime_bg:random_anime_bg_1767900096653.jpg": {
-        "value": {
-          "filePath": "D:/cache/random_anime_bg_1767900096653.jpg",
-          "fileName": "random_anime_bg_1767900096653.jpg",
-          "timestamp": 1767900096653,
-          "source": "uapis.cn"
-        },
-        "expiresAt": 0,
-        "createdAt": 1767900096728,
-        "updatedAt": 1767900096728,
-        "size": 150
       }
     }
   }

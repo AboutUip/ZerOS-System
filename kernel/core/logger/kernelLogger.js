@@ -63,6 +63,54 @@
 
         static setLevel(lvl) {
             KernelLogger.level = lvl;
+            // 同时保存到注册表（如果LStorage可用）
+            KernelLogger._saveLevelToRegistry(lvl);
+        }
+        
+        /**
+         * 从注册表加载日志级别
+         */
+        static async _loadLevelFromRegistry() {
+            // 等待LStorage初始化（如果可用）
+            if (typeof LStorage === 'undefined') {
+                return; // LStorage未加载，使用默认级别
+            }
+            
+            try {
+                // 等待LStorage初始化完成
+                let retries = 0;
+                while (retries < 20 && (!LStorage._initialized || typeof LStorage.getSystemStorage !== 'function')) {
+                    await new Promise(resolve => setTimeout(resolve, 50));
+                    retries++;
+                }
+                
+                if (typeof LStorage.getSystemStorage === 'function') {
+                    const level = await LStorage.getSystemStorage('bios.logLevel');
+                    if (level !== undefined && level !== null) {
+                        const levelNum = parseInt(level, 10);
+                        if (!isNaN(levelNum) && levelNum >= -1 && levelNum <= 3) {
+                            KernelLogger.level = levelNum;
+                        }
+                    }
+                }
+            } catch (e) {
+                // 忽略错误，使用默认级别
+            }
+        }
+        
+        /**
+         * 保存日志级别到注册表
+         */
+        static async _saveLevelToRegistry(level) {
+            if (typeof LStorage === 'undefined' || typeof LStorage.setSystemStorage !== 'function') {
+                return; // LStorage不可用，跳过保存
+            }
+            
+            try {
+                await LStorage.setSystemStorage('bios.logLevel', level);
+            } catch (e) {
+                // 忽略错误
+            }
         }
         static setLocale(loc) {
             KernelLogger.locale = loc || KernelLogger.locale;

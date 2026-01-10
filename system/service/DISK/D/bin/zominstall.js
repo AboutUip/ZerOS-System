@@ -383,7 +383,7 @@
             
             // 规范化路径（确保根路径格式正确）
             const normalizePath = (path) => {
-                if (/^[CD]:$/.test(path)) {
+                if (/^[A-Z]:$/.test(path)) {
                     return path + '/';
                 }
                 return path;
@@ -969,9 +969,10 @@
                 }
 
                 // 读取文件内容
-                // 构建完整路径：如果 file 已经是绝对路径，直接使用；否则拼接 tempDir
+                // 构建完整路径：如果 file 已经是绝对路径，直接使用；否则拼接 tempDir（支持所有分区 A-Z）
                 let filePath;
-                if (file.startsWith('D:/') || file.startsWith('C:/')) {
+                const partitionMatch = file.match(/^([A-Z]):\//);
+                if (partitionMatch) {
                     filePath = file;
                     this.terminal.write(`[处理文件] 文件已经是绝对路径: ${filePath}\n`);
                 } else {
@@ -1145,7 +1146,7 @@
                 // 分离目录和文件名
                 let dirPath, fileName;
                 
-                if (normalizedPath.match(/^[CD]:/)) {
+                if (normalizedPath.match(/^[A-Z]:/)) {
                     // 绝对路径，如 D:/cache/temp/piano.js
                     const lastSlashIndex = normalizedPath.lastIndexOf('/');
                     if (lastSlashIndex > 1) {
@@ -1457,7 +1458,8 @@
             try {
                 // 检查主脚本文件
                 const scriptFile = appConfig.script || `${programName}.js`;
-                const scriptPath = scriptFile.startsWith('D:/') || scriptFile.startsWith('C:/') 
+                // 支持所有分区 A-Z
+                const scriptPath = scriptFile.match(/^([A-Z]):\//) 
                     ? scriptFile 
                     : `${targetBasePath}/${scriptFile}`;
                 
@@ -1473,7 +1475,8 @@
                 // 检查样式文件
                 if (Array.isArray(appConfig.styles)) {
                     for (const style of appConfig.styles) {
-                        const stylePath = style.startsWith('D:/') || style.startsWith('C:/')
+                        // 支持所有分区 A-Z
+                        const stylePath = style.match(/^([A-Z]):\//)
                             ? style
                             : `${targetBasePath}/${style}`;
                         try {
@@ -1489,7 +1492,8 @@
                 
                 // 检查图标文件
                 if (appConfig.icon) {
-                    const iconPath = appConfig.icon.startsWith('D:/') || appConfig.icon.startsWith('C:/')
+                    // 支持所有分区 A-Z
+                    const iconPath = appConfig.icon.match(/^([A-Z]):\//)
                         ? appConfig.icon
                         : `${targetBasePath}/${appConfig.icon}`;
                     try {
@@ -1530,9 +1534,10 @@
             
             // 直接使用 PHP 服务删除文件（避免权限问题）
             for (const file of extractedFiles) {
-                // 构建完整路径
+                // 构建完整路径（支持所有分区 A-Z）
                 let filePath;
-                if (file.startsWith('D:/') || file.startsWith('C:/')) {
+                const partitionMatch = file.match(/^([A-Z]):\//);
+                if (partitionMatch) {
                     filePath = file;
                 } else {
                     const normalizedTempDir = tempDir.replace(/\/+$/, '');
@@ -1546,7 +1551,7 @@
                     const lastSlashIndex = normalizedPath.lastIndexOf('/');
                     
                     let dirPath, fileName;
-                    if (normalizedPath.match(/^[CD]:/)) {
+                    if (normalizedPath.match(/^[A-Z]:/)) {
                         if (lastSlashIndex > 1) {
                             dirPath = normalizedPath.substring(0, lastSlashIndex);
                             fileName = normalizedPath.substring(lastSlashIndex + 1);

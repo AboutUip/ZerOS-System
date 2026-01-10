@@ -151,6 +151,11 @@ class TaskbarManager {
             TaskbarManager._globalShortcutsRegistered = true;
         }
         
+        // 在系统启动时应用亮度设置
+        TaskbarManager._applyBrightnessOnStartup().catch(e => {
+            KernelLogger.warn("TaskbarManager", `系统启动时应用亮度设置失败: ${e.message}`);
+        });
+        
         KernelLogger.info("TaskbarManager", "任务栏初始化完成");
     }
     
@@ -6958,28 +6963,8 @@ class TaskbarManager {
             const value = parseInt(e.target.value);
             valueDisplay.textContent = `${value}%`;
             
-            // 实时更新屏幕亮度（通过CSS变量）
-            // 将70-100映射到0.3-1.0的亮度值（70%对应0.3，100%对应1.0）
-            // 公式：brightness = 0.3 + (value - 70) / 30 * 0.7
-            const brightnessValue = 0.3 + ((value - 70) / 30) * 0.7;
-            document.documentElement.style.setProperty('--screen-brightness', brightnessValue.toString());
-            
-            // 同时直接应用到 sandbox-container 和 gui-container（确保立即生效）
-            const sandboxContainer = document.getElementById('sandbox-container') || document.querySelector('.sandbox-container');
-            const guiContainer = document.getElementById('gui-container') || document.querySelector('.gui-container');
-            
-            if (sandboxContainer) {
-                sandboxContainer.style.filter = `brightness(${brightnessValue})`;
-            }
-            if (guiContainer) {
-                guiContainer.style.filter = `brightness(${brightnessValue})`;
-            }
-            
-            // 应用到所有视频背景元素
-            const videoBackgrounds = document.querySelectorAll('.desktop-background-video');
-            videoBackgrounds.forEach(video => {
-                video.style.filter = `brightness(${brightnessValue})`;
-            });
+            // 应用亮度到DOM
+            TaskbarManager._applyBrightnessToDOM(value);
             
             // 防抖保存到注册表（延迟500ms）
             if (updateTimeout) {
@@ -6996,6 +6981,70 @@ class TaskbarManager {
         document.body.appendChild(panel);
         
         return panel;
+    }
+    
+    /**
+     * 应用亮度到DOM（内部方法，供其他方法调用）
+     * @param {number} brightness 亮度值（70-100）
+     * @private
+     */
+    static _applyBrightnessToDOM(brightness) {
+        // 应用亮度：将70-100映射到0.3-1.0
+        const brightnessValue = 0.3 + ((brightness - 70) / 30) * 0.7;
+        document.documentElement.style.setProperty('--screen-brightness', brightnessValue.toString());
+        
+        // 同时直接应用到容器（确保立即生效，包括视频背景）
+        const sandboxContainer = document.getElementById('sandbox-container') || document.querySelector('.sandbox-container');
+        const guiContainer = document.getElementById('gui-container') || document.querySelector('.gui-container');
+        
+        if (sandboxContainer) {
+            sandboxContainer.style.filter = `brightness(${brightnessValue})`;
+        }
+        if (guiContainer) {
+            guiContainer.style.filter = `brightness(${brightnessValue})`;
+        }
+        
+        // 应用到所有视频背景元素（确保视频背景也受亮度影响）
+        const videoBackgrounds = document.querySelectorAll('.desktop-background-video');
+        videoBackgrounds.forEach(video => {
+            video.style.filter = `brightness(${brightnessValue})`;
+        });
+    }
+    
+    /**
+     * 在系统启动时应用亮度设置
+     */
+    static async _applyBrightnessOnStartup() {
+        try {
+            if (typeof LStorage !== 'undefined') {
+                const registry = await LStorage.getSystemStorage('registry');
+                if (registry && registry.brightness !== undefined) {
+                    let brightness = registry.brightness;
+                    // 如果旧值小于70，调整到70（兼容旧数据）
+                    if (brightness < 70) {
+                        brightness = 70;
+                    }
+                    // 如果旧值大于100，调整到100
+                    if (brightness > 100) {
+                        brightness = 100;
+                    }
+                    
+                    // 使用 requestAnimationFrame 确保 DOM 已经渲染
+                    requestAnimationFrame(() => {
+                        // 应用亮度到DOM
+                        TaskbarManager._applyBrightnessToDOM(brightness);
+                        
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.info("TaskbarManager", `系统启动时应用亮度设置: ${brightness}%`);
+                        }
+                    });
+                }
+            }
+        } catch (e) {
+            if (typeof KernelLogger !== 'undefined') {
+                KernelLogger.warn("TaskbarManager", `系统启动时应用亮度设置失败: ${e.message}`);
+            }
+        }
     }
     
     /**
@@ -7019,26 +7068,8 @@ class TaskbarManager {
                     }
                     slider.value = brightness;
                     valueDisplay.textContent = `${brightness}%`;
-                    // 应用亮度：将70-100映射到0.3-1.0
-                    const brightnessValue = 0.3 + ((brightness - 70) / 30) * 0.7;
-                    document.documentElement.style.setProperty('--screen-brightness', brightnessValue.toString());
-                    
-                    // 同时直接应用到容器（确保立即生效，包括视频背景）
-                    const sandboxContainer = document.getElementById('sandbox-container') || document.querySelector('.sandbox-container');
-                    const guiContainer = document.getElementById('gui-container') || document.querySelector('.gui-container');
-                    
-                    if (sandboxContainer) {
-                        sandboxContainer.style.filter = `brightness(${brightnessValue})`;
-                    }
-                    if (guiContainer) {
-                        guiContainer.style.filter = `brightness(${brightnessValue})`;
-                    }
-                    
-                    // 应用到所有视频背景元素（确保视频背景也受亮度影响）
-                    const videoBackgrounds = document.querySelectorAll('.desktop-background-video');
-                    videoBackgrounds.forEach(video => {
-                        video.style.filter = `brightness(${brightnessValue})`;
-                    });
+                    // 应用亮度到DOM
+                    TaskbarManager._applyBrightnessToDOM(brightness);
                 }
             }
         } catch (e) {
