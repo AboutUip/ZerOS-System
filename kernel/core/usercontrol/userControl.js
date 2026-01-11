@@ -396,37 +396,37 @@ class UserControl {
     static _createDefaultUsers() {
         let createdCount = 0;
         
-        // 创建默认管理员 root（无密码）- 仅在不存在时创建
-        if (!UserControl._users.has('root')) {
-            UserControl._users.set('root', {
-                level: UserControl.USER_LEVEL.DEFAULT_ADMIN,
-                password: null, // 默认无密码（MD5加密后存储）
-                avatar: null, // 用户头像路径（相对于cache目录）
-                createdAt: Date.now(),
-                lastLogin: Date.now()
-            });
-            createdCount++;
-            KernelLogger.info("UserControl", "已创建默认管理员：root");
-        } else {
-            const existingRoot = UserControl._users.get('root');
-            KernelLogger.debug("UserControl", `root 用户已存在，跳过创建。当前数据: level=${existingRoot?.level}, password=${existingRoot?.password ? existingRoot.password.substring(0, 8) + '...' : 'null'}`);
-        }
+        // 创建默认管理员 root - 仅在不存在时创建
+        // if (!UserControl._users.has('root')) {
+        //     UserControl._users.set('root', {
+        //         level: UserControl.USER_LEVEL.DEFAULT_ADMIN,
+        //         password: null, // 默认无密码（MD5加密后存储）
+        //         avatar: null, // 用户头像路径（相对于cache目录）
+        //         createdAt: Date.now(),
+        //         lastLogin: Date.now()
+        //     });
+        //     createdCount++;
+        //     KernelLogger.info("UserControl", "已创建默认管理员：root");
+        // } else {
+        //     const existingRoot = UserControl._users.get('root');
+        //     KernelLogger.debug("UserControl", `root 用户已存在，跳过创建。当前数据: level=${existingRoot?.level}, password=${existingRoot?.password ? existingRoot.password.substring(0, 8) + '...' : 'null'}`);
+        // }
         
         // 创建测试用户 TestUser（无密码）- 仅在不存在时创建
-        if (!UserControl._users.has('TestUser')) {
-            UserControl._users.set('TestUser', {
-                level: UserControl.USER_LEVEL.USER,
-                password: null, // 默认无密码（MD5加密后存储）
-                avatar: null, // 用户头像路径（相对于cache目录）
-                createdAt: Date.now(),
-                lastLogin: null
-            });
-            createdCount++;
-            KernelLogger.info("UserControl", "已创建测试用户：TestUser");
-        } else {
-            const existingTestUser = UserControl._users.get('TestUser');
-            KernelLogger.debug("UserControl", `TestUser 用户已存在，跳过创建。当前数据: level=${existingTestUser?.level}, password=${existingTestUser?.password ? existingTestUser.password.substring(0, 8) + '...' : 'null'}`);
-        }
+        // if (!UserControl._users.has('TestUser')) {
+        //     UserControl._users.set('TestUser', {
+        //         level: UserControl.USER_LEVEL.USER,
+        //         password: null, // 默认无密码（MD5加密后存储）
+        //         avatar: null, // 用户头像路径（相对于cache目录）
+        //         createdAt: Date.now(),
+        //         lastLogin: null
+        //     });
+        //     createdCount++;
+        //     KernelLogger.info("UserControl", "已创建测试用户：TestUser");
+        // } else {
+        //     const existingTestUser = UserControl._users.get('TestUser');
+        //     KernelLogger.debug("UserControl", `TestUser 用户已存在，跳过创建。当前数据: level=${existingTestUser?.level}, password=${existingTestUser?.password ? existingTestUser.password.substring(0, 8) + '...' : 'null'}`);
+        // }
         
         // 只有在创建了新用户时才保存
         if (createdCount > 0) {

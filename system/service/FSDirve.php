@@ -260,9 +260,23 @@ function deleteDirectory($path) {
  * 列出目录内容
  */
 function listDirectory($path) {
+    // 首先验证路径格式
+    $validated = validatePath($path);
+    if (!$validated) {
+        sendResponse(false, '无效的路径格式: ' . $path, null, 400);
+    }
+    
+    $disk = $validated['disk'];
+    $basePath = getPartitionPath($disk);
+    
+    // 检查分区目录是否存在
+    if ($basePath === null || !is_dir($basePath)) {
+        sendResponse(false, '分区不存在: ' . $disk . ':', null, 404);
+    }
+    
     $dirPath = getDirPath($path);
     if (!$dirPath) {
-        sendResponse(false, '无效的路径格式', null, 400);
+        sendResponse(false, '无法获取目录路径: ' . $path, null, 400);
     }
     
     // 检查目录是否存在
