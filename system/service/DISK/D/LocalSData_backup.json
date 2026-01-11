@@ -1,6 +1,14 @@
 {
   "system": {
-    "permissionManager.permissions": {},
+    "permissionManager.permissions": {
+      "filemanager": [
+        "GUI_WINDOW_CREATE",
+        "KERNEL_DISK_READ",
+        "KERNEL_DISK_LIST",
+        "SYSTEM_NOTIFICATION",
+        "EVENT_LISTENER"
+      ]
+    },
     "system.style": "macos",
     "desktop.icons": [
       {
