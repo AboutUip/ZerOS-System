@@ -847,9 +847,9 @@
         },
         
         /**
-         * 更新侧边栏磁盘列表
+         * 更新侧边栏磁盘列表（异步）
          */
-        _updateSidebarDisks: function(diskList) {
+        _updateSidebarDisks: async function(diskList) {
             // 清除现有磁盘项（保留根目录项和分隔线）
             const itemsToRemove = [];
             for (let i = 2; i < diskList.children.length; i++) {
@@ -859,26 +859,58 @@
             
             // 获取所有磁盘分区
             const disks = [];
-            if (typeof Disk !== 'undefined' && typeof Disk._getDiskSeparateMap === 'function') {
+            if (typeof Disk !== 'undefined') {
                 try {
-                    const diskMap = Disk._getDiskSeparateMap();
-                    if (diskMap && diskMap.size > 0) {
-                        for (const [diskName, coll] of diskMap) {
-                            if (coll && typeof coll === 'object') {
-                                disks.push(diskName);
+                    // 优先从 diskSeparateSize 获取（这是最可靠的来源，因为它是从 D:/DiskData.json 读取的）
+                    const diskSeparateSize = Disk.diskSeparateSize;
+                    if (diskSeparateSize && diskSeparateSize.size > 0) {
+                        disks.push(...Array.from(diskSeparateSize.keys()));
+                    } else {
+                        // 如果 diskSeparateSize 为空，尝试从 diskSeparateMap 获取
+                        const diskMap = Disk.diskSeparateMap;
+                        if (diskMap && diskMap.size > 0) {
+                            for (const [diskName, coll] of diskMap) {
+                                if (coll && typeof coll === 'object') {
+                                    disks.push(diskName);
+                                }
                             }
                         }
                     }
                 } catch (e) {
                     if (typeof KernelLogger !== 'undefined') {
-                        KernelLogger.warn('FileManager', '获取磁盘分区失败', e);
+                        KernelLogger.warn('FileManager', '从 Disk API 获取磁盘分区失败', e);
                     }
                 }
             }
             
-            // 如果 Disk API 不可用，尝试从 POOL 获取（降级方案，向后兼容）
-            // 注意：这是一个降级方案，实际应该通过Disk API获取所有分区
-            // 检查所有可能的分区（A-Z），支持多分区
+            // 如果 Disk API 无法获取分区，尝试从 PHP 服务获取（系统安装时创建的分区可能还未加载到内存）
+            if (disks.length === 0) {
+                try {
+                    const listUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                        ? SystemInformation.buildServiceUrlObject('/system/service/DISKMANAGER.php')
+                        : new URL('/system/service/DISKMANAGER.php', (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                            ? SystemInformation.getOrigin()
+                            : window.location.origin);
+                    listUrl.searchParams.set('action', 'list');
+                    
+                    const listResponse = await fetch(listUrl.toString());
+                    if (listResponse.ok) {
+                        const listResult = await listResponse.json();
+                        if (listResult.status === 'success' && listResult.data && listResult.data.partitions) {
+                            disks.push(...listResult.data.partitions.map(p => p.partition || p.name || p.letter + ':'));
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.debug('FileManager', `从 PHP 服务获取到 ${disks.length} 个分区: ${disks.join(', ')}`);
+                            }
+                        }
+                    }
+                } catch (e) {
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.debug('FileManager', `从 PHP 服务获取分区列表失败: ${e.message}`);
+                    }
+                }
+            }
+            
+            // 如果仍然无法获取，尝试从 POOL 获取（降级方案，向后兼容）
             if (disks.length === 0 && typeof POOL !== 'undefined' && typeof POOL.__GET__ === 'function') {
                 // 按字母顺序检查所有分区（A-Z）
                 for (let i = 0; i < 26; i++) {
@@ -4209,7 +4241,20 @@
                 return;
             }
             const diskNameMatch = currentPath.match(/^([A-Za-z]:)/);
-            const diskName = diskNameMatch ? diskNameMatch[1] : 'C:';
+            // 如果无法匹配磁盘名称，尝试获取系统盘（D:）或第一个可用分区，而不是硬编码 C:
+            let diskName = diskNameMatch ? diskNameMatch[1] : null;
+            if (!diskName) {
+                // 优先使用系统盘 D:
+                if (typeof Disk !== 'undefined' && Disk.diskSeparateSize && Disk.diskSeparateSize.has('D:')) {
+                    diskName = 'D:';
+                } else if (typeof Disk !== 'undefined' && Disk.diskSeparateSize && Disk.diskSeparateSize.size > 0) {
+                    // 如果没有 D:，使用第一个可用分区
+                    diskName = Array.from(Disk.diskSeparateSize.keys())[0];
+                } else {
+                    // 降级方案：如果 Disk API 不可用，使用 D:（系统盘）
+                    diskName = 'D:';
+                }
+            }
             if (currentPath === diskName) {
                 await this._loadRootDirectory();
                 return;

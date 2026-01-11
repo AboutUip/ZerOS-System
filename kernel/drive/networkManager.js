@@ -261,7 +261,8 @@
                 return originalFetch.apply(this, args)
                     .then(response => {
                         // 对于 D:/bin/ 路径的 404 错误，静默处理（文件不存在是正常情况）
-                        const isBinPath404 = response.status === 404 && url.includes('path=D%3A%2Fbin') || url.includes('path=D:/bin');
+                        // 注意：使用括号确保运算符优先级正确
+                        const isBinPath404 = response.status === 404 && (url.includes('path=D%3A%2Fbin') || url.includes('path=D:/bin'));
                         
                         if (!isBinPath404) {
                             // 异步记录响应（不阻塞响应返回）

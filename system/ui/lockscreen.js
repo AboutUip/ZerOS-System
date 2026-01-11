@@ -19,6 +19,7 @@ KernelLogger.info("LockScreen", "模块初始化");
         static _isLoading = false;
         static _userList = [];
         static _currentUserIndex = 0;
+        static _initialUserIndexSet = false; // 标记是否已设置初始用户索引
         static _userSwitchButton = null;
         static _userListContainer = null;
         static _showUserList = false;
@@ -785,6 +786,44 @@ KernelLogger.info("LockScreen", "模块初始化");
                     LockScreen._userSwitchButton.style.display = 'flex';
                 } else if (LockScreen._userSwitchButton) {
                     LockScreen._userSwitchButton.style.display = 'none';
+                }
+                
+                // 如果还没有设置初始用户索引，尝试从 UserControl 获取保存的默认启动用户
+                if (!LockScreen._initialUserIndexSet) {
+                    try {
+                        if (typeof UserControl !== 'undefined' && typeof UserControl.getSavedCurrentUser === 'function') {
+                            const savedCurrentUser = await UserControl.getSavedCurrentUser();
+                            if (savedCurrentUser && typeof savedCurrentUser === 'string') {
+                                // 在用户列表中找到保存的用户索引
+                                const savedUserIndex = users.findIndex(u => u.username === savedCurrentUser);
+                                if (savedUserIndex >= 0) {
+                                    LockScreen._currentUserIndex = savedUserIndex;
+                                    if (typeof KernelLogger !== 'undefined') {
+                                        KernelLogger.debug('LockScreen', `从注册表读取到默认启动用户: ${savedCurrentUser} (索引: ${savedUserIndex})`);
+                                    }
+                                } else {
+                                    // 保存的用户不存在于用户列表中，使用默认值 0
+                                    if (typeof KernelLogger !== 'undefined') {
+                                        KernelLogger.warn('LockScreen', `注册表中的默认用户 ${savedCurrentUser} 不存在于用户列表中，使用第一个用户`);
+                                    }
+                                    LockScreen._currentUserIndex = 0;
+                                }
+                            } else {
+                                // 没有保存的当前用户，使用默认值 0
+                                LockScreen._currentUserIndex = 0;
+                            }
+                        } else {
+                            // UserControl 不可用或没有 getSavedCurrentUser 方法，使用默认值 0
+                            LockScreen._currentUserIndex = 0;
+                        }
+                    } catch (e) {
+                        // 读取失败，使用默认值 0
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('LockScreen', `从 UserControl 获取默认用户失败: ${e.message}，使用第一个用户`);
+                        }
+                        LockScreen._currentUserIndex = 0;
+                    }
+                    LockScreen._initialUserIndexSet = true; // 标记为已设置
                 }
                 
                 // 确保当前用户索引有效

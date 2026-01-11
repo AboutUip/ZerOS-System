@@ -1138,7 +1138,7 @@ class NodeTreeCollection {
         }
     }
     
-    // 递归从 PHP 服务构建目录结构
+    // 递归从 PHP 服务构建目录结构（支持所有分区 A-Z）
     async _rebuildDirectoryFromPHP(dirPath, parentPath) {
         try {
             const phpServiceUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.getFSDirvePath) 
@@ -1152,7 +1152,12 @@ class NodeTreeCollection {
                     ? SystemInformation.getOrigin()
                     : window.location.origin);
             url.searchParams.set('action', 'list_dir');
-            url.searchParams.set('path', dirPath);
+            // 确保路径格式正确：如果是分区根目录（A: 到 Z:），转换为 A:/ 到 Z:/（支持所有分区A-Z）
+            let phpPath = dirPath;
+            if (/^[A-Z]:$/.test(phpPath)) {
+                phpPath = phpPath + '/';
+            }
+            url.searchParams.set('path', phpPath);
             
             const response = await fetch(url.toString(), {
                 method: 'GET',

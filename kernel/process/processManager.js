@@ -1845,12 +1845,24 @@ class ProcessManager {
             
             if (programClass && typeof programClass.__init__ === 'function') {
                 try {
+                    // 获取默认工作目录（系统盘 D: 或第一个可用分区）
+                    let defaultCwd = 'D:';  // 默认使用系统盘 D:
+                    if (typeof Disk !== 'undefined' && Disk.diskSeparateSize && Disk.diskSeparateSize.size > 0) {
+                        // 优先使用系统盘 D:
+                        if (Disk.diskSeparateSize.has('D:')) {
+                            defaultCwd = 'D:';
+                        } else {
+                            // 如果 D: 不存在，使用第一个可用分区
+                            defaultCwd = Array.from(Disk.diskSeparateSize.keys())[0];
+                        }
+                    }
+                    
                     // 构建标准化的初始化参数
                     const standardizedInitArgs = {
                         pid: pid,
                         args: initArgs.args || [],  // 命令行参数（如文件名）
                         env: initArgs.env || {},  // 环境变量
-                        cwd: initArgs.cwd || 'C:',  // 当前工作目录
+                        cwd: initArgs.cwd || defaultCwd,  // 当前工作目录（默认使用系统盘 D: 或第一个可用分区）
                         terminal: terminalInstance,  // 终端实例（CLI程序，已自动获取或启动）
                         metadata: initArgs.metadata || {},  // 元数据
                         ...initArgs  // 保留其他自定义参数

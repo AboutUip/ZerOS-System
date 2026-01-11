@@ -329,28 +329,14 @@ class Disk {
 
     /**
      * 从DiskData.json加载分区配置（异步）
+     * 注意：D: 是系统盘，注册表和磁盘分区信息都必须从 D:/ 中查找
      * @returns {Promise<Map<string, number>>} 分区名称到大小的映射
      */
     static async _loadPartitionConfig() {
         try {
-            // 直接使用fetch读取DiskData.json（不依赖diskSeparateMap，因为此时可能还未初始化）
-            // DiskData.json存储在D:分区，如果D:不存在则从第一个可用分区读取
-            // 优先尝试从D:读取（系统盘）
-            let configUrl = '/system/service/DISK/D/DiskData.json';
-            let response = await fetch(configUrl);
-            
-            // 如果D:不存在，尝试从其他分区读取（A-Z）
-            if (!response.ok) {
-                for (let i = 0; i < 26; i++) {
-                    const letter = String.fromCharCode(65 + i); // A-Z
-                    configUrl = `/system/service/DISK/${letter}/DiskData.json`;
-                    response = await fetch(configUrl);
-                    if (response.ok) {
-                        KernelLogger.debug("Disk", `从分区 ${letter}: 读取DiskData.json`);
-                        break;
-                    }
-                }
-            }
+            // D: 是系统盘，所有磁盘分区信息都必须从 D:/DiskData.json 读取
+            const configUrl = '/system/service/DISK/D/DiskData.json';
+            const response = await fetch(configUrl);
             
             if (response.ok) {
                 const data = await response.json();
@@ -380,11 +366,11 @@ class Disk {
                     if (data.totalSize) {
                         Disk.diskSize = parseInt(data.totalSize, 10);
                     }
-                    KernelLogger.info("Disk", `从DiskData.json加载了 ${partitionMap.size} 个分区配置（按优先级排序）: ${Array.from(partitionMap.keys()).join(', ')}`);
+                    KernelLogger.info("Disk", `从D:/DiskData.json加载了 ${partitionMap.size} 个分区配置（按优先级排序）: ${Array.from(partitionMap.keys()).join(', ')}`);
                     return partitionMap;
                 }
             } else {
-                KernelLogger.debug("Disk", `无法读取DiskData.json: ${response.status} ${response.statusText}`);
+                KernelLogger.warn("Disk", `无法从D:/读取DiskData.json: ${response.status} ${response.statusText}。D: 是系统盘，所有磁盘分区信息都必须从 D:/ 中查找。`);
             }
         } catch (e) {
             KernelLogger.debug("Disk", `从DiskData.json加载配置失败: ${e.message}`);

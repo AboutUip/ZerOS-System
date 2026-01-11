@@ -1,11 +1,14 @@
 {
   "system": {
     "permissionManager.permissions": {
-      "filemanager": [
+      "terminal": [
         "GUI_WINDOW_CREATE",
         "KERNEL_DISK_READ",
         "KERNEL_DISK_LIST",
-        "SYSTEM_NOTIFICATION",
+        "EVENT_LISTENER",
+        "ENVIRONMENT_READ"
+      ],
+      "ps": [
         "EVENT_LISTENER"
       ]
     },
@@ -94,7 +97,7 @@
         "password": "61b249bf6d604d14120821f43625e84e",
         "avatar": "avatar_root_1766272534753.jpg",
         "createdAt": 1766271155991,
-        "lastLogin": 1768072398411
+        "lastLogin": 1768122663205
       },
       "TestUser": {
         "level": "USER",

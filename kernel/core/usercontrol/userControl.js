@@ -900,6 +900,36 @@ class UserControl {
     }
     
     /**
+     * 获取注册表中保存的默认启动用户（不设置当前登录用户）
+     * 此方法用于锁屏界面显示默认用户，但不会自动登录
+     * @returns {Promise<string|null>} 默认用户名，如果不存在则返回 null
+     */
+    static async getSavedCurrentUser() {
+        if (typeof LStorage === 'undefined') {
+            return null;
+        }
+        
+        try {
+            // 确保 LStorage 已初始化
+            if (!LStorage._initialized && typeof LStorage.init === 'function') {
+                await LStorage.init();
+            }
+            
+            // UserControl 是内核模块，有权限读取 userControl.currentUser
+            const savedCurrentUser = await LStorage.getSystemStorage('userControl.currentUser');
+            if (savedCurrentUser && typeof savedCurrentUser === 'string') {
+                return savedCurrentUser;
+            }
+        } catch (e) {
+            if (typeof KernelLogger !== 'undefined') {
+                KernelLogger.warn("UserControl", `读取保存的当前用户失败: ${e.message}`);
+            }
+        }
+        
+        return null;
+    }
+    
+    /**
      * 获取当前用户的级别
      * @returns {string|null} 用户级别
      */
