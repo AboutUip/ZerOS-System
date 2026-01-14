@@ -795,6 +795,14 @@ class EventManager {
             try {
                 // 执行处理程序，传入事件对象和上下文
                 // 为了向后兼容，如果处理程序不接受第二个参数，只传入事件对象
+                // 添加额外的安全检查，确保事件对象有效
+                if (!e || typeof e !== 'object') {
+                    KernelLogger.warn("EventManager", 
+                        `事件对象无效，跳过处理程序: PID ${pid}, 事件类型 ${eventType}, handlerId ${handlerInfo.handlerId}`
+                    );
+                    continue;
+                }
+                
                 let result;
                 if (handler.length >= 2) {
                     result = handler(e, eventContext);
@@ -837,10 +845,43 @@ class EventManager {
                 }
             } catch (error) {
                 // 记录错误但继续执行其他处理程序
-                KernelLogger.error("EventManager", 
-                    `事件处理程序执行失败: PID ${pid}, 事件类型 ${eventType}, handlerId ${handlerInfo.handlerId}`, 
-                    error
-                );
+                // 安全地提取错误信息，避免在错误处理时再次抛出异常
+                try {
+                    let errorMessage = '未知错误';
+                    let errorStack = '';
+                    
+                    if (error) {
+                        if (typeof error === 'string') {
+                            errorMessage = error;
+                        } else if (typeof error === 'object') {
+                            errorMessage = error.message || error.toString() || '未知错误对象';
+                            errorStack = error.stack || '';
+                        } else {
+                            errorMessage = String(error);
+                        }
+                    }
+                    
+                    KernelLogger.error("EventManager", 
+                        `事件处理程序执行失败: PID ${pid}, 事件类型 ${eventType}, handlerId ${handlerInfo.handlerId}, 错误: ${errorMessage}`, 
+                        error,
+                        {
+                            pid: pid,
+                            eventType: eventType,
+                            handlerId: handlerInfo.handlerId,
+                            errorMessage: errorMessage,
+                            errorStack: errorStack
+                        }
+                    );
+                } catch (logError) {
+                    // 如果日志记录也失败，至少尝试基本日志
+                    try {
+                        KernelLogger.error("EventManager", 
+                            `事件处理程序执行失败: PID ${pid}, 事件类型 ${eventType}, handlerId ${handlerInfo.handlerId}`
+                        );
+                    } catch (e) {
+                        // 完全失败，静默忽略
+                    }
+                }
                 // 不中断其他处理程序的执行
             }
         }

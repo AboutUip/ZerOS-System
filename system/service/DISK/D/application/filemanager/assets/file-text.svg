@@ -1,8 +1,21 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-  <polyline points="14 2 14 8 20 8"/>
-  <line x1="16" y1="13" x2="8" y2="13"/>
-  <line x1="16" y1="17" x2="8" y2="17"/>
-  <polyline points="10 9 9 9 8 9"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+  <defs>
+    <linearGradient id="textFileGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#5BA3D6;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#3E7FA8;stop-opacity:1" />
+    </linearGradient>
+    <filter id="textFileShadow">
+      <feDropShadow dx="0" dy="1" stdDeviation="1.5" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+  <!-- 文件主体 -->
+  <path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6z" 
+        fill="url(#textFileGradient)" 
+        filter="url(#textFileShadow)"/>
+  <!-- 文件折角 -->
+  <path d="M14 2v6h6" fill="none" stroke="#2B5F7F" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- 文本行 -->
+  <line x1="8" y1="13" x2="16" y2="13" stroke="#FFFFFF" stroke-width="1.5" stroke-linecap="round" stroke-opacity="0.9"/>
+  <line x1="8" y1="17" x2="16" y2="17" stroke="#FFFFFF" stroke-width="1.5" stroke-linecap="round" stroke-opacity="0.9"/>
+  <line x1="8" y1="10" x2="12" y2="10" stroke="#FFFFFF" stroke-width="1.5" stroke-linecap="round" stroke-opacity="0.7"/>
 </svg>
-

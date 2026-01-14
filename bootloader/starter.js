@@ -72,6 +72,16 @@
             "../kernel/filesystem/fileFramework.js"
         ],
         
+        // 第十层：异常处理管理器（依赖本地存储管理器，高优先级，需要尽早加载以检查内核异常标志）
+        "../kernel/core/exceptionHM/exceptionHandler.js": [
+            "../kernel/drive/LStorage.js"
+        ],
+        
+        // 第十层：安全模式管理器（依赖本地存储管理器，高优先级）
+        "../kernel/core/safemode/safeModeManager.js": [
+            "../kernel/drive/LStorage.js"
+        ],
+        
         // 第十一层：主题管理器（依赖本地存储管理器）
         "../system/ui/themeManager.js": [
             "../kernel/drive/LStorage.js"
@@ -1108,6 +1118,123 @@
             // 异步加载所有其他模块
             await loadModules(MODULE_DEPENDENCIES);
             
+            // 检查内核异常标志（在加载模块后立即检查）
+            // 如果检测到内核异常，强制进入安全模式并阻止正常启动
+            if (typeof ExceptionHandler !== 'undefined') {
+                try {
+                    // 确保ExceptionHandler已初始化（现在是异步的）
+                    if (typeof ExceptionHandler.init === 'function') {
+                        await ExceptionHandler.init();
+                    }
+                    
+                    // 检查是否可以正常启动（现在是异步的）
+                    const canBoot = await ExceptionHandler.canNormalBoot();
+                    if (!canBoot) {
+                        KernelLogger.error("BootLoader", "检测到内核异常标志，强制进入BIOS安全模式，阻止正常启动");
+                        
+                        // 确保安全模式标志已设置
+                        if (typeof SafeModeManager !== 'undefined') {
+                            SafeModeManager.enableSafeMode();
+                        } else {
+                            // 如果SafeModeManager未加载，直接设置sessionStorage
+                            try {
+                                if (typeof sessionStorage !== 'undefined') {
+                                    sessionStorage.setItem('__ZEROS_SAFE_MODE__', 'true');
+                                }
+                            } catch (e) {
+                                KernelLogger.error("BootLoader", `设置安全模式标志失败: ${e.message}`);
+                            }
+                        }
+                        
+                        // 显示安全模式界面
+                        const safeModeContainer = document.getElementById('safe-mode-container');
+                        const biosLoading = document.getElementById('bios-loading');
+                        if (safeModeContainer) {
+                            safeModeContainer.style.display = 'flex';
+                        }
+                        if (biosLoading) {
+                            biosLoading.style.display = 'flex';
+                        }
+                        
+                        // 隐藏内核内容容器
+                        const contentEl = document.getElementById('kernel-content');
+                        if (contentEl) {
+                            contentEl.style.display = 'none';
+                        }
+                        
+                        // 立即加载BIOS模块（按需加载）
+                        KernelLogger.info("BootLoader", "开始按需加载BIOS模块");
+                        try {
+                            // 等待LStorage初始化完成（如果还未完成）
+                            if (typeof LStorage !== 'undefined') {
+                                let retries = 0;
+                                while (retries < 50 && (!LStorage._initialized || typeof LStorage.getSystemStorage !== 'function')) {
+                                    await new Promise(resolve => setTimeout(resolve, 100));
+                                    retries++;
+                                }
+                            }
+                            
+                            // 加载BIOS CSS（如果还未加载）
+                            if (typeof document !== 'undefined' && !document.querySelector('link[href*="bios.css"]')) {
+                                const link = document.createElement('link');
+                                link.rel = 'stylesheet';
+                                link.href = '../bootloader/BIOS/bios.css';
+                                document.head.appendChild(link);
+                                // 等待CSS加载
+                                await new Promise(resolve => setTimeout(resolve, 100));
+                            }
+                            
+                            // 动态加载BIOS管理器脚本
+                            if (typeof loadScript === 'function') {
+                                await loadScript('../bootloader/BIOS/biosManager.js');
+                            } else {
+                                // 如果loadScript不可用，使用动态脚本加载
+                                await new Promise((resolve, reject) => {
+                                    const script = document.createElement('script');
+                                    script.src = '../bootloader/BIOS/biosManager.js';
+                                    script.async = false;
+                                    script.onload = () => resolve();
+                                    script.onerror = () => reject(new Error('Failed to load BIOS script'));
+                                    document.head.appendChild(script);
+                                });
+                            }
+                            
+                            // 初始化BIOS管理器
+                            if (typeof BIOSManager !== 'undefined' && typeof BIOSManager.init === 'function') {
+                                await BIOSManager.init();
+                                
+                                // 隐藏加载动画
+                                if (biosLoading) {
+                                    biosLoading.style.display = 'none';
+                                }
+                                
+                                KernelLogger.info("BootLoader", "BIOS模块加载并初始化完成，系统已进入BIOS安全模式");
+                            } else {
+                                KernelLogger.error("BootLoader", "BIOSManager初始化失败");
+                            }
+                        } catch (error) {
+                            KernelLogger.error("BootLoader", `BIOS模块加载失败: ${error.message}`, error);
+                            // 显示错误信息
+                            if (biosLoading) {
+                                biosLoading.innerHTML = `
+                                    <div class="bios-loading-terminal">
+                                        <div class="bios-loading-line" style="color: #ff0000;">Error: Failed to load BIOS</div>
+                                        <div class="bios-loading-line" style="color: #ff0000;">${error.message}</div>
+                                    </div>
+                                `;
+                            }
+                        }
+                        
+                        // 不继续正常启动流程，直接返回
+                        KernelLogger.warn("BootLoader", "由于内核异常，系统启动已中断，已进入BIOS安全模式");
+                        return;
+                    }
+                } catch (e) {
+                    KernelLogger.error("BootLoader", `检查内核异常标志失败: ${e.message}`, e);
+                    // 如果检查失败，继续正常启动（避免因检查错误导致系统无法启动）
+                }
+            }
+            
             // 确保KernelMemory已注册到POOL
             if (typeof KernelMemory !== 'undefined') {
                 try {
@@ -1317,20 +1444,35 @@
                     loadingEl.style.display = 'none';
                 }
                 
-                // 检查是否处于安全模式
+                // 检查是否处于安全模式（包括内核异常情况）
                 let isSafeMode = false;
+                let hasKernelException = false;
                 try {
                     if (typeof sessionStorage !== 'undefined') {
                         const safeModeFlag = sessionStorage.getItem('__ZEROS_SAFE_MODE__');
                         isSafeMode = safeModeFlag === 'true';
                     }
+                    
+                    // 检查内核异常标志（优先检查LStorage，降级到localStorage）
+                    if (typeof ExceptionHandler !== 'undefined') {
+                        try {
+                            const canBoot = await ExceptionHandler.canNormalBoot();
+                            if (!canBoot) {
+                                hasKernelException = true;
+                                isSafeMode = true; // 内核异常时强制进入安全模式
+                                KernelLogger.error("BootLoader", "检测到内核异常标志，强制进入BIOS安全模式");
+                            }
+                        } catch (e) {
+                            KernelLogger.warn("BootLoader", `检查内核异常标志失败: ${e.message}`);
+                        }
+                    }
                 } catch (e) {
                     // sessionStorage可能不可用，忽略错误
                 }
                 
-                // 如果处于安全模式，按需加载BIOS模块
-                if (isSafeMode) {
-                    KernelLogger.info("BootLoader", "检测到安全模式，按需加载BIOS模块");
+                // 如果处于安全模式（包括内核异常），按需加载BIOS模块
+                if (isSafeMode || hasKernelException) {
+                    KernelLogger.info("BootLoader", `检测到安全模式${hasKernelException ? '（内核异常）' : ''}，按需加载BIOS模块`);
                     
                     // 确保内核内容容器保持隐藏
                     const contentEl = document.getElementById('kernel-content');
@@ -1346,6 +1488,22 @@
                     }
                     if (biosLoading) {
                         biosLoading.style.display = 'flex';
+                    }
+                    
+                    // 如果是内核异常，确保安全模式标志已设置
+                    if (hasKernelException) {
+                        if (typeof SafeModeManager !== 'undefined' && typeof SafeModeManager.enableSafeMode === 'function') {
+                            SafeModeManager.enableSafeMode();
+                        } else {
+                            try {
+                                if (typeof sessionStorage !== 'undefined') {
+                                    sessionStorage.setItem('__ZEROS_SAFE_MODE__', 'true');
+                                    KernelLogger.info("BootLoader", "已设置安全模式标志（sessionStorage）");
+                                }
+                            } catch (e) {
+                                KernelLogger.error("BootLoader", `设置安全模式标志失败: ${e.message}`);
+                            }
+                        }
                     }
                     
                     // 按需加载BIOS模块（需要等待LStorage加载完成）

@@ -47,6 +47,12 @@
    - [权限验证阶段](#权限验证阶段)
    - [权限审计](#权限审计)
 
+6. [异常处理流程](#6-异常处理流程)
+   - [内核异常处理](#内核异常处理)
+   - [系统异常处理](#系统异常处理)
+   - [程序异常处理](#程序异常处理)
+   - [服务异常处理](#服务异常处理)
+
 ---
 
 ## 🔗 相关文档
@@ -67,6 +73,7 @@
 - [GUIManager](./API/GUIManager.md) - GUI 窗口管理
 - [PermissionManager](./API/PermissionManager.md) - 权限管理、审计、统计
 - [KernelLogger](./API/KernelLogger.md) - 统一的日志记录
+- [ExceptionHandler](./API/ExceptionHandler.md) - 异常处理管理器（结构化异常处理SEH）
 
 #### 系统启动相关
 
@@ -178,9 +185,24 @@ BootLoader 初始化
       ├─ geographyDrive.js
       ├─ cacheDrive.js
       ├─ cryptDrive.js
-      └─ speechDrive.js
+      ├─ speechDrive.js
+      ├─ exceptionHandler.js (异常处理管理器)
+      └─ safeModeManager.js (安全模式管理器)
 
 内核初始化
+├─ 检查内核异常标志
+│  ├─ 初始化 ExceptionHandler
+│  ├─ 调用 ExceptionHandler.canNormalBoot()
+│  │  ├─ 如果检测到内核异常标志
+│  │  │  ├─ 设置安全模式标志
+│  │  │  ├─ 显示安全模式界面
+│  │  │  ├─ 显示BIOS加载动画
+│  │  │  └─ 中断启动流程（不继续正常启动）
+│  │  └─ 如果未检测到异常
+│  │     └─ 继续正常启动流程
+│  └─ 如果检查失败，继续正常启动（避免因检查错误导致系统无法启动）
+│
+├─ 初始化事件管理器
 ├─ 初始化事件管理器
 │  └─ EventManager.init()
 │
@@ -1140,17 +1162,174 @@ BootLoader 初始化
 
 ---
 
+## 6. 异常处理流程
+
+ZerOS 提供结构化异常处理（SEH）机制，支持4种异常等级，自动处理不同类型的异常。
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    异常处理流程 (ExceptionHandler)             │
+└─────────────────────────────────────────────────────────────┘
+
+异常报告入口
+├─ 程序调用 KernelAPI.call('Exception.report', [level, message, details, pid])
+│  ├─ ProcessManager._executeKernelAPI() 接收请求
+│  ├─ 权限检查：SYSTEM_NOTIFICATION（普通权限，自动授予）
+│  └─ 路由到 ExceptionHandler.reportException()
+│
+└─ 根据异常等级分发处理
+   ├─ KERNEL（内核异常）
+   ├─ SYSTEM（系统异常）
+   ├─ PROGRAM（程序异常）
+   └─ SERVICE（服务异常）
+```
+
+### 内核异常处理
+
+```
+程序调用 Exception.report('KERNEL', message, details)
+│
+├─ 设置内核异常标志
+│  ├─ ExceptionHandler._kernelExceptionFlag = true
+│  ├─ LStorage.setSystemStorage('exceptionHandler.kernelExceptionFlag', true)
+│  └─ LStorage.setSystemStorage('exceptionHandler.blockNormalBoot', true)
+│
+├─ 启用安全模式
+│  ├─ 如果 SafeModeManager 可用
+│  │  └─ SafeModeManager.enableSafeMode()
+│  └─ 否则设置 sessionStorage
+│     └─ sessionStorage.setItem('__ZEROS_SAFE_MODE__', 'true')
+│
+├─ 记录日志
+│  └─ KernelLogger.error('ExceptionHandler', '内核异常', ...)
+│
+└─ 跳转到BIOS或刷新页面
+   ├─ 如果 BIOSManager 可用
+   │  └─ 跳转到BIOS界面
+   └─ 否则
+      └─ location.reload()（刷新页面）
+
+系统重启后（BootLoader）
+├─ 加载 ExceptionHandler 模块
+│  └─ 从 LStorage 读取内核异常标志
+│
+├─ 检查内核异常标志
+│  ├─ ExceptionHandler.init() 初始化
+│  └─ ExceptionHandler.canNormalBoot() 检查
+│     ├─ 如果检测到内核异常标志
+│     │  ├─ 设置安全模式标志
+│     │  ├─ 显示安全模式界面
+│     │  ├─ 显示BIOS加载动画
+│     │  └─ 中断启动流程（不继续正常启动）
+│     └─ 如果未检测到异常
+│        └─ 继续正常启动流程
+│
+└─ 用户在BIOS中清除标志
+   ├─ 选择"清除内核异常标志并强制进入系统"
+   ├─ BIOSManager._confirmClearKernelException()
+   ├─ ExceptionHandler.clearKernelExceptionFlag()
+   │  ├─ ExceptionHandler._kernelExceptionFlag = false
+   │  ├─ LStorage.setSystemStorage('exceptionHandler.kernelExceptionFlag', false)
+   │  └─ LStorage.setSystemStorage('exceptionHandler.blockNormalBoot', false)
+   └─ 系统可以正常启动
+```
+
+### 系统异常处理
+
+```
+程序调用 Exception.report('SYSTEM', message, details)
+│
+├─ 强制停止所有程序
+│  ├─ 遍历 ProcessManager.PROCESS_TABLE
+│  ├─ 跳过 Exploit 程序 (PID: 10000)
+│  └─ 终止所有其他进程
+│     └─ ProcessManager.terminateProcess(pid)
+│
+├─ 显示蓝屏界面
+│  ├─ 创建全屏覆盖层
+│  ├─ 设置蓝色背景 (#0078D4)
+│  ├─ 显示错误信息
+│  │  ├─ 错误代码：SYSTEM_EXCEPTION
+│  │  ├─ 错误消息：message
+│  │  ├─ 时间戳：当前时间
+│  │  └─ 详细信息：details（JSON格式）
+│  └─ 显示进度指示器
+│     └─ "正在收集错误信息..."
+│
+├─ 执行系统自检
+│  ├─ 检查内存管理器
+│  │  └─ MemoryManager.checkMemory()
+│  ├─ 检查文件系统
+│  │  └─ Disk.canUsed
+│  └─ 检查进程管理器
+│     └─ ProcessManager.PROCESS_TABLE.size
+│
+├─ 更新蓝屏进度
+│  ├─ "正在检查内存..."
+│  ├─ "正在检查文件系统..."
+│  └─ "正在检查进程管理器..."
+│
+├─ 等待随机延迟（15-60秒）
+│  └─ setTimeout(..., random(15000, 60000))
+│
+└─ 自动重启系统
+   └─ location.reload()
+```
+
+### 程序异常处理
+
+```
+程序调用 Exception.report('PROGRAM', message, details, pid)
+│
+├─ 获取进程信息
+│  ├─ 如果 pid 为 null，使用当前调用者 PID
+│  └─ ProcessManager.getProcessInfo(pid)
+│
+├─ 强制终止进程
+│  └─ ProcessManager.terminateProcess(pid)
+│     ├─ 调用程序的 exit() 方法（如果存在）
+│     ├─ 清理程序资源
+│     ├─ 从 PROCESS_TABLE 移除进程
+│     └─ 释放内存
+│
+├─ 显示通知
+│  └─ NotificationManager.createNotification({
+│       title: '程序异常',
+│       content: `程序 ${programName} 发生异常并已被终止`,
+│       type: 'error',
+│       duration: 5000
+│     })
+│
+└─ 记录日志
+   └─ KernelLogger.error('ExceptionHandler', '程序异常', {
+       pid, programName, message, details
+     })
+```
+
+### 服务异常处理
+
+```
+程序调用 Exception.report('SERVICE', message, details)
+│
+└─ 记录日志
+   └─ KernelLogger.error('ExceptionHandler', '服务异常', {
+       message, details
+     })
+   └─ 不影响系统运行
+```
+
 ---
 
 ## 📝 总结
 
-本文档详细描述了 ZerOS 虚拟操作系统的五个核心流程：
+本文档详细描述了 ZerOS 虚拟操作系统的六个核心流程：
 
-1. **系统启动流程**：从 HTML 加载到用户登录的完整启动过程
+1. **系统启动流程**：从 HTML 加载到用户登录的完整启动过程，包括内核异常检查
 2. **程序启动流程**：从接收启动请求到程序运行的所有步骤
 3. **程序结束流程**：从接收终止请求到资源清理的完整过程
 4. **程序与内核交互流程**：程序如何通过 callKernelAPI 调用内核功能
 5. **权限控制流程**：从权限声明到权限验证的完整权限管理流程
+6. **异常处理流程**：4种异常等级的处理机制（内核异常、系统异常、程序异常、服务异常）
 
 这些流程共同构成了 ZerOS 系统的核心运行机制，确保了系统的安全性、稳定性和可扩展性。
 
@@ -1174,6 +1353,7 @@ BootLoader 初始化
 - [PermissionManager API](./API/PermissionManager.md) - 权限管理、审计、统计
 - [EventManager API](./API/EventManager.md) - 统一的事件处理系统
 - [GUIManager API](./API/GUIManager.md) - GUI 窗口管理
+- [ExceptionHandler API](./API/ExceptionHandler.md) - 异常处理管理器（结构化异常处理SEH）
 
 #### 系统启动
 

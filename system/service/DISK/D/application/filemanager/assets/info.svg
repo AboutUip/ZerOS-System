@@ -1,6 +1,18 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-  <circle cx="12" cy="12" r="10"/>
-  <line x1="12" y1="16" x2="12" y2="12"/>
-  <line x1="12" y1="8" x2="12.01" y2="8"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+  <defs>
+    <linearGradient id="infoGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#3498DB;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#2980B9;stop-opacity:1" />
+    </linearGradient>
+    <filter id="infoShadow">
+      <feDropShadow dx="0" dy="1" stdDeviation="1.5" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+  <!-- 圆形背景 -->
+  <circle cx="12" cy="12" r="10" fill="url(#infoGradient)" filter="url(#infoShadow)"/>
+  <!-- 信息图标 "i" -->
+  <circle cx="12" cy="8" r="1.5" fill="#FFFFFF" fill-opacity="0.95"/>
+  <rect x="11" y="11" width="2" height="6" rx="1" fill="#FFFFFF" fill-opacity="0.95"/>
+  <!-- 高光效果 -->
+  <circle cx="12" cy="12" r="10" fill="none" stroke="#FFFFFF" stroke-width="0.5" stroke-opacity="0.3"/>
 </svg>
-

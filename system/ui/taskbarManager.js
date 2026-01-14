@@ -7126,18 +7126,6 @@ class TaskbarManager {
             panel._hideTimeout = null;
         }
         
-        // 创建或获取蒙版层
-        let mask = document.getElementById('taskbar-popup-mask');
-        if (!mask) {
-            mask = document.createElement('div');
-            mask.id = 'taskbar-popup-mask';
-            mask.className = 'taskbar-popup-mask';
-            document.body.appendChild(mask);
-        }
-        
-        // 显示蒙版层（带动画）
-        mask.classList.add('visible');
-        
         // 重置内联样式（确保之前强制隐藏的样式被清除）
         panel.style.display = '';
         panel.style.opacity = '';
@@ -7270,16 +7258,6 @@ class TaskbarManager {
         }
         
         // 注册点击外部关闭
-        const closeOnClickOutside = (e) => {
-            if (!panel.contains(e.target) && !brightnessContainer.contains(e.target)) {
-                TaskbarManager._hideBrightnessPanel(panel);
-            }
-        };
-        
-        // 蒙版层点击关闭
-        mask.addEventListener('click', closeOnClickOutside);
-        panel._maskCloseHandler = closeOnClickOutside;
-        
         if (typeof EventManager !== 'undefined' && typeof EventManager.registerMenu === 'function') {
             EventManager.registerMenu(
                 'brightness-panel',
@@ -7291,6 +7269,13 @@ class TaskbarManager {
             );
         } else {
             // 降级方案
+            const closeOnClickOutside = (e) => {
+                if (!panel.contains(e.target) && !brightnessContainer.contains(e.target)) {
+                    TaskbarManager._hideBrightnessPanel(panel);
+                    document.removeEventListener('click', closeOnClickOutside, true);
+                    document.removeEventListener('mousedown', closeOnClickOutside, true);
+                }
+            };
             setTimeout(() => {
                 document.addEventListener('click', closeOnClickOutside, true);
                 document.addEventListener('mousedown', closeOnClickOutside, true);
@@ -7312,22 +7297,11 @@ class TaskbarManager {
             panel._hideTimeout = null;
         }
         
-        // 隐藏蒙版层
-        const mask = document.getElementById('taskbar-popup-mask');
-        if (mask) {
-            mask.classList.remove('visible');
-        }
-        
         // 清理事件监听器
         if (panel._closeOnClickOutside) {
             document.removeEventListener('click', panel._closeOnClickOutside, true);
             document.removeEventListener('mousedown', panel._closeOnClickOutside, true);
             panel._closeOnClickOutside = null;
-        }
-        
-        if (panel._maskCloseHandler && mask) {
-            mask.removeEventListener('click', panel._maskCloseHandler);
-            panel._maskCloseHandler = null;
         }
         
         if (immediate) {

@@ -1,10 +1,23 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-  <polyline points="14 2 14 8 20 8"/>
-  <!-- 视频播放按钮 -->
-  <rect x="8" y="10" width="8" height="6" rx="1" fill="currentColor" opacity="0.2"/>
-  <polygon points="10 12 13 13.5 10 15 10 12" fill="currentColor"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+  <defs>
+    <linearGradient id="videoFileGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#E74C3C;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#C0392B;stop-opacity:1" />
+    </linearGradient>
+    <filter id="videoFileShadow">
+      <feDropShadow dx="0" dy="1" stdDeviation="1.5" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+  <!-- 文件主体 -->
+  <path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6z" 
+        fill="url(#videoFileGradient)" 
+        filter="url(#videoFileShadow)"/>
+  <!-- 文件折角 -->
+  <path d="M14 2v6h6" fill="none" stroke="#922B21" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- 播放按钮 -->
+  <rect x="8" y="10" width="8" height="6" rx="1" fill="#FFFFFF" fill-opacity="0.2"/>
+  <polygon points="10.5,12 13,13.5 10.5,15 10.5,12" fill="#FFFFFF" fill-opacity="0.9"/>
   <!-- 摄像机镜头 -->
-  <circle cx="16" cy="11" r="1.5" fill="none"/>
-  <circle cx="16" cy="11" r="0.5" fill="currentColor"/>
+  <circle cx="16" cy="11" r="2" fill="#FFFFFF" fill-opacity="0.2"/>
+  <circle cx="16" cy="11" r="1" fill="#FFFFFF" fill-opacity="0.5"/>
 </svg>

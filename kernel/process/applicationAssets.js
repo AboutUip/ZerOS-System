@@ -39,26 +39,6 @@ const APPLICATION_ASSETS = {
         }
     },
     
-    // Vim编辑器
-    // 注意：路径是 D: 盘下的真实路径
-    "vim": {
-        script: "D:/application/vim/vim.js",
-        styles: ["D:/application/vim/vim.css"],
-        icon: "D:/application/vim/vim.svg",
-        // assets: 程序资源文件（可选）
-        // assets: ["D:/application/vim/assets/icon.svg"],
-        metadata: {
-            autoStart: false,
-            priority: 1,
-            description: "Vim文本编辑器",
-            version: "1.0.0",
-            alwaysShowInTaskbar: false,  // 不常显在任务栏（仅在运行时显示）
-            allowMultipleInstances: true,
-            supportsPreview: true,  // 支持窗口预览快照
-            category: "utility"  // 轻松使用
-        }
-    },
-    
     // 任务管理器
     // 注意：路径是 D: 盘下的真实路径
     "taskmanager": {

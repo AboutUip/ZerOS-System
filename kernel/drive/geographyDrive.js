@@ -203,6 +203,14 @@ class GeographyDrive {
             GeographyDrive._pendingRequest = null;
             return location;
         } catch (error) {
+            // 报告异常
+            if (typeof ExceptionHandler !== 'undefined') {
+                ExceptionHandler.reportException(
+                    ExceptionHandler.ExceptionLevel.SERVICE,
+                    `GeographyDrive.获取当前位置失败: ${error.message}`,
+                    { enableHighAccuracy, timeout, maximumAge, error: error.message, stack: error.stack }
+                ).catch(() => { });
+            }
             // 请求失败，清除 pending 状态
             GeographyDrive._pendingRequest = null;
             throw error;

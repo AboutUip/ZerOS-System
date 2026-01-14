@@ -1,9 +1,20 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-  <polyline points="5 9 2 12 5 15"/>
-  <polyline points="9 5 12 2 15 5"/>
-  <polyline points="15 19 12 22 9 19"/>
-  <polyline points="19 9 22 12 19 15"/>
-  <line x1="2" y1="12" x2="22" y2="12"/>
-  <line x1="12" y1="2" x2="12" y2="22"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+  <defs>
+    <linearGradient id="moveGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#F39C12;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#D68910;stop-opacity:1" />
+    </linearGradient>
+    <filter id="moveShadow">
+      <feDropShadow dx="0" dy="1" stdDeviation="1.5" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+  <!-- 中心圆 -->
+  <circle cx="12" cy="12" r="3" fill="url(#moveGradient)" filter="url(#moveShadow)"/>
+  <!-- 四个方向的箭头 -->
+  <path d="M12 2L10 6h4L12 2z" fill="url(#moveGradient)" filter="url(#moveShadow)"/>
+  <path d="M22 12l-4-2v4l4-2z" fill="url(#moveGradient)" filter="url(#moveShadow)"/>
+  <path d="M12 22l2-4h-4l2 4z" fill="url(#moveGradient)" filter="url(#moveShadow)"/>
+  <path d="M2 12l4 2v-4L2 12z" fill="url(#moveGradient)" filter="url(#moveShadow)"/>
+  <!-- 中心高光 -->
+  <circle cx="12" cy="12" r="1" fill="#FFFFFF" fill-opacity="0.6"/>
 </svg>
-

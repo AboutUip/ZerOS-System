@@ -1,5 +1,20 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-  <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/>
-  <polyline points="13 2 13 9 20 9"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+  <defs>
+    <linearGradient id="fileGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#4A90E2;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#357ABD;stop-opacity:1" />
+    </linearGradient>
+    <filter id="fileShadow">
+      <feDropShadow dx="0" dy="1" stdDeviation="1.5" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+  <!-- 文件主体 -->
+  <path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6z" 
+        fill="url(#fileGradient)" 
+        filter="url(#fileShadow)"/>
+  <!-- 文件折角 -->
+  <path d="M14 2v6h6" fill="none" stroke="#2E5C8A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- 高光效果 -->
+  <line x1="8" y1="12" x2="16" y2="12" stroke="#FFFFFF" stroke-width="1" stroke-opacity="0.3" stroke-linecap="round"/>
+  <line x1="8" y1="16" x2="14" y2="16" stroke="#FFFFFF" stroke-width="1" stroke-opacity="0.3" stroke-linecap="round"/>
 </svg>
-

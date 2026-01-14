@@ -1804,7 +1804,7 @@ function escapeHtml(s){
             // 推荐使用事件监听：Terminal.on('command', handler)
             this.commandHandler = this._defaultHandler.bind(this);
             // 用于 Tab 补全的已知命令列表（可由外部修改）
-            this._completionCommands = ['clear','pwd','whoami','echo','demo','toggleview','cd','markdir','markfile','ls','tree','cat','write','rm','kill','help','check','diskmanger','vim','rename','mv','copy','paste','power','exit','login','su','users','groups','groupadd','groupdel','groupmod','groupinfo','env','setenv','export','unsetenv','unset','getenv'];
+            this._completionCommands = ['debug','clear','pwd','whoami','echo','demo','toggleview','cd','markdir','markfile','ls','tree','cat','write','rm','kill','help','check','diskmanger','rename','mv','copy','paste','power','exit','login','su','users','groups','groupadd','groupdel','groupmod','groupinfo','env','setenv','export','unsetenv','unset','getenv'];
             
             // CLI程序补全缓存（从ApplicationAssetManager获取）
             this._cliProgramsCache = null;
@@ -1818,9 +1818,6 @@ function escapeHtml(s){
             
             // 剪贴板现在存储在 Exploit 内存中（PID 10000）
             
-            // Vim模式标记
-            this._vimMode = false;
-            this._vimInstance = null;
             // completion 状态：{ visible, candidates, index, beforeText, dirPart } - 现在存储在 Exploit 内存中
             
             // 从内存初始化终端数据
@@ -2297,46 +2294,6 @@ function escapeHtml(s){
                         ev.stopPropagation();
                         return;
                     }
-                    
-                    // Vim模式：拦截所有键盘事件
-                    if (this._vimMode && this._vimInstance) {
-                        ev.preventDefault();
-                        ev.stopPropagation();
-                        
-                        // 清空输入框内容（防止显示输入的字符）
-                        if (this.cmdEl && this.cmdEl.textContent) {
-                            this.cmdEl.textContent = '';
-                        }
-                        
-                        // 获取键盘按键信息
-                        let key = ev.key;
-                        const ctrlKey = ev.ctrlKey;
-                        const shiftKey = ev.shiftKey;
-                        
-                        // 调试信息（仅在开发模式下）
-                        if (this._vimInstance.mode === 1 && window._debugVim) { // MODE_INSERT
-                            if (typeof KernelLogger !== 'undefined') {
-                                KernelLogger.debug('Terminal', `Vim Insert Mode - key: ${key}, ctrlKey: ${ctrlKey}, shiftKey: ${shiftKey}`);
-                            }
-                        }
-                        
-                        // ev.key已经自动处理了Shift键组合
-                        // 直接传递给vim处理
-                        if (this._vimInstance && typeof this._vimInstance.handleKey === 'function') {
-                            try {
-                                this._vimInstance.handleKey(key, ctrlKey, shiftKey);
-                            } catch (error) {
-                                if (typeof KernelLogger !== 'undefined') {
-                                    KernelLogger.error('Terminal', 'Vim handleKey error', error);
-                                }
-                            }
-                        } else {
-                            if (typeof KernelLogger !== 'undefined') {
-                                KernelLogger.error('Terminal', '_vimInstance.handleKey is not a function', this._vimInstance);
-                            }
-                        }
-                        return;
-                    }
                 
                 // 键盘快捷键支持
                 if (ev.ctrlKey || ev.metaKey) {
@@ -2739,40 +2696,6 @@ function escapeHtml(s){
                     // 只在活动标签页时处理键盘事件
                     if (!this.isActive) return;
                     
-                    // Vim模式：拦截所有键盘事件
-                    if (this._vimMode && this._vimInstance) {
-                        ev.preventDefault();
-                        ev.stopPropagation();
-                        
-                        // 清空输入框内容（防止显示输入的字符）
-                        if (this.cmdEl && this.cmdEl.textContent) {
-                            this.cmdEl.textContent = '';
-                        }
-                        
-                        // 获取键盘按键信息
-                        let key = ev.key;
-                        const ctrlKey = ev.ctrlKey;
-                        const shiftKey = ev.shiftKey;
-                        
-                        // 调试信息
-                        if (this._vimInstance.mode === 1) { // MODE_INSERT
-                            if (typeof KernelLogger !== 'undefined') {
-                                KernelLogger.debug('Terminal', `Vim Insert Mode - key: ${key}, ctrlKey: ${ctrlKey}, shiftKey: ${shiftKey}`);
-                            }
-                        }
-                        
-                        // ev.key已经自动处理了Shift键组合
-                        // 直接传递给vim处理
-                        if (this._vimInstance && typeof this._vimInstance.handleKey === 'function') {
-                            this._vimInstance.handleKey(key, ctrlKey, shiftKey);
-                        } else {
-                            if (typeof KernelLogger !== 'undefined') {
-                                KernelLogger.error('Terminal', '_vimInstance.handleKey is not a function', this._vimInstance);
-                            }
-                        }
-                        return;
-                    }
-                    
                     // 键盘快捷键支持
                     if (ev.ctrlKey || ev.metaKey) {
                         // Ctrl+L 或 Cmd+L: 清屏
@@ -3105,28 +3028,7 @@ function escapeHtml(s){
                 EventManager.registerElementEvent(this.pid, this.cmdEl, 'paste', async (ev) => {
                 if (!this.isActive) return;
                 
-                // Vim模式：将粘贴内容传递给vim（插入模式下）
-                if (this._vimMode && this._vimInstance) {
-                    // 检查是否为插入模式（MODE_INSERT = 1）
-                    if (this._vimInstance.mode === 1) {
-                        ev.preventDefault();
-                        ev.stopPropagation();
-                        
-                        try {
-                            const text = (ev.clipboardData || window.clipboardData).getData('text');
-                            if (text) {
-                                this._vimInstance._pasteText(text);
-                            }
-                        } catch (e) {
-                            if (typeof KernelLogger !== 'undefined') {
-                                KernelLogger.error('Terminal', 'Vim: Failed to paste', e);
-                            }
-                        }
-                        return;
-                    }
-                }
-                
-                // 普通模式：防止粘贴样式内容
+                // 防止粘贴样式内容
                 ev.preventDefault();
                 const text = (ev.clipboardData || window.clipboardData).getData('text');
                 document.execCommand('insertText', false, text);
@@ -3136,65 +3038,22 @@ function escapeHtml(s){
                 this.cmdEl.addEventListener('paste', async (ev) => {
                     if (!this.isActive) return;
                     
-                    // Vim模式：将粘贴内容传递给vim（插入模式下）
-                    if (this._vimMode && this._vimInstance) {
-                        // 检查是否为插入模式（MODE_INSERT = 1）
-                        if (this._vimInstance.mode === 1) {
-                            ev.preventDefault();
-                            ev.stopPropagation();
-                            
-                            try {
-                                const text = (ev.clipboardData || window.clipboardData).getData('text');
-                                if (text) {
-                                    this._vimInstance._pasteText(text);
-                                }
-                            } catch (e) {
-                                if (typeof KernelLogger !== 'undefined') {
-                                KernelLogger.error('Terminal', 'Vim: Failed to paste', e);
-                            }
-                            }
-                            return;
-                        }
-                    }
-                    
-                    // 普通模式：防止粘贴样式内容
+                    // 防止粘贴样式内容
                     ev.preventDefault();
                     const text = (ev.clipboardData || window.clipboardData).getData('text');
                     document.execCommand('insertText', false, text);
                 });
             }
             
-            // 处理鼠标滚轮事件 - 在Vim模式下需要拦截，普通模式让浏览器自然滚动
-            // 注意：wheel 事件需要 passive 选项以优化性能，因此保持使用原生 addEventListener
-            // 使用 passive: true 以优化性能，在普通模式下不影响滚动
+            // 处理鼠标滚轮事件
+            // 注意：wheel 事件使用 passive: true 以优化性能
             this._wheelHandler = (ev) => {
                 if (!this.isActive) return;
-                
-                // Vim模式：将滚轮事件传递给vim
-                // 注意：在 passive: true 模式下无法阻止默认行为
-                // 因此需要在Vim模式下动态切换监听器
-                if (this._vimMode && this._vimInstance) {
-                    this._vimInstance._handleWheel(ev);
-                }
-                
                 // 普通模式：完全不做任何处理，让浏览器自然处理滚动
             };
             
-            // 初始使用 passive: true 以优化性能，不影响普通模式下的滚动
+            // 使用 passive: true 以优化性能
             this.outputEl.addEventListener('wheel', this._wheelHandler, { passive: true });
-            
-            // 用于Vim模式的滚轮处理（需要阻止默认行为）
-            this._wheelHandlerVim = (ev) => {
-                if (!this.isActive) return;
-                
-                // Vim模式：将滚轮事件传递给vim并阻止默认滚动
-                if (this._vimMode && this._vimInstance) {
-                    ev.preventDefault();
-                    ev.stopPropagation();
-                    this._vimInstance._handleWheel(ev);
-                    return;
-                }
-            };
         }
 
         _bindWindowControls(){
@@ -4321,6 +4180,93 @@ function escapeHtml(s){
             this.outputEl.innerHTML = '';
         }
 
+        // 注入CSS样式（用于自定义UI）
+        injectCSS(cssText, id = null) {
+            if (!cssText || typeof cssText !== 'string') {
+                return false;
+            }
+            
+            // 如果没有提供ID，生成一个唯一ID
+            if (!id) {
+                id = `terminal-custom-css-${this.pid || 'default'}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+            }
+            
+            // 检查是否已经存在相同ID的样式
+            let styleEl = document.getElementById(id);
+            if (styleEl) {
+                // 如果已存在，更新内容
+                styleEl.textContent = cssText;
+                return true;
+            }
+            
+            // 创建新的style元素
+            styleEl = document.createElement('style');
+            styleEl.id = id;
+            styleEl.type = 'text/css';
+            styleEl.textContent = cssText;
+            
+            // 添加到文档head中
+            if (document.head) {
+                document.head.appendChild(styleEl);
+                return true;
+            }
+            
+            return false;
+        }
+
+        // 移除CSS样式
+        removeCSS(id) {
+            if (!id) {
+                return false;
+            }
+            
+            const styleEl = document.getElementById(id);
+            if (styleEl && styleEl.parentNode) {
+                styleEl.parentNode.removeChild(styleEl);
+                return true;
+            }
+            
+            return false;
+        }
+
+        // 创建自定义HTML容器（用于复杂的自定义UI，如vim编辑器）
+        createContainer(html, options = {}) {
+            if (!html || typeof html !== 'string') {
+                return null;
+            }
+            
+            // 创建一个容器元素
+            const container = document.createElement('div');
+            container.className = options.className || 'terminal-custom-container';
+            
+            // 添加自定义样式
+            if (options.style && typeof options.style === 'object') {
+                Object.assign(container.style, options.style);
+            }
+            
+            // 设置HTML内容
+            container.innerHTML = html;
+            
+            // 标记DOM元素（如果知道PID）
+            if (this.pid && container.dataset) {
+                container.dataset.pid = this.pid.toString();
+            }
+            
+            // 添加到输出区域
+            this.outputEl.appendChild(container);
+            
+            // 触发可见性动画（如果容器包含 out-line 类）
+            requestAnimationFrame(() => {
+                container.querySelectorAll('.out-line').forEach(line => {
+                    line.classList.add('visible');
+                });
+            });
+            
+            this._scrollToBottom();
+            
+            return container;
+        }
+
         // Exploit 内存管理工具 - 统一的临时数据存储
         _ensureExploitMemory() {
             const EXPLOIT_PID = 10000;
@@ -5151,7 +5097,8 @@ function escapeHtml(s){
                 'su',         // 切换用户（可能提权）
                 'groupadd',   // 创建用户组
                 'groupmod',   // 修改用户组
-                'tcpdump'     // 网络数据包捕获（敏感操作，需要管理员权限）
+                'tcpdump',    // 网络数据包捕获（敏感操作，需要管理员权限）
+                'debug'       // 调试工具（触发异常测试，需要管理员权限）
             ];
             
             // 检查命令是否需要管理员权限
@@ -7508,6 +7455,126 @@ function escapeHtml(s){
                     });
                 }
                 break;
+            case 'debug':
+                // debug 命令：调试工具，支持触发异常测试
+                (async () => {
+                    try {
+                        if (payload.args.length < 2) {
+                            payload.write('debug: 用法: debug <action> [args...]');
+                            payload.write('');
+                            payload.write('Actions:');
+                            payload.write('  exception <level> [message]  - 触发指定等级的异常（用于测试）');
+                            payload.write('    levels: kernel, system, program, service');
+                            payload.write('    message: 可选的异常消息（默认使用测试消息）');
+                            payload.write('');
+                            payload.write('Examples:');
+                            payload.write('  debug exception service "测试服务异常"');
+                            payload.write('  debug exception program');
+                            payload.write('  debug exception system "系统资源耗尽"');
+                            payload.write('  debug exception kernel "内核模块错误"');
+                            return;
+                        }
+                        
+                        const action = payload.args[1];
+                        
+                        if (action === 'exception') {
+                            // 触发异常测试
+                            if (payload.args.length < 3) {
+                                payload.write('debug exception: 用法: debug exception <level> [message]');
+                                payload.write('  levels: kernel, system, program, service');
+                                return;
+                            }
+                            
+                            const level = payload.args[2].toUpperCase();
+                            const message = payload.args.length > 3 
+                                ? payload.args.slice(3).join(' ') 
+                                : `测试${level}异常 - 由debug命令触发`;
+                            
+                            // 验证异常等级
+                            const validLevels = ['KERNEL', 'SYSTEM', 'PROGRAM', 'SERVICE'];
+                            if (!validLevels.includes(level)) {
+                                payload.write(`debug exception: 无效的异常等级 '${payload.args[2]}'`);
+                                payload.write(`  有效的等级: ${validLevels.join(', ').toLowerCase()}`);
+                                return;
+                            }
+                            
+                            // 获取当前进程PID（用于程序异常）
+                            let currentPid = null;
+                            if (terminalInstance && terminalInstance.pid) {
+                                currentPid = terminalInstance.pid;
+                            } else if (terminalInstance && terminalInstance.tabManager && terminalInstance.tabManager.pid) {
+                                currentPid = terminalInstance.tabManager.pid;
+                            }
+                            
+                            // 准备异常详情
+                            const details = {
+                                source: 'debug_command',
+                                timestamp: new Date().toISOString(),
+                                pid: currentPid,
+                                test: true
+                            };
+                            
+                            payload.write(`正在触发 ${level} 异常...`);
+                            payload.write(`消息: ${message}`);
+                            
+                            // 调用异常处理API（通过 ProcessManager）
+                            if (typeof ProcessManager !== 'undefined' && typeof ProcessManager.callKernelAPI === 'function') {
+                                try {
+                                    // 获取终端程序的 PID（用于调用内核API）
+                                    let terminalPid = currentPid;
+                                    if (!terminalPid && terminalInstance && terminalInstance.pid) {
+                                        terminalPid = terminalInstance.pid;
+                                    } else if (!terminalPid && terminalInstance && terminalInstance.tabManager && terminalInstance.tabManager.pid) {
+                                        terminalPid = terminalInstance.tabManager.pid;
+                                    }
+                                    
+                                    if (!terminalPid) {
+                                        payload.write('debug exception: 无法获取终端进程PID');
+                                        return;
+                                    }
+                                    
+                                    await ProcessManager.callKernelAPI(terminalPid, 'Exception.report', [
+                                        level,
+                                        message,
+                                        details,
+                                        level === 'PROGRAM' ? currentPid : null
+                                    ]);
+                                    
+                                    payload.write(`✓ ${level} 异常已报告`);
+                                    
+                                    // 根据异常等级给出提示
+                                    if (level === 'KERNEL') {
+                                        payload.write('⚠ 警告: 内核异常将导致系统进入BIOS安全模式');
+                                        payload.write('  系统重启后必须进入BIOS清除异常标志才能正常启动');
+                                    } else if (level === 'SYSTEM') {
+                                        payload.write('⚠ 警告: 系统异常将显示蓝屏并重启系统');
+                                        payload.write('  所有程序将被终止，系统将在15-60秒后自动重启');
+                                    } else if (level === 'PROGRAM') {
+                                        payload.write('⚠ 警告: 程序异常将导致当前程序被终止');
+                                    } else if (level === 'SERVICE') {
+                                        payload.write('✓ 服务异常已记录到日志（不影响系统运行）');
+                                    }
+                                } catch (error) {
+                                    payload.write(`debug exception: 错误: ${error.message}`);
+                                    if (typeof KernelLogger !== 'undefined') {
+                                        KernelLogger.error('Terminal', 'debug exception 失败', error);
+                                    }
+                                }
+                            } else {
+                                payload.write('debug exception: ProcessManager 不可用');
+                            }
+                        } else {
+                            payload.write(`debug: 未知的操作 '${action}'`);
+                            payload.write('  使用 "debug" 查看帮助信息');
+                        }
+                    } catch (error) {
+                        payload.write(`debug: 错误: ${error.message}`);
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.error('Terminal', 'debug 命令错误', error);
+                        }
+                    }
+                })();
+                break;
             case 'help':
                 // 对于已支持的命令提供帮助信息,比如参数
                 payload.write('Supported commands (detailed):');
@@ -7547,6 +7614,7 @@ function escapeHtml(s){
                 payload.write(' - getenv <name>          : 获取环境变量值');
                 payload.write(' - demo, toggleview       : 演示脚本 / 切换视图');
                 payload.write(' - power <action>         : 系统电源管理（reboot/shutdown/help）');
+                payload.write(' - debug <action> [args]   : 调试工具，支持触发异常测试（debug exception <level> [message]）');
                 payload.write('Notes: 路径格式以盘符开头如 C:/path，或相对于当前工作目录使用 ../ 和 ./ 。');
                 break;
             case 'diskmanger':
@@ -8242,22 +8310,28 @@ function escapeHtml(s){
                                 url.searchParams.set('fileName', `${cmd}.js`);
                                 
                                 // 尝试读取文件（静默处理 404 错误，因为文件不存在是正常情况）
+                                // 注意：浏览器可能会在控制台显示404错误，这是浏览器行为，无法完全避免
+                                // 但我们可以通过提前检查来减少不必要的请求
                                 let response;
                                 try {
+                                    // 使用fetch，但捕获所有错误（包括404）
                                     response = await fetch(url.toString());
+                                    // 如果响应不是 200，静默继续（文件不存在是正常情况）
+                                    if (!response.ok) {
+                                        foundInBin = false;
+                                        // 不return，继续后续查找（环境变量等）
+                                    }
                                 } catch (error) {
                                     // 网络错误，静默继续后续查找
                                     foundInBin = false;
-                                    return; // 从 try 块返回，继续后续查找
+                                    // 不return，继续后续查找（环境变量等）
                                 }
                                 
-                                // 如果响应不是 200，静默继续（文件不存在是正常情况）
-                                if (!response.ok) {
+                                // 如果响应不是ok，直接跳过后续处理，继续查找其他位置
+                                if (!response || !response.ok) {
                                     foundInBin = false;
-                                    return; // 静默继续后续查找
-                                }
-                                
-                                if (response.ok) {
+                                    // 继续执行后续查找（不return）
+                                } else if (response.ok) {
                                     const result = await response.json();
                                     if (result.status === 'success') {
                                         const fileContent = result.data?.content || result.data || '';
@@ -8919,6 +8993,33 @@ function escapeHtml(s){
                     if (term && typeof term.clear === 'function') {
                         term.clear();
                     }
+                },
+                
+                // 注入CSS样式（为自定义UI提供支持）
+                injectCSS: (cssText, id = null) => {
+                    const term = getActiveTerminal();
+                    if (term && typeof term.injectCSS === 'function') {
+                        return term.injectCSS(cssText, id);
+                    }
+                    return false;
+                },
+                
+                // 移除CSS样式
+                removeCSS: (id) => {
+                    const term = getActiveTerminal();
+                    if (term && typeof term.removeCSS === 'function') {
+                        return term.removeCSS(id);
+                    }
+                    return false;
+                },
+                
+                // 创建自定义HTML容器（用于复杂的自定义UI）
+                createContainer: (html, options = {}) => {
+                    const term = getActiveTerminal();
+                    if (term && typeof term.createContainer === 'function') {
+                        return term.createContainer(html, options);
+                    }
+                    return null;
                 },
                 
                 // 设置当前工作目录

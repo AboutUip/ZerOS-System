@@ -75,7 +75,16 @@ async function init() {
             }
         }
     } catch (e) {
-        KernelLogger.error("FSInit", `初始化失败: ${e.message}`, e);
+        // 报告异常
+        if (typeof ExceptionHandler !== 'undefined') {
+            ExceptionHandler.reportException(
+                ExceptionHandler.ExceptionLevel.SYSTEM,
+                `FSInit.初始化失败: ${e.message}`,
+                { error: e.message, stack: e.stack }
+            ).catch(() => { });
+        } else {
+            KernelLogger.error("FSInit", `初始化失败: ${e.message}`, e);
+        }
         // 即使失败也发布信号，避免阻塞其他模块
     }
 

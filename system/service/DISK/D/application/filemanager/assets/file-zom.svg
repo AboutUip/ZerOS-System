@@ -1,13 +1,25 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+  <defs>
+    <linearGradient id="zomFileGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#00CED1;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#008B8B;stop-opacity:1" />
+    </linearGradient>
+    <filter id="zomFileShadow">
+      <feDropShadow dx="0" dy="1" stdDeviation="1.5" flood-opacity="0.3"/>
+    </filter>
+  </defs>
   <!-- 文件主体 -->
-  <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/>
-  <polyline points="13 2 13 9 20 9"/>
-  <!-- ZOM 标识：盒子/包装图标 -->
-  <rect x="7" y="12" width="10" height="8" rx="1" fill="none"/>
-  <line x1="9" y1="14" x2="15" y2="14"/>
-  <line x1="9" y1="16" x2="15" y2="16"/>
-  <line x1="9" y1="18" x2="13" y2="18"/>
+  <path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6z" 
+        fill="url(#zomFileGradient)" 
+        filter="url(#zomFileShadow)"/>
+  <!-- 文件折角 -->
+  <path d="M14 2v6h6" fill="none" stroke="#006666" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- ZOM 包装盒图标 -->
+  <rect x="7" y="11" width="10" height="8" rx="1" fill="#FFFFFF" fill-opacity="0.9"/>
+  <line x1="7" y1="13" x2="17" y2="13" stroke="#008B8B" stroke-width="1" stroke-opacity="0.6"/>
+  <line x1="7" y1="15.5" x2="17" y2="15.5" stroke="#008B8B" stroke-width="1" stroke-opacity="0.6"/>
+  <line x1="7" y1="18" x2="14" y2="18" stroke="#008B8B" stroke-width="1" stroke-opacity="0.6"/>
   <!-- 右上角装饰：表示安装包 -->
-  <circle cx="16" cy="5" r="1.5" fill="currentColor"/>
+  <circle cx="16.5" cy="5.5" r="1.5" fill="#FFFFFF" fill-opacity="0.8"/>
+  <circle cx="16.5" cy="5.5" r="0.8" fill="#00CED1"/>
 </svg>
-

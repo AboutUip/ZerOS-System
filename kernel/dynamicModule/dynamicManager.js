@@ -749,17 +749,26 @@ class DynamicManager {
             
             return globalObj;
         } catch (error) {
+            // 报告异常
+            if (typeof ExceptionHandler !== 'undefined') {
+                ExceptionHandler.reportException(
+                    ExceptionHandler.ExceptionLevel.SYSTEM,
+                    `DynamicManager.模块加载失败: ${moduleName}`,
+                    { moduleName, error: error.message, stack: error.stack, loadTime: Date.now() - startTime }
+                ).catch(() => { });
+            }
+
             const loadTime = Date.now() - startTime;
             DynamicManager._moduleStatus.set(moduleName, {
                 loaded: false,
                 error: error,
                 loadTime: loadTime
             });
-            
+
             KernelLogger.error("DynamicManager", `模块 ${moduleName} 加载失败: ${error.message}`, {
                 loadTime: `${loadTime}ms`
             });
-            
+
             throw error;
         }
     }

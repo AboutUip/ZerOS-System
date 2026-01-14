@@ -76,7 +76,16 @@ class UserGroup {
                 UserGroup._initialized = true;
                 KernelLogger.info("UserGroup", "用户组系统初始化完成");
             } catch (e) {
-                KernelLogger.error("UserGroup", `初始化失败: ${e.message}`, e);
+                // 报告异常
+                if (typeof ExceptionHandler !== 'undefined') {
+                    ExceptionHandler.reportException(
+                        ExceptionHandler.ExceptionLevel.SYSTEM,
+                        `UserGroup.初始化失败: ${e.message}`,
+                        { error: e.message, stack: e.stack }
+                    ).catch(() => { });
+                } else {
+                    KernelLogger.error("UserGroup", `初始化失败: ${e.message}`, e);
+                }
                 UserGroup._initialized = true;
             } finally {
                 UserGroup._initPromise = null;

@@ -1,5 +1,22 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-  <polyline points="3 6 5 6 21 6"/>
-  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+  <defs>
+    <linearGradient id="trashGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#E74C3C;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#C0392B;stop-opacity:1" />
+    </linearGradient>
+    <filter id="trashShadow">
+      <feDropShadow dx="0" dy="1" stdDeviation="1.5" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+  <!-- 垃圾桶主体 -->
+  <path d="M19 7h-3V6a2 2 0 0 0-2-2H10a2 2 0 0 0-2 2v1H5a1 1 0 0 0 0 2h1v11a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V9h1a1 1 0 0 0 0-2zM9 6h6v1H9V6zm8 15H7V9h10v12z" 
+        fill="url(#trashGradient)" 
+        filter="url(#trashShadow)"/>
+  <!-- 垃圾桶盖子 -->
+  <rect x="6" y="4" width="12" height="2" rx="1" fill="url(#trashGradient)" filter="url(#trashShadow)"/>
+  <!-- 盖子高光 -->
+  <rect x="7" y="4.5" width="10" height="0.5" fill="#FFFFFF" fill-opacity="0.5"/>
+  <!-- 删除线装饰 -->
+  <line x1="9" y1="12" x2="15" y2="12" stroke="#FFFFFF" stroke-width="1.5" stroke-linecap="round" stroke-opacity="0.8"/>
+  <line x1="9" y1="15" x2="15" y2="15" stroke="#FFFFFF" stroke-width="1.5" stroke-linecap="round" stroke-opacity="0.8"/>
 </svg>
-

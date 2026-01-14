@@ -765,6 +765,14 @@
             }
             POOL.__ADD__("KERNEL_GLOBAL_POOL", "KernelLogger", KernelLogger);
         } catch (e) {
+            // 报告异常
+            if (typeof ExceptionHandler !== 'undefined') {
+                ExceptionHandler.reportException(
+                    ExceptionHandler.ExceptionLevel.SERVICE,
+                    `KernelLogger.POOL注册失败: ${e.message}`,
+                    { error: e.message, stack: e.stack }
+                ).catch(() => { });
+            }
             // POOL 可能还未完全初始化，已经导出到全局，无需再次导出
         }
     }

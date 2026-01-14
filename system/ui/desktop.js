@@ -2743,7 +2743,16 @@ class DesktopManager {
                 }
                 POOL.__ADD__("KERNEL_GLOBAL_POOL", "DesktopManager", DesktopManager);
             } catch (e) {
-                KernelLogger.warn("DesktopManager", `注册到POOL失败: ${e.message}`);
+                // 报告异常
+                if (typeof ExceptionHandler !== 'undefined') {
+                    ExceptionHandler.reportException(
+                        ExceptionHandler.ExceptionLevel.SERVICE,
+                        `DesktopManager.POOL注册失败: ${e.message}`,
+                        { error: e.message, stack: e.stack }
+                    ).catch(() => { });
+                } else {
+                    KernelLogger.warn("DesktopManager", `注册到POOL失败: ${e.message}`);
+                }
             }
         }
     }

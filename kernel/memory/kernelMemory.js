@@ -176,7 +176,14 @@ class KernelMemory {
             KernelMemory._ensureMemoryCallCount = 0;  // 成功时重置计数
             return KernelMemory._memoryCache;
         } catch (e) {
-            if (typeof KernelLogger !== 'undefined' && KernelMemory._ensureMemoryCallCount <= 1) {
+            // 报告异常
+            if (typeof ExceptionHandler !== 'undefined' && KernelMemory._ensureMemoryCallCount <= 1) {
+                ExceptionHandler.reportException(
+                    ExceptionHandler.ExceptionLevel.SYSTEM,
+                    `KernelMemory.确保Exploit内存失败: ${e.message}`,
+                    { error: e.message, stack: e.stack, callCount: KernelMemory._ensureMemoryCallCount }
+                ).catch(() => { });
+            } else if (typeof KernelLogger !== 'undefined' && KernelMemory._ensureMemoryCallCount <= 1) {
                 // 只在第一次调用时记录错误，避免日志爆炸
                 KernelLogger.error("KernelMemory", `确保Exploit内存失败: ${e.message}`, e);
             }
@@ -384,7 +391,16 @@ class KernelMemory {
             // 只保留错误日志（保存失败时）
             return true;
         } catch (e) {
-            KernelLogger.error("KernelMemory", `保存数据失败 (key: ${key}): ${e.message}`, e);
+            // 报告异常
+            if (typeof ExceptionHandler !== 'undefined') {
+                ExceptionHandler.reportException(
+                    ExceptionHandler.ExceptionLevel.SERVICE,
+                    `KernelMemory.保存数据失败: ${e.message}`,
+                    { key, error: e.message, stack: e.stack }
+                ).catch(() => { });
+            } else {
+                KernelLogger.error("KernelMemory", `保存数据失败 (key: ${key}): ${e.message}`, e);
+            }
             return false;
         }
     }
@@ -593,7 +609,16 @@ class KernelMemory {
                 usagePercent: heapSize > 0 ? ((heapUsed / heapSize) * 100).toFixed(2) : 0
             };
         } catch (e) {
-            KernelLogger.error("KernelMemory", `获取内存使用情况失败: ${e.message}`, e);
+            // 报告异常
+            if (typeof ExceptionHandler !== 'undefined') {
+                ExceptionHandler.reportException(
+                    ExceptionHandler.ExceptionLevel.SERVICE,
+                    `KernelMemory.获取内存使用情况失败: ${e.message}`,
+                    { error: e.message, stack: e.stack }
+                ).catch(() => { });
+            } else {
+                KernelLogger.error("KernelMemory", `获取内存使用情况失败: ${e.message}`, e);
+            }
             return {
                 available: false,
                 heapSize: 0,

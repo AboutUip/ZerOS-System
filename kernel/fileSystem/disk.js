@@ -3,15 +3,15 @@ KernelLogger.info("Disk", "module init");
 class Disk {
     // diskSize = [long] 描述磁盘大小（从 DiskData.json 读取，默认为 3GB）
     static _diskSize = 1024 * 1024 * 1024 * 5; // 5GB 默认值
-    
+
     static get diskSize() {
         return Disk._diskSize;
     }
-    
+
     static set diskSize(value) {
         Disk._diskSize = value;
     }
-    
+
     // 注意：以下数据存储在Exploit内存中
     // diskSeparateMap = [Map<String,NodeTreeCollection>] 描述磁盘分区映射表
     // 注意：NodeTreeCollection对象存储在POOL中，这里只存储分区名称列表
@@ -19,7 +19,7 @@ class Disk {
     // diskFreeMap = [Map<String,long>] 描述磁盘空闲区映射表
     // diskUsedMap = [Map<String,long>] 描述磁盘已用区映射表
     // canUsed = [bool] 表示磁盘初始化程度
-    
+
     /**
      * 获取磁盘分区映射表（从Exploit内存）
      * 注意：NodeTreeCollection对象从POOL获取，这里只返回分区名称列表
@@ -32,7 +32,7 @@ class Disk {
             }
             return Disk._fallbackDiskSeparateMap;
         }
-        
+
         const data = KernelMemory.loadData('DISK_SEPARATE_MAP');
         if (data) {
             // 从存储的分区名称列表重建Map
@@ -54,12 +54,12 @@ class Disk {
             }
             return map;
         }
-        
+
         const newMap = new Map();
         Disk._saveDiskSeparateMap(newMap);
         return newMap;
     }
-    
+
     /**
      * 保存磁盘分区映射表（到Exploit内存）
      * 只保存分区名称列表，不保存NodeTreeCollection对象
@@ -69,12 +69,12 @@ class Disk {
         if (typeof KernelMemory === 'undefined') {
             return;
         }
-        
+
         // 只保存分区名称列表
         const names = Array.from(map.keys());
         KernelMemory.saveData('DISK_SEPARATE_MAP', names);
     }
-    
+
     /**
      * 获取磁盘分区映射表（兼容旧代码）
      * @returns {Map<String,NodeTreeCollection>} 磁盘分区映射表
@@ -83,12 +83,12 @@ class Disk {
         if (Disk._diskSeparateMapCache) {
             return Disk._diskSeparateMapCache;
         }
-        
+
         const map = Disk._getDiskSeparateMap();
         Disk._diskSeparateMapCache = map;
         return map;
     }
-    
+
     /**
      * 获取磁盘分区大小映射表（从Exploit内存）
      * @returns {Map<String,number>} 磁盘分区大小映射表
@@ -100,7 +100,7 @@ class Disk {
             }
             return Disk._fallbackDiskSeparateSize;
         }
-        
+
         const data = KernelMemory.loadData('DISK_SEPARATE_SIZE');
         if (data) {
             const map = new Map();
@@ -117,13 +117,13 @@ class Disk {
             KernelLogger.debug("Disk", `从 KernelMemory 加载 diskSeparateSize，分区数量: ${map.size}, 分区列表: ${keys.join(', ')}`);
             return map;
         }
-        
+
         KernelLogger.debug("Disk", "KernelMemory 中没有 diskSeparateSize 数据，创建新 Map");
         const newMap = new Map();
         Disk._saveDiskSeparateSize(newMap);
         return newMap;
     }
-    
+
     /**
      * 保存磁盘分区大小映射表（到Exploit内存）
      * @param {Map<String,number>} map 磁盘分区大小映射表
@@ -132,11 +132,11 @@ class Disk {
         if (typeof KernelMemory === 'undefined') {
             return;
         }
-        
+
         const array = Array.from(map.entries());
         KernelMemory.saveData('DISK_SEPARATE_SIZE', array);
     }
-    
+
     /**
      * 获取磁盘分区大小映射表（兼容旧代码）
      * @returns {Map<String,number>} 磁盘分区大小映射表
@@ -147,14 +147,14 @@ class Disk {
             KernelLogger.debug("Disk", `diskSeparateSize getter (缓存): 分区数量=${Disk._diskSeparateSizeCache.size}, 分区列表=${keys.join(', ')}`);
             return Disk._diskSeparateSizeCache;
         }
-        
+
         const map = Disk._getDiskSeparateSize();
         Disk._diskSeparateSizeCache = map;
         const keys = Array.from(map.keys());
         KernelLogger.debug("Disk", `diskSeparateSize getter (新建): 分区数量=${map.size}, 分区列表=${keys.join(', ')}`);
         return map;
     }
-    
+
     /**
      * 获取磁盘空闲区映射表（从Exploit内存）
      * @returns {Map<String,number>} 磁盘空闲区映射表
@@ -166,7 +166,7 @@ class Disk {
             }
             return Disk._fallbackDiskFreeMap;
         }
-        
+
         const data = KernelMemory.loadData('DISK_FREE_MAP');
         if (data) {
             const map = new Map();
@@ -181,12 +181,12 @@ class Disk {
             }
             return map;
         }
-        
+
         const newMap = new Map();
         Disk._saveDiskFreeMap(newMap);
         return newMap;
     }
-    
+
     /**
      * 保存磁盘空闲区映射表（到Exploit内存）
      * @param {Map<String,number>} map 磁盘空闲区映射表
@@ -195,11 +195,11 @@ class Disk {
         if (typeof KernelMemory === 'undefined') {
             return;
         }
-        
+
         const array = Array.from(map.entries());
         KernelMemory.saveData('DISK_FREE_MAP', array);
     }
-    
+
     /**
      * 获取磁盘空闲区映射表（兼容旧代码）
      * @returns {Map<String,number>} 磁盘空闲区映射表
@@ -208,12 +208,12 @@ class Disk {
         if (Disk._diskFreeMapCache) {
             return Disk._diskFreeMapCache;
         }
-        
+
         const map = Disk._getDiskFreeMap();
         Disk._diskFreeMapCache = map;
         return map;
     }
-    
+
     /**
      * 获取磁盘已用区映射表（从Exploit内存）
      * @returns {Map<String,number>} 磁盘已用区映射表
@@ -225,7 +225,7 @@ class Disk {
             }
             return Disk._fallbackDiskUsedMap;
         }
-        
+
         const data = KernelMemory.loadData('DISK_USED_MAP');
         if (data) {
             const map = new Map();
@@ -240,12 +240,12 @@ class Disk {
             }
             return map;
         }
-        
+
         const newMap = new Map();
         Disk._saveDiskUsedMap(newMap);
         return newMap;
     }
-    
+
     /**
      * 保存磁盘已用区映射表（到Exploit内存）
      * @param {Map<String,number>} map 磁盘已用区映射表
@@ -254,11 +254,11 @@ class Disk {
         if (typeof KernelMemory === 'undefined') {
             return;
         }
-        
+
         const array = Array.from(map.entries());
         KernelMemory.saveData('DISK_USED_MAP', array);
     }
-    
+
     /**
      * 获取磁盘已用区映射表（兼容旧代码）
      * @returns {Map<String,number>} 磁盘已用区映射表
@@ -267,12 +267,12 @@ class Disk {
         if (Disk._diskUsedMapCache) {
             return Disk._diskUsedMapCache;
         }
-        
+
         const map = Disk._getDiskUsedMap();
         Disk._diskUsedMapCache = map;
         return map;
     }
-    
+
     /**
      * 获取磁盘可用状态（从Exploit内存）
      * @returns {boolean} 磁盘是否可用
@@ -282,7 +282,7 @@ class Disk {
         if (Disk._canUsedCache !== undefined) {
             return Disk._canUsedCache;
         }
-        
+
         if (typeof KernelMemory === 'undefined') {
             if (Disk._fallbackCanUsed === undefined) {
                 Disk._fallbackCanUsed = false;
@@ -290,13 +290,13 @@ class Disk {
             Disk._canUsedCache = Disk._fallbackCanUsed;
             return Disk._fallbackCanUsed;
         }
-        
+
         const canUsed = KernelMemory.loadData('DISK_CAN_USED');
         const result = canUsed !== null ? canUsed : false;
         Disk._canUsedCache = result;
         return result;
     }
-    
+
     /**
      * 设置磁盘可用状态（保存到Exploit内存）
      * @param {boolean} value 磁盘是否可用
@@ -304,22 +304,22 @@ class Disk {
     static set canUsed(value) {
         // 更新缓存
         Disk._canUsedCache = value;
-        
+
         if (typeof KernelMemory === 'undefined') {
             Disk._fallbackCanUsed = value;
             return;
         }
-        
+
         KernelMemory.saveData('DISK_CAN_USED', value);
     }
-    
+
     // 缓存（避免频繁从内存读取）
     static _diskSeparateMapCache = null;
     static _diskSeparateSizeCache = null;
     static _diskFreeMapCache = null;
     static _diskUsedMapCache = null;
     static _canUsedCache = undefined;  // canUsed 缓存
-    
+
     // 降级方案：临时存储
     static _fallbackDiskSeparateMap = null;
     static _fallbackDiskSeparateSize = null;
@@ -337,7 +337,7 @@ class Disk {
             // D: 是系统盘，所有磁盘分区信息都必须从 D:/DiskData.json 读取
             const configUrl = '/system/service/DISK/D/DiskData.json';
             const response = await fetch(configUrl);
-            
+
             if (response.ok) {
                 const data = await response.json();
                 if (data && data.partitions && typeof data.partitions === 'object') {
@@ -375,11 +375,11 @@ class Disk {
         } catch (e) {
             KernelLogger.debug("Disk", `从DiskData.json加载配置失败: ${e.message}`);
         }
-        
+
         // 返回null表示使用默认配置
         return null;
     }
-    
+
     static init() {
         // 初始化磁盘分区
         KernelLogger.info("Disk", "initializing partitions");
@@ -387,7 +387,7 @@ class Disk {
             // 尝试获取 Dependency 实例
             // 优先从 POOL 中获取，如果不可用，则创建新实例
             let Dependency = null;
-            
+
             // 首先尝试从 POOL 中获取
             if (typeof POOL !== 'undefined' && POOL && typeof POOL.__GET__ === 'function') {
                 try {
@@ -400,7 +400,7 @@ class Disk {
                     KernelLogger.debug("Disk", "从 POOL 获取 Dependency 失败，将创建新实例");
                 }
             }
-            
+
             // 如果从 POOL 中获取失败，直接创建新实例（DependencyConfig 已在 HTML 中加载）
             if (!Dependency) {
                 if (typeof DependencyConfig !== 'undefined') {
@@ -414,11 +414,11 @@ class Disk {
                     KernelLogger.debug("Disk", "DependencyConfig 类未定义");
                 }
             }
-            
+
             // 初始化分区的内部函数
             const initializePartitions = async (partitionConfig) => {
                 Disk.canUsed = true;
-                
+
                 // 如果提供了分区配置，使用配置；否则使用默认配置
                 if (partitionConfig && partitionConfig.size > 0) {
                     KernelLogger.info("Disk", `使用配置的分区: ${Array.from(partitionConfig.keys()).join(', ')}`);
@@ -426,11 +426,11 @@ class Disk {
                         // 首先检查分区是否已存在于内存中（diskSeparateSize）
                         const diskSeparateSize = Disk.diskSeparateSize;
                         const existingSize = diskSeparateSize.get(partitionName);
-                        
+
                         if (existingSize !== undefined) {
                             // 分区已在内存中存在，但需要确保diskSeparateMap中有对应的NodeTreeCollection
                             KernelLogger.debug("Disk", `分区 ${partitionName} 已在内存中存在 (${existingSize} 字节)`);
-                            
+
                             // 检查大小是否需要更新
                             if (existingSize !== size) {
                                 KernelLogger.info("Disk", `更新分区 ${partitionName} 大小: ${existingSize} -> ${size}`);
@@ -439,7 +439,7 @@ class Disk {
                                 const free = size - used;
                                 Disk.setMap("diskFreeMap", partitionName, free);
                             }
-                            
+
                             // 确保diskSeparateMap中有对应的NodeTreeCollection
                             let coll = Disk.diskSeparateMap.get(partitionName);
                             if (!coll) {
@@ -475,7 +475,7 @@ class Disk {
                         } else {
                             // 分区在内存中不存在，检查物理分区是否存在
                             const partitionExists = await Disk._checkPartitionExists(partitionName);
-                            
+
                             if (partitionExists) {
                                 // 物理分区存在，加载分区
                                 KernelLogger.info("Disk", `检测到已存在的物理分区: ${partitionName}，正在加载...`);
@@ -523,11 +523,11 @@ class Disk {
                         ["C:", 1024 * 1024 * 1024 * 1], // 1GB
                         ["D:", 1024 * 1024 * 1024 * 2]  // 2GB
                     ];
-                    
+
                     for (const [partitionName, size] of defaultPartitions) {
                         const diskSeparateSize = Disk.diskSeparateSize;
                         const existingSize = diskSeparateSize.get(partitionName);
-                        
+
                         if (existingSize === undefined) {
                             const partitionExists = await Disk._checkPartitionExists(partitionName);
                             if (partitionExists) {
@@ -538,11 +538,11 @@ class Disk {
                         }
                     }
                 }
-                
+
                 Disk.update();
                 KernelLogger.info("Disk", "initialization complete");
             };
-            
+
             // 如果 Dependency 可用，等待 nodeTree 加载
             if (Dependency && typeof Dependency.waitLoaded === 'function') {
                 KernelLogger.debug("Disk", "等待 nodeTree 模块加载");
@@ -550,22 +550,22 @@ class Disk {
                     interval: 50,
                     timeout: 1000,
                 })
-                .then(async () => {
-                    KernelLogger.debug("Disk", "nodeTree 模块已加载，开始初始化");
-                    // 尝试加载分区配置
-                    const partitionConfig = await Disk._loadPartitionConfig();
-                    await initializePartitions(partitionConfig);
-                })
-                .catch(async (e) => {
-                    KernelLogger.warn("Disk", "等待 nodeTree 超时，直接初始化", String(e));
-                    // 即使失败也尝试初始化
-                    try {
+                    .then(async () => {
+                        KernelLogger.debug("Disk", "nodeTree 模块已加载，开始初始化");
+                        // 尝试加载分区配置
                         const partitionConfig = await Disk._loadPartitionConfig();
                         await initializePartitions(partitionConfig);
-                    } catch (e2) {
-                        KernelLogger.error("Disk", "fallback initialization failed", { e: String(e2) });
-                    }
-                });
+                    })
+                    .catch(async (e) => {
+                        KernelLogger.warn("Disk", "等待 nodeTree 超时，直接初始化", String(e));
+                        // 即使失败也尝试初始化
+                        try {
+                            const partitionConfig = await Disk._loadPartitionConfig();
+                            await initializePartitions(partitionConfig);
+                        } catch (e2) {
+                            KernelLogger.error("Disk", "fallback initialization failed", { e: String(e2) });
+                        }
+                    });
             } else {
                 // 如果 Dependency 不可用，直接尝试初始化（Disk 不强制依赖 nodeTree）
                 KernelLogger.debug("Disk", "Dependency 不可用，直接初始化（不等待 nodeTree）");
@@ -616,6 +616,20 @@ class Disk {
                     KernelLogger.error("Disk", "fallback initialization failed", { e: String(e2) });
                 }
             })();
+
+            // 报告异常
+            // 报告异常
+            if (typeof ExceptionHandler !== 'undefined') {
+                ExceptionHandler.reportException(
+                    ExceptionHandler.ExceptionLevel.SYSTEM,
+                    `Disk.init 失败: ${e.message}`,
+                    { error: e.message, stack: e.stack }
+                ).catch(() => { });
+            } else if (typeof KernelLogger !== 'undefined') {
+                KernelLogger.error("Disk", `初始化失败: ${e.message}`, e);
+            }
+            // 设置 canUsed 为 false，表示初始化失败
+            Disk.canUsed = false;
         }
     }
 
@@ -658,7 +672,7 @@ class Disk {
                         KernelLogger.info("Disk", `为分区 ${key} 设置默认大小: ${defaultSize} 字节`);
                     }
                 });
-                
+
                 if (rebuildCount > 0) {
                     // 重新获取 diskSeparateSizeMap（因为可能已经更新）
                     diskSeparateSizeMap = Disk.diskSeparateSize;
@@ -670,7 +684,7 @@ class Disk {
             } else {
                 KernelLogger.debug("Disk", "diskSeparateSize 为空，diskSeparateMap 也为空或不可用，可能分区尚未初始化");
             }
-            
+
             // 如果重建后仍然为空，直接返回（不输出警告，因为这是正常的初始化状态）
             if (diskSeparateSizeMap.size === 0) {
                 KernelLogger.debug("Disk", "diskSeparateSize 为空，跳过更新（分区可能尚未初始化）");
@@ -683,7 +697,7 @@ class Disk {
             try {
                 // 首先尝试从 diskSeparateMap 获取
                 let coll = Disk.getMap("diskSeparateMap", key);
-                
+
                 // 如果从 diskSeparateMap 获取失败，尝试从 POOL 获取
                 if (!coll && typeof POOL !== 'undefined' && typeof POOL.__GET__ === 'function') {
                     try {
@@ -699,7 +713,7 @@ class Disk {
                         KernelLogger.debug("Disk", `从 POOL 获取分区 ${key} 失败: ${e.message}`);
                     }
                 }
-                
+
                 const used =
                     coll && typeof coll.usedSpace === "function"
                         ? coll.usedSpace()
@@ -726,33 +740,33 @@ class Disk {
             if (!/^[A-Z]$/.test(diskLetter)) {
                 return false;
             }
-            
+
             // 检查filesystem JSON文件是否存在
             const safeName = partitionName.replace(':', '_');
             const fileName = `filesystem_${safeName}.json`;
             const filePath = `${partitionName}/`;
-            
-            const phpServiceUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.getFSDirvePath) 
+
+            const phpServiceUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.getFSDirvePath)
                 ? SystemInformation.getFSDirvePath()
                 : "/system/service/FSDirve.php";
-            const checkUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+            const checkUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject)
                 ? SystemInformation.buildServiceUrlObject(phpServiceUrl)
-                : new URL(phpServiceUrl, (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                : new URL(phpServiceUrl, (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin)
                     ? SystemInformation.getOrigin()
                     : window.location.origin);
             checkUrl.searchParams.set('action', 'exists');
             checkUrl.searchParams.set('path', `${filePath}${fileName}`);
-            
+
             const response = await fetch(checkUrl.toString());
             if (!response.ok) {
                 return false;
             }
-            
+
             const contentType = response.headers.get('content-type');
             if (!contentType || !contentType.includes('application/json')) {
                 return false;
             }
-            
+
             const result = await response.json();
             return result.status === 'success' && result.data && result.data.exists && result.data.type === 'file';
         } catch (e) {
@@ -760,7 +774,7 @@ class Disk {
             return false;
         }
     }
-    
+
     /**
      * 加载已存在的分区（从filesystem JSON文件加载数据）
      * @param {string} partitionName 分区名称（如 "C:"）
@@ -770,30 +784,30 @@ class Disk {
     static async _loadPartition(partitionName, size) {
         try {
             KernelLogger.info("Disk", `加载已存在的分区: ${partitionName} (${size} 字节)`);
-            
+
             // 确保物理目录存在
             await Disk._ensurePartitionDirectoryExists(partitionName);
-            
+
             // 创建NodeTreeCollection（会自动从filesystem JSON文件加载数据）
             if (typeof NodeTreeCollection === 'undefined') {
                 KernelLogger.error("Disk", `NodeTreeCollection 未定义，无法加载分区 ${partitionName}`);
                 return false;
             }
-            
+
             const nodeTree = new NodeTreeCollection(partitionName);
-            
+
             // 更新分区信息到diskSeparateSize和diskSeparateMap
             Disk.setMap("diskSeparateSize", partitionName, size);
             const diskSeparateMap = Disk.diskSeparateMap;
             diskSeparateMap.set(partitionName, nodeTree);
             Disk._diskSeparateMapCache = diskSeparateMap;
             Disk._saveDiskSeparateMap(diskSeparateMap);
-            
+
             // 初始化空闲空间（从NodeTreeCollection计算或使用分区大小）
             // 注意：这里先设置为分区大小，后续Disk.update()会重新计算
             Disk.setMap("diskFreeMap", partitionName, size);
             Disk.setMap("diskUsedMap", partitionName, 0);
-            
+
             // 注册到POOL
             try {
                 if (typeof POOL !== 'undefined' && typeof POOL.__ADD__ === 'function') {
@@ -808,14 +822,14 @@ class Disk {
             } catch (e) {
                 KernelLogger.error("Disk", `注册 ${partitionName} 到POOL失败: ${e.message}`, e);
             }
-            
+
             return true;
         } catch (e) {
             KernelLogger.error("Disk", `加载分区 ${partitionName} 失败: ${e.message}`, e);
             return false;
         }
     }
-    
+
     /**
      * 确保分区物理目录存在（通过 DISKMANAGER API 创建）
      * @param {string} partitionName 分区名称（如 "B:"）
@@ -829,23 +843,23 @@ class Disk {
                 KernelLogger.warn("Disk", `无效的分区名称: ${partitionName}`);
                 return false;
             }
-            
+
             // D: 是系统盘，应该已经存在，跳过创建
             if (diskLetter === 'D') {
                 return true;
             }
-            
+
             // 通过 DISKMANAGER API 检查分区是否存在
-            const origin = (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+            const origin = (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin)
                 ? SystemInformation.getOrigin()
                 : (typeof window !== 'undefined' && window.location) ? window.location.origin : 'http://localhost:8089';
             const diskManagerUrl = new URL('/system/service/DISKMANAGER.php', origin);
-            
+
             // 先检查分区是否存在
             const checkUrl = new URL(diskManagerUrl);
             checkUrl.searchParams.set('action', 'check');
             checkUrl.searchParams.set('partition', partitionName);
-            
+
             const checkResponse = await fetch(checkUrl.toString());
             if (checkResponse.ok) {
                 const checkResult = await checkResponse.json();
@@ -854,15 +868,15 @@ class Disk {
                     return true;
                 }
             }
-            
+
             // 分区不存在，创建分区
             const createUrl = new URL(diskManagerUrl);
             createUrl.searchParams.set('action', 'create');
             createUrl.searchParams.set('partition', partitionName);
-            
+
             KernelLogger.info("Disk", `创建分区物理目录: ${partitionName}`);
             const createResponse = await fetch(createUrl.toString());
-            
+
             if (createResponse.ok) {
                 const createResult = await createResponse.json();
                 if (createResult.status === 'success') {
@@ -881,85 +895,99 @@ class Disk {
             return false;
         }
     }
-    
+
     // 分卷格式化
     static async format(separateName, size) {
-        if (!Disk.canUsed) {
-            KernelLogger.warn("Disk", "format on uninitialized disk");
-            return;
-        }
-        
-        // 检查分区是否已存在（防止覆盖已存在的分区）
-        const partitionExists = await Disk._checkPartitionExists(separateName);
-        if (partitionExists) {
-            KernelLogger.warn("Disk", `分区 ${separateName} 已存在，跳过格式化。如果需要重新格式化，请先删除该分区。`);
-            // 如果分区已存在，尝试加载而不是格式化
-            await Disk._loadPartition(separateName, size);
-            return;
-        }
-        
-        // 计算当前磁盘空闲大小
-        let diskFreeSize = Disk.diskSize;
-        // 计算空闲大小
-        Disk.forEachMap("diskSeparateSize", (value, key) => {
-            diskFreeSize -= value;
-        });
-        
-        // 检查是否有足够空间进行格式化
-        KernelLogger.info("Disk", `format prepare ${separateName}, 大小: ${size} 字节, 可用空间: ${diskFreeSize} 字节`);
-        if (size <= diskFreeSize) {
-            // 进行格式化
-            KernelLogger.info("Disk", `格式化新分区 ${separateName}，大小: ${size} 字节`);
-            
-            // 确保物理目录存在（在创建 NodeTreeCollection 之前）
-            await Disk._ensurePartitionDirectoryExists(separateName);
-            
-            // 设置分区大小
-            Disk.setMap("diskSeparateSize", separateName, size);
-            
-            // 创建NodeTreeCollection（会自动创建filesystem JSON文件）
-            if (typeof NodeTreeCollection === 'undefined') {
-                KernelLogger.error("Disk", `NodeTreeCollection 未定义，无法格式化分区 ${separateName}`);
+        try {
+            if (!Disk.canUsed) {
+                KernelLogger.warn("Disk", "format on uninitialized disk");
                 return;
             }
-            const nodeTree = new NodeTreeCollection(separateName);
-            
-            // 直接更新 diskSeparateMap（绕过 setMap 以避免缓存问题）
-            const diskSeparateMap = Disk.diskSeparateMap;
-            diskSeparateMap.set(separateName, nodeTree);
-            // 更新缓存
-            Disk._diskSeparateMapCache = diskSeparateMap;
-            // 保存到 KernelMemory
-            Disk._saveDiskSeparateMap(diskSeparateMap);
-            
-            // 初始化空闲和已用空间
-            Disk.setMap("diskFreeMap", separateName, size);
-            Disk.setMap("diskUsedMap", separateName, 0);
-            
-            // 注册到 POOL
-            try {
-                if (typeof POOL !== 'undefined' && typeof POOL.__ADD__ === 'function') {
-                    // 确保 KERNEL_GLOBAL_POOL 存在
-                    if (!POOL.__HAS__("KERNEL_GLOBAL_POOL")) {
-                        POOL.__INIT__("KERNEL_GLOBAL_POOL");
-                    }
-                    POOL.__ADD__(
-                        "KERNEL_GLOBAL_POOL",
-                        separateName,
-                        Disk.getMap("diskSeparateMap", separateName)
-                    );
-                    KernelLogger.info("Disk", `format success ${separateName}, registered to POOL`, { size });
-                } else {
-                    KernelLogger.warn("Disk", `POOL 不可用，无法注册 ${separateName} 到 POOL`);
-                }
-            } catch (e) {
-                KernelLogger.error("Disk", `注册 ${separateName} 到 POOL 失败: ${e.message}`, e);
+
+            // 检查分区是否已存在（防止覆盖已存在的分区）
+            const partitionExists = await Disk._checkPartitionExists(separateName);
+            if (partitionExists) {
+                KernelLogger.warn("Disk", `分区 ${separateName} 已存在，跳过格式化。如果需要重新格式化，请先删除该分区。`);
+                // 如果分区已存在，尝试加载而不是格式化
+                await Disk._loadPartition(separateName, size);
+                return;
             }
-            
-            KernelLogger.info("Disk", `format success ${separateName}`, { size });
-        } else {
-            KernelLogger.warn("Disk", `format failed ${separateName} insufficient space`, { size, diskFreeSize });
-            throw new Error(`格式化失败: 分区 ${separateName} 空间不足（需要 ${size} 字节，可用 ${diskFreeSize} 字节）`);
+
+            // 计算当前磁盘空闲大小
+            let diskFreeSize = Disk.diskSize;
+            // 计算空闲大小
+            Disk.forEachMap("diskSeparateSize", (value, key) => {
+                diskFreeSize -= value;
+            });
+
+            // 检查是否有足够空间进行格式化
+            KernelLogger.info("Disk", `format prepare ${separateName}, 大小: ${size} 字节, 可用空间: ${diskFreeSize} 字节`);
+            if (size <= diskFreeSize) {
+                // 进行格式化
+                KernelLogger.info("Disk", `格式化新分区 ${separateName}，大小: ${size} 字节`);
+
+                // 确保物理目录存在（在创建 NodeTreeCollection 之前）
+                await Disk._ensurePartitionDirectoryExists(separateName);
+
+                // 设置分区大小
+                Disk.setMap("diskSeparateSize", separateName, size);
+
+                // 创建NodeTreeCollection（会自动创建filesystem JSON文件）
+                if (typeof NodeTreeCollection === 'undefined') {
+                    KernelLogger.error("Disk", `NodeTreeCollection 未定义，无法格式化分区 ${separateName}`);
+                    return;
+                }
+                const nodeTree = new NodeTreeCollection(separateName);
+
+                // 直接更新 diskSeparateMap（绕过 setMap 以避免缓存问题）
+                const diskSeparateMap = Disk.diskSeparateMap;
+                diskSeparateMap.set(separateName, nodeTree);
+                // 更新缓存
+                Disk._diskSeparateMapCache = diskSeparateMap;
+                // 保存到 KernelMemory
+                Disk._saveDiskSeparateMap(diskSeparateMap);
+
+                // 初始化空闲和已用空间
+                Disk.setMap("diskFreeMap", separateName, size);
+                Disk.setMap("diskUsedMap", separateName, 0);
+
+                // 注册到 POOL
+                try {
+                    if (typeof POOL !== 'undefined' && typeof POOL.__ADD__ === 'function') {
+                        // 确保 KERNEL_GLOBAL_POOL 存在
+                        if (!POOL.__HAS__("KERNEL_GLOBAL_POOL")) {
+                            POOL.__INIT__("KERNEL_GLOBAL_POOL");
+                        }
+                        POOL.__ADD__(
+                            "KERNEL_GLOBAL_POOL",
+                            separateName,
+                            Disk.getMap("diskSeparateMap", separateName)
+                        );
+                        KernelLogger.info("Disk", `format success ${separateName}, registered to POOL`, { size });
+                    } else {
+                        KernelLogger.warn("Disk", `POOL 不可用，无法注册 ${separateName} 到 POOL`);
+                    }
+                } catch (e) {
+                    KernelLogger.error("Disk", `注册 ${separateName} 到 POOL 失败: ${e.message}`, e);
+                }
+
+                KernelLogger.info("Disk", `format success ${separateName}`, { size });
+            } else {
+                KernelLogger.warn("Disk", `format failed ${separateName} insufficient space`, { size, diskFreeSize });
+                throw new Error(`格式化失败: 分区 ${separateName} 空间不足（需要 ${size} 字节，可用 ${diskFreeSize} 字节）`);
+            }
+        } catch (e) {
+            // 报告异常
+            if (typeof ExceptionHandler !== 'undefined') {
+                ExceptionHandler.reportException(
+                    ExceptionHandler.ExceptionLevel.SYSTEM,
+                    `Disk.format 失败: ${e.message}`,
+                    { separateName, size, error: e.message, stack: e.stack }
+                ).catch(() => { });
+            } else if (typeof KernelLogger !== 'undefined') {
+                KernelLogger.error("Disk", `格式化分区失败: ${e.message}`, e);
+            }
+            throw e;
         }
     }
 
@@ -971,73 +999,101 @@ class Disk {
     }
 
     static setMap(mapName, key, value) {
-        // 对于使用 getter 的 Map（diskSeparateMap, diskSeparateSize, diskFreeMap, diskUsedMap），
-        // 需要先获取实际的 Map 对象，然后更新它
-        let map = null;
-        if (mapName === 'diskSeparateMap') {
-            map = Disk.diskSeparateMap;
-        } else if (mapName === 'diskSeparateSize') {
-            map = Disk.diskSeparateSize;
-        } else if (mapName === 'diskFreeMap') {
-            map = Disk.diskFreeMap;
-        } else if (mapName === 'diskUsedMap') {
-            map = Disk.diskUsedMap;
-        } else if (Disk[mapName] && Disk[mapName] instanceof Map) {
-            map = Disk[mapName];
-        } else {
-            KernelLogger.error("Disk", "setMap unknown map", { mapName });
-            return;
+        try {
+            // 对于使用 getter 的 Map（diskSeparateMap, diskSeparateSize, diskFreeMap, diskUsedMap），
+            // 需要先获取实际的 Map 对象，然后更新它
+            let map = null;
+            if (mapName === 'diskSeparateMap') {
+                map = Disk.diskSeparateMap;
+            } else if (mapName === 'diskSeparateSize') {
+                map = Disk.diskSeparateSize;
+            } else if (mapName === 'diskFreeMap') {
+                map = Disk.diskFreeMap;
+            } else if (mapName === 'diskUsedMap') {
+                map = Disk.diskUsedMap;
+            } else if (Disk[mapName] && Disk[mapName] instanceof Map) {
+                map = Disk[mapName];
+            } else {
+                KernelLogger.error("Disk", "setMap unknown map", { mapName });
+                return;
+            }
+
+            Disk._logMap("SET", mapName, key, value);
+            const result = map.set(key, value);
+
+            // 更新缓存（确保缓存与 Map 同步）
+            if (mapName === 'diskSeparateMap') {
+                Disk._diskSeparateMapCache = map;
+                Disk._saveDiskSeparateMap(map);
+            } else if (mapName === 'diskSeparateSize') {
+                Disk._diskSeparateSizeCache = map;
+                Disk._saveDiskSeparateSize(map);
+                const sizeKeys = Array.from(map.keys());
+                KernelLogger.debug("Disk", `diskSeparateSize 已更新并保存，当前分区: ${sizeKeys.join(', ')}, 数量: ${map.size}`);
+            } else if (mapName === 'diskFreeMap') {
+                Disk._diskFreeMapCache = map;
+                Disk._saveDiskFreeMap(map);
+            } else if (mapName === 'diskUsedMap') {
+                Disk._diskUsedMapCache = map;
+                Disk._saveDiskUsedMap(map);
+            }
+
+            return result;
+        } catch (e) {
+            // 报告异常
+            if (typeof ExceptionHandler !== 'undefined') {
+                ExceptionHandler.reportException(
+                    ExceptionHandler.ExceptionLevel.SERVICE,
+                    `Disk.setMap 失败: ${e.message}`,
+                    { mapName, key, error: e.message, stack: e.stack }
+                ).catch(() => { });
+            } else if (typeof KernelLogger !== 'undefined') {
+                KernelLogger.error("Disk", `setMap 失败: ${e.message}`, e);
+            }
+            throw e;
         }
-        
-        Disk._logMap("SET", mapName, key, value);
-        const result = map.set(key, value);
-        
-        // 更新缓存（确保缓存与 Map 同步）
-        if (mapName === 'diskSeparateMap') {
-            Disk._diskSeparateMapCache = map;
-            Disk._saveDiskSeparateMap(map);
-        } else if (mapName === 'diskSeparateSize') {
-            Disk._diskSeparateSizeCache = map;
-            Disk._saveDiskSeparateSize(map);
-            const sizeKeys = Array.from(map.keys());
-            KernelLogger.debug("Disk", `diskSeparateSize 已更新并保存，当前分区: ${sizeKeys.join(', ')}, 数量: ${map.size}`);
-        } else if (mapName === 'diskFreeMap') {
-            Disk._diskFreeMapCache = map;
-            Disk._saveDiskFreeMap(map);
-        } else if (mapName === 'diskUsedMap') {
-            Disk._diskUsedMapCache = map;
-            Disk._saveDiskUsedMap(map);
-        }
-        
-        return result;
     }
 
     static getMap(mapName, key) {
-        // 对于使用 getter 的 Map，需要通过 getter 获取实际的 Map 对象
-        let map = null;
-        if (mapName === 'diskSeparateMap') {
-            map = Disk.diskSeparateMap;
-        } else if (mapName === 'diskSeparateSize') {
-            map = Disk.diskSeparateSize;
-        } else if (mapName === 'diskFreeMap') {
-            map = Disk.diskFreeMap;
-        } else if (mapName === 'diskUsedMap') {
-            map = Disk.diskUsedMap;
-        } else if (Disk[mapName] && Disk[mapName] instanceof Map) {
-            map = Disk[mapName];
-        } else {
-            KernelLogger.error("Disk", "getMap unknown map", { mapName });
+        try {
+            // 对于使用 getter 的 Map，需要通过 getter 获取实际的 Map 对象
+            let map = null;
+            if (mapName === 'diskSeparateMap') {
+                map = Disk.diskSeparateMap;
+            } else if (mapName === 'diskSeparateSize') {
+                map = Disk.diskSeparateSize;
+            } else if (mapName === 'diskFreeMap') {
+                map = Disk.diskFreeMap;
+            } else if (mapName === 'diskUsedMap') {
+                map = Disk.diskUsedMap;
+            } else if (Disk[mapName] && Disk[mapName] instanceof Map) {
+                map = Disk[mapName];
+            } else {
+                KernelLogger.error("Disk", "getMap unknown map", { mapName });
+                return undefined;
+            }
+
+            if (!map || !(map instanceof Map)) {
+                KernelLogger.error("Disk", "getMap: map is not a Map", { mapName, mapType: typeof map });
+                return undefined;
+            }
+
+            const val = map.get(key);
+            Disk._logMap("GET", mapName, key, val);
+            return val;
+        } catch (e) {
+            // 报告异常
+            if (typeof ExceptionHandler !== 'undefined') {
+                ExceptionHandler.reportException(
+                    ExceptionHandler.ExceptionLevel.SERVICE,
+                    `Disk.getMap 失败: ${e.message}`,
+                    { mapName, key, error: e.message, stack: e.stack }
+                ).catch(() => { });
+            } else if (typeof KernelLogger !== 'undefined') {
+                KernelLogger.error("Disk", `getMap 失败: ${e.message}`, e);
+            }
             return undefined;
         }
-        
-        if (!map || !(map instanceof Map)) {
-            KernelLogger.error("Disk", "getMap: map is not a Map", { mapName, mapType: typeof map });
-            return undefined;
-        }
-        
-        const val = map.get(key);
-        Disk._logMap("GET", mapName, key, val);
-        return val;
     }
 
     static deleteMap(mapName, key) {
@@ -1063,21 +1119,21 @@ class Disk {
         } else if (Disk[mapName] && Disk[mapName] instanceof Map) {
             map = Disk[mapName];
         } else {
-            KernelLogger.error('Disk','forEachMap unknown map', { mapName });
+            KernelLogger.error('Disk', 'forEachMap unknown map', { mapName });
             return;
         }
-        
+
         if (!map || !(map instanceof Map)) {
-            KernelLogger.error('Disk','forEachMap: map is not a Map', { mapName, mapType: typeof map });
+            KernelLogger.error('Disk', 'forEachMap: map is not a Map', { mapName, mapType: typeof map });
             return;
         }
-        
+
         map.forEach((v, k) => {
             Disk._logMap("ITER", mapName, k, v);
             try {
                 fn(v, k);
             } catch (e) {
-                KernelLogger.error('Disk','forEachMap callback error', String(e));
+                KernelLogger.error('Disk', 'forEachMap callback error', String(e));
             }
         });
     }
@@ -1086,7 +1142,7 @@ class Disk {
     static _attachLoggingToMap(mapName) {
         const m = Disk[mapName];
         if (!m || !(m instanceof Map)) {
-            KernelLogger.warn('Disk','attachLogging skip unknown map', { mapName });
+            KernelLogger.warn('Disk', 'attachLogging skip unknown map', { mapName });
             return;
         }
         if (m.__logged) return; // avoid double-wrap
@@ -1142,6 +1198,15 @@ if (typeof POOL !== 'undefined' && typeof POOL.__ADD__ === 'function') {
         }
         POOL.__ADD__("KERNEL_GLOBAL_POOL", "Disk", Disk);
     } catch (e) {
+        // 报告异常
+        if (typeof ExceptionHandler !== 'undefined') {
+            ExceptionHandler.reportException(
+                ExceptionHandler.ExceptionLevel.SERVICE,
+                `Disk.POOL注册失败: ${e.message}`,
+                { error: e.message, stack: e.stack }
+            ).catch(() => { });
+        }
+
         // POOL 可能还未完全初始化，暂时导出到全局作为降级方案
         if (typeof window !== 'undefined') {
             window.Disk = Disk;

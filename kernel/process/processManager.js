@@ -6,10 +6,10 @@ KernelLogger.info("ProcessManager", "模块初始化");
 class ProcessManager {
     // Exploit程序PID（固定为10000）
     static EXPLOIT_PID = 10000;
-    
+
     // 日志级别
     static logLevel = (typeof LogLevel !== 'undefined' && LogLevel.LEVEL.DEBUG) ? LogLevel.LEVEL.DEBUG : 3;
-    
+
     /**
      * 规范化路径，去掉末尾的斜杠（除非是根路径如 "D:" 或 "C:"）
      * 用于避免 SpringBoot 后端路径拼接时出现双斜杠
@@ -37,10 +37,10 @@ class ProcessManager {
         if (ProcessManager.logLevel !== undefined && ProcessManager.logLevel < level) {
             return;  // 如果 ProcessManager 的日志级别低于当前级别，不输出
         }
-        
+
         const message = args.length > 0 && typeof args[0] === 'string' ? args[0] : '';
         const meta = args.length > 1 ? args.slice(1) : undefined;
-        
+
         // 不再总是输出到 console.log，而是通过 KernelLogger 统一管理
         // 这样会遵循 KernelLogger 的日志级别设置
         const debugLevel = (typeof LogLevel !== 'undefined' && LogLevel.LEVEL && LogLevel.LEVEL.DEBUG) ? LogLevel.LEVEL.DEBUG : 3;
@@ -76,7 +76,7 @@ class ProcessManager {
     //     },
     //     requestedModules: Set<string>  // 该进程请求的动态模块集合
     // }
-    
+
     /**
      * 获取进程表（从Exploit内存）
      * @returns {Map<number, Object>} 进程表
@@ -89,7 +89,7 @@ class ProcessManager {
             }
             return ProcessManager._fallbackProcessTable;
         }
-        
+
         const data = KernelMemory.loadData('PROCESS_TABLE');
         if (data) {
             // 将数组转换回Map
@@ -98,64 +98,64 @@ class ProcessManager {
                 for (const [pid, info] of data) {
                     // 反序列化：恢复Map和Set对象
                     const deserializedInfo = { ...info };
-                    
+
                     // 恢复 memoryRefs (Map)
                     if (Array.isArray(info.memoryRefs)) {
                         deserializedInfo.memoryRefs = new Map(info.memoryRefs);
                     } else if (!(info.memoryRefs instanceof Map)) {
                         deserializedInfo.memoryRefs = new Map();
                     }
-                    
+
                     // 恢复 domElements (Set) - 但DOM元素无法恢复，所以创建新的空Set
                     deserializedInfo.domElements = new Set();
-                    
+
                     // mutationObserver 无法恢复，设为null
                     deserializedInfo.mutationObserver = null;
-                    
+
                     // 恢复 requestedModules (Set)
                     if (Array.isArray(info.requestedModules)) {
                         deserializedInfo.requestedModules = new Set(info.requestedModules);
                     } else if (!(info.requestedModules instanceof Set)) {
                         deserializedInfo.requestedModules = new Set();
                     }
-                    
+
                     map.set(pid, deserializedInfo);
                 }
             } else if (typeof data === 'object') {
                 // 兼容对象格式
                 for (const [pid, info] of Object.entries(data)) {
                     const deserializedInfo = { ...info };
-                    
+
                     // 恢复 memoryRefs (Map)
                     if (Array.isArray(info.memoryRefs)) {
                         deserializedInfo.memoryRefs = new Map(info.memoryRefs);
                     } else if (!(info.memoryRefs instanceof Map)) {
                         deserializedInfo.memoryRefs = new Map();
                     }
-                    
+
                     // 恢复 domElements (Set)
                     deserializedInfo.domElements = new Set();
                     deserializedInfo.mutationObserver = null;
-                    
+
                     // 恢复 requestedModules (Set)
                     if (Array.isArray(info.requestedModules)) {
                         deserializedInfo.requestedModules = new Set(info.requestedModules);
                     } else if (!(info.requestedModules instanceof Set)) {
                         deserializedInfo.requestedModules = new Set();
                     }
-                    
+
                     map.set(parseInt(pid), deserializedInfo);
                 }
             }
             return map;
         }
-        
+
         // 如果不存在，创建新的Map并保存
         const newMap = new Map();
         ProcessManager._saveProcessTable(newMap);
         return newMap;
     }
-    
+
     /**
      * 保存进程表（到Exploit内存）
      * @param {Map<number, Object>} table 进程表
@@ -164,45 +164,45 @@ class ProcessManager {
         if (typeof KernelMemory === 'undefined') {
             return;
         }
-        
+
         // 将Map转换为数组以便序列化
         // 注意：需要序列化Map和Set对象
         const array = Array.from(table.entries()).map(([pid, info]) => {
             // 深拷贝，将Map和Set转换为普通对象
             const serializedInfo = { ...info };
-            
+
             // 序列化 memoryRefs (Map)
             if (info.memoryRefs instanceof Map) {
                 serializedInfo.memoryRefs = Array.from(info.memoryRefs.entries());
             }
-            
+
             // 序列化 domElements (Set) - 但DOM元素无法序列化，所以只保存数量
             if (info.domElements instanceof Set) {
                 serializedInfo.domElementsCount = info.domElements.size;
                 serializedInfo.domElements = []; // 清空，因为DOM元素无法序列化
             }
-            
+
             // mutationObserver 无法序列化，清空
             if (info.mutationObserver) {
                 serializedInfo.mutationObserver = null;
             }
-            
+
             // 序列化 requestedModules (Set)
             if (info.requestedModules instanceof Set) {
                 serializedInfo.requestedModules = Array.from(info.requestedModules);
             } else if (!Array.isArray(info.requestedModules)) {
                 serializedInfo.requestedModules = [];
             }
-            
+
             return [pid, serializedInfo];
         });
-        
+
         KernelMemory.saveData('PROCESS_TABLE', array);
-        
+
         // 保存后更新缓存
         ProcessManager._processTableCache = table;
     }
-    
+
     /**
      * 创建受保护的进程表代理
      * 防止外部代码直接修改进程表
@@ -212,18 +212,18 @@ class ProcessManager {
     static _createProtectedProcessTable(table) {
         // 创建只读副本，但允许通过安全方法更新
         const protectedTable = new Map();
-        
+
         // 复制所有进程信息，但创建受保护的进程信息对象
         for (const [pid, info] of table) {
             protectedTable.set(pid, ProcessManager._createProtectedProcessInfo(pid, info));
         }
-        
+
         // 使用 Proxy 保护 Map 操作
         return new Proxy(protectedTable, {
             get(target, prop) {
                 // 允许读取操作
-                if (prop === 'get' || prop === 'has' || prop === 'entries' || 
-                    prop === 'keys' || prop === 'values' || prop === 'forEach' || 
+                if (prop === 'get' || prop === 'has' || prop === 'entries' ||
+                    prop === 'keys' || prop === 'values' || prop === 'forEach' ||
                     prop === Symbol.iterator) {
                     const method = target[prop];
                     if (typeof method === 'function') {
@@ -231,16 +231,16 @@ class ProcessManager {
                     }
                     return method;
                 }
-                
+
                 // size 是属性，不是方法
                 if (prop === 'size') {
                     return target.size;
                 }
-                
+
                 // 禁止修改操作
                 if (prop === 'set' || prop === 'delete' || prop === 'clear') {
                     if (typeof KernelLogger !== 'undefined') {
-                        KernelLogger.warn("ProcessManager", 
+                        KernelLogger.warn("ProcessManager",
                             `安全警告: 尝试直接修改进程表 (操作: ${prop})。请使用 ProcessManager.updateProcessInfo() 方法。`);
                     }
                     // 返回一个空函数，防止修改
@@ -248,20 +248,20 @@ class ProcessManager {
                         throw new Error(`安全错误: 不能直接修改进程表。请使用 ProcessManager.updateProcessInfo() 方法。`);
                     };
                 }
-                
+
                 return target[prop];
             },
             set(target, prop, value) {
                 // 禁止设置新属性
                 if (typeof KernelLogger !== 'undefined') {
-                    KernelLogger.warn("ProcessManager", 
+                    KernelLogger.warn("ProcessManager",
                         `安全警告: 尝试直接设置进程表属性 (属性: ${prop})。`);
                 }
                 return false;
             }
         });
     }
-    
+
     /**
      * 创建受保护的进程信息对象
      * 防止直接修改关键字段（如 isExploit）
@@ -273,12 +273,12 @@ class ProcessManager {
         // 创建进程信息的浅拷贝（注意：嵌套对象不会被深拷贝）
         // 这是为了性能考虑，因为进程信息中的 Map 和 Set 对象已经通过其他方式保护
         const protectedInfo = { ...info };
-        
+
         // 注意：嵌套对象（如 windowState）不会被深拷贝
         // 但关键字段（如 isExploit）通过 Proxy 保护
         // 如果进程信息包含嵌套对象，这些对象仍然可以被修改
         // 但这不会影响 isExploit 等关键字段的保护
-        
+
         // 对关键字段使用 Proxy 保护
         return new Proxy(protectedInfo, {
             set(target, prop, value) {
@@ -287,26 +287,26 @@ class ProcessManager {
                     // 只有 EXPLOIT_PID 可以设置 isExploit，且只能设置为 true
                     if (pid !== ProcessManager.EXPLOIT_PID) {
                         if (typeof KernelLogger !== 'undefined') {
-                            KernelLogger.error("ProcessManager", 
+                            KernelLogger.error("ProcessManager",
                                 `安全错误: 进程 ${pid} 尝试修改 isExploit 标志。只有 EXPLOIT_PID (${ProcessManager.EXPLOIT_PID}) 可以设置此标志。`);
                         }
                         // 记录安全审计
-                        ProcessManager._logSecurityViolation(pid, 'attempt_modify_isExploit', { 
+                        ProcessManager._logSecurityViolation(pid, 'attempt_modify_isExploit', {
                             attemptedValue: value,
-                            currentValue: target.isExploit 
+                            currentValue: target.isExploit
                         });
                         return false; // 拒绝修改
                     }
                     // EXPLOIT_PID 只能设置为 true
                     if (value !== true) {
                         if (typeof KernelLogger !== 'undefined') {
-                            KernelLogger.warn("ProcessManager", 
+                            KernelLogger.warn("ProcessManager",
                                 `安全警告: EXPLOIT_PID 尝试将 isExploit 设置为 ${value}，已拒绝。`);
                         }
                         return false;
                     }
                 }
-                
+
                 // 允许其他字段的修改
                 target[prop] = value;
                 return true;
@@ -316,22 +316,22 @@ class ProcessManager {
             }
         });
     }
-    
+
     /**
      * 记录安全违规
      * @private
      */
     static _logSecurityViolation(pid, violationType, details = {}) {
         if (typeof KernelLogger !== 'undefined') {
-            KernelLogger.error("ProcessManager", 
+            KernelLogger.error("ProcessManager",
                 `安全违规: PID ${pid}, 类型: ${violationType}`, details);
         }
-        
+
         // 记录到安全审计日志
         if (!ProcessManager._securityAuditLog) {
             ProcessManager._securityAuditLog = [];
         }
-        
+
         ProcessManager._securityAuditLog.push({
             timestamp: Date.now(),
             pid,
@@ -339,13 +339,13 @@ class ProcessManager {
             details,
             stack: new Error().stack
         });
-        
+
         // 限制日志大小
         if (ProcessManager._securityAuditLog.length > 1000) {
             ProcessManager._securityAuditLog.shift();
         }
     }
-    
+
     /**
      * 安全地更新进程信息
      * 这是唯一允许修改进程表的方法
@@ -361,10 +361,10 @@ class ProcessManager {
             }
             return false;
         }
-        
+
         // 获取原始进程表（绕过保护）
         const rawTable = ProcessManager._getProcessTable();
-        
+
         // 检查进程是否存在
         if (!rawTable.has(pid)) {
             if (typeof KernelLogger !== 'undefined') {
@@ -372,15 +372,15 @@ class ProcessManager {
             }
             return false;
         }
-        
+
         // 获取原始进程信息
         const processInfo = rawTable.get(pid);
-        
+
         // 特殊检查：禁止修改 isExploit（除非是 EXPLOIT_PID 且设置为 true）
         if ('isExploit' in updates) {
             if (pid !== ProcessManager.EXPLOIT_PID) {
                 if (typeof KernelLogger !== 'undefined') {
-                    KernelLogger.error("ProcessManager", 
+                    KernelLogger.error("ProcessManager",
                         `安全错误: 进程 ${pid} 尝试通过 updateProcessInfo 修改 isExploit 标志。`);
                 }
                 ProcessManager._logSecurityViolation(pid, 'attempt_modify_isExploit_via_update', updates);
@@ -388,34 +388,34 @@ class ProcessManager {
             } else if (updates.isExploit !== true) {
                 // EXPLOIT_PID 只能设置为 true
                 if (typeof KernelLogger !== 'undefined') {
-                    KernelLogger.warn("ProcessManager", 
+                    KernelLogger.warn("ProcessManager",
                         `安全警告: EXPLOIT_PID 尝试将 isExploit 设置为 ${updates.isExploit}，已拒绝。`);
                 }
                 delete updates.isExploit;
             }
         }
-        
+
         // 更新进程信息
         Object.assign(processInfo, updates);
         rawTable.set(pid, processInfo);
-        
+
         // 保存到内存
         ProcessManager._saveProcessTable(rawTable);
-        
+
         // 清空所有缓存，强制重新加载
         ProcessManager._processTableCache = null;
         ProcessManager._protectedProcessTableCache = null;
-        
+
         // 清除已使用PID缓存（进程表已更新）
         ProcessManager._invalidateUsedPidsCache();
-        
+
         if (typeof KernelLogger !== 'undefined') {
             KernelLogger.debug("ProcessManager", `已更新进程信息: PID ${pid}`, updates);
         }
-        
+
         return true;
     }
-    
+
     /**
      * 获取进程表（兼容旧代码）
      * 返回受保护的只读副本
@@ -426,39 +426,39 @@ class ProcessManager {
         if (ProcessManager._protectedProcessTableCache) {
             return ProcessManager._protectedProcessTableCache;
         }
-        
+
         // 从内存加载原始表
         const rawTable = ProcessManager._getProcessTable();
-        
+
         // 创建受保护的副本
         const protectedTable = ProcessManager._createProtectedProcessTable(rawTable);
-        
+
         // 缓存受保护的表
         ProcessManager._protectedProcessTableCache = protectedTable;
-        
+
         // 同时保存原始表的引用（用于内部更新）
         ProcessManager._processTableCache = rawTable;
-        
+
         return protectedTable;
     }
-    
+
     // 进程表缓存（避免频繁从内存读取）
     static _processTableCache = null;
     static _protectedProcessTableCache = null;
     static _securityAuditLog = [];
-    
+
     /**
      * PID分配范围配置
      */
     static PID_MIN = ProcessManager.EXPLOIT_PID + 1;  // 最小PID（10001）
     static PID_MAX = 99999;  // 最大PID
-    
+
     /**
      * 已使用的PID集合（用于避免重复分配）
      * 注意：这个集合会从进程表中动态生成，不需要持久化
      */
     static _usedPids = null;
-    
+
     /**
      * 获取已使用的PID集合
      * @returns {Set<number>} 已使用的PID集合
@@ -466,27 +466,27 @@ class ProcessManager {
     static _getUsedPids() {
         if (ProcessManager._usedPids === null) {
             ProcessManager._usedPids = new Set();
-            
+
             // 从进程表中收集所有已使用的PID
             const processTable = ProcessManager.PROCESS_TABLE;
             for (const pid of processTable.keys()) {
                 ProcessManager._usedPids.add(pid);
             }
-            
+
             // 始终包含EXPLOIT_PID
             ProcessManager._usedPids.add(ProcessManager.EXPLOIT_PID);
         }
-        
+
         return ProcessManager._usedPids;
     }
-    
+
     /**
      * 清除已使用PID缓存（当进程表发生变化时调用）
      */
     static _invalidateUsedPidsCache() {
         ProcessManager._usedPids = null;
     }
-    
+
     /**
      * 生成加密安全的随机PID
      * 使用crypto.getRandomValues（如果可用）或Math.random作为降级方案
@@ -496,7 +496,7 @@ class ProcessManager {
         const min = ProcessManager.PID_MIN;
         const max = ProcessManager.PID_MAX;
         const range = max - min + 1;
-        
+
         // 尝试使用crypto.getRandomValues（更安全）
         if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
             try {
@@ -514,11 +514,11 @@ class ProcessManager {
                 ProcessManager._log(1, `crypto.getRandomValues失败，使用Math.random: ${e.message}`);
             }
         }
-        
+
         // 降级方案：使用Math.random（虽然不够安全，但比顺序递增好）
         return Math.floor(min + Math.random() * range);
     }
-    
+
     /**
      * 获取下一个PID（已废弃，保留用于向后兼容）
      * @deprecated 使用 _allocatePid() 代替
@@ -531,7 +531,7 @@ class ProcessManager {
         const offset = Date.now() % (ProcessManager.PID_MAX - ProcessManager.PID_MIN + 1);
         return base + offset;
     }
-    
+
     /**
      * 设置下一个PID（已废弃，保留用于向后兼容）
      * @deprecated PID现在是随机分配的，不再需要设置
@@ -542,14 +542,14 @@ class ProcessManager {
         // PID现在是随机分配的，不需要设置
         ProcessManager._log(3, `NEXT_PID setter被调用（已废弃），PID现在是随机分配的`);
     }
-    
+
     // 降级方案：临时存储（仅在KernelMemory不可用时使用）
     static _fallbackProcessTable = null;
     static _fallbackNextPid = undefined;
-    
+
     // DOM 观察器（全局，观察 document.body 的变化）
     static _globalDOMObserver = null;
-    
+
     // DOM 元素到 PID 的映射（用于快速查找元素属于哪个进程）
     static _elementToPidMap = new WeakMap();
 
@@ -562,7 +562,7 @@ class ProcessManager {
      */
     static async init() {
         ProcessManager._log(2, "初始化进程管理器");
-        
+
         // 确保KernelMemory可用
         if (typeof KernelMemory === 'undefined') {
             ProcessManager._log(1, "KernelMemory 不可用，将使用降级方案");
@@ -571,7 +571,7 @@ class ProcessManager {
             ProcessManager._processTableCache = null;
             ProcessManager._log(2, "进程表已从Exploit内存加载");
         }
-        
+
         // 加载应用程序资源管理器
         try {
             // 如果 ApplicationAssetManager 还未加载，尝试动态加载
@@ -579,20 +579,20 @@ class ProcessManager {
                 const managerPath = "../kernel/process/applicationAssetManager.js";
                 await ProcessManager._loadScript(managerPath);
             }
-            
+
             // 初始化 ApplicationAssetManager
             if (typeof ApplicationAssetManager !== 'undefined' && typeof ApplicationAssetManager.init === 'function') {
                 await ApplicationAssetManager.init();
                 ProcessManager._log(2, "应用程序资源管理器初始化成功");
             } else {
                 ProcessManager._log(1, "ApplicationAssetManager 不可用，使用降级方案");
-                
+
                 // 降级方案：直接加载 applicationAssets.js
                 if (typeof APPLICATION_ASSETS === 'undefined') {
                     const assetsPath = "../kernel/process/applicationAssets.js";
                     await ProcessManager._loadScript(assetsPath);
                 }
-                
+
                 // 从POOL获取APPLICATION_ASSETS，如果不存在则从全局对象获取
                 let applicationAssets = null;
                 if (typeof POOL !== 'undefined' && typeof POOL.__GET__ === 'function') {
@@ -602,11 +602,11 @@ class ProcessManager {
                         // 忽略错误
                     }
                 }
-                
+
                 if (!applicationAssets && typeof APPLICATION_ASSETS !== 'undefined') {
                     applicationAssets = APPLICATION_ASSETS;
                 }
-                
+
                 if (applicationAssets) {
                     // 将APPLICATION_ASSETS存储到POOL
                     if (typeof POOL !== 'undefined' && typeof POOL.__ADD__ === 'function') {
@@ -619,8 +619,8 @@ class ProcessManager {
                             ProcessManager._log(1, `存储APPLICATION_ASSETS到POOL失败: ${e.message}`);
                         }
                     }
-                    ProcessManager._log(2, "应用程序资源映射加载成功", { 
-                        programs: Object.keys(applicationAssets || {}) 
+                    ProcessManager._log(2, "应用程序资源映射加载成功", {
+                        programs: Object.keys(applicationAssets || {})
                     });
                 } else {
                     applicationAssets = {};
@@ -639,12 +639,21 @@ class ProcessManager {
                 }
             }
         } catch (e) {
-            ProcessManager._log(1, `加载应用程序资源管理器失败: ${e.message}`);
+            // 报告异常
+            if (typeof ExceptionHandler !== 'undefined') {
+                ExceptionHandler.reportException(
+                    ExceptionHandler.ExceptionLevel.SERVICE,
+                    `ProcessManager.加载应用程序资源管理器失败: ${e.message}`,
+                    { error: e.message, stack: e.stack }
+                ).catch(() => { });
+            } else {
+                ProcessManager._log(1, `加载应用程序资源管理器失败: ${e.message}`);
+            }
         }
-        
+
         // 注册Exploit程序（进程管理器自身）
         ProcessManager._registerExploitProgram();
-        
+
         // 验证Exploit程序是否成功注册
         const exploitPid = ProcessManager.EXPLOIT_PID;
         const exploitInfo = ProcessManager.PROCESS_TABLE.get(exploitPid);
@@ -655,7 +664,7 @@ class ProcessManager {
             // 强制重新注册
             ProcessManager._processTableCache = null;
             ProcessManager._registerExploitProgram();
-            
+
             // 再次验证
             const retryInfo = ProcessManager.PROCESS_TABLE.get(exploitPid);
             if (retryInfo) {
@@ -664,25 +673,25 @@ class ProcessManager {
                 ProcessManager._log(1, `Exploit程序重新注册仍然失败 (PID: ${exploitPid})`);
             }
         }
-        
+
         // 初始化 DOM 观察器
         if (typeof document !== 'undefined' && document.body) {
             ProcessManager._initDOMObserver();
         }
-        
+
         // 初始化共享空间
         ProcessManager._initSharedSpace();
-        
+
         ProcessManager._log(2, "进程管理器初始化完成");
     }
-    
+
     /**
      * 启动需要自动启动的程序
      * 必须在系统加载完成且用户登录后才调用
      */
     static async startAutoStartPrograms() {
         ProcessManager._log(2, "检查需要自动启动的程序");
-        
+
         // 检查是否处于安全模式（安全模式下不启动自动启动程序）
         let isSafeMode = false;
         try {
@@ -693,7 +702,7 @@ class ProcessManager {
         } catch (e) {
             // sessionStorage可能不可用，忽略错误
         }
-        
+
         if (isSafeMode) {
             ProcessManager._log(2, "安全模式已启用，跳过自动启动程序");
             if (typeof KernelLogger !== 'undefined') {
@@ -701,7 +710,7 @@ class ProcessManager {
             }
             return;
         }
-        
+
         // 检查系统加载标志位是否已删除（确保系统加载完成且用户已登录）
         if (typeof POOL !== 'undefined' && typeof POOL.__IS_SYSTEM_LOADING__ === 'function') {
             if (POOL.__IS_SYSTEM_LOADING__()) {
@@ -712,7 +721,7 @@ class ProcessManager {
                 return;
             }
         }
-        
+
         // 从POOL获取应用程序资源映射
         let applicationAssets = null;
         if (typeof POOL !== 'undefined' && typeof POOL.__GET__ === 'function') {
@@ -723,18 +732,18 @@ class ProcessManager {
                 return;
             }
         }
-        
+
         if (!applicationAssets) {
             ProcessManager._log(2, "没有应用程序资源映射，跳过自动启动");
             return;
         }
-        
+
         // 收集需要自动启动的程序
         const autoStartPrograms = [];
         for (const [programName, asset] of Object.entries(applicationAssets)) {
             const parsedAsset = ProcessManager._parseAsset(asset);
             const metadata = parsedAsset.metadata || {};
-            
+
             if (metadata.autoStart === true) {
                 autoStartPrograms.push({
                     programName: programName,
@@ -743,19 +752,19 @@ class ProcessManager {
                 });
             }
         }
-        
+
         if (autoStartPrograms.length === 0) {
             ProcessManager._log(2, "没有需要自动启动的程序");
             return;
         }
-        
+
         // 按优先级排序（数字越小优先级越高）
         autoStartPrograms.sort((a, b) => a.priority - b.priority);
-        
+
         ProcessManager._log(2, `找到 ${autoStartPrograms.length} 个需要自动启动的程序`, {
             programs: autoStartPrograms.map(p => ({ name: p.programName, priority: p.priority }))
         });
-        
+
         // 检查当前用户是否为管理员
         // 普通用户不应该自动启动 autoStart 程序
         let isAdmin = false;
@@ -769,13 +778,13 @@ class ProcessManager {
                 isAdmin = false;
             }
         }
-        
+
         if (!isAdmin) {
             ProcessManager._log(2, "当前用户不是管理员，跳过自动启动程序（普通用户不应自动启动 autoStart 程序）");
             KernelLogger.info("ProcessManager", "当前用户不是管理员，跳过自动启动程序（普通用户不应自动启动 autoStart 程序）");
             return;
         }
-        
+
         // 依次启动程序（只有管理员才会执行到这里）
         for (const program of autoStartPrograms) {
             try {
@@ -790,7 +799,7 @@ class ProcessManager {
                 // 继续启动其他程序，不因一个程序失败而停止
             }
         }
-        
+
         ProcessManager._log(2, "自动启动程序检查完成");
     }
 
@@ -817,7 +826,7 @@ class ProcessManager {
                 return path;
             }
         }
-        
+
         // 处理虚拟路径（支持 A-Z 所有分区）
         // 匹配格式：X:/path 或 X:（其中X是A-Z的单个字母）
         const partitionMatch = path.match(/^([A-Z]):(\/.*)?$/);
@@ -829,16 +838,16 @@ class ProcessManager {
             const normalizedPath = relativePath.replace(/^\/+/, '');
             return `/system/service/DISK/${diskLetter}${normalizedPath ? '/' + normalizedPath : ''}`;
         }
-        
+
         // 其他情况直接返回原路径
         return path;
     }
-    
+
     static _loadScript(path) {
         return new Promise((resolve, reject) => {
             // 转换虚拟路径为实际 URL
             const actualUrl = ProcessManager.convertVirtualPathToUrl(path);
-            
+
             // 检查是否已经加载过
             const existingScript = document.querySelector(`script[src="${actualUrl}"]`);
             if (existingScript) {
@@ -846,7 +855,7 @@ class ProcessManager {
                 resolve();
                 return;
             }
-            
+
             const script = document.createElement('script');
             script.src = actualUrl;
             script.async = true;
@@ -861,7 +870,7 @@ class ProcessManager {
             document.head.appendChild(script);
         });
     }
-    
+
     /**
      * 动态加载样式表
      * @param {string} path 样式表路径
@@ -871,7 +880,7 @@ class ProcessManager {
         return new Promise((resolve, reject) => {
             // 转换虚拟路径为实际 URL
             const actualUrl = ProcessManager.convertVirtualPathToUrl(path);
-            
+
             // 检查是否已经加载过
             const existingLink = document.querySelector(`link[href="${actualUrl}"]`);
             if (existingLink) {
@@ -879,7 +888,7 @@ class ProcessManager {
                 resolve();
                 return;
             }
-            
+
             const link = document.createElement('link');
             link.rel = 'stylesheet';
             link.type = 'text/css';
@@ -895,7 +904,7 @@ class ProcessManager {
             document.head.appendChild(link);
         });
     }
-    
+
     /**
      * 动态加载程序资源文件（图片、字体、数据文件等）
      * @param {string} path 资源文件路径
@@ -905,12 +914,12 @@ class ProcessManager {
         return new Promise((resolve, reject) => {
             // 转换虚拟路径为实际 URL
             const actualUrl = ProcessManager.convertVirtualPathToUrl(path);
-            
+
             // 根据文件扩展名确定资源类型
             const ext = path.split('.').pop().toLowerCase();
             const imageExts = ['svg', 'png', 'jpg', 'jpeg', 'gif', 'webp', 'ico'];
             const fontExts = ['woff', 'woff2', 'ttf', 'otf', 'eot'];
-            
+
             // 检查是否已经加载过（对于图片，检查img标签；对于字体，检查link标签）
             if (imageExts.includes(ext)) {
                 const existingImg = document.querySelector(`img[src="${actualUrl}"]`);
@@ -919,7 +928,7 @@ class ProcessManager {
                     resolve();
                     return;
                 }
-                
+
                 // 预加载图片
                 const img = new Image();
                 img.onload = () => {
@@ -932,7 +941,7 @@ class ProcessManager {
                     resolve();  // 不reject，允许程序继续
                 };
                 img.src = actualUrl;
-                
+
             } else if (fontExts.includes(ext)) {
                 // 检查字体是否已加载
                 const existingLink = document.querySelector(`link[href="${actualUrl}"]`);
@@ -941,7 +950,7 @@ class ProcessManager {
                     resolve();
                     return;
                 }
-                
+
                 // 加载字体
                 const link = document.createElement('link');
                 link.rel = 'preload';
@@ -959,7 +968,7 @@ class ProcessManager {
                     resolve();  // 不reject，允许程序继续
                 };
                 document.head.appendChild(link);
-                
+
             } else if (ext === 'js') {
                 // JavaScript文件：使用script标签加载
                 const existingScript = document.querySelector(`script[src="${actualUrl}"]`);
@@ -968,7 +977,7 @@ class ProcessManager {
                     resolve();
                     return;
                 }
-                
+
                 const script = document.createElement('script');
                 script.src = actualUrl;
                 script.onload = () => {
@@ -985,7 +994,7 @@ class ProcessManager {
                 // 其他类型的资源（JSON、数据文件等）
                 // 使用 NetworkManager 进行网络请求（如果可用）
                 let fetchFn = fetch; // 默认使用原生 fetch
-                
+
                 // 尝试获取 NetworkManager
                 if (typeof POOL !== 'undefined' && typeof POOL.__GET__ === 'function') {
                     try {
@@ -997,7 +1006,7 @@ class ProcessManager {
                         // NetworkManager 不可用，使用原生 fetch
                     }
                 }
-                
+
                 // 使用 fetch 预加载
                 fetchFn(actualUrl, { method: 'HEAD' })
                     .then(() => {
@@ -1012,7 +1021,7 @@ class ProcessManager {
             }
         });
     }
-    
+
     /**
      * 解析应用程序资源项（支持简单格式和完整格式）
      * @param {string|Object} asset 资源项（字符串路径或对象）
@@ -1038,7 +1047,7 @@ class ProcessManager {
                     assets = asset.assets;
                 }
             }
-            
+
             return {
                 script: asset.script || asset.path || '',
                 styles: Array.isArray(asset.styles) ? asset.styles : [],
@@ -1050,7 +1059,7 @@ class ProcessManager {
             throw new Error('Invalid asset format');
         }
     }
-    
+
     /**
      * 验证 JS 文件是否符合 ZerOS 程序规范
      * @param {string} fileContent JS 文件内容
@@ -1060,54 +1069,54 @@ class ProcessManager {
     static validateProgramFile(fileContent, fileName = '') {
         const errors = [];
         const warnings = [];
-        
+
         if (!fileContent || typeof fileContent !== 'string') {
             errors.push('文件内容为空或无效');
             return { valid: false, errors, warnings };
         }
-        
+
         // 检查必需的方法：__init__
         const hasInitMethod = /__init__\s*[:=]\s*function|__init__\s*\(|function\s+__init__|__init__\s*:\s*async\s+function|__init__\s*:\s*function/.test(fileContent);
         if (!hasInitMethod) {
             errors.push('缺少必需的方法: __init__');
         }
-        
+
         // 检查必需的方法：__info__
         const hasInfoMethod = /__info__\s*[:=]\s*function|__info__\s*\(|function\s+__info__|__info__\s*:\s*function/.test(fileContent);
         if (!hasInfoMethod) {
             errors.push('缺少必需的方法: __info__');
         }
-        
+
         // 检查必需的方法：__exit__
         const hasExitMethod = /__exit__\s*[:=]\s*function|__exit__\s*\(|function\s+__exit__|__exit__\s*:\s*function/.test(fileContent);
         if (!hasExitMethod) {
             warnings.push('缺少推荐的方法: __exit__（程序可能无法正确清理资源）');
         }
-        
+
         // 检查程序对象导出（检查常见的导出模式）
         const hasProgramObject = /const\s+\w+\s*=\s*\{|let\s+\w+\s*=\s*\{|var\s+\w+\s*=\s*\{|window\[\w+\]\s*=|globalThis\[\w+\]\s*=|POOL\.__ADD__/.test(fileContent);
         if (!hasProgramObject) {
             warnings.push('未检测到程序对象导出（可能使用非标准导出方式）');
         }
-        
+
         // 检查是否使用了立即执行函数（IIFE）模式（这是 ZerOS 推荐的方式）
         const hasIIFE = /\(function\s*\(|\(function\s*\(window\)/.test(fileContent);
         if (!hasIIFE) {
             warnings.push('未使用立即执行函数（IIFE）模式（可能污染全局作用域）');
         }
-        
+
         // 检查是否禁止自动初始化
         const hasAutoInit = /\(function\s*\(\)\s*\{[\s\S]*?__init__|\(function\s*\(window\)\s*\{[\s\S]*?__init__/.test(fileContent);
         if (hasAutoInit && /__init__\s*\(/.test(fileContent.split('__init__')[1]?.split('__info__')[0] || '')) {
             warnings.push('检测到可能的自动初始化调用（ZerOS 程序应禁止自动初始化）');
         }
-        
+
         // 检查是否有 pid 参数（__init__ 应该接受 pid 参数）
         const initHasPid = /__init__\s*[:=]\s*.*?function\s*\([^)]*pid|__init__\s*:\s*.*?function\s*\([^)]*pid|function\s+__init__\s*\([^)]*pid/.test(fileContent);
         if (!initHasPid) {
             warnings.push('__init__ 方法可能未接受 pid 参数（ZerOS 程序规范要求）');
         }
-        
+
         const valid = errors.length === 0;
         return { valid, errors, warnings };
     }
@@ -1121,23 +1130,23 @@ class ProcessManager {
         const maxAttempts = 1000;  // 最大尝试次数，防止无限循环
         let attempts = 0;
         let pid;
-        
+
         // 如果已使用的PID数量接近范围上限，需要清理或扩展范围
         const availableRange = ProcessManager.PID_MAX - ProcessManager.PID_MIN + 1;
         if (usedPids.size >= availableRange * 0.9) {
             ProcessManager._log(1, `警告: 已使用的PID数量 (${usedPids.size}) 接近可用范围上限 (${availableRange})`);
         }
-        
+
         // 生成随机PID，确保不与已使用的PID冲突
         do {
             pid = ProcessManager._generateRandomPid();
             attempts++;
-            
+
             // 确保不会分配 Exploit 程序的 PID
             if (pid === ProcessManager.EXPLOIT_PID) {
                 continue;
             }
-            
+
             // 检查PID是否已被使用
             if (!usedPids.has(pid)) {
                 // 找到未使用的PID
@@ -1145,7 +1154,7 @@ class ProcessManager {
                 ProcessManager._log(3, `分配随机 PID: ${pid} (尝试次数: ${attempts})`);
                 return pid;
             }
-            
+
             // 如果尝试次数过多，可能PID空间已满，记录警告
             if (attempts >= maxAttempts) {
                 ProcessManager._log(1, `错误: 无法分配PID，已尝试 ${maxAttempts} 次。已使用PID数量: ${usedPids.size}`);
@@ -1161,7 +1170,7 @@ class ProcessManager {
                 throw new Error(`无法分配PID：所有可用的PID (${ProcessManager.PID_MIN}-${ProcessManager.PID_MAX}) 都已被使用`);
             }
         } while (attempts < maxAttempts);
-        
+
         // 理论上不应该到达这里
         throw new Error(`PID分配失败：达到最大尝试次数 ${maxAttempts}`);
     }
@@ -1174,11 +1183,11 @@ class ProcessManager {
      */
     static async startProgram(programName, initArgs = {}) {
         ProcessManager._log(2, `[启动程序] 开始启动: ${programName}`, initArgs);
-        
+
         // 检查是否提供了临时程序配置
         let asset = null;
         let programMetadata = null;
-        
+
         if (initArgs.tempAsset) {
             // 使用临时程序配置
             ProcessManager._log(2, `[启动程序] 使用临时程序配置: ${programName}`);
@@ -1188,7 +1197,7 @@ class ProcessManager {
         } else {
             // 优先使用 ApplicationAssetManager 获取程序信息和元数据
             ProcessManager._log(2, `[启动程序] 查找程序资源: ${programName}`);
-            
+
             if (typeof ApplicationAssetManager !== 'undefined' && typeof ApplicationAssetManager.getProgramInfo === 'function') {
                 try {
                     const programInfo = ApplicationAssetManager.getProgramInfo(programName);
@@ -1210,7 +1219,7 @@ class ProcessManager {
             } else {
                 ProcessManager._log(2, `[启动程序] ApplicationAssetManager不可用，使用降级方案`);
             }
-            
+
             // 降级方案：直接从POOL获取
             if (!asset) {
                 let applicationAssets = null;
@@ -1221,25 +1230,25 @@ class ProcessManager {
                         ProcessManager._log(1, `从POOL获取APPLICATION_ASSETS失败: ${e.message}`);
                     }
                 }
-                
+
                 if (!applicationAssets) {
                     ProcessManager._log(1, `应用程序资源映射不可用`);
                     throw new Error(`Application assets not available`);
                 }
-                
+
                 // 检查应用程序资源映射
                 if (!applicationAssets[programName]) {
                     ProcessManager._log(1, `程序 ${programName} 未在应用程序资源映射中找到`);
                     throw new Error(`Program ${programName} not found in application assets`);
                 }
-                
+
                 // 解析应用程序资源（支持简单格式和完整格式）
                 asset = ProcessManager._parseAsset(applicationAssets[programName]);
                 programMetadata = asset.metadata || {};
                 ProcessManager._log(2, `[启动程序] 从POOL获取资源成功`, asset);
             }
         }
-        
+
         // 尝试从程序对象获取元数据（如果程序已加载）
         if (!programMetadata || !programMetadata.hasOwnProperty('allowMultipleInstances')) {
             const programNameUpper = programName.toUpperCase();
@@ -1249,7 +1258,7 @@ class ProcessManager {
             } else if (typeof globalThis !== 'undefined' && globalThis[programNameUpper]) {
                 programClass = globalThis[programNameUpper];
             }
-            
+
             if (programClass && typeof programClass.__info__ === 'function') {
                 try {
                     const programInfo = programClass.__info__();
@@ -1262,7 +1271,7 @@ class ProcessManager {
                 }
             }
         }
-        
+
         // 检查程序是否需要管理员权限
         const ADMIN_ONLY_PROGRAMS = ['regedit', 'kernelchecker', 'authenticator', 'permissioncontrol'];
         let isAdminProgram = false;
@@ -1286,12 +1295,12 @@ class ProcessManager {
                 KernelLogger.warn("ProcessManager", `UserControl 未加载，无法验证用户权限，拒绝启动管理员专用程序: ${programName}`);
                 isAdmin = false;
             }
-            
+
             if (!isAdmin) {
                 const errorMsg = `程序 ${programName} 需要管理员权限，当前用户无权访问`;
                 ProcessManager._log(1, errorMsg);
                 KernelLogger.warn("ProcessManager", errorMsg);
-                
+
                 // 显示错误通知（错误通知不自动关闭，需要用户手动关闭）
                 if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
                     try {
@@ -1306,17 +1315,17 @@ class ProcessManager {
                         ProcessManager._log(1, `创建通知失败: ${e.message}`);
                     }
                 }
-                
+
                 throw new Error(errorMsg);
             } else {
                 ProcessManager._log(2, `程序 ${programName} 管理员权限检查通过`);
             }
         }
-        
+
         // 检查 autoStart 程序的用户权限限制
         // 如果程序设置了 autoStart=true，且不是计划任务启动的，需要检查用户权限
         // 普通用户不应该自动启动 autoStart 程序，但计划任务允许
-        if (programMetadata && programMetadata.autoStart === true && 
+        if (programMetadata && programMetadata.autoStart === true &&
             !initArgs.scheduledTask && !initArgs.autoStart) {
             // 这是用户手动启动的 autoStart 程序，需要检查用户权限
             let isAdmin = false;
@@ -1330,12 +1339,12 @@ class ProcessManager {
                     isAdmin = false;
                 }
             }
-            
+
             if (!isAdmin) {
                 const errorMsg = `程序 ${programName} 设置为自动启动，只有管理员用户可以手动启动此程序。普通用户无法启动 autoStart 程序。`;
                 ProcessManager._log(1, errorMsg);
                 KernelLogger.warn("ProcessManager", errorMsg);
-                
+
                 // 显示错误通知
                 if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
                     try {
@@ -1350,22 +1359,22 @@ class ProcessManager {
                         ProcessManager._log(1, `创建通知失败: ${e.message}`);
                     }
                 }
-                
+
                 throw new Error(errorMsg);
             } else {
                 ProcessManager._log(2, `程序 ${programName} autoStart 权限检查通过（管理员用户）`);
             }
         }
-        
+
         // 检查程序是否支持多开
         const allowMultipleInstances = programMetadata && programMetadata.allowMultipleInstances === true;
-        
+
         // 如果不支持多开，检查程序是否已在运行
         if (!allowMultipleInstances) {
             for (const [pid, processInfo] of ProcessManager.PROCESS_TABLE) {
                 if (processInfo.programName === programName && processInfo.status === 'running') {
                     ProcessManager._log(2, `程序 ${programName} 已在运行 (PID: ${pid})，且不支持多开，聚焦现有窗口`);
-                    
+
                     // 聚焦到现有程序的窗口
                     if (typeof GUIManager !== 'undefined') {
                         try {
@@ -1393,7 +1402,7 @@ class ProcessManager {
                             ProcessManager._log(1, `聚焦程序 ${programName} (PID: ${pid}) 的窗口失败: ${e.message}`);
                         }
                     }
-                    
+
                     // 返回现有进程的 PID，而不是抛出错误
                     return pid;
                 }
@@ -1402,29 +1411,29 @@ class ProcessManager {
             ProcessManager._log(2, `程序 ${programName} 支持多开，将创建新实例`);
             // 日志已通过 ProcessManager._log 输出
         }
-        
+
         if (!asset.script) {
             ProcessManager._log(1, `程序 ${programName} 的脚本路径未定义`);
             ProcessManager._log(1, `程序 ${programName} 的脚本路径未定义`);
             throw new Error(`Program ${programName} script path is not defined`);
         }
-        
+
         const scriptPath = asset.script;
         const styles = asset.styles || [];
         const assets = asset.assets || [];  // 程序资源文件
         const metadata = asset.metadata || {};
         const pid = ProcessManager._allocatePid();
         const programNameUpper = programName.toUpperCase();
-        
+
         // 判断 scriptPath 是文件路径还是文件内容
         // 如果是文件内容（包含换行符或很长，且不是路径格式），则直接执行
-        const isScriptContent = typeof scriptPath === 'string' && 
-                                 (scriptPath.includes('\n') || 
-                                  scriptPath.length > 500 || 
-                                  (!scriptPath.includes('/') && !scriptPath.includes('\\') && !scriptPath.endsWith('.js')));
-        
+        const isScriptContent = typeof scriptPath === 'string' &&
+            (scriptPath.includes('\n') ||
+                scriptPath.length > 500 ||
+                (!scriptPath.includes('/') && !scriptPath.includes('\\') && !scriptPath.endsWith('.js')));
+
         ProcessManager._log(2, `[启动程序] 分配PID: ${pid}, 脚本: ${isScriptContent ? '内容（直接执行）' : `路径: ${scriptPath}`}`);
-        
+
         // 创建进程信息
         const processInfo = {
             pid: pid,
@@ -1451,28 +1460,28 @@ class ProcessManager {
             isCLITerminal: false,  // 是否为CLI程序创建的独立终端（不应在任务栏显示为terminal程序）
             requestedModules: new Set()  // 该进程请求的动态模块集合
         };
-        
+
         const table = ProcessManager.PROCESS_TABLE;
         // 使用原始表进行更新（绕过保护）
         const rawTable = ProcessManager._getProcessTable();
         rawTable.set(pid, processInfo);
         ProcessManager._saveProcessTable(rawTable);
-        
+
         // 清空缓存，强制重新加载
         ProcessManager._processTableCache = null;
         ProcessManager._protectedProcessTableCache = null;
-        
+
         // 清除已使用PID缓存（新进程已创建）
         ProcessManager._invalidateUsedPidsCache();
-        
+
         // 清除已使用PID缓存（进程表已更新）
         ProcessManager._invalidateUsedPidsCache();
-        
+
         // 注册程序名称到 MemoryManager
         if (typeof MemoryManager !== 'undefined') {
             MemoryManager.registerProgramName(pid, programName);
         }
-        
+
         try {
             // 先加载样式表（如果有）
             if (styles.length > 0) {
@@ -1485,7 +1494,7 @@ class ProcessManager {
                     // 样式表加载失败不影响程序启动
                 }
             }
-            
+
             // 加载程序资源文件（如果有）
             if (assets.length > 0) {
                 ProcessManager._log(2, `加载程序资源: ${programName}`, { assets });
@@ -1497,7 +1506,7 @@ class ProcessManager {
                     // 资源加载失败不影响程序启动
                 }
             }
-            
+
             // 加载或执行程序脚本
             if (isScriptContent) {
                 // 直接执行脚本内容（使用 script 标签）
@@ -1507,16 +1516,16 @@ class ProcessManager {
                     const script = document.createElement('script');
                     script.textContent = scriptPath;
                     script.type = 'text/javascript';
-                    
+
                     // 使用 Promise 等待脚本执行完成
                     await new Promise((resolve, reject) => {
                         let resolved = false;
-                        
+
                         script.onload = () => {
                             if (resolved) return;
                             resolved = true;
                             ProcessManager._log(2, `[启动程序] 脚本内容执行完成（onload）`);
-                            
+
                             // 脚本执行后，立即检查程序对象是否已注册
                             setTimeout(() => {
                                 if (script.parentNode) {
@@ -1525,7 +1534,7 @@ class ProcessManager {
                                 resolve();
                             }, 100);  // 给程序对象注册一点时间
                         };
-                        
+
                         script.onerror = (e) => {
                             if (resolved) return;
                             resolved = true;
@@ -1535,10 +1544,10 @@ class ProcessManager {
                             }
                             reject(new Error('脚本执行失败'));
                         };
-                        
+
                         // 添加到文档头部
                         document.head.appendChild(script);
-                        
+
                         // 对于内联脚本，onload 可能不会触发，使用 setTimeout 作为备用
                         // 增加延迟以确保程序对象有足够时间注册到 window 和 POOL
                         // 对于 tempAsset 程序，可能需要更长时间来注册程序对象
@@ -1552,7 +1561,7 @@ class ProcessManager {
                             resolve();
                         }, 500);  // 增加到 500ms，确保程序对象有足够时间注册完成
                     });
-                    
+
                     // 脚本执行后，立即检查程序对象是否已注册（用于调试）
                     if (typeof window !== 'undefined' && window[programNameUpper]) {
                         ProcessManager._log(2, `[启动程序] 脚本执行后立即找到程序对象: ${programNameUpper}`);
@@ -1569,9 +1578,9 @@ class ProcessManager {
                 await ProcessManager._loadScript(scriptPath);
                 ProcessManager._log(2, `[启动程序] 脚本加载完成`);
             }
-            
+
             ProcessManager._log(2, `[启动程序] 等待程序对象出现: ${programNameUpper}`);
-            
+
             // 等待程序通过依赖管理器注册加载完成
             // 程序应该调用 DependencyConfig.publishSignal() 来通知加载完成
             // 这里我们通过轮询检查全局对象是否存在
@@ -1582,7 +1591,7 @@ class ProcessManager {
             const startTime = Date.now();
             const maxChecks = Math.ceil(maxWaitTime / checkInterval);  // 根据等待时间计算最大检查次数
             let checkCount = 0;
-            
+
             let programLoaded = false;
             while (Date.now() - startTime < maxWaitTime && checkCount < maxChecks) {
                 try {
@@ -1598,7 +1607,7 @@ class ProcessManager {
                         ProcessManager._log(2, `[启动程序] 在globalThis中找到程序对象: ${programNameUpper}`);
                         break;
                     }
-                    
+
                     // 也检查 POOL 中的 APPLICATION_SHARED_POOL 和 APPLICATION_POOL
                     if (typeof POOL !== 'undefined' && typeof POOL.__GET__ === 'function') {
                         try {
@@ -1637,11 +1646,11 @@ class ProcessManager {
                     ProcessManager._log(1, `检查程序加载状态失败: ${e.message}`);
                     break;
                 }
-                
+
                 checkCount++;
                 await new Promise(resolve => setTimeout(resolve, checkInterval));
             }
-            
+
             if (!programLoaded) {
                 // 对于 tempAsset 程序，提供更详细的调试信息
                 if (isTempAsset) {
@@ -1669,9 +1678,9 @@ class ProcessManager {
                 }
                 throw new Error(`Program ${programName} failed to load within timeout`);
             }
-            
+
             ProcessManager._log(2, `[启动程序] 程序 ${programName} 加载完成，调用 __init__`);
-            
+
             // 调用程序的 __init__ 方法
             let programClass = null;
             if (typeof window !== 'undefined' && window[programNameUpper]) {
@@ -1679,7 +1688,7 @@ class ProcessManager {
             } else if (typeof globalThis !== 'undefined' && globalThis[programNameUpper]) {
                 programClass = globalThis[programNameUpper];
             }
-            
+
             // 如果找不到，尝试从 POOL 获取（支持从 D:/bin/ 启动的程序）
             if (!programClass && typeof POOL !== 'undefined' && typeof POOL.__GET__ === 'function') {
                 try {
@@ -1709,14 +1718,14 @@ class ProcessManager {
                     ProcessManager._log(1, `从 POOL 获取程序对象失败: ${e.message}`);
                 }
             }
-            
+
             if (!programClass) {
                 ProcessManager._log(1, `程序对象 ${programNameUpper} 不存在`);
                 throw new Error(`Program class ${programNameUpper} not found`);
             }
-            
+
             ProcessManager._log(2, `[启动程序] 找到程序对象，检查类型`);
-            
+
             // 检查程序类型（CLI或GUI）
             let programType = null;
             if (programClass && typeof programClass.__info__ === 'function') {
@@ -1730,16 +1739,16 @@ class ProcessManager {
             } else {
                 ProcessManager._log(2, `[启动程序] 程序没有__info__方法`);
             }
-            
+
             // 如果是CLI程序，处理终端环境
             let terminalInstance = initArgs.terminal || null;
             let terminalPid = null;
             let launchedFromTerminal = false;
-            
+
             if (programType === 'CLI') {
                 // 标记为CLI程序
                 processInfo.isCLI = true;
-                
+
                 // 检查是否从终端内启动（如果提供了terminal实例，说明是从终端启动的）
                 if (terminalInstance) {
                     launchedFromTerminal = true;
@@ -1752,7 +1761,7 @@ class ProcessManager {
                 } else {
                     // 从GUI启动，需要创建独立的终端实例（无标签页）
                     ProcessManager._log(2, `CLI程序 ${programName} 从GUI启动，创建独立终端实例`);
-                    
+
                     // 创建新的终端程序实例（独立窗口，无标签页）
                     try {
                         terminalPid = await ProcessManager.startProgram('terminal', {
@@ -1769,7 +1778,7 @@ class ProcessManager {
                             terminalProcessInfo.isCLITerminal = true;
                         }
                         ProcessManager._log(2, `为CLI程序 ${programName} 创建独立终端 (PID: ${terminalPid})`);
-                        
+
                         // 等待终端完全初始化（最多等待3秒）
                         let terminalReady = false;
                         const maxWaitTime = 3000;
@@ -1798,7 +1807,7 @@ class ProcessManager {
                             }
                             await new Promise(resolve => setTimeout(resolve, checkInterval));
                         }
-                        
+
                         if (!terminalReady) {
                             ProcessManager._log(1, `终端程序启动超时，CLI程序可能无法正常工作`);
                         } else {
@@ -1809,17 +1818,17 @@ class ProcessManager {
                     }
                 }
             }
-            
+
             // 记录启动前的 DOM 快照（用于后续跟踪）
             const domSnapshotBefore = ProcessManager._getDOMSnapshot();
-            
+
             // 将进程状态设置为 'starting'，允许在 __init__ 中调用 ProcessManager API
             processInfo.status = 'starting';
             ProcessManager._saveProcessTable(ProcessManager.PROCESS_TABLE);
-            
+
             // 清除已使用PID缓存（进程状态已更新）
             ProcessManager._invalidateUsedPidsCache();
-            
+
             // 注册程序权限（从 __info__ 中读取）
             // 必须在 __init__ 之前完成权限注册，确保程序初始化时已拥有所需权限
             if (typeof PermissionManager !== 'undefined') {
@@ -1842,7 +1851,7 @@ class ProcessManager {
                     // 权限注册失败不应该阻止程序启动，但会记录错误
                 }
             }
-            
+
             if (programClass && typeof programClass.__init__ === 'function') {
                 try {
                     // 获取默认工作目录（系统盘 D: 或第一个可用分区）
@@ -1856,7 +1865,7 @@ class ProcessManager {
                             defaultCwd = Array.from(Disk.diskSeparateSize.keys())[0];
                         }
                     }
-                    
+
                     // 构建标准化的初始化参数
                     const standardizedInitArgs = {
                         pid: pid,
@@ -1867,36 +1876,36 @@ class ProcessManager {
                         metadata: initArgs.metadata || {},  // 元数据
                         ...initArgs  // 保留其他自定义参数
                     };
-                    
+
                     ProcessManager._log(2, `[启动程序] 调用 __init__ 方法`, standardizedInitArgs);
                     ProcessManager._log(2, `[启动程序] 调用 __init__ 方法`, standardizedInitArgs);
-                    
+
                     await programClass.__init__(pid, standardizedInitArgs);
                     processInfo.status = 'running';
-                    
+
                     // 保存进程表（状态已更新为 running）
                     // 使用原始表进行保存（绕过保护）
                     const rawTable = ProcessManager._getProcessTable();
                     rawTable.set(pid, processInfo);
                     ProcessManager._saveProcessTable(rawTable);
-                    
+
                     // 清除所有缓存，强制重新加载（确保任务栏和任务管理器能看到最新状态）
                     ProcessManager._processTableCache = null;
                     ProcessManager._protectedProcessTableCache = null;
-                    
+
                     // 清除已使用PID缓存（进程状态已更新）
                     ProcessManager._invalidateUsedPidsCache();
-                    
+
                     // 标记程序创建的元素（通过 data-pid 属性）
                     if (typeof document !== 'undefined' && document.body) {
                         ProcessManager._markProgramElements(pid, domSnapshotBefore);
                     }
-                    
+
                     ProcessManager._log(2, `[启动程序] 程序 ${programName} (PID: ${pid}) 初始化完成`, {
                         args: standardizedInitArgs.args
                     });
                     ProcessManager._log(2, `[启动程序] 程序 ${programName} (PID: ${pid}) 初始化完成`);
-                    
+
                     // 通知任务栏更新（延迟更新，确保程序状态已保存）
                     if (typeof TaskbarManager !== 'undefined' && typeof TaskbarManager.update === 'function') {
                         setTimeout(() => {
@@ -1912,7 +1921,7 @@ class ProcessManager {
                         stack: e.stack,
                         timestamp: Date.now()
                     };
-                    
+
                     // 尝试清理已创建的资源
                     try {
                         // 清理 GUI 元素
@@ -1928,12 +1937,12 @@ class ProcessManager {
                                 }
                             }
                         }
-                        
+
                         // 清理事件监听器
                         if (typeof EventManager !== 'undefined' && typeof EventManager.unregisterAllHandlersForPid === 'function') {
                             EventManager.unregisterAllHandlersForPid(pid);
                         }
-                        
+
                         // 释放内存
                         if (typeof MemoryManager !== 'undefined') {
                             try {
@@ -1945,26 +1954,26 @@ class ProcessManager {
                     } catch (cleanupError) {
                         ProcessManager._log(1, `清理资源时发生错误: ${cleanupError.message}`);
                     }
-                    
+
                     // 保存进程表（状态已更新为 exited）
                     // 使用原始表进行保存（绕过保护）
                     const rawTable = ProcessManager._getProcessTable();
                     rawTable.set(pid, processInfo);
                     ProcessManager._saveProcessTable(rawTable);
-                    
+
                     // 清除所有缓存，强制重新加载
                     ProcessManager._processTableCache = null;
                     ProcessManager._protectedProcessTableCache = null;
-                    
+
                     // 清除已使用PID缓存（进程状态已更新）
                     ProcessManager._invalidateUsedPidsCache();
-                    
+
                     // 记录错误日志
                     ProcessManager._log(1, `程序 ${programName} (PID: ${pid}) 初始化失败: ${e.message}`, {
                         error: e.message,
                         stack: e.stack
                     });
-                    
+
                     // 显示用户友好的错误提示
                     if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
                         try {
@@ -1980,32 +1989,32 @@ class ProcessManager {
                             // 忽略通知创建失败
                         }
                     }
-                    
+
                     throw e;
                 }
             } else {
                 ProcessManager._log(1, `程序 ${programName} 没有 __init__ 方法，跳过初始化`);
                 processInfo.status = 'running';
-                
+
                 // 保存进程表（状态已更新为 running）
                 // 使用原始表进行保存（绕过保护）
                 const rawTable = ProcessManager._getProcessTable();
                 rawTable.set(pid, processInfo);
                 ProcessManager._saveProcessTable(rawTable);
-                
+
                 // 清除所有缓存，强制重新加载（确保任务栏和任务管理器能看到最新状态）
                 ProcessManager._processTableCache = null;
                 ProcessManager._protectedProcessTableCache = null;
-                
+
                 // 清除已使用PID缓存（进程状态已更新）
                 ProcessManager._invalidateUsedPidsCache();
-                
+
                 // 即使没有 __init__ 方法，也尝试标记元素
                 if (typeof document !== 'undefined' && document.body) {
                     ProcessManager._markProgramElements(pid, domSnapshotBefore);
                 }
             }
-            
+
             return pid;
         } catch (e) {
             // 启动失败，清理进程信息
@@ -2013,11 +2022,11 @@ class ProcessManager {
             const rawTable = ProcessManager._getProcessTable();
             rawTable.delete(pid);
             ProcessManager._saveProcessTable(rawTable);
-            
+
             // 清空缓存，强制重新加载
             ProcessManager._processTableCache = null;
             ProcessManager._protectedProcessTableCache = null;
-            
+
             // 清除已使用PID缓存（进程已删除）
             ProcessManager._invalidateUsedPidsCache();
             if (typeof MemoryManager !== 'undefined') {
@@ -2036,13 +2045,13 @@ class ProcessManager {
      */
     static async killProgram(pid, force = false) {
         ProcessManager._log(2, `终止程序 PID: ${pid}`, { force });
-        
+
         const processInfo = ProcessManager.PROCESS_TABLE.get(pid);
         if (!processInfo) {
             ProcessManager._log(1, `程序 PID ${pid} 不存在`);
             return false;
         }
-        
+
         // 如果程序已经退出，但强制关闭或需要清理资源，继续执行清理
         if (processInfo.status === 'exited') {
             ProcessManager._log(1, `程序 PID ${pid} 已经退出，但继续清理资源`);
@@ -2065,21 +2074,21 @@ class ProcessManager {
                 }
             }
         }
-        
+
         try {
             // 调用程序的 __exit__ 方法（仅在程序未退出时）
             // 对于 loading 状态的程序，也尝试调用 __exit__，因为程序可能已经初始化但状态未更新
             if (processInfo.status !== 'exited') {
                 const programNameUpper = processInfo.programNameUpper;
                 let programClass = null;
-                
+
                 // 优先从 window 或 globalThis 获取
                 if (typeof window !== 'undefined' && window[programNameUpper]) {
                     programClass = window[programNameUpper];
                 } else if (typeof globalThis !== 'undefined' && globalThis[programNameUpper]) {
                     programClass = globalThis[programNameUpper];
                 }
-                
+
                 // 如果找不到，尝试从 POOL 获取（支持从 D:/bin/ 启动的程序）
                 if (!programClass && typeof POOL !== 'undefined' && typeof POOL.__GET__ === 'function') {
                     try {
@@ -2109,7 +2118,7 @@ class ProcessManager {
                         ProcessManager._log(1, `从 POOL 获取程序对象失败: ${e.message}`);
                     }
                 }
-                
+
                 // 如果程序对象存在，尝试调用 __exit__
                 // 对于 loading 状态的程序，如果找不到程序对象，直接标记为 exiting 并继续清理
                 if (programClass && typeof programClass.__exit__ === 'function') {
@@ -2126,12 +2135,12 @@ class ProcessManager {
                             timestamp: Date.now(),
                             phase: 'exit'
                         };
-                        
+
                         ProcessManager._log(1, `程序 ${processInfo.programName} 的 __exit__ 方法执行失败: ${e.message}`, {
                             error: e.message,
                             stack: e.stack
                         });
-                        
+
                         if (!force) {
                             // 非强制模式，记录错误但继续清理资源
                             ProcessManager._log(2, `程序 ${processInfo.programName} 退出方法失败，但继续清理资源（非强制模式）`);
@@ -2157,7 +2166,7 @@ class ProcessManager {
             } else {
                 ProcessManager._log(2, `程序 ${processInfo.programName} 已退出，跳过 __exit__ 调用，直接清理资源`);
             }
-            
+
             // 如果是CLI程序且创建了独立终端，先关闭终端
             // 注意：只有 isCLITerminal = true 的终端才是程序创建的，应该关闭
             // 从现有终端启动的程序（launchedFromTerminal = true）不应该关闭终端
@@ -2175,7 +2184,7 @@ class ProcessManager {
                     ProcessManager._log(2, `CLI程序 ${processInfo.programName} 从现有终端启动，不关闭终端 (终端PID: ${processInfo.terminalPid})`);
                 }
             }
-            
+
             // 如果是CLI程序创建的独立终端，关闭关联的CLI程序
             // 注意：必须在清理GUI之前关闭关联程序，避免递归调用问题
             let cliProgramPidToKill = null;
@@ -2188,7 +2197,7 @@ class ProcessManager {
                     }
                 }
             }
-            
+
             // 清理 GUI 元素（包括 GUIManager 中的窗口注册）
             // 先关闭所有窗口，确保窗口的 onClose 回调被调用
             if (typeof GUIManager !== 'undefined' && typeof GUIManager.getWindowsByPid === 'function') {
@@ -2207,7 +2216,7 @@ class ProcessManager {
             }
             // 然后清理其他 GUI 元素
             ProcessManager._cleanupGUI(pid);
-            
+
             // 清理程序注册的上下文菜单
             if (typeof ContextMenuManager !== 'undefined' && typeof ContextMenuManager.unregisterContextMenu === 'function') {
                 try {
@@ -2217,7 +2226,7 @@ class ProcessManager {
                     ProcessManager._log(1, `清理程序 PID ${pid} 的上下文菜单失败: ${e.message}`);
                 }
             }
-            
+
             // 清理程序创建的桌面组件
             if (typeof DesktopManager !== 'undefined' && typeof DesktopManager.cleanupProgramComponents === 'function') {
                 try {
@@ -2227,7 +2236,7 @@ class ProcessManager {
                     ProcessManager._log(1, `清理程序 PID ${pid} 的桌面组件失败: ${e.message}`);
                 }
             }
-            
+
             // 清理程序创建的任务栏自定义图标
             if (typeof TaskbarManager !== 'undefined' && typeof TaskbarManager.cleanupCustomIconsByPid === 'function') {
                 try {
@@ -2239,7 +2248,7 @@ class ProcessManager {
                     ProcessManager._log(1, `清理程序 PID ${pid} 的任务栏自定义图标失败: ${e.message}`);
                 }
             }
-            
+
             // 清理程序创建的拖拽会话
             if (typeof DragDrive !== 'undefined' && typeof DragDrive.cleanupProcessDrags === 'function') {
                 try {
@@ -2249,7 +2258,7 @@ class ProcessManager {
                     ProcessManager._log(1, `清理程序 PID ${pid} 的拖拽会话失败: ${e.message}`);
                 }
             }
-            
+
             // 清理程序创建的通知（仅清理依赖类型的通知，快照类型保留）
             if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.cleanupProgramNotifications === 'function') {
                 try {
@@ -2260,7 +2269,7 @@ class ProcessManager {
                     ProcessManager._log(1, `清理程序 PID ${pid} 的通知失败: ${e.message}`);
                 }
             }
-            
+
             // 清理程序注册的事件处理器
             if (typeof EventManager !== 'undefined' && typeof EventManager.unregisterAllHandlersForPid === 'function') {
                 try {
@@ -2270,7 +2279,7 @@ class ProcessManager {
                     ProcessManager._log(1, `清理程序 PID ${pid} 的事件处理器失败: ${e.message}`);
                 }
             }
-            
+
             // 清理程序权限
             if (typeof PermissionManager !== 'undefined' && typeof PermissionManager.clearProgramPermissions === 'function') {
                 try {
@@ -2280,7 +2289,7 @@ class ProcessManager {
                     ProcessManager._log(1, `清理程序 PID ${pid} 的权限失败: ${e.message}`);
                 }
             }
-            
+
             // 清理程序的多线程资源
             if (typeof MultithreadingDrive !== 'undefined' && typeof MultithreadingDrive.cleanupProcessThreads === 'function') {
                 try {
@@ -2290,7 +2299,7 @@ class ProcessManager {
                     ProcessManager._log(1, `清理程序 PID ${pid} 的多线程资源失败: ${e.message}`);
                 }
             }
-            
+
             // 清理程序的语音识别会话
             if (typeof SpeechDrive !== 'undefined' && typeof SpeechDrive.cleanupProcess === 'function') {
                 try {
@@ -2300,7 +2309,7 @@ class ProcessManager {
                     ProcessManager._log(1, `清理程序 PID ${pid} 的语音识别会话失败: ${e.message}`);
                 }
             }
-            
+
             // 在清理GUI之后，关闭关联的CLI程序（避免递归调用）
             if (cliProgramPidToKill) {
                 ProcessManager._log(2, `CLI程序专用终端退出，关闭关联CLI程序 (PID: ${cliProgramPidToKill})`);
@@ -2313,7 +2322,7 @@ class ProcessManager {
                     }
                 }, 0);
             }
-            
+
             // 释放内存（在状态设置为 exited 之前，避免 MemoryManager 检查失败）
             if (typeof MemoryManager !== 'undefined') {
                 try {
@@ -2323,38 +2332,38 @@ class ProcessManager {
                     ProcessManager._log(1, `释放内存失败: ${e.message}`);
                 }
             }
-            
+
             // 清理内存引用
             processInfo.memoryRefs.clear();
-            
+
             // 清理 DOM 元素集合
             if (processInfo.domElements) {
                 processInfo.domElements.clear();
             }
-            
+
             // 停止 DOM 观察器（如果有）
             if (processInfo.mutationObserver) {
                 processInfo.mutationObserver.disconnect();
                 processInfo.mutationObserver = null;
             }
-            
+
             // 更新进程状态
             processInfo.status = 'exited';
             processInfo.exitTime = Date.now();
-            
+
             // 保存进程表
             ProcessManager._saveProcessTable(ProcessManager.PROCESS_TABLE);
-            
+
             // 清除已使用PID缓存（进程状态已更新）
             ProcessManager._invalidateUsedPidsCache();
-            
+
             // 通知任务栏更新（延迟更新，确保状态已保存）
             if (typeof TaskbarManager !== 'undefined' && typeof TaskbarManager.update === 'function') {
                 setTimeout(() => {
                     TaskbarManager.update();
                 }, 50);
             }
-            
+
             ProcessManager._log(2, `程序 PID ${pid} 已终止`);
             return true;
         } catch (e) {
@@ -2362,37 +2371,37 @@ class ProcessManager {
                 // 强制终止，即使出错也清理
                 // 清理 GUI 元素
                 ProcessManager._cleanupGUI(pid);
-                
+
                 processInfo.status = 'exited';
                 processInfo.exitTime = Date.now();
                 if (typeof MemoryManager !== 'undefined') {
                     MemoryManager.freeMemory(pid);
                 }
-                
+
                 // 清理 DOM 元素集合
                 if (processInfo.domElements) {
                     processInfo.domElements.clear();
                 }
-                
+
                 // 停止 DOM 观察器（如果有）
                 if (processInfo.mutationObserver) {
                     processInfo.mutationObserver.disconnect();
                     processInfo.mutationObserver = null;
                 }
-                
+
                 // 保存进程表
                 ProcessManager._saveProcessTable(ProcessManager.PROCESS_TABLE);
-                
+
                 // 清除已使用PID缓存（进程状态已更新）
                 ProcessManager._invalidateUsedPidsCache();
-                
+
                 // 通知任务栏更新（延迟更新，确保状态已保存）
                 if (typeof TaskbarManager !== 'undefined' && typeof TaskbarManager.update === 'function') {
                     setTimeout(() => {
                         TaskbarManager.update();
                     }, 50);
                 }
-                
+
                 ProcessManager._log(1, `强制终止程序 PID ${pid}，但退出处理失败: ${e.message}`);
                 return true;
             }
@@ -2410,24 +2419,24 @@ class ProcessManager {
      */
     static async requestSelfTermination(pid) {
         ProcessManager._log(2, `程序 PID ${pid} 请求自终止`);
-        
+
         const processInfo = ProcessManager.PROCESS_TABLE.get(pid);
         if (!processInfo) {
             ProcessManager._log(1, `程序 PID ${pid} 不存在`);
             return false;
         }
-        
+
         // 标记为 exiting，防止重复调用
         if (processInfo.status === 'exiting' || processInfo.status === 'exited') {
             ProcessManager._log(2, `程序 PID ${pid} 已经在退出或已退出`);
             return true;
         }
-        
+
         processInfo.status = 'exiting';
-        
+
         try {
             // 跳过 __exit__ 调用，直接清理资源（因为程序自己请求关闭）
-            
+
             // 清理程序注册的上下文菜单
             if (typeof ContextMenuManager !== 'undefined' && typeof ContextMenuManager.unregisterContextMenu === 'function') {
                 try {
@@ -2436,7 +2445,7 @@ class ProcessManager {
                     ProcessManager._log(1, `清理程序 PID ${pid} 的上下文菜单失败: ${e.message}`);
                 }
             }
-            
+
             // 清理程序创建的桌面组件
             if (typeof DesktopManager !== 'undefined' && typeof DesktopManager.cleanupProgramComponents === 'function') {
                 try {
@@ -2445,7 +2454,7 @@ class ProcessManager {
                     ProcessManager._log(1, `清理程序 PID ${pid} 的桌面组件失败: ${e.message}`);
                 }
             }
-            
+
             // 清理程序创建的任务栏自定义图标
             if (typeof TaskbarManager !== 'undefined' && typeof TaskbarManager.cleanupCustomIconsByPid === 'function') {
                 try {
@@ -2454,7 +2463,7 @@ class ProcessManager {
                     ProcessManager._log(1, `清理程序 PID ${pid} 的任务栏自定义图标失败: ${e.message}`);
                 }
             }
-            
+
             // 清理程序创建的拖拽会话
             if (typeof DragDrive !== 'undefined' && typeof DragDrive.cleanupProcessDrags === 'function') {
                 try {
@@ -2463,12 +2472,12 @@ class ProcessManager {
                     ProcessManager._log(1, `清理程序 PID ${pid} 的拖拽会话失败: ${e.message}`);
                 }
             }
-            
+
             // 清理事件监听器
             if (typeof EventManager !== 'undefined' && typeof EventManager.unregisterAllHandlersForPid === 'function') {
                 EventManager.unregisterAllHandlersForPid(pid);
             }
-            
+
             // 释放内存
             if (typeof MemoryManager !== 'undefined') {
                 try {
@@ -2477,21 +2486,21 @@ class ProcessManager {
                     ProcessManager._log(1, `释放内存失败: ${e.message}`);
                 }
             }
-            
+
             // 清理内存引用
             processInfo.memoryRefs.clear();
-            
+
             // 清理 DOM 元素集合
             if (processInfo.domElements) {
                 processInfo.domElements.clear();
             }
-            
+
             // 停止 DOM 观察器（如果有）
             if (processInfo.mutationObserver) {
                 processInfo.mutationObserver.disconnect();
                 processInfo.mutationObserver = null;
             }
-            
+
             // 如果是CLI程序且创建了独立终端，先关闭终端
             // 注意：只有 isCLITerminal = true 的终端才是程序创建的，应该关闭
             // 从现有终端启动的程序（launchedFromTerminal = true）不应该关闭终端
@@ -2509,7 +2518,7 @@ class ProcessManager {
                     ProcessManager._log(2, `CLI程序 ${processInfo.programName} 从现有终端启动，不关闭终端 (终端PID: ${processInfo.terminalPid})`);
                 }
             }
-            
+
             // 清理所有窗口
             if (typeof GUIManager !== 'undefined' && typeof GUIManager.getWindowsByPid === 'function') {
                 const windows = GUIManager.getWindowsByPid(pid);
@@ -2523,42 +2532,51 @@ class ProcessManager {
                     }
                 }
             }
-            
+
             // 更新进程状态
             processInfo.status = 'exited';
             processInfo.exitTime = Date.now();
-            
+
             // 保存进程表
             const rawTable = ProcessManager._getProcessTable();
             rawTable.set(pid, processInfo);
             ProcessManager._saveProcessTable(rawTable);
-            
+
             // 清除所有缓存
             ProcessManager._processTableCache = null;
             ProcessManager._protectedProcessTableCache = null;
-            
+
             // 清除已使用PID缓存（进程状态已更新）
             ProcessManager._invalidateUsedPidsCache();
-            
+
             // 通知任务栏更新
             if (typeof TaskbarManager !== 'undefined' && typeof TaskbarManager.update === 'function') {
                 setTimeout(() => {
                     TaskbarManager.update();
                 }, 50);
             }
-            
+
             ProcessManager._log(2, `程序 PID ${pid} 已自终止`);
             return true;
         } catch (e) {
+            // 报告异常
+            if (typeof ExceptionHandler !== 'undefined') {
+                ExceptionHandler.reportException(
+                    ExceptionHandler.ExceptionLevel.PROGRAM,
+                    `ProcessManager.killProgram 自终止处理失败: ${e.message}`,
+                    { pid, error: e.message, stack: e.stack }
+                ).catch(() => { });
+            }
+
             // 即使出错也强制清理
             processInfo.status = 'exited';
             processInfo.exitTime = Date.now();
-            
+
             // 保存进程表
             const rawTable = ProcessManager._getProcessTable();
             rawTable.set(pid, processInfo);
             ProcessManager._saveProcessTable(rawTable);
-            
+
             ProcessManager._log(1, `程序 PID ${pid} 自终止处理失败，但已强制标记为退出: ${e.message}`);
             return true;  // 返回 true，因为程序已经被标记为退出
         }
@@ -2574,31 +2592,31 @@ class ProcessManager {
      */
     static allocateMemory(pid, heapSize = -1, shedSize = -1, refId = null) {
         ProcessManager._log(2, `为进程 PID ${pid} 申请内存`, { heapSize, shedSize, refId });
-        
+
         const processInfo = ProcessManager.PROCESS_TABLE.get(pid);
         if (!processInfo) {
             ProcessManager._log(1, `进程 PID ${pid} 不存在`);
             throw new Error(`Process ${pid} does not exist`);
         }
-        
+
         if (processInfo.status !== 'running') {
             ProcessManager._log(1, `进程 PID ${pid} 状态异常: ${processInfo.status}`);
             throw new Error(`Process ${pid} is not running`);
         }
-        
+
         // 通过 MemoryManager 分配内存（自动生成ID）
         if (typeof MemoryManager === 'undefined') {
             ProcessManager._log(1, "MemoryManager 不可用");
             throw new Error("MemoryManager is not available");
         }
-        
+
         const memoryResult = MemoryManager.allocateMemory(pid, heapSize, shedSize);
-        
+
         // 生成引用 ID
         if (!refId) {
             refId = `ref_${pid}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
         }
-        
+
         // 创建内存引用对象
         const memoryRef = {
             pid: pid,
@@ -2609,15 +2627,15 @@ class ProcessManager {
             refId: refId,
             allocatedAt: Date.now()
         };
-        
+
         // 存储内存引用
         processInfo.memoryRefs.set(refId, memoryRef);
-        
+
         // 记录程序行为
         ProcessManager._logProgramAction(pid, 'allocateMemory', { heapSize, shedSize, heapId: memoryResult.heapId, shedId: memoryResult.shedId });
-        
+
         ProcessManager._log(2, `内存申请成功`, { pid, refId, heapId: memoryResult.heapId, shedId: memoryResult.shedId });
-        
+
         return memoryRef;
     }
 
@@ -2629,23 +2647,23 @@ class ProcessManager {
      */
     static freeMemoryRef(pid, refId) {
         ProcessManager._log(2, `释放内存引用 PID: ${pid}, refId: ${refId}`);
-        
+
         const processInfo = ProcessManager.PROCESS_TABLE.get(pid);
         if (!processInfo) {
             ProcessManager._log(1, `进程 PID ${pid} 不存在`);
             return false;
         }
-        
+
         const memoryRef = processInfo.memoryRefs.get(refId);
         if (!memoryRef) {
             ProcessManager._log(1, `内存引用 ${refId} 不存在`);
             return false;
         }
-        
+
         // 注意：这里不实际释放内存，只是移除引用
         // 实际的内存释放由 MemoryManager.freeMemory() 统一处理
         processInfo.memoryRefs.delete(refId);
-        
+
         ProcessManager._log(2, `内存引用 ${refId} 已释放`);
         return true;
     }
@@ -2661,13 +2679,13 @@ class ProcessManager {
             if (!processInfo) {
                 return null;
             }
-            
+
             // 获取内存信息
             let memoryInfo = null;
             if (typeof MemoryManager !== 'undefined') {
                 memoryInfo = MemoryManager.checkMemory(pid);
             }
-            
+
             // 确保返回的对象包含所有原始信息，包括actions
             return {
                 ...processInfo,
@@ -2678,14 +2696,14 @@ class ProcessManager {
         } else {
             // 返回所有进程信息
             const processes = [];
-            
+
             // 确保Exploit程序在进程表中
             const exploitPid = ProcessManager.EXPLOIT_PID;
             if (!ProcessManager.PROCESS_TABLE.has(exploitPid)) {
                 ProcessManager._log(1, `Exploit程序不在进程表中，尝试注册 (PID: ${exploitPid})`);
                 ProcessManager._registerExploitProgram();
             }
-            
+
             ProcessManager.PROCESS_TABLE.forEach((processInfo, pid) => {
                 let memoryInfo = null;
                 if (typeof MemoryManager !== 'undefined') {
@@ -2730,7 +2748,7 @@ class ProcessManager {
         });
         return running;
     }
-    
+
     /**
      * 列出所有进程（包含内存信息）
      * @returns {Array<Object>} 进程信息数组
@@ -2739,7 +2757,7 @@ class ProcessManager {
         // 返回所有进程信息（包含内存信息）
         return ProcessManager.getProcessInfo();
     }
-    
+
     /**
      * 记录程序行为
      * @param {number} pid 进程ID
@@ -2751,7 +2769,7 @@ class ProcessManager {
         if (!processInfo) {
             return;
         }
-        
+
         // 限制行为记录数量，避免内存泄漏
         if (!processInfo.actions) {
             processInfo.actions = [];
@@ -2759,14 +2777,14 @@ class ProcessManager {
         if (processInfo.actions.length > 1000) {
             processInfo.actions.shift(); // 移除最旧的记录
         }
-        
+
         processInfo.actions.push({
             action: action,
             timestamp: Date.now(),
             details: details
         });
     }
-    
+
     /**
      * 内核API代理：所有程序调用内核API必须通过此方法
      * @param {number} pid 进程ID
@@ -2779,13 +2797,13 @@ class ProcessManager {
         if (!processInfo) {
             throw new Error(`Process ${pid} does not exist`);
         }
-        
+
         // Exploit程序享有直接通信权限
         if (processInfo.isExploit) {
             ProcessManager._log(3, `Exploit程序 ${pid} 直接调用内核API: ${apiName}`);
             return await ProcessManager._executeKernelAPI(apiName, args);
         }
-        
+
         // 普通程序需要通过进程管理器代理
         // 特殊处理：允许 loading 和 starting 状态的程序调用 requestSelfTermination
         if (processInfo.status !== 'running' && apiName !== 'Process.requestSelfTermination') {
@@ -2794,11 +2812,11 @@ class ProcessManager {
                 throw new Error(`Process ${pid} is not running (status: ${processInfo.status})`);
             }
         }
-        
+
         // 权限检查（如果权限管理器已加载）- 这是强制性的安全检查
         // 注意：某些 API（如 ScheduleTask.create）需要在内部进行特殊权限检查，跳过默认检查
         const skipDefaultPermissionCheck = apiName === 'ScheduleTask.create';
-        
+
         if (typeof PermissionManager !== 'undefined' && !skipDefaultPermissionCheck) {
             const requiredPermission = ProcessManager._getRequiredPermission(apiName);
             if (requiredPermission) {
@@ -2830,16 +2848,16 @@ class ProcessManager {
             // 权限管理器未加载，记录警告但允许继续（向后兼容）
             ProcessManager._log(2, `警告: 权限管理器未加载，跳过权限检查: ${apiName}`);
         }
-        
+
         // 记录程序行为
         ProcessManager._logProgramAction(pid, 'callKernelAPI', { apiName, args });
-        
+
         ProcessManager._log(2, `进程 ${pid} 调用内核API: ${apiName}`);
-        
+
         // 执行API调用
         return await ProcessManager._executeKernelAPI(apiName, args, pid);
     }
-    
+
     /**
      * 获取API所需的权限
      * @param {string} apiName API名称
@@ -2849,7 +2867,7 @@ class ProcessManager {
         if (typeof PermissionManager === 'undefined') {
             return null;
         }
-        
+
         // API到权限的映射
         const apiPermissionMap = {
             // 文件系统API
@@ -2858,11 +2876,11 @@ class ProcessManager {
             'FileSystem.delete': PermissionManager.PERMISSION.KERNEL_DISK_DELETE,
             'FileSystem.create': PermissionManager.PERMISSION.KERNEL_DISK_CREATE,
             'FileSystem.list': PermissionManager.PERMISSION.KERNEL_DISK_LIST,
-            
+
             // 通知API
             'Notification.create': PermissionManager.PERMISSION.SYSTEM_NOTIFICATION,
             'Notification.remove': PermissionManager.PERMISSION.SYSTEM_NOTIFICATION,
-            
+
             // 网络API
             'Network.request': PermissionManager.PERMISSION.NETWORK_ACCESS,
             'Network.fetch': PermissionManager.PERMISSION.NETWORK_ACCESS,
@@ -2871,26 +2889,26 @@ class ProcessManager {
             'Network.Port.getStatus': PermissionManager.PERMISSION.NETWORK_ACCESS,
             'Network.Port.list': PermissionManager.PERMISSION.NETWORK_ACCESS,
             'Network.Port.send': PermissionManager.PERMISSION.NETWORK_ACCESS,
-            
+
             // GUI API
             'GUI.createWindow': PermissionManager.PERMISSION.GUI_WINDOW_CREATE,
             'GUI.manageWindow': PermissionManager.PERMISSION.GUI_WINDOW_MANAGE,
-            
+
             // 存储API
             'Storage.read': PermissionManager.PERMISSION.SYSTEM_STORAGE_READ,
             'Storage.write': PermissionManager.PERMISSION.SYSTEM_STORAGE_WRITE,
-            
+
             // 环境变量API
             'Environment.get': PermissionManager.PERMISSION.ENVIRONMENT_READ,
             'Environment.set': PermissionManager.PERMISSION.ENVIRONMENT_WRITE,
             'Environment.delete': PermissionManager.PERMISSION.ENVIRONMENT_WRITE,
             'Environment.list': PermissionManager.PERMISSION.ENVIRONMENT_READ,
             'Environment.getAll': PermissionManager.PERMISSION.ENVIRONMENT_READ,
-            
+
             // 主题API
             'Theme.read': PermissionManager.PERMISSION.THEME_READ,
             'Theme.write': PermissionManager.PERMISSION.THEME_WRITE,
-            
+
             // 桌面API
             'Desktop.manage': PermissionManager.PERMISSION.DESKTOP_MANAGE,
             'Desktop.addShortcut': PermissionManager.PERMISSION.DESKTOP_SHORTCUT, // 添加桌面快捷方式需要快捷方式权限（普通权限）
@@ -2902,7 +2920,7 @@ class ProcessManager {
             'Desktop.setAutoArrange': PermissionManager.PERMISSION.DESKTOP_MANAGE, // 设置自动排列需要桌面管理权限
             'Desktop.refresh': PermissionManager.PERMISSION.DESKTOP_MANAGE, // 刷新桌面需要桌面管理权限
             'Desktop.addFileOrFolderIcon': PermissionManager.PERMISSION.DESKTOP_MANAGE, // 添加文件/文件夹图标需要桌面管理权限
-            
+
             // 任务栏API
             'Taskbar.pinProgram': PermissionManager.PERMISSION.DESKTOP_MANAGE,
             'Taskbar.unpinProgram': PermissionManager.PERMISSION.DESKTOP_MANAGE,
@@ -2914,15 +2932,15 @@ class ProcessManager {
             'Taskbar.updateIcon': PermissionManager.PERMISSION.DESKTOP_MANAGE, // 更新自定义图标需要桌面管理权限
             'Taskbar.getCustomIcons': null, // 读取操作不需要权限
             'Taskbar.getCustomIconsByPid': null, // 读取操作不需要权限
-            
+
             // 事件API
             'Event.register': PermissionManager.PERMISSION.EVENT_LISTENER,
             'Event.unregister': PermissionManager.PERMISSION.EVENT_LISTENER,
-            
+
             // 进程管理API
             'Process.manage': PermissionManager.PERMISSION.PROCESS_MANAGE,
             'Process.requestSelfTermination': null,  // 程序自终止不需要权限（只能终止自己）
-            
+
             // 应用程序管理API（危险权限，仅管理员可授予）
             'Application.install': PermissionManager.PERMISSION.APPLICATION_INSTALL,
             'Application.uninstall': PermissionManager.PERMISSION.APPLICATION_UNINSTALL,
@@ -2930,12 +2948,12 @@ class ProcessManager {
             'Application.isInstalled': null,  // 读取操作不需要权限
             'Application.list': null,  // 读取操作不需要权限
             'Application.listNames': null,  // 读取操作不需要权限
-            
+
             // 多线程API
             'Multithreading.createThread': PermissionManager.PERMISSION.MULTITHREADING_CREATE,
             'Multithreading.executeTask': PermissionManager.PERMISSION.MULTITHREADING_EXECUTE,
             'Multithreading.getPoolStatus': PermissionManager.PERMISSION.MULTITHREADING_EXECUTE,
-            
+
             // 加密API
             'Crypt.generateKeyPair': PermissionManager.PERMISSION.CRYPT_GENERATE_KEY,
             'Crypt.importKeyPair': PermissionManager.PERMISSION.CRYPT_IMPORT_KEY,
@@ -2952,7 +2970,7 @@ class ProcessManager {
             'Crypt.randomString': PermissionManager.PERMISSION.CRYPT_RANDOM,
             'Crypt.randomChoice': PermissionManager.PERMISSION.CRYPT_RANDOM,
             'Crypt.shuffle': PermissionManager.PERMISSION.CRYPT_RANDOM,
-            
+
             // 拖拽API
             'Drag.createSession': PermissionManager.PERMISSION.DRAG_ELEMENT,
             'Drag.enable': PermissionManager.PERMISSION.DRAG_ELEMENT,
@@ -2964,13 +2982,13 @@ class ProcessManager {
             'Drag.createFileDrag': PermissionManager.PERMISSION.DRAG_FILE,
             'Drag.createWindowDrag': PermissionManager.PERMISSION.DRAG_WINDOW,
             'Drag.getProcessDrags': PermissionManager.PERMISSION.DRAG_ELEMENT,
-            
+
             // 地理位置API
             'Geography.getCurrentPosition': PermissionManager.PERMISSION.GEOGRAPHY_LOCATION,
             'Geography.clearCache': PermissionManager.PERMISSION.GEOGRAPHY_LOCATION,
             'Geography.isSupported': null, // 检查支持性不需要权限
             'Geography.getCachedLocation': PermissionManager.PERMISSION.GEOGRAPHY_LOCATION,
-            
+
             // 缓存API
             'Cache.set': PermissionManager.PERMISSION.CACHE_WRITE,
             'Cache.get': PermissionManager.PERMISSION.CACHE_READ,
@@ -2978,7 +2996,7 @@ class ProcessManager {
             'Cache.delete': PermissionManager.PERMISSION.CACHE_WRITE,
             'Cache.clear': PermissionManager.PERMISSION.CACHE_WRITE,
             'Cache.getStats': PermissionManager.PERMISSION.CACHE_READ,
-            
+
             // 语音识别API
             'Speech.isSupported': null,  // 检查支持性不需要权限
             'Speech.createSession': PermissionManager.PERMISSION.SPEECH_RECOGNITION,
@@ -2987,7 +3005,7 @@ class ProcessManager {
             'Speech.stopSession': PermissionManager.PERMISSION.SPEECH_RECOGNITION,
             'Speech.getSessionStatus': PermissionManager.PERMISSION.SPEECH_RECOGNITION,
             'Speech.getSessionResults': PermissionManager.PERMISSION.SPEECH_RECOGNITION,
-            
+
             // 计划任务API
             'ScheduleTask.create': PermissionManager.PERMISSION.SCHEDULE_TASK_CREATE,  // 注意：实际权限检查在API内部，因为需要区分普通任务和启动任务
             'ScheduleTask.delete': PermissionManager.PERMISSION.SCHEDULE_TASK_MANAGE,
@@ -2995,7 +3013,7 @@ class ProcessManager {
             'ScheduleTask.get': null,  // 读取操作不需要权限
             'ScheduleTask.getAll': null,  // 读取操作不需要权限
             'ScheduleTask.setEnabled': PermissionManager.PERMISSION.SCHEDULE_TASK_MANAGE,
-            
+
             // 日志API（需要日志读取权限）
             'Log.getStatistics': PermissionManager.PERMISSION.SYSTEM_LOG_READ,
             'Log.query': PermissionManager.PERMISSION.SYSTEM_LOG_READ,
@@ -3007,11 +3025,14 @@ class ProcessManager {
             'Log.getRecent': PermissionManager.PERMISSION.SYSTEM_LOG_READ,
             'Log.getSubsystems': PermissionManager.PERMISSION.SYSTEM_LOG_READ,
             'Log.getDates': PermissionManager.PERMISSION.SYSTEM_LOG_READ,
+
+            // 异常处理API（普通权限，自动授予）
+            'Exception.report': PermissionManager.PERMISSION.SYSTEM_NOTIFICATION, // 使用通知权限作为普通权限
         };
-        
+
         return apiPermissionMap[apiName] || null;
     }
-    
+
     /**
      * 执行内核API调用（内部方法）
      * @param {string} apiName API名称
@@ -3024,7 +3045,7 @@ class ProcessManager {
         if (!apiName || typeof apiName !== 'string') {
             throw new Error('_executeKernelAPI: apiName 必须是字符串');
         }
-        
+
         if (!Array.isArray(args)) {
             throw new Error('_executeKernelAPI: args 必须是数组');
         }
@@ -3035,41 +3056,41 @@ class ProcessManager {
                 if (!path || typeof path !== 'string') {
                     throw new Error('FileSystem.read: 路径必须是字符串');
                 }
-                
+
                 try {
                     // 解析路径：格式为 "盘符/路径/文件名"
                     const parts = path.split('/');
                     if (parts.length < 2) {
                         throw new Error(`FileSystem.read: 无效的路径格式: ${path}`);
                     }
-                    
+
                     const diskName = parts[0];
                     const fileName = parts[parts.length - 1];
                     const dirPath = parts.slice(0, -1).join('/');
-                    
+
                     // 获取磁盘分区
                     if (typeof Disk === 'undefined') {
                         throw new Error('FileSystem.read: Disk 模块未加载');
                     }
-                    
+
                     // 检查分区是否存在（同时检查 diskSeparateMap 和 diskSeparateSize）
                     const diskMap = Disk.diskSeparateMap;
                     const diskSize = Disk.diskSeparateSize;
-                    const hasPartition = (diskMap && diskMap.has(diskName)) || 
-                                       (diskSize && diskSize.has(diskName));
+                    const hasPartition = (diskMap && diskMap.has(diskName)) ||
+                        (diskSize && diskSize.has(diskName));
                     if (!hasPartition) {
                         throw new Error(`FileSystem.read: 磁盘分区不存在: ${diskName}`);
                     }
-                    
+
                     // 尝试获取 nodeTree（可能不存在或未初始化）
                     let nodeTree = diskMap && diskMap.has(diskName) ? diskMap.get(diskName) : null;
-                    
+
                     // 如果 nodeTree 不存在或未初始化，尝试从 PHP 服务重建
                     if (!nodeTree || !nodeTree.initialized) {
                         if (typeof KernelLogger !== 'undefined') {
                             KernelLogger.info('ProcessManager', `FileSystem.read: 磁盘分区 ${diskName} 的 nodeTree 不可靠，尝试从 PHP 服务重建`);
                         }
-                        
+
                         // 如果 nodeTree 不存在，尝试创建它
                         if (!nodeTree && typeof NodeTreeCollection !== 'undefined') {
                             try {
@@ -3093,7 +3114,7 @@ class ProcessManager {
                                 KernelLogger.error('ProcessManager', `创建 nodeTree 失败: ${diskName}`, e);
                             }
                         }
-                        
+
                         // 如果 nodeTree 存在但未初始化，尝试从 PHP 服务重建
                         if (nodeTree && typeof nodeTree._rebuildFromPHP === 'function') {
                             try {
@@ -3108,7 +3129,7 @@ class ProcessManager {
                             }
                         }
                     }
-                    
+
                     // 读取文件
                     // 如果 nodeTree 仍然不存在或未初始化，直接从 PHP 服务读取
                     if (!nodeTree || !nodeTree.initialized) {
@@ -3118,17 +3139,17 @@ class ProcessManager {
                             // 对于根目录，使用 "D:" 格式（不带斜杠）
                             actualDirPath = diskName;
                         }
-                        
+
                         // 从 PHP 服务直接读取文件
-                        const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                        const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject)
                             ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
-                            : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                            : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin)
                                 ? SystemInformation.getOrigin()
                                 : window.location.origin);
                         url.searchParams.set('action', 'read_file');
                         url.searchParams.set('path', ProcessManager._normalizePath(actualDirPath));
                         url.searchParams.set('fileName', fileName);
-                        
+
                         const response = await fetch(url.toString());
                         if (!response.ok) {
                             throw new Error(`FileSystem.read: 从 PHP 服务读取文件失败: ${path}`);
@@ -3139,13 +3160,13 @@ class ProcessManager {
                         }
                         throw new Error(`FileSystem.read: PHP 服务返回错误: ${result.message || '未知错误'}`);
                     }
-                    
+
                     // 如果 dirPath 是根目录（如 "D:"），使用 separateName 作为路径
                     let actualDirPath = dirPath;
                     if (dirPath === diskName) {
                         actualDirPath = nodeTree.separateName || diskName;
                     }
-                    
+
                     const content = nodeTree.read_file(actualDirPath, fileName);
                     if (content === null || content === undefined) {
                         // 记录详细的错误信息
@@ -3154,7 +3175,7 @@ class ProcessManager {
                         }
                         throw new Error(`FileSystem.read: 文件不存在: ${path}`);
                     }
-                    
+
                     return content;
                 } catch (error) {
                     if (typeof KernelLogger !== 'undefined') {
@@ -3167,45 +3188,45 @@ class ProcessManager {
                 if (!path || typeof path !== 'string') {
                     throw new Error('FileSystem.write: 路径必须是字符串');
                 }
-                
+
                 if (content === undefined || content === null) {
                     throw new Error('FileSystem.write: 内容不能为空');
                 }
-                
+
                 try {
                     // 解析路径：格式为 "盘符/路径/文件名"
                     const parts = path.split('/');
                     if (parts.length < 2) {
                         throw new Error(`FileSystem.write: 无效的路径格式: ${path}`);
                     }
-                    
+
                     const diskName = parts[0];
                     const fileName = parts[parts.length - 1];
                     const dirPath = parts.slice(0, -1).join('/');
-                    
+
                     // 获取磁盘分区
                     if (typeof Disk === 'undefined') {
                         throw new Error('FileSystem.write: Disk 模块未加载');
                     }
-                    
+
                     // 检查分区是否存在（同时检查 diskSeparateMap 和 diskSeparateSize）
                     const diskMap = Disk.diskSeparateMap;
                     const diskSize = Disk.diskSeparateSize;
-                    const hasPartition = (diskMap && diskMap.has(diskName)) || 
-                                       (diskSize && diskSize.has(diskName));
+                    const hasPartition = (diskMap && diskMap.has(diskName)) ||
+                        (diskSize && diskSize.has(diskName));
                     if (!hasPartition) {
                         throw new Error(`FileSystem.write: 磁盘分区不存在: ${diskName}`);
                     }
-                    
+
                     // 尝试获取 nodeTree（可能不存在或未初始化）
                     let nodeTree = diskMap && diskMap.has(diskName) ? diskMap.get(diskName) : null;
-                    
+
                     // 如果 nodeTree 不存在或未初始化，尝试从 PHP 服务重建
                     if (!nodeTree || !nodeTree.initialized) {
                         if (typeof KernelLogger !== 'undefined') {
                             KernelLogger.info('ProcessManager', `FileSystem.write: 磁盘分区 ${diskName} 的 nodeTree 不可靠，尝试从 PHP 服务重建`);
                         }
-                        
+
                         // 如果 nodeTree 不存在，尝试创建它
                         if (!nodeTree && typeof NodeTreeCollection !== 'undefined') {
                             try {
@@ -3229,7 +3250,7 @@ class ProcessManager {
                                 KernelLogger.error('ProcessManager', `创建 nodeTree 失败: ${diskName}`, e);
                             }
                         }
-                        
+
                         // 如果 nodeTree 存在但未初始化，尝试从 PHP 服务重建
                         if (nodeTree && typeof nodeTree._rebuildFromPHP === 'function') {
                             try {
@@ -3244,7 +3265,7 @@ class ProcessManager {
                             }
                         }
                     }
-                    
+
                     // 如果 nodeTree 仍然不存在或未初始化，直接通过 PHP 服务写入
                     if (!nodeTree || !nodeTree.initialized) {
                         // 如果 dirPath 是根目录（如 "D:"），使用 "D:" 格式（不带斜杠）
@@ -3252,11 +3273,11 @@ class ProcessManager {
                         if (dirPath === diskName) {
                             actualDirPath = diskName;
                         }
-                        
+
                         // 通过 PHP 服务直接写入文件
-                        const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                        const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject)
                             ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
-                            : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                            : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin)
                                 ? SystemInformation.getOrigin()
                                 : window.location.origin);
                         url.searchParams.set('action', 'write_file');
@@ -3264,7 +3285,7 @@ class ProcessManager {
                         url.searchParams.set('fileName', fileName);
                         url.searchParams.set('content', content);
                         url.searchParams.set('writeMod', writeMode);
-                        
+
                         const response = await fetch(url.toString(), {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -3275,7 +3296,7 @@ class ProcessManager {
                                 writeMod: writeMode
                             })
                         });
-                        
+
                         if (!response.ok) {
                             throw new Error(`FileSystem.write: 从 PHP 服务写入文件失败: ${path}`);
                         }
@@ -3285,72 +3306,72 @@ class ProcessManager {
                         }
                         throw new Error(`FileSystem.write: PHP 服务返回错误: ${result.message || '未知错误'}`);
                     }
-                    
+
                     // 检查目录节点是否存在
                     // 如果 dirPath 是根目录（如 "D:"），使用 separateName 作为路径
                     let actualDirPath = dirPath;
                     if (dirPath === diskName) {
                         actualDirPath = nodeTree.separateName || diskName;
                     }
-                    
+
                     let dirNode = nodeTree.getNode(actualDirPath);
                     if (!dirNode) {
                         // 如果目录节点不存在，且是根目录，尝试确保根节点存在
                         if (actualDirPath === nodeTree.separateName && !nodeTree.initialized) {
                             throw new Error(`FileSystem.write: 磁盘分区未初始化: ${diskName}`);
                         }
-                        
+
                         // 尝试自动创建不存在的目录
                         if (typeof KernelLogger !== 'undefined') {
                             KernelLogger.info('ProcessManager', `FileSystem.write: 目录不存在，尝试自动创建: ${actualDirPath}`);
                         }
-                        
+
                         try {
                             // 解析目录路径，逐级创建
                             // 规范化路径：移除双斜杠，过滤空部分
                             const normalizedPath = actualDirPath.replace(/\/+/g, '/').replace(/\/$/, '');
                             const pathParts = normalizedPath.split('/').filter(p => p);
-                            
+
                             // 移除盘符和 separateName（如果存在）
                             const basePath = nodeTree.separateName || diskName;
                             const dirParts = pathParts.filter(p => p !== diskName && p !== nodeTree.separateName);
-                            
+
                             let currentPath = basePath;
-                            
+
                             for (const dirName of dirParts) {
                                 // 构建检查路径
-                                const checkPath = currentPath === basePath ? 
-                                    `${basePath}/${dirName}` : 
+                                const checkPath = currentPath === basePath ?
+                                    `${basePath}/${dirName}` :
                                     `${currentPath}/${dirName}`;
-                                
+
                                 const checkNode = nodeTree.getNode(checkPath);
                                 if (!checkNode) {
                                     // 目录不存在，创建它
                                     if (typeof KernelLogger !== 'undefined') {
                                         KernelLogger.debug('ProcessManager', `FileSystem.write: 创建目录: ${checkPath}`);
                                     }
-                                    
+
                                     // 使用 nodeTree.create_dir 创建目录
                                     if (typeof nodeTree.create_dir === 'function') {
                                         await nodeTree.create_dir(currentPath, dirName);
                                     } else {
                                         // 如果 create_dir 不可用，通过 PHP 服务创建
                                         const phpPath = currentPath === basePath ? diskName : currentPath;
-                                        const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
-                            ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
-                            : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
-                                ? SystemInformation.getOrigin()
-                                : window.location.origin);
+                                        const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject)
+                                            ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                                            : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin)
+                                                ? SystemInformation.getOrigin()
+                                                : window.location.origin);
                                         url.searchParams.set('action', 'create_dir');
                                         url.searchParams.set('path', phpPath);
                                         url.searchParams.set('name', dirName);
-                                        
+
                                         const createResponse = await fetch(url.toString());
                                         if (!createResponse.ok) {
                                             const createResult = await createResponse.json();
                                             throw new Error(`创建目录失败: ${createResult.message || '未知错误'}`);
                                         }
-                                        
+
                                         // 手动在 nodeTree 中添加节点
                                         const FileTypeRef = typeof FileType !== 'undefined' ? FileType : null;
                                         if (FileTypeRef && typeof Node !== 'undefined' && nodeTree.optNode) {
@@ -3365,11 +3386,11 @@ class ProcessManager {
                                         }
                                     }
                                 }
-                                
+
                                 // 更新当前路径
                                 currentPath = checkPath;
                             }
-                            
+
                             // 重新检查目录节点（使用规范化后的路径）
                             const finalDirPath = dirParts.length === 0 ? basePath : `${basePath}/${dirParts.join('/')}`;
                             const finalDirNode = nodeTree.getNode(finalDirPath);
@@ -3392,7 +3413,7 @@ class ProcessManager {
                             throw new Error(`FileSystem.write: 目录不存在且无法创建: ${actualDirPath}，错误: ${createError.message}`);
                         }
                     }
-                    
+
                     // 重新获取目录节点（可能在创建目录后已更新）
                     dirNode = nodeTree.getNode(actualDirPath);
                     if (!dirNode) {
@@ -3401,16 +3422,16 @@ class ProcessManager {
                             KernelLogger.warn('ProcessManager', `FileSystem.write: 无法找到目录节点: ${actualDirPath}，将通过 PHP 服务直接写入`);
                         }
                         // 通过 PHP 服务直接写入文件
-                        const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                        const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject)
                             ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
-                            : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                            : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin)
                                 ? SystemInformation.getOrigin()
                                 : window.location.origin);
                         url.searchParams.set('action', 'write_file');
                         url.searchParams.set('path', ProcessManager._normalizePath(dirPath));
                         url.searchParams.set('fileName', fileName);
                         url.searchParams.set('writeMod', writeMode.toLowerCase());
-                        
+
                         const response = await fetch(url.toString(), {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -3422,7 +3443,7 @@ class ProcessManager {
                                 writeMod: writeMode.toLowerCase()
                             })
                         });
-                        
+
                         if (!response.ok) {
                             throw new Error(`FileSystem.write: 从 PHP 服务写入文件失败: ${path}`);
                         }
@@ -3432,13 +3453,13 @@ class ProcessManager {
                         }
                         throw new Error(`FileSystem.write: PHP 服务返回错误: ${result.message || '未知错误'}`);
                     }
-                    
+
                     // 检查文件是否存在，如果不存在则先创建
                     if (!dirNode.attributes[fileName]) {
                         // 文件不存在，先创建文件
                         const FileTypeRef = typeof FileType !== 'undefined' ? FileType : null;
                         let fileObj = null;
-                        
+
                         if (FileTypeRef && typeof FileFormwork !== 'undefined') {
                             try {
                                 const fileType = FileTypeRef.GENRE ? FileTypeRef.GENRE.TEXT : 0;
@@ -3461,8 +3482,8 @@ class ProcessManager {
                                     inited: true,
                                     fileCreatTime: new Date().getTime(),
                                     fileModifyTime: new Date().getTime(),
-                                    readFile() { 
-                                        return this.fileContent.join('\n') + (this.fileContent.length ? '\n' : ''); 
+                                    readFile() {
+                                        return this.fileContent.join('\n') + (this.fileContent.length ? '\n' : '');
                                     },
                                     writeFile(newContent, writeMod) {
                                         const appendMode = FileTypeRef && FileTypeRef.WRITE_MODES ? FileTypeRef.WRITE_MODES.APPEND : 1;
@@ -3493,8 +3514,8 @@ class ProcessManager {
                                 inited: true,
                                 fileCreatTime: new Date().getTime(),
                                 fileModifyTime: new Date().getTime(),
-                                readFile() { 
-                                    return this.fileContent.join('\n') + (this.fileContent.length ? '\n' : ''); 
+                                readFile() {
+                                    return this.fileContent.join('\n') + (this.fileContent.length ? '\n' : '');
                                 },
                                 writeFile(newContent, writeMod) {
                                     if (writeMod === 1) { // APPEND
@@ -3513,23 +3534,23 @@ class ProcessManager {
                                 }
                             };
                         }
-                        
+
                         // 创建文件（使用实际目录路径）
                         await nodeTree.create_file(actualDirPath, fileObj);
                     }
-                    
+
                     // 将内容转换为字符串
                     const contentStr = typeof content === 'string' ? content : String(content);
-                    
+
                     // 获取写入模式
                     let writeMod = null;
                     if (typeof FileType !== 'undefined' && FileType.WRITE_MODES) {
                         writeMod = FileType.WRITE_MODES[writeMode] || FileType.WRITE_MODES.OVERWRITE;
                     }
-                    
+
                     // 写入文件（使用实际目录路径）
                     await nodeTree.write_file(actualDirPath, fileName, contentStr, writeMod);
-                    
+
                     return true;
                 } catch (error) {
                     if (typeof KernelLogger !== 'undefined') {
@@ -3545,37 +3566,37 @@ class ProcessManager {
                 if (!path || typeof path !== 'string') {
                     throw new Error('FileSystem.create: path 必须是字符串');
                 }
-                
+
                 try {
                     // 解析路径
                     const parts = path.split('/');
                     const diskName = parts[0];
                     const itemName = parts[parts.length - 1];
                     const parentPath = parts.slice(0, -1).join('/') || diskName;
-                    
+
                     // 获取磁盘分区
                     if (typeof Disk === 'undefined') {
                         throw new Error('FileSystem.create: Disk 模块未加载');
                     }
-                    
+
                     // 检查分区是否存在（同时检查 diskSeparateMap 和 diskSeparateSize）
                     const diskMap = Disk.diskSeparateMap;
                     const diskSize = Disk.diskSeparateSize;
-                    const hasPartition = (diskMap && diskMap.has(diskName)) || 
-                                       (diskSize && diskSize.has(diskName));
+                    const hasPartition = (diskMap && diskMap.has(diskName)) ||
+                        (diskSize && diskSize.has(diskName));
                     if (!hasPartition) {
                         throw new Error(`FileSystem.create: 磁盘分区不存在: ${diskName}`);
                     }
-                    
+
                     // 尝试获取 nodeTree（可能不存在或未初始化）
                     let nodeTree = diskMap && diskMap.has(diskName) ? diskMap.get(diskName) : null;
-                    
+
                     // 如果 nodeTree 不存在或未初始化，尝试从 PHP 服务重建
                     if (!nodeTree || !nodeTree.initialized) {
                         if (typeof KernelLogger !== 'undefined') {
                             KernelLogger.info('ProcessManager', `FileSystem.create: 磁盘分区 ${diskName} 的 nodeTree 不可靠，尝试从 PHP 服务重建`);
                         }
-                        
+
                         // 如果 nodeTree 不存在，尝试创建它
                         if (!nodeTree && typeof NodeTreeCollection !== 'undefined') {
                             try {
@@ -3599,7 +3620,7 @@ class ProcessManager {
                                 KernelLogger.error('ProcessManager', `创建 nodeTree 失败: ${diskName}`, e);
                             }
                         }
-                        
+
                         // 如果 nodeTree 存在但未初始化，尝试从 PHP 服务重建
                         if (nodeTree && typeof nodeTree._rebuildFromPHP === 'function') {
                             try {
@@ -3614,7 +3635,7 @@ class ProcessManager {
                             }
                         }
                     }
-                    
+
                     // 规范化路径：去掉末尾斜杠，避免 SpringBoot 后端路径拼接时出现双斜杠
                     let phpPath = parentPath;
                     // 如果路径以斜杠结尾（除了根路径 "A:" 到 "Z:"），去掉末尾斜杠（支持所有分区A-Z）
@@ -3622,11 +3643,11 @@ class ProcessManager {
                         phpPath = phpPath.replace(/\/+$/, '');
                     }
                     // 如果路径是根路径 "A:" 到 "Z:"，保持原样（SpringBoot 会正确拼接）
-                    
+
                     // 使用 PHP 服务创建
-                    const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                    const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject)
                         ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
-                        : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                        : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin)
                             ? SystemInformation.getOrigin()
                             : window.location.origin);
                     if (type === 'directory') {
@@ -3641,20 +3662,20 @@ class ProcessManager {
                     } else {
                         throw new Error(`FileSystem.create: 无效的类型: ${type} (必须是 directory 或 file)`);
                     }
-                    
+
                     const response = await fetch(url.toString());
-                    
+
                     if (!response.ok) {
                         const errorResult = await response.json().catch(() => ({ message: response.statusText }));
                         throw new Error(errorResult.message || `HTTP ${response.status}`);
                     }
-                    
+
                     const result = await response.json();
-                    
+
                     if (result.status !== 'success') {
                         throw new Error(result.message || '创建失败');
                     }
-                    
+
                     // 如果创建成功，还需要在 nodeTree 中创建对应的节点（如果 nodeTree 存在）
                     if (type === 'directory' && nodeTree) {
                         try {
@@ -3671,7 +3692,7 @@ class ProcessManager {
                                         // 父路径是根目录，使用 nodeTree 的 separateName
                                         actualParentPath = nodeTree.separateName || diskName;
                                     }
-                                    
+
                                     // 如果 actualParentPath 是根目录，确保使用正确的根节点路径
                                     if (actualParentPath === nodeTree.separateName) {
                                         // 根节点应该总是存在，直接使用 separateName
@@ -3745,7 +3766,7 @@ class ProcessManager {
                             if (parentPath === diskName) {
                                 actualParentPath = nodeTree.separateName || diskName;
                             }
-                            
+
                             // 检查父目录节点是否存在
                             const parentNode = nodeTree.getNode(actualParentPath);
                             if (!parentNode) {
@@ -3757,7 +3778,7 @@ class ProcessManager {
                                 // 创建文件对象
                                 const FileTypeRef = typeof FileType !== 'undefined' ? FileType : null;
                                 let fileObj = null;
-                                
+
                                 if (FileTypeRef && typeof FileFormwork !== 'undefined') {
                                     try {
                                         const fileType = FileTypeRef.GENRE ? FileTypeRef.GENRE.TEXT : 0;
@@ -3780,8 +3801,8 @@ class ProcessManager {
                                             inited: true,
                                             fileCreatTime: new Date().getTime(),
                                             fileModifyTime: new Date().getTime(),
-                                            readFile() { 
-                                                return this.fileContent.join('\n') + (this.fileContent.length ? '\n' : ''); 
+                                            readFile() {
+                                                return this.fileContent.join('\n') + (this.fileContent.length ? '\n' : '');
                                             },
                                             writeFile(newContent, writeMod) {
                                                 if (writeMod === 1) { // APPEND
@@ -3811,8 +3832,8 @@ class ProcessManager {
                                         inited: true,
                                         fileCreatTime: new Date().getTime(),
                                         fileModifyTime: new Date().getTime(),
-                                        readFile() { 
-                                            return this.fileContent.join('\n') + (this.fileContent.length ? '\n' : ''); 
+                                        readFile() {
+                                            return this.fileContent.join('\n') + (this.fileContent.length ? '\n' : '');
                                         },
                                         writeFile(newContent, writeMod) {
                                             if (writeMod === 1) { // APPEND
@@ -3831,7 +3852,7 @@ class ProcessManager {
                                         }
                                     };
                                 }
-                                
+
                                 await nodeTree.create_file(actualParentPath, fileObj);
                             }
                         } catch (e) {
@@ -3841,7 +3862,7 @@ class ProcessManager {
                             }
                         }
                     }
-                    
+
                     return { status: 'success', data: result.data };
                 } catch (error) {
                     if (typeof KernelLogger !== 'undefined') {
@@ -3854,36 +3875,36 @@ class ProcessManager {
                 if (!path || typeof path !== 'string') {
                     throw new Error('FileSystem.delete: path 必须是字符串');
                 }
-                
+
                 try {
                     // 解析路径
                     const pathParts = path.split('/');
                     const itemName = pathParts[pathParts.length - 1];
                     const parentPath = pathParts.slice(0, -1).join('/') || (path.split(':')[0] + ':');
-                    
+
                     // 规范化路径（支持所有分区A-Z）
                     let phpPath = parentPath;
                     if (/^[A-Z]:$/.test(phpPath)) {
                         phpPath = phpPath + '/';
                     }
-                    
+
                     // 使用 PHP 服务删除
-                    const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                    const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject)
                         ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
-                        : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                        : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin)
                             ? SystemInformation.getOrigin()
                             : window.location.origin);
-                    
+
                     // 先检查是文件还是目录（通过尝试列出目录）
                     try {
-                        const checkUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                        const checkUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject)
                             ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
-                            : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                            : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin)
                                 ? SystemInformation.getOrigin()
                                 : window.location.origin);
                         checkUrl.searchParams.set('action', 'list_dir');
                         checkUrl.searchParams.set('path', phpPath);
-                        
+
                         const checkResponse = await fetch(checkUrl.toString());
                         if (checkResponse.ok) {
                             const checkResult = await checkResponse.json();
@@ -3935,16 +3956,16 @@ class ProcessManager {
                         url.searchParams.set('path', phpPath);
                         url.searchParams.set('fileName', itemName);
                     }
-                    
+
                     const response = await fetch(url.toString());
-                    
+
                     if (!response.ok) {
                         const errorResult = await response.json().catch(() => ({ message: response.statusText }));
                         throw new Error(errorResult.message || `HTTP ${response.status}`);
                     }
-                    
+
                     const result = await response.json();
-                    
+
                     if (result.status !== 'success') {
                         // 如果文件不存在，这是可以接受的（可能已经被删除或从未存在）
                         if (result.message && (result.message.includes('文件不存在') || result.message.includes('not found') || result.message.includes('404'))) {
@@ -3955,7 +3976,7 @@ class ProcessManager {
                         }
                         throw new Error(result.message || '删除失败');
                     }
-                    
+
                     return { status: 'success', data: result.data };
                 } catch (error) {
                     // 如果错误是文件不存在，这是可以接受的
@@ -3965,7 +3986,7 @@ class ProcessManager {
                         }
                         return { status: 'success', data: { deleted: false, reason: 'file_not_found' } };
                     }
-                    
+
                     if (typeof KernelLogger !== 'undefined') {
                         KernelLogger.error('ProcessManager', `FileSystem.delete 失败: ${error.message}`, { path });
                     }
@@ -3976,7 +3997,7 @@ class ProcessManager {
                 if (!path || typeof path !== 'string') {
                     throw new Error('FileSystem.list: 路径必须是字符串');
                 }
-                
+
                 try {
                     // 解析路径：格式为 "盘符/路径" 或 "盘符"
                     // 处理可能的双斜杠情况：A://path -> A:/path（支持所有分区A-Z）
@@ -3984,14 +4005,14 @@ class ProcessManager {
                     const parts = normalizedPath.split('/');
                     const diskName = parts[0];
                     const dirPath = normalizedPath;
-                    
+
                     // 获取磁盘分区
                     if (typeof Disk === 'undefined') {
                         throw new Error('FileSystem.list: Disk 模块未加载');
                     }
-                    
+
                     const diskMap = Disk.diskSeparateMap;
-                    
+
                     // 调试信息：检查磁盘映射表
                     if (typeof KernelLogger !== 'undefined') {
                         KernelLogger.debug('ProcessManager', `FileSystem.list: 路径=${path}, 规范化路径=${normalizedPath}, 盘符=${diskName}, 磁盘映射表大小=${diskMap.size}`);
@@ -4000,42 +4021,42 @@ class ProcessManager {
                             KernelLogger.debug('ProcessManager', `FileSystem.list: 可用的磁盘分区: ${diskNames.join(', ')}`);
                         }
                     }
-                    
+
                     // 如果磁盘映射表为空，直接从 PHP 服务获取数据（不尝试重新初始化，避免重复格式化）
                     if (diskMap.size === 0) {
                         if (typeof KernelLogger !== 'undefined') {
                             KernelLogger.info('ProcessManager', `磁盘映射表为空，直接从 PHP 服务获取目录列表: ${dirPath}`);
                         }
-                        
+
                         try {
-                            const phpServiceUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.getFSDirvePath) 
+                            const phpServiceUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.getFSDirvePath)
                                 ? SystemInformation.getFSDirvePath()
-                                : (typeof SystemInformation !== 'undefined' && SystemInformation.getFSDirvePath) 
+                                : (typeof SystemInformation !== 'undefined' && SystemInformation.getFSDirvePath)
                                     ? SystemInformation.getFSDirvePath()
-                                    : (typeof SystemInformation !== 'undefined' && SystemInformation.getFSDirvePath) 
+                                    : (typeof SystemInformation !== 'undefined' && SystemInformation.getFSDirvePath)
                                         ? SystemInformation.getFSDirvePath()
                                         : "/system/service/FSDirve.php";
-                            const listUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                            const listUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject)
                                 ? SystemInformation.buildServiceUrlObject(phpServiceUrl)
-                                : new URL(phpServiceUrl, (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                                : new URL(phpServiceUrl, (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin)
                                     ? SystemInformation.getOrigin()
                                     : window.location.origin);
                             listUrl.searchParams.set('action', 'list_dir');
                             listUrl.searchParams.set('path', ProcessManager._normalizePath(dirPath));
-                            
+
                             const response = await fetch(listUrl.toString(), {
                                 method: 'GET',
                                 headers: {
                                     'Content-Type': 'application/json'
                                 }
                             });
-                            
+
                             if (response.ok) {
                                 const phpResult = await response.json();
                                 if (phpResult.status === 'success' && phpResult.data && phpResult.data.items) {
                                     // 从 PHP 服务获取到的数据
                                     const phpItems = phpResult.data.items || [];
-                                    
+
                                     // 从 PHP 服务数据构建结果
                                     const files = phpItems.filter(item => item.type === 'file').map(item => ({
                                         name: item.name,
@@ -4043,17 +4064,17 @@ class ProcessManager {
                                         path: item.path || `${dirPath}/${item.name}`,
                                         type: 'file'
                                     }));
-                                    
+
                                     const dirs = phpItems.filter(item => item.type === 'directory').map(item => ({
                                         name: item.name,
                                         path: item.path || `${dirPath}/${item.name}`,
                                         type: 'directory'
                                     }));
-                                    
+
                                     if (typeof KernelLogger !== 'undefined') {
                                         KernelLogger.info('ProcessManager', `从 PHP 服务获取目录列表成功，文件数: ${files.length}, 目录数: ${dirs.length}`);
                                     }
-                                    
+
                                     return {
                                         path: dirPath,
                                         files: files,
@@ -4075,20 +4096,20 @@ class ProcessManager {
                             throw new Error(`FileSystem.list: 磁盘映射表为空且无法从 PHP 服务获取数据: ${phpError.message}`);
                         }
                     }
-                    
+
                     if (!diskMap.has(diskName)) {
                         const availableDisks = Array.from(diskMap.keys()).join(', ') || '无';
                         throw new Error(`FileSystem.list: 磁盘分区不存在: ${diskName} (可用分区: ${availableDisks})`);
                     }
-                    
+
                     let nodeTree = diskMap.get(diskName);
-                    
+
                     // 如果 nodeTree 不存在或未初始化，尝试从 PHP 服务重建
                     if (!nodeTree || !nodeTree.initialized) {
                         if (typeof KernelLogger !== 'undefined') {
                             KernelLogger.info('ProcessManager', `FileSystem.list: 磁盘分区 ${diskName} 的 nodeTree 不可靠，尝试从 PHP 服务重建`);
                         }
-                        
+
                         // 如果 nodeTree 不存在，尝试创建它
                         if (!nodeTree && typeof NodeTreeCollection !== 'undefined') {
                             try {
@@ -4110,7 +4131,7 @@ class ProcessManager {
                                 KernelLogger.error('ProcessManager', `创建 nodeTree 失败: ${diskName}`, e);
                             }
                         }
-                        
+
                         // 如果 nodeTree 存在但未初始化，尝试从 PHP 服务重建
                         if (nodeTree && typeof nodeTree._rebuildFromPHP === 'function') {
                             try {
@@ -4125,95 +4146,95 @@ class ProcessManager {
                             }
                         }
                     }
-                    
+
                     // 如果 nodeTree 仍然不存在或未初始化，直接从 PHP 服务获取列表
                     if (!nodeTree || !nodeTree.initialized) {
                         // 从 PHP 服务直接获取目录列表
-                        const phpServiceUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.getFSDirvePath) 
+                        const phpServiceUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.getFSDirvePath)
                             ? SystemInformation.getFSDirvePath()
                             : "/system/service/FSDirve.php";
-                        const listUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                        const listUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject)
                             ? SystemInformation.buildServiceUrlObject(phpServiceUrl)
-                            : new URL(phpServiceUrl, (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                            : new URL(phpServiceUrl, (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin)
                                 ? SystemInformation.getOrigin()
                                 : window.location.origin);
                         listUrl.searchParams.set('action', 'list_dir');
                         listUrl.searchParams.set('path', dirPath);
-                        
+
                         const response = await fetch(listUrl.toString(), {
                             method: 'GET',
                             headers: {
                                 'Content-Type': 'application/json'
                             }
                         });
-                        
+
                         if (response.ok) {
                             const phpResult = await response.json();
                             if (phpResult.status === 'success' && phpResult.data && phpResult.data.items) {
                                 // 从 PHP 服务获取到的数据
                                 const phpItems = phpResult.data.items || [];
-                                
+
                                 // 从 PHP 服务数据构建结果
                                 const files = phpItems.filter(item => item.type === 'file').map(item => ({
                                     name: item.name,
                                     size: item.size || 0,
                                     type: 'file'
                                 }));
-                                
+
                                 const directories = phpItems.filter(item => item.type === 'directory').map(item => ({
                                     name: item.name,
                                     type: 'directory'
                                 }));
-                                
+
                                 return {
                                     files: files,
                                     directories: directories
                                 };
                             }
                         }
-                        
+
                         throw new Error(`FileSystem.list: 无法从 PHP 服务获取目录列表: ${dirPath}`);
                     }
-                    
+
                     // 检查节点是否存在
                     const targetNode = nodeTree.nodes.get(dirPath);
-                    
+
                     // 如果节点不存在，直接尝试从 PHP 服务获取目录列表
                     if (!targetNode) {
                         // 节点不存在，尝试从 PHP 服务获取
                         if (typeof KernelLogger !== 'undefined') {
                             KernelLogger.debug('ProcessManager', `NodeTree 中找不到节点 ${dirPath}，尝试从 PHP 服务获取`);
                         }
-                        
+
                         try {
-                            const phpServiceUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.getFSDirvePath) 
+                            const phpServiceUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.getFSDirvePath)
                                 ? SystemInformation.getFSDirvePath()
-                                : (typeof SystemInformation !== 'undefined' && SystemInformation.getFSDirvePath) 
+                                : (typeof SystemInformation !== 'undefined' && SystemInformation.getFSDirvePath)
                                     ? SystemInformation.getFSDirvePath()
-                                    : (typeof SystemInformation !== 'undefined' && SystemInformation.getFSDirvePath) 
+                                    : (typeof SystemInformation !== 'undefined' && SystemInformation.getFSDirvePath)
                                         ? SystemInformation.getFSDirvePath()
                                         : "/system/service/FSDirve.php";
-                            const listUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                            const listUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject)
                                 ? SystemInformation.buildServiceUrlObject(phpServiceUrl)
-                                : new URL(phpServiceUrl, (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                                : new URL(phpServiceUrl, (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin)
                                     ? SystemInformation.getOrigin()
                                     : window.location.origin);
                             listUrl.searchParams.set('action', 'list_dir');
                             listUrl.searchParams.set('path', ProcessManager._normalizePath(dirPath));
-                            
+
                             const response = await fetch(listUrl.toString(), {
                                 method: 'GET',
                                 headers: {
                                     'Content-Type': 'application/json'
                                 }
                             });
-                            
+
                             if (response.ok) {
                                 const phpResult = await response.json();
                                 if (phpResult.status === 'success' && phpResult.data && phpResult.data.items) {
                                     // 从 PHP 服务获取到的数据
                                     const phpItems = phpResult.data.items || [];
-                                    
+
                                     // 从 PHP 服务数据构建结果
                                     const files = phpItems.filter(item => item.type === 'file').map(item => ({
                                         name: item.name,
@@ -4221,17 +4242,17 @@ class ProcessManager {
                                         path: item.path || `${dirPath}/${item.name}`,
                                         type: 'file'
                                     }));
-                                    
+
                                     const dirs = phpItems.filter(item => item.type === 'directory').map(item => ({
                                         name: item.name,
                                         path: item.path || `${dirPath}/${item.name}`,
                                         type: 'directory'
                                     }));
-                                    
+
                                     if (typeof KernelLogger !== 'undefined') {
                                         KernelLogger.debug('ProcessManager', `从 PHP 服务获取目录列表成功，文件数: ${files.length}, 目录数: ${dirs.length}`);
                                     }
-                                    
+
                                     return {
                                         path: dirPath,
                                         files: files,
@@ -4271,49 +4292,49 @@ class ProcessManager {
                             };
                         }
                     }
-                    
+
                     // 节点存在，从 NodeTree 列出文件和目录
                     let files = nodeTree.list_file(dirPath) || [];
                     let dirs = nodeTree.list_dir(dirPath) || [];
-                    
+
                     // 如果列表为空，尝试从 PHP 服务获取（可能是新创建的目录）
                     const isEmpty = (!files || files.length === 0) && (!dirs || dirs.length === 0);
-                    
+
                     if (isEmpty) {
                         // 列表为空，尝试从 PHP 服务获取（可能是新创建的目录或文件系统不同步）
                         if (typeof KernelLogger !== 'undefined') {
                             KernelLogger.debug('ProcessManager', `NodeTree 中节点 ${dirPath} 列表为空，尝试从 PHP 服务获取`);
                         }
-                        
+
                         try {
-                            const phpServiceUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.getFSDirvePath) 
+                            const phpServiceUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.getFSDirvePath)
                                 ? SystemInformation.getFSDirvePath()
-                                : (typeof SystemInformation !== 'undefined' && SystemInformation.getFSDirvePath) 
+                                : (typeof SystemInformation !== 'undefined' && SystemInformation.getFSDirvePath)
                                     ? SystemInformation.getFSDirvePath()
-                                    : (typeof SystemInformation !== 'undefined' && SystemInformation.getFSDirvePath) 
+                                    : (typeof SystemInformation !== 'undefined' && SystemInformation.getFSDirvePath)
                                         ? SystemInformation.getFSDirvePath()
                                         : "/system/service/FSDirve.php";
-                            const listUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                            const listUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject)
                                 ? SystemInformation.buildServiceUrlObject(phpServiceUrl)
-                                : new URL(phpServiceUrl, (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                                : new URL(phpServiceUrl, (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin)
                                     ? SystemInformation.getOrigin()
                                     : window.location.origin);
                             listUrl.searchParams.set('action', 'list_dir');
                             listUrl.searchParams.set('path', ProcessManager._normalizePath(dirPath));
-                            
+
                             const response = await fetch(listUrl.toString(), {
                                 method: 'GET',
                                 headers: {
                                     'Content-Type': 'application/json'
                                 }
                             });
-                            
+
                             if (response.ok) {
                                 const phpResult = await response.json();
                                 if (phpResult.status === 'success' && phpResult.data && phpResult.data.items) {
                                     // 从 PHP 服务获取到的数据
                                     const phpItems = phpResult.data.items || [];
-                                    
+
                                     // 从 PHP 服务数据构建结果
                                     files = phpItems.filter(item => item.type === 'file').map(item => ({
                                         name: item.name,
@@ -4321,13 +4342,13 @@ class ProcessManager {
                                         path: item.path || `${dirPath}/${item.name}`,
                                         type: 'file'
                                     }));
-                                    
+
                                     dirs = phpItems.filter(item => item.type === 'directory').map(item => ({
                                         name: item.name,
                                         path: item.path || `${dirPath}/${item.name}`,
                                         type: 'directory'
                                     }));
-                                    
+
                                     if (typeof KernelLogger !== 'undefined') {
                                         KernelLogger.info('ProcessManager', `从 PHP 服务获取目录列表成功，文件数: ${files.length}, 目录数: ${dirs.length}`);
                                     }
@@ -4343,9 +4364,9 @@ class ProcessManager {
                             }
                         } catch (phpError) {
                             if (typeof KernelLogger !== 'undefined') {
-                                KernelLogger.error('ProcessManager', `从 PHP 服务获取目录列表失败: ${phpError.message}`, { 
+                                KernelLogger.error('ProcessManager', `从 PHP 服务获取目录列表失败: ${phpError.message}`, {
                                     path: dirPath,
-                                    error: phpError.stack 
+                                    error: phpError.stack
                                 });
                             }
                             // 继续使用空的文件/目录列表
@@ -4356,7 +4377,7 @@ class ProcessManager {
                             KernelLogger.debug('ProcessManager', `节点 ${dirPath} 不存在，但列表不为空（文件: ${files?.length || 0}, 目录: ${dirs?.length || 0}）`);
                         }
                     }
-                    
+
                     // 格式化结果
                     const result = {
                         path: dirPath,
@@ -4372,7 +4393,7 @@ class ProcessManager {
                             type: 'directory'
                         }))
                     };
-                    
+
                     return result;
                 } catch (error) {
                     if (typeof KernelLogger !== 'undefined') {
@@ -4381,7 +4402,7 @@ class ProcessManager {
                     throw error;
                 }
             },
-            
+
             // 通知API
             'Notification.create': async (pid, options) => {
                 if (typeof NotificationManager === 'undefined') {
@@ -4390,7 +4411,7 @@ class ProcessManager {
                 if (!options || typeof options !== 'object') {
                     throw new Error('Notification.create: options 必须是对象');
                 }
-                
+
                 // 转换参数格式（从 ProcessManager API 格式转换为 NotificationManager 格式）
                 const notificationOptions = {
                     type: options.type || 'snapshot',
@@ -4399,7 +4420,7 @@ class ProcessManager {
                     duration: options.duration || 0,
                     onClose: options.onClose
                 };
-                
+
                 // 调用 NotificationManager.createNotification
                 const notificationId = await NotificationManager.createNotification(pid, notificationOptions);
                 return { status: 'success', data: { id: notificationId } };
@@ -4411,11 +4432,11 @@ class ProcessManager {
                 if (!notificationId || typeof notificationId !== 'string') {
                     throw new Error('Notification.remove: notificationId 必须是字符串');
                 }
-                
+
                 NotificationManager.removeNotification(notificationId);
                 return { status: 'success' };
             },
-            
+
             // 事件API
             'Event.register': async (pid, eventType, handler, options) => {
                 if (typeof EventManager === 'undefined') {
@@ -4427,7 +4448,7 @@ class ProcessManager {
                 if (!handler || typeof handler !== 'function') {
                     throw new Error('Event.register: handler 必须是函数');
                 }
-                
+
                 const handlerId = EventManager.registerEventHandler(pid, eventType, handler, options || {});
                 return { status: 'success', data: { handlerId } };
             },
@@ -4438,7 +4459,7 @@ class ProcessManager {
                 if (!handlerId || typeof handlerId !== 'number') {
                     throw new Error('Event.unregister: handlerId 必须是数字');
                 }
-                
+
                 EventManager.unregisterEventHandler(handlerId);
                 return { status: 'success' };
             },
@@ -4446,11 +4467,11 @@ class ProcessManager {
                 if (typeof EventManager === 'undefined') {
                     throw new Error('EventManager 模块未加载');
                 }
-                
+
                 EventManager.unregisterAllHandlersForPid(pid);
                 return { status: 'success' };
             },
-            
+
             // 内存管理API
             'Memory.allocate': async (pid, heapSize, shedSize) => {
                 return ProcessManager.allocateMemory(pid, heapSize, shedSize);
@@ -4458,19 +4479,19 @@ class ProcessManager {
             'Memory.free': async (pid, refId) => {
                 return ProcessManager.freeMemoryRef(pid, refId);
             },
-            
+
             // 日志API
             'Logger.log': async (level, subsystem, message, meta) => {
                 if (typeof KernelLogger !== 'undefined') {
                     KernelLogger.log(level, subsystem, message, meta);
                 }
             },
-            
+
             // 动态模块API
             'DynamicModule.request': async (pid, moduleName) => {
                 return await ProcessManager.requestDynamicModule(pid, moduleName);
             },
-            
+
             // 本地存储API
             'LocalStorage.register': async (pid, key, defaultValue) => {
                 return await ProcessManager.requestLocalStorage(pid, 'register', key, defaultValue);
@@ -4484,7 +4505,7 @@ class ProcessManager {
             'LocalStorage.delete': async (pid, key) => {
                 return await ProcessManager.requestLocalStorage(pid, 'delete', key);
             },
-            
+
             // 环境变量API
             'Environment.get': async (name) => {
                 if (typeof LStorage === 'undefined') {
@@ -4516,7 +4537,7 @@ class ProcessManager {
                 }
                 return await LStorage.getAllEnvironmentVariables();
             },
-            
+
             // 进程管理API
             'Process.requestSelfTermination': async () => {
                 // 程序请求自终止，强制关闭程序
@@ -4526,7 +4547,7 @@ class ProcessManager {
                 }
                 return await ProcessManager.requestSelfTermination(pid);
             },
-            
+
             // 应用程序管理API
             'Application.install': async (programName, asset, sourceFiles = null) => {
                 if (!programName || typeof programName !== 'string') {
@@ -4627,7 +4648,7 @@ class ProcessManager {
                     LStorage._currentContextPid = oldContextPid;
                 }
             },
-            
+
             // 网络信息API
             'Network.getInfo': async () => {
                 return await ProcessManager.getNetworkInfo();
@@ -4695,12 +4716,12 @@ class ProcessManager {
                 }
                 return await ProcessManager.sendDataToPort(host, port, data);
             },
-            
+
             // 电池信息API
             'Battery.getInfo': async () => {
                 return await ProcessManager.getBatteryInfo();
             },
-            
+
             // 主题管理API
             'Theme.getCurrent': async () => {
                 return ProcessManager.getCurrentTheme();
@@ -4753,7 +4774,7 @@ class ProcessManager {
             'AnimationPreset.set': async (presetId) => {
                 return await ProcessManager.setAnimationPreset(presetId);
             },
-            
+
             // 桌面管理API
             'Desktop.addShortcut': async (options) => {
                 if (typeof DesktopManager === 'undefined') {
@@ -4844,7 +4865,7 @@ class ProcessManager {
                 DesktopManager.refresh();
                 return true;
             },
-            
+
             // 任务栏固定程序管理 API
             'Taskbar.pinProgram': async (programName) => {
                 if (typeof TaskbarManager === 'undefined') {
@@ -4953,7 +4974,7 @@ class ProcessManager {
                 }
                 return await TaskbarManager.getCustomIconsByPid(pid);
             },
-            
+
             // 多线程API
             'Multithreading.createThread': async (pid) => {
                 if (typeof MultithreadingDrive === 'undefined') {
@@ -4979,7 +5000,7 @@ class ProcessManager {
                 }
                 return MultithreadingDrive.getPoolStatus();
             },
-            
+
             // 拖拽API
             'Drag.createSession': async (pid, sourceElementSelector, dragType, dragData = {}, options = {}) => {
                 if (typeof DragDrive === 'undefined') {
@@ -4991,13 +5012,13 @@ class ProcessManager {
                 if (!Object.values(DragDrive.DRAG_TYPE).includes(dragType)) {
                     throw new Error(`Drag.createSession: 无效的拖拽类型: ${dragType}`);
                 }
-                
+
                 // 查找源元素
                 const sourceElement = document.querySelector(sourceElementSelector);
                 if (!sourceElement) {
                     throw new Error(`Drag.createSession: 找不到元素: ${sourceElementSelector}`);
                 }
-                
+
                 return DragDrive.createDragSession(pid, sourceElement, dragType, dragData, options);
             },
             'Drag.enable': async (dragId) => {
@@ -5045,13 +5066,13 @@ class ProcessManager {
                 if (!dropZoneSelector || typeof dropZoneSelector !== 'string') {
                     throw new Error('Drag.registerDropZone: dropZoneSelector 必须是字符串选择器');
                 }
-                
+
                 // 查找放置区域元素
                 const element = document.querySelector(dropZoneSelector);
                 if (!element) {
                     throw new Error(`Drag.registerDropZone: 找不到元素: ${dropZoneSelector}`);
                 }
-                
+
                 return DragDrive.registerDropZone(element, options);
             },
             'Drag.unregisterDropZone': async (dropZoneSelector) => {
@@ -5061,13 +5082,13 @@ class ProcessManager {
                 if (!dropZoneSelector || typeof dropZoneSelector !== 'string') {
                     throw new Error('Drag.unregisterDropZone: dropZoneSelector 必须是字符串选择器');
                 }
-                
+
                 // 查找放置区域元素
                 const element = document.querySelector(dropZoneSelector);
                 if (!element) {
                     throw new Error(`Drag.unregisterDropZone: 找不到元素: ${dropZoneSelector}`);
                 }
-                
+
                 DragDrive.unregisterDropZone(element);
                 return true;
             },
@@ -5081,18 +5102,18 @@ class ProcessManager {
                 if (!Array.isArray(filePaths)) {
                     throw new Error('Drag.createFileDrag: filePaths 必须是数组');
                 }
-                
+
                 // 查找源元素
                 const sourceElement = document.querySelector(sourceElementSelector);
                 if (!sourceElement) {
                     throw new Error(`Drag.createFileDrag: 找不到元素: ${sourceElementSelector}`);
                 }
-                
+
                 const dragData = {
                     filePaths: filePaths,
                     type: 'file'
                 };
-                
+
                 return DragDrive.createDragSession(pid, sourceElement, DragDrive.DRAG_TYPE.FILE, dragData, options);
             },
             'Drag.createWindowDrag': async (pid, sourceElementSelector, windowId, options = {}) => {
@@ -5105,18 +5126,18 @@ class ProcessManager {
                 if (!windowId || typeof windowId !== 'string') {
                     throw new Error('Drag.createWindowDrag: windowId 必须是字符串');
                 }
-                
+
                 // 查找源元素
                 const sourceElement = document.querySelector(sourceElementSelector);
                 if (!sourceElement) {
                     throw new Error(`Drag.createWindowDrag: 找不到元素: ${sourceElementSelector}`);
                 }
-                
+
                 const dragData = {
                     windowId: windowId,
                     type: 'window'
                 };
-                
+
                 return DragDrive.createDragSession(pid, sourceElement, DragDrive.DRAG_TYPE.WINDOW, dragData, options);
             },
             'Drag.getProcessDrags': async (pid) => {
@@ -5128,7 +5149,7 @@ class ProcessManager {
                 }
                 return DragDrive.getProcessDrags(pid);
             },
-            
+
             // 地理位置API
             'Geography.getCurrentPosition': async (options = {}) => {
                 if (typeof GeographyDrive === 'undefined') {
@@ -5158,7 +5179,7 @@ class ProcessManager {
                 }
                 return GeographyDrive.getCachedLocation();
             },
-            
+
             // 语音识别API
             'Speech.isSupported': async () => {
                 if (typeof SpeechDrive === 'undefined') {
@@ -5226,7 +5247,7 @@ class ProcessManager {
                 }
                 return SpeechDrive.getSessionResults(pid);
             },
-            
+
             // 缓存API
             'Cache.set': async (key, value, options = {}) => {
                 if (typeof CacheDrive === 'undefined') {
@@ -5306,7 +5327,7 @@ class ProcessManager {
                 }
                 return await CacheDrive.getStats(finalOptions);
             },
-            
+
             // 加密API
             'Crypt.generateKeyPair': async (options) => {
                 if (typeof CryptDrive === 'undefined') {
@@ -5398,36 +5419,36 @@ class ProcessManager {
                 }
                 return CryptDrive.shuffle(array);
             },
-            
+
             // 计划任务API
             'ScheduleTask.create': async (pid, taskConfig, requiresStartupPermission = false) => {
                 if (typeof ScheduleTaskManager === 'undefined') {
                     throw new Error('ScheduleTaskManager 模块未加载');
                 }
-                
+
                 if (!pid) {
                     throw new Error('ScheduleTask.create: 需要 PID');
                 }
-                
+
                 // 参数验证
                 if (!taskConfig || typeof taskConfig !== 'object') {
                     throw new Error('ScheduleTask.create: taskConfig 必须是对象');
                 }
-                
+
                 // 获取程序名称
                 const processInfo = ProcessManager.PROCESS_TABLE.get(pid);
                 if (!processInfo) {
                     throw new Error(`Process ${pid} does not exist`);
                 }
-                
+
                 const createdBy = processInfo.programName || `pid_${pid}`;
-                
+
                 // 检查权限
                 if (requiresStartupPermission) {
                     // 系统启动后的计划任务需要危险权限
                     if (typeof PermissionManager !== 'undefined') {
                         const hasPermission = await PermissionManager.checkAndRequestPermission(
-                            pid, 
+                            pid,
                             PermissionManager.PERMISSION.SCHEDULE_TASK_STARTUP
                         );
                         if (!hasPermission) {
@@ -5438,7 +5459,7 @@ class ProcessManager {
                     // 普通计划任务需要特殊权限
                     if (typeof PermissionManager !== 'undefined') {
                         const hasPermission = await PermissionManager.checkAndRequestPermission(
-                            pid, 
+                            pid,
                             PermissionManager.PERMISSION.SCHEDULE_TASK_CREATE
                         );
                         if (!hasPermission) {
@@ -5446,203 +5467,230 @@ class ProcessManager {
                         }
                     }
                 }
-                
+
                 return await ScheduleTaskManager.createTask(taskConfig, createdBy, requiresStartupPermission);
             },
             'ScheduleTask.delete': async (pid, taskId) => {
                 if (typeof ScheduleTaskManager === 'undefined') {
                     throw new Error('ScheduleTaskManager 模块未加载');
                 }
-                
+
                 if (!pid) {
                     throw new Error('ScheduleTask.delete: 需要 PID');
                 }
-                
+
                 // 检查权限
                 if (typeof PermissionManager !== 'undefined') {
                     const hasPermission = await PermissionManager.checkAndRequestPermission(
-                        pid, 
+                        pid,
                         PermissionManager.PERMISSION.SCHEDULE_TASK_MANAGE
                     );
                     if (!hasPermission) {
                         throw new Error('没有权限删除计划任务（需要 SCHEDULE_TASK_MANAGE 权限）');
                     }
                 }
-                
+
                 return await ScheduleTaskManager.deleteTask(taskId);
             },
             'ScheduleTask.update': async (pid, taskId, updates) => {
                 if (typeof ScheduleTaskManager === 'undefined') {
                     throw new Error('ScheduleTaskManager 模块未加载');
                 }
-                
+
                 if (!pid) {
                     throw new Error('ScheduleTask.update: 需要 PID');
                 }
-                
+
                 // 检查权限
                 if (typeof PermissionManager !== 'undefined') {
                     const hasPermission = await PermissionManager.checkAndRequestPermission(
-                        pid, 
+                        pid,
                         PermissionManager.PERMISSION.SCHEDULE_TASK_MANAGE
                     );
                     if (!hasPermission) {
                         throw new Error('没有权限更新计划任务（需要 SCHEDULE_TASK_MANAGE 权限）');
                     }
                 }
-                
+
                 return await ScheduleTaskManager.updateTask(taskId, updates);
             },
             'ScheduleTask.get': async (taskId) => {
                 if (typeof ScheduleTaskManager === 'undefined') {
                     throw new Error('ScheduleTaskManager 模块未加载');
                 }
-                
+
                 return ScheduleTaskManager.getTask(taskId);
             },
             'ScheduleTask.getAll': async () => {
                 if (typeof ScheduleTaskManager === 'undefined') {
                     throw new Error('ScheduleTaskManager 模块未加载');
                 }
-                
+
                 return ScheduleTaskManager.getAllTasks();
             },
             'ScheduleTask.setEnabled': async (pid, taskId, enabled) => {
                 if (typeof ScheduleTaskManager === 'undefined') {
                     throw new Error('ScheduleTaskManager 模块未加载');
                 }
-                
+
                 if (!pid) {
                     throw new Error('ScheduleTask.setEnabled: 需要 PID');
                 }
-                
+
                 // 检查权限
                 if (typeof PermissionManager !== 'undefined') {
                     const hasPermission = await PermissionManager.checkAndRequestPermission(
-                        pid, 
+                        pid,
                         PermissionManager.PERMISSION.SCHEDULE_TASK_MANAGE
                     );
                     if (!hasPermission) {
                         throw new Error('没有权限管理计划任务（需要 SCHEDULE_TASK_MANAGE 权限）');
                     }
                 }
-                
+
                 return await ScheduleTaskManager.setTaskEnabled(taskId, enabled);
             },
-            
+
             // ==================== 日志API ====================
-            
+
             'Log.getStatistics': async () => {
                 if (typeof KernelLogger === 'undefined') {
                     throw new Error('KernelLogger 模块未加载');
                 }
-                
+
                 return KernelLogger.getStatistics();
             },
-            
+
             'Log.query': async (options) => {
                 if (typeof KernelLogger === 'undefined') {
                     throw new Error('KernelLogger 模块未加载');
                 }
-                
+
                 if (!options || typeof options !== 'object') {
                     throw new Error('Log.query: options 必须是对象');
                 }
-                
+
                 return KernelLogger.queryLogs(options);
             },
-            
+
             'Log.getByLevel': async (level, limit, offset) => {
                 if (typeof KernelLogger === 'undefined') {
                     throw new Error('KernelLogger 模块未加载');
                 }
-                
+
                 if (!level || typeof level !== 'string') {
                     throw new Error('Log.getByLevel: level 必须是字符串');
                 }
-                
+
                 return KernelLogger.getLogsByLevel(level, limit || 100, offset || 0);
             },
-            
+
             'Log.getBySubsystem': async (subsystem, limit, offset) => {
                 if (typeof KernelLogger === 'undefined') {
                     throw new Error('KernelLogger 模块未加载');
                 }
-                
+
                 if (!subsystem || typeof subsystem !== 'string') {
                     throw new Error('Log.getBySubsystem: subsystem 必须是字符串');
                 }
-                
+
                 return KernelLogger.getLogsBySubsystem(subsystem, limit || 100, offset || 0);
             },
-            
+
             'Log.getByDate': async (date, limit, offset) => {
                 if (typeof KernelLogger === 'undefined') {
                     throw new Error('KernelLogger 模块未加载');
                 }
-                
+
                 if (!date || typeof date !== 'string') {
                     throw new Error('Log.getByDate: date 必须是字符串（格式：YYYY-MM-DD）');
                 }
-                
+
                 return KernelLogger.getLogsByDate(date, limit || 100, offset || 0);
             },
-            
+
             'Log.getByTimeRange': async (startTime, endTime, limit, offset) => {
                 if (typeof KernelLogger === 'undefined') {
                     throw new Error('KernelLogger 模块未加载');
                 }
-                
+
                 if (typeof startTime !== 'number' || typeof endTime !== 'number') {
                     throw new Error('Log.getByTimeRange: startTime 和 endTime 必须是数字（时间戳，毫秒）');
                 }
-                
+
                 if (startTime > endTime) {
                     throw new Error('Log.getByTimeRange: startTime 不能大于 endTime');
                 }
-                
+
                 return KernelLogger.getLogsByTimeRange(startTime, endTime, limit || 100, offset || 0);
             },
-            
+
             'Log.search': async (keyword, limit, offset) => {
                 if (typeof KernelLogger === 'undefined') {
                     throw new Error('KernelLogger 模块未加载');
                 }
-                
+
                 if (!keyword || typeof keyword !== 'string') {
                     throw new Error('Log.search: keyword 必须是字符串');
                 }
-                
+
                 return KernelLogger.searchLogs(keyword, limit || 100, offset || 0);
             },
-            
+
             'Log.getRecent': async (count) => {
                 if (typeof KernelLogger === 'undefined') {
                     throw new Error('KernelLogger 模块未加载');
                 }
-                
+
                 return KernelLogger.getRecentLogs(count || 100);
             },
-            
+
             'Log.getSubsystems': async () => {
                 if (typeof KernelLogger === 'undefined') {
                     throw new Error('KernelLogger 模块未加载');
                 }
-                
+
                 return KernelLogger.getSubsystems();
             },
-            
+
             'Log.getDates': async () => {
                 if (typeof KernelLogger === 'undefined') {
                     throw new Error('KernelLogger 模块未加载');
                 }
-                
+
                 return KernelLogger.getDates();
             },
-            
+
+            // 异常处理API
+            'Exception.report': async function (level, message, details, targetPid) {
+                if (typeof ExceptionHandler === 'undefined') {
+                    throw new Error('ExceptionHandler 模块未加载');
+                }
+
+                // 参数验证
+                if (!level || typeof level !== 'string') {
+                    throw new Error('Exception.report: level 必须是字符串');
+                }
+
+                if (!message || typeof message !== 'string') {
+                    throw new Error('Exception.report: message 必须是字符串');
+                }
+
+                // details 是可选的，默认为空对象
+                const exceptionDetails = details || {};
+
+                // targetPid 是可选的，用于程序异常
+                // 如果没有提供targetPid，使用当前调用者的pid（从_executeKernelAPI的pid参数获取）
+                // 注意：这里使用闭包捕获_executeKernelAPI的pid参数
+                const exceptionPid = targetPid !== undefined && targetPid !== null ? targetPid : pid;
+
+                // 调用异常处理器的报告方法
+                await ExceptionHandler.reportException(level, message, exceptionDetails, exceptionPid);
+            },
+
             // 其他API可以在这里添加
         };
-        
+
         const apiHandler = kernelAPIs[apiName];
         if (!apiHandler) {
             const availableAPIs = Object.keys(kernelAPIs).join(', ');
@@ -5652,11 +5700,11 @@ class ProcessManager {
             }
             throw new Error(errorMsg);
         }
-        
+
         try {
             // 某些 API 需要 pid 作为第一个参数
             if (pid !== null && (
-                apiName === 'Notification.create' || 
+                apiName === 'Notification.create' ||
                 apiName === 'Notification.remove' ||
                 apiName === 'Event.register' ||
                 apiName === 'Event.unregister' ||
@@ -5673,13 +5721,13 @@ class ProcessManager {
         } catch (error) {
             // 增强错误信息
             const errorMsg = `Kernel API调用失败: ${apiName} - ${error.message}`;
-            
+
             // 对于某些正常的业务逻辑错误（如端口未注册），不应该记录为错误
             const isNormalBusinessLogic = (
                 (apiName === 'Network.Port.getStatus' && error.message && error.message.includes('未注册')) ||
                 (apiName === 'Network.Port.unregister' && error.message && error.message.includes('未注册'))
             );
-            
+
             if (typeof KernelLogger !== 'undefined') {
                 if (isNormalBusinessLogic) {
                     // 正常业务逻辑，使用调试日志
@@ -5692,7 +5740,7 @@ class ProcessManager {
             throw new Error(errorMsg);
         }
     }
-    
+
     /**
      * 请求本地存储操作（供程序调用）
      * 
@@ -5736,19 +5784,19 @@ class ProcessManager {
      */
     static async requestLocalStorage(pid, operation, key, value = null) {
         ProcessManager._log(2, `进程 ${pid} 请求本地存储操作: ${operation}, Key=${key}`);
-        
+
         // 验证进程
         const processInfo = ProcessManager.PROCESS_TABLE.get(pid);
         if (!processInfo) {
             ProcessManager._log(1, `进程 ${pid} 不存在`);
             throw new Error(`Process ${pid} does not exist`);
         }
-        
+
         if (processInfo.status !== 'running') {
             ProcessManager._log(1, `进程 ${pid} 状态异常: ${processInfo.status}`);
             throw new Error(`Process ${pid} is not running`);
         }
-        
+
         // 获取 LStorage
         let LStorageRef = null;
         if (typeof POOL !== 'undefined' && typeof POOL.__GET__ === 'function') {
@@ -5758,19 +5806,19 @@ class ProcessManager {
                 ProcessManager._log(1, `无法从POOL获取LStorage: ${e.message}`);
             }
         }
-        
+
         if (!LStorageRef && typeof LStorage !== 'undefined') {
             LStorageRef = LStorage;
         }
-        
+
         if (!LStorageRef) {
             ProcessManager._log(1, `LStorage 不可用`);
             throw new Error('LStorage is not available');
         }
-        
+
         // 记录程序行为
         ProcessManager._logProgramAction(pid, 'requestLocalStorage', { operation, key });
-        
+
         // 执行操作
         try {
             switch (operation) {
@@ -5790,7 +5838,7 @@ class ProcessManager {
             throw error;
         }
     }
-    
+
     /**
      * 请求动态模块（供程序调用）
      * 
@@ -5830,44 +5878,44 @@ class ProcessManager {
      */
     static async requestDynamicModule(pid, moduleName) {
         ProcessManager._log(2, `进程 ${pid} 请求动态模块: ${moduleName}`);
-        
+
         // 验证进程
         const processInfo = ProcessManager.PROCESS_TABLE.get(pid);
         if (!processInfo) {
             ProcessManager._log(1, `进程 ${pid} 不存在`);
             throw new Error(`Process ${pid} does not exist`);
         }
-        
+
         if (processInfo.status !== 'running') {
             ProcessManager._log(1, `进程 ${pid} 状态异常: ${processInfo.status}`);
             throw new Error(`Process ${pid} is not running`);
         }
-        
+
         // 检查 DynamicManager 是否可用
         if (typeof DynamicManager === 'undefined') {
             ProcessManager._log(1, `DynamicManager 不可用`);
             throw new Error('DynamicManager is not available');
         }
-        
+
         // 检查模块是否存在
         if (!DynamicManager.hasModule(moduleName)) {
             ProcessManager._log(1, `模块 ${moduleName} 不存在`);
             throw new Error(`Dynamic module ${moduleName} does not exist`);
         }
-        
+
         // 记录程序行为
         ProcessManager._logProgramAction(pid, 'requestDynamicModule', { moduleName });
-        
+
         // 检查模块是否已加载
         if (DynamicManager.isModuleLoaded(moduleName)) {
             ProcessManager._log(2, `模块 ${moduleName} 已加载，直接返回`);
-            
+
             // 记录到进程信息中
             if (!processInfo.requestedModules) {
                 processInfo.requestedModules = new Set();
             }
             processInfo.requestedModules.add(moduleName);
-            
+
             // 返回模块的全局对象
             const moduleGlobal = DynamicManager.getModuleGlobal(moduleName);
             if (moduleGlobal) {
@@ -5877,32 +5925,32 @@ class ProcessManager {
                 ProcessManager._log(1, `模块 ${moduleName} 已标记为加载，但全局对象不存在，尝试重新加载`);
             }
         }
-        
+
         // 模块未加载，进行加载
         ProcessManager._log(2, `模块 ${moduleName} 未加载，开始加载`);
-        
+
         try {
             // 通过 DynamicManager 加载模块
             const moduleGlobal = await DynamicManager.loadModule(moduleName, {
                 force: false,
                 checkDependencies: true
             });
-            
+
             // 记录到进程信息中
             if (!processInfo.requestedModules) {
                 processInfo.requestedModules = new Set();
             }
             processInfo.requestedModules.add(moduleName);
-            
+
             ProcessManager._log(2, `模块 ${moduleName} 加载完成，已告知进程 ${pid}`);
-            
+
             return moduleGlobal;
         } catch (error) {
             ProcessManager._log(1, `模块 ${moduleName} 加载失败: ${error.message}`);
             throw new Error(`Failed to load dynamic module ${moduleName}: ${error.message}`);
         }
     }
-    
+
     /**
      * 获取进程请求的动态模块列表
      * @param {number} pid 进程ID
@@ -5913,10 +5961,10 @@ class ProcessManager {
         if (!processInfo || !processInfo.requestedModules) {
             return [];
         }
-        
+
         return Array.from(processInfo.requestedModules);
     }
-    
+
     /**
      * 检查进程是否为Exploit程序
      * @param {number} pid 进程ID
@@ -5928,14 +5976,14 @@ class ProcessManager {
         if (pid === ProcessManager.EXPLOIT_PID) {
             return true;
         }
-        
+
         // 对于非 EXPLOIT_PID，即使 isExploit 为 true，也不认为是 Exploit 程序
         // 这防止了通过修改进程表来绕过检查的攻击
         const processInfo = ProcessManager.PROCESS_TABLE.get(pid);
         if (processInfo?.isExploit && pid !== ProcessManager.EXPLOIT_PID) {
             // 检测到可疑的 isExploit 标志设置
             if (typeof KernelLogger !== 'undefined') {
-                KernelLogger.warn("ProcessManager", 
+                KernelLogger.warn("ProcessManager",
                     `安全警告: 进程 ${pid} 的 isExploit 标志被设置为 true，但 PID 不是合法的 EXPLOIT_PID。`);
             }
             ProcessManager._logSecurityViolation(pid, 'suspicious_isExploit_flag_in_check', {
@@ -5943,10 +5991,10 @@ class ProcessManager {
                 expectedExploitPid: ProcessManager.EXPLOIT_PID
             });
         }
-        
+
         return false;
     }
-    
+
     /**
      * 获取程序行为记录
      * @param {number} pid 进程ID
@@ -5958,14 +6006,14 @@ class ProcessManager {
         if (!processInfo) {
             return [];
         }
-        
+
         const actions = processInfo.actions || [];
         if (limit && limit > 0) {
             return actions.slice(-limit);
         }
         return actions;
     }
-    
+
     /**
      * 注册Exploit程序（进程管理器自身）
      * Exploit程序享有与内核直接通信的权限
@@ -5984,17 +6032,17 @@ class ProcessManager {
             actions: [],
             isExploit: true  // 标记为Exploit程序
         };
-        
+
         try {
             // 清空缓存，确保从内存加载最新的数据
             ProcessManager._processTableCache = null;
-            
+
             // 获取进程表（如果不存在则创建新的）
             const table = ProcessManager.PROCESS_TABLE;
-            
+
             // 使用原始表进行更新（绕过保护）
             const rawTable = ProcessManager._getProcessTable();
-            
+
             // 检查是否已存在（避免重复注册）
             if (rawTable.has(exploitPid)) {
                 const existingInfo = rawTable.get(exploitPid);
@@ -6012,19 +6060,19 @@ class ProcessManager {
                 rawTable.set(exploitPid, exploitInfo);
                 ProcessManager._log(2, `添加Exploit程序到进程表 (PID: ${exploitPid})`);
             }
-            
+
             // 更新缓存（使用原始表）
             ProcessManager._processTableCache = rawTable;
-            
+
             // 保存到内存
             ProcessManager._saveProcessTable(rawTable);
-            
+
             // 清空受保护表的缓存，强制重新加载
             ProcessManager._protectedProcessTableCache = null;
-            
+
             // 清除已使用PID缓存（Exploit进程已注册）
             ProcessManager._invalidateUsedPidsCache();
-            
+
             // 验证保存是否成功
             ProcessManager._processTableCache = null;  // 清空缓存以验证
             const verifyTable = ProcessManager.PROCESS_TABLE;
@@ -6033,10 +6081,10 @@ class ProcessManager {
             } else {
                 ProcessManager._log(1, `Exploit程序保存验证失败 (PID: ${exploitPid})`);
             }
-            
+
             // 恢复缓存
             ProcessManager._processTableCache = table;
-            
+
             // 确保Exploit程序的内存已分配
             if (typeof KernelMemory !== 'undefined') {
                 try {
@@ -6051,7 +6099,7 @@ class ProcessManager {
                     ProcessManager._log(1, `确保Exploit程序内存失败: ${e.message}`);
                 }
             }
-            
+
             // 注册程序名称到MemoryManager
             if (typeof MemoryManager !== 'undefined') {
                 try {
@@ -6061,10 +6109,10 @@ class ProcessManager {
                     ProcessManager._log(1, `注册Exploit程序名称到MemoryManager失败: ${e.message}`);
                 }
             }
-            
+
             // 注意：PID现在是随机分配的，不再需要设置NEXT_PID
             // 保留此代码仅用于向后兼容，实际不会执行任何操作
-            
+
             ProcessManager._log(2, `Exploit程序已注册 (PID: ${exploitPid})`);
         } catch (e) {
             ProcessManager._log(1, `注册Exploit程序失败: ${e.message}`, { error: String(e), stack: e.stack });
@@ -6073,14 +6121,14 @@ class ProcessManager {
                 ProcessManager._fallbackProcessTable = new Map();
             }
             ProcessManager._fallbackProcessTable.set(exploitPid, exploitInfo);
-            
+
             // 注意：PID现在是随机分配的，不再需要设置NEXT_PID
             // 保留此代码仅用于向后兼容，实际不会执行任何操作
-            
+
             ProcessManager._log(2, `Exploit程序已使用降级方案注册 (PID: ${exploitPid})`);
         }
     }
-    
+
     /**
      * 获取 DOM 快照（用于跟踪新创建的元素）
      * @returns {Set<Element>} 当前所有元素的集合
@@ -6089,7 +6137,7 @@ class ProcessManager {
         if (typeof document === 'undefined' || !document.body) {
             return new Set();
         }
-        
+
         const snapshot = new Set();
         const allElements = document.body.querySelectorAll('*');
         for (const element of allElements) {
@@ -6097,7 +6145,7 @@ class ProcessManager {
         }
         return snapshot;
     }
-    
+
     /**
      * 标记程序创建的元素
      * @param {number} pid 进程 ID
@@ -6107,13 +6155,13 @@ class ProcessManager {
         if (typeof document === 'undefined' || !document.body) {
             return;
         }
-        
+
         const snapshotAfter = ProcessManager._getDOMSnapshot();
         const processInfo = ProcessManager.PROCESS_TABLE.get(pid);
         if (!processInfo) {
             return;
         }
-        
+
         // 找出新创建的元素
         for (const element of snapshotAfter) {
             if (!snapshotBefore.has(element)) {
@@ -6121,19 +6169,19 @@ class ProcessManager {
                 if (element.dataset) {
                     element.dataset.pid = pid.toString();
                 }
-                
+
                 // 添加到进程的 DOM 元素集合
                 if (!processInfo.domElements) {
                     processInfo.domElements = new Set();
                 }
                 processInfo.domElements.add(element);
                 ProcessManager._elementToPidMap.set(element, pid);
-                
+
                 ProcessManager._log(3, `标记程序元素: ${element.tagName} (PID: ${pid})`);
             }
         }
     }
-    
+
     /**
      * 获取程序创建的所有 GUI 元素
      * @param {number} pid 进程 ID
@@ -6144,15 +6192,15 @@ class ProcessManager {
         if (!processInfo || !processInfo.domElements) {
             return [];
         }
-        
+
         // 过滤出仍然在 DOM 中的元素
         const elements = Array.from(processInfo.domElements).filter(el => {
             return el.parentNode !== null;
         });
-        
+
         return elements;
     }
-    
+
     /**
      * 获取 ApplicationAssetManager（如果可用）
      * @returns {ApplicationAssetManager|null} 应用程序资源管理器
@@ -6161,7 +6209,7 @@ class ProcessManager {
         if (typeof ApplicationAssetManager !== 'undefined') {
             return ApplicationAssetManager;
         }
-        
+
         // 尝试从 POOL 获取
         if (typeof POOL !== 'undefined' && typeof POOL.__GET__ === 'function') {
             try {
@@ -6170,10 +6218,10 @@ class ProcessManager {
                 return null;
             }
         }
-        
+
         return null;
     }
-    
+
     /**
      * 获取 NetworkManager 实例（内部方法）
      * @returns {Object|null} NetworkManager 实例
@@ -6194,7 +6242,7 @@ class ProcessManager {
         }
         return null;
     }
-    
+
     /**
      * 获取网络信息（供程序调用）
      * @param {number} pid 进程ID（可选，用于权限检查）
@@ -6209,7 +6257,7 @@ class ProcessManager {
             }
             ProcessManager._logProgramAction(pid, 'getNetworkInfo', {});
         }
-        
+
         const networkManager = ProcessManager._getNetworkManager();
         if (!networkManager) {
             // 降级：返回基本网络信息
@@ -6220,12 +6268,12 @@ class ProcessManager {
                 timestamp: Date.now()
             };
         }
-        
+
         try {
             const connectionInfo = networkManager.getConnectionInfo();
             const isOnline = networkManager.isOnline();
             const isEnabled = networkManager.isNetworkEnabled();
-            
+
             return {
                 online: isOnline,
                 enabled: isEnabled,
@@ -6238,7 +6286,7 @@ class ProcessManager {
             throw e;
         }
     }
-    
+
     /**
      * 获取网络状态（供程序调用）
      * @param {number} pid 进程ID（可选，用于权限检查）
@@ -6253,7 +6301,7 @@ class ProcessManager {
             }
             ProcessManager._logProgramAction(pid, 'getNetworkState', {});
         }
-        
+
         const networkManager = ProcessManager._getNetworkManager();
         if (!networkManager) {
             // 降级：返回基本网络状态
@@ -6263,7 +6311,7 @@ class ProcessManager {
                 timestamp: Date.now()
             };
         }
-        
+
         try {
             return networkManager.getNetworkStateSnapshot();
         } catch (e) {
@@ -6271,7 +6319,7 @@ class ProcessManager {
             throw e;
         }
     }
-    
+
     /**
      * 检查网络是否在线（供程序调用）
      * @param {number} pid 进程ID（可选，用于权限检查）
@@ -6286,13 +6334,13 @@ class ProcessManager {
             }
             ProcessManager._logProgramAction(pid, 'isNetworkOnline', {});
         }
-        
+
         const networkManager = ProcessManager._getNetworkManager();
         if (!networkManager) {
             // 降级：使用 navigator.onLine
             return typeof navigator !== 'undefined' ? navigator.onLine : false;
         }
-        
+
         try {
             return networkManager.isOnline();
         } catch (e) {
@@ -6300,7 +6348,7 @@ class ProcessManager {
             return false;
         }
     }
-    
+
     /**
      * 获取网络连接信息（供程序调用）
      * @param {number} pid 进程ID（可选，用于权限检查）
@@ -6315,12 +6363,12 @@ class ProcessManager {
             }
             ProcessManager._logProgramAction(pid, 'getNetworkConnectionInfo', {});
         }
-        
+
         const networkManager = ProcessManager._getNetworkManager();
         if (!networkManager) {
             return null;
         }
-        
+
         try {
             return networkManager.getConnectionInfo();
         } catch (e) {
@@ -6328,7 +6376,7 @@ class ProcessManager {
             return null;
         }
     }
-    
+
     /**
      * 获取电池信息（供程序调用）
      * @param {number} pid 进程ID（可选，用于权限检查）
@@ -6343,7 +6391,7 @@ class ProcessManager {
             }
             ProcessManager._logProgramAction(pid, 'getBatteryInfo', {});
         }
-        
+
         const networkManager = ProcessManager._getNetworkManager();
         if (!networkManager) {
             // 降级：尝试直接使用 navigator.getBattery
@@ -6363,7 +6411,7 @@ class ProcessManager {
             }
             return null;
         }
-        
+
         try {
             // 检查 getBatteryInfo 方法是否存在
             if (typeof networkManager.getBatteryInfo !== 'function') {
@@ -6406,7 +6454,7 @@ class ProcessManager {
             return null;
         }
     }
-    
+
     /**
      * 启用网络（供程序调用）
      * @param {number} pid 进程ID（可选，用于权限检查）
@@ -6421,13 +6469,13 @@ class ProcessManager {
             }
             ProcessManager._logProgramAction(pid, 'enableNetwork', {});
         }
-        
+
         const networkManager = ProcessManager._getNetworkManager();
         if (!networkManager) {
             ProcessManager._log(1, "NetworkManager 不可用");
             return false;
         }
-        
+
         try {
             networkManager.enableNetwork();
             return true;
@@ -6436,7 +6484,7 @@ class ProcessManager {
             return false;
         }
     }
-    
+
     /**
      * 禁用网络（供程序调用）
      * @param {number} pid 进程ID（可选，用于权限检查）
@@ -6451,13 +6499,13 @@ class ProcessManager {
             }
             ProcessManager._logProgramAction(pid, 'disableNetwork', {});
         }
-        
+
         const networkManager = ProcessManager._getNetworkManager();
         if (!networkManager) {
             ProcessManager._log(1, "NetworkManager 不可用");
             return false;
         }
-        
+
         try {
             networkManager.disableNetwork();
             return true;
@@ -6466,7 +6514,7 @@ class ProcessManager {
             return false;
         }
     }
-    
+
     /**
      * 切换网络状态（供程序调用）
      * @param {number} pid 进程ID（可选，用于权限检查）
@@ -6481,13 +6529,13 @@ class ProcessManager {
             }
             ProcessManager._logProgramAction(pid, 'toggleNetwork', {});
         }
-        
+
         const networkManager = ProcessManager._getNetworkManager();
         if (!networkManager) {
             ProcessManager._log(1, "NetworkManager 不可用");
             return false;
         }
-        
+
         try {
             return networkManager.toggleNetwork();
         } catch (e) {
@@ -6495,7 +6543,7 @@ class ProcessManager {
             return false;
         }
     }
-    
+
     /**
      * 注册 TCP 端口监听（供程序调用）
      * @param {number} port - 端口号（1-65535）
@@ -6513,11 +6561,11 @@ class ProcessManager {
                 throw new Error(`无效的端口号: ${port}`);
             }
         }
-        
+
         if (!Number.isInteger(port) || port < 1 || port > 65535) {
             throw new Error(`端口号必须是 1-65535 之间的整数，当前值: ${port} (类型: ${typeof port})`);
         }
-        
+
         // 如果提供了 pidForCheck，验证进程是否存在
         if (pidForCheck !== null) {
             const processInfo = ProcessManager.PROCESS_TABLE.get(pidForCheck);
@@ -6526,12 +6574,12 @@ class ProcessManager {
             }
             ProcessManager._logProgramAction(pidForCheck, 'registerPort', { port, pid, programName });
         }
-        
+
         const networkManager = ProcessManager._getNetworkManager();
         if (!networkManager) {
             throw new Error('NetworkManager 不可用');
         }
-        
+
         try {
             return await networkManager.registerPort(port, pid, programName, options);
         } catch (e) {
@@ -6539,7 +6587,7 @@ class ProcessManager {
             throw e;
         }
     }
-    
+
     /**
      * 取消 TCP 端口监听（供程序调用）
      * @param {number} port - 端口号
@@ -6554,11 +6602,11 @@ class ProcessManager {
                 throw new Error(`无效的端口号: ${port}`);
             }
         }
-        
+
         if (!Number.isInteger(port) || port < 1 || port > 65535) {
             throw new Error(`端口号必须是 1-65535 之间的整数，当前值: ${port} (类型: ${typeof port})`);
         }
-        
+
         // 如果提供了 pidForCheck，验证进程是否存在
         if (pidForCheck !== null) {
             const processInfo = ProcessManager.PROCESS_TABLE.get(pidForCheck);
@@ -6567,12 +6615,12 @@ class ProcessManager {
             }
             ProcessManager._logProgramAction(pidForCheck, 'unregisterPort', { port });
         }
-        
+
         const networkManager = ProcessManager._getNetworkManager();
         if (!networkManager) {
             throw new Error('NetworkManager 不可用');
         }
-        
+
         try {
             return await networkManager.unregisterPort(port);
         } catch (e) {
@@ -6580,7 +6628,7 @@ class ProcessManager {
             throw e;
         }
     }
-    
+
     /**
      * 获取端口状态（供程序调用）
      * @param {number} port - 端口号
@@ -6595,11 +6643,11 @@ class ProcessManager {
                 throw new Error(`无效的端口号: ${port}`);
             }
         }
-        
+
         if (!Number.isInteger(port) || port < 1 || port > 65535) {
             throw new Error(`端口号必须是 1-65535 之间的整数，当前值: ${port} (类型: ${typeof port})`);
         }
-        
+
         // 如果提供了 pidForCheck，验证进程是否存在
         if (pidForCheck !== null) {
             const processInfo = ProcessManager.PROCESS_TABLE.get(pidForCheck);
@@ -6608,12 +6656,12 @@ class ProcessManager {
             }
             ProcessManager._logProgramAction(pidForCheck, 'getPortStatus', { port });
         }
-        
+
         const networkManager = ProcessManager._getNetworkManager();
         if (!networkManager) {
             throw new Error('NetworkManager 不可用');
         }
-        
+
         try {
             return await networkManager.getPortStatus(port);
         } catch (e) {
@@ -6626,7 +6674,7 @@ class ProcessManager {
             throw e;
         }
     }
-    
+
     /**
      * 列出所有已注册的端口（供程序调用）
      * @param {number} pidForCheck - 进程ID（可选，用于权限检查）
@@ -6641,12 +6689,12 @@ class ProcessManager {
             }
             ProcessManager._logProgramAction(pidForCheck, 'listPorts', {});
         }
-        
+
         const networkManager = ProcessManager._getNetworkManager();
         if (!networkManager) {
             throw new Error('NetworkManager 不可用');
         }
-        
+
         try {
             return await networkManager.listPorts();
         } catch (e) {
@@ -6654,7 +6702,7 @@ class ProcessManager {
             throw e;
         }
     }
-    
+
     /**
      * 向端口发送数据（作为客户端）（供程序调用）
      * @param {string} host - 主机地址
@@ -6671,11 +6719,11 @@ class ProcessManager {
                 throw new Error(`无效的端口号: ${port}`);
             }
         }
-        
+
         if (!Number.isInteger(port) || port < 1 || port > 65535) {
             throw new Error(`端口号必须是 1-65535 之间的整数，当前值: ${port} (类型: ${typeof port})`);
         }
-        
+
         // 如果提供了 pidForCheck，验证进程是否存在
         if (pidForCheck !== null) {
             const processInfo = ProcessManager.PROCESS_TABLE.get(pidForCheck);
@@ -6684,12 +6732,12 @@ class ProcessManager {
             }
             ProcessManager._logProgramAction(pidForCheck, 'sendDataToPort', { host, port });
         }
-        
+
         const networkManager = ProcessManager._getNetworkManager();
         if (!networkManager) {
             throw new Error('NetworkManager 不可用');
         }
-        
+
         try {
             return await networkManager.sendDataToPort(host, port, data);
         } catch (e) {
@@ -6697,7 +6745,7 @@ class ProcessManager {
             throw e;
         }
     }
-    
+
     /**
      * 获取 ThemeManager 实例（内部方法）
      * @returns {Object|null} ThemeManager 实例
@@ -6718,7 +6766,7 @@ class ProcessManager {
         }
         return null;
     }
-    
+
     /**
      * 获取当前主题（供程序调用）
      * @param {number} pid 进程ID（可选，用于权限检查）
@@ -6736,13 +6784,13 @@ class ProcessManager {
                 ProcessManager._logProgramAction(pid, 'getCurrentTheme', {});
             }
         }
-        
+
         const themeManager = ProcessManager._getThemeManager();
         if (!themeManager) {
             ProcessManager._log(1, "ThemeManager 不可用");
             return null;
         }
-        
+
         // 确保 ThemeManager 已初始化
         if (!themeManager._initialized) {
             ProcessManager._log(1, "ThemeManager 尚未初始化，尝试初始化");
@@ -6750,7 +6798,7 @@ class ProcessManager {
             // 程序可以在稍后重试
             return null;
         }
-        
+
         try {
             return themeManager.getCurrentTheme();
         } catch (e) {
@@ -6759,7 +6807,7 @@ class ProcessManager {
             return null;
         }
     }
-    
+
     /**
      * 获取当前主题ID（供程序调用）
      * @param {number} pid 进程ID（可选，用于权限检查）
@@ -6774,13 +6822,13 @@ class ProcessManager {
             }
             ProcessManager._logProgramAction(pid, 'getCurrentThemeId', {});
         }
-        
+
         const themeManager = ProcessManager._getThemeManager();
         if (!themeManager) {
             ProcessManager._log(1, "ThemeManager 不可用");
             return 'default';
         }
-        
+
         try {
             return themeManager.getCurrentThemeId();
         } catch (e) {
@@ -6788,7 +6836,7 @@ class ProcessManager {
             return 'default';
         }
     }
-    
+
     /**
      * 获取所有主题列表（供程序调用）
      * @param {number} pid 进程ID（可选，用于权限检查）
@@ -6806,13 +6854,13 @@ class ProcessManager {
                 ProcessManager._logProgramAction(pid, 'getAllThemes', {});
             }
         }
-        
+
         const themeManager = ProcessManager._getThemeManager();
         if (!themeManager) {
             ProcessManager._log(1, "ThemeManager 不可用");
             return [];
         }
-        
+
         try {
             return themeManager.getAllThemes();
         } catch (e) {
@@ -6820,7 +6868,7 @@ class ProcessManager {
             return [];
         }
     }
-    
+
     /**
      * 获取指定主题配置（供程序调用）
      * @param {string} themeId 主题ID
@@ -6831,7 +6879,7 @@ class ProcessManager {
         if (!themeId || typeof themeId !== 'string') {
             throw new Error('themeId 必须是字符串');
         }
-        
+
         // 如果提供了 PID，验证进程是否存在
         if (pid !== null) {
             const processInfo = ProcessManager.PROCESS_TABLE.get(pid);
@@ -6840,13 +6888,13 @@ class ProcessManager {
             }
             ProcessManager._logProgramAction(pid, 'getTheme', { themeId });
         }
-        
+
         const themeManager = ProcessManager._getThemeManager();
         if (!themeManager) {
             ProcessManager._log(1, "ThemeManager 不可用");
             return null;
         }
-        
+
         try {
             return themeManager.getTheme(themeId);
         } catch (e) {
@@ -6854,7 +6902,7 @@ class ProcessManager {
             return null;
         }
     }
-    
+
     /**
      * 设置主题（供程序调用）
      * @param {string} themeId 主题ID
@@ -6865,7 +6913,7 @@ class ProcessManager {
         if (!themeId || typeof themeId !== 'string') {
             throw new Error('themeId 必须是字符串');
         }
-        
+
         // 如果提供了 PID，验证进程是否存在
         if (pid !== null) {
             const processInfo = ProcessManager.PROCESS_TABLE.get(pid);
@@ -6874,19 +6922,19 @@ class ProcessManager {
             }
             ProcessManager._logProgramAction(pid, 'setTheme', { themeId });
         }
-        
+
         const themeManager = ProcessManager._getThemeManager();
         if (!themeManager) {
             ProcessManager._log(1, "ThemeManager 不可用");
             return false;
         }
-        
+
         try {
             // 确保 ThemeManager 已初始化
             if (!themeManager._initialized) {
                 await themeManager.init();
             }
-            
+
             // 检查主题是否存在
             if (!themeManager._themes || !themeManager._themes.has(themeId)) {
                 ProcessManager._log(1, `主题不存在: ${themeId}`);
@@ -6897,7 +6945,7 @@ class ProcessManager {
                 }
                 return false;
             }
-            
+
             return await themeManager.setTheme(themeId);
         } catch (e) {
             ProcessManager._log(1, `设置主题失败: ${e.message}`);
@@ -6905,7 +6953,7 @@ class ProcessManager {
             return false;
         }
     }
-    
+
     /**
      * 监听主题变更（供程序调用）
      * @param {Function} listener 监听器函数
@@ -6916,7 +6964,7 @@ class ProcessManager {
         if (typeof listener !== 'function') {
             throw new Error('listener 必须是函数');
         }
-        
+
         // 如果提供了 PID，验证进程是否存在
         if (pid !== null) {
             const processInfo = ProcessManager.PROCESS_TABLE.get(pid);
@@ -6928,21 +6976,21 @@ class ProcessManager {
                 ProcessManager._logProgramAction(pid, 'onThemeChange', {});
             }
         }
-        
+
         const themeManager = ProcessManager._getThemeManager();
         if (!themeManager) {
             ProcessManager._log(1, "ThemeManager 不可用");
-            return () => {};
+            return () => { };
         }
-        
+
         try {
             return themeManager.onThemeChange(listener);
         } catch (e) {
             ProcessManager._log(1, `注册主题变更监听器失败: ${e.message}`);
-            return () => {};
+            return () => { };
         }
     }
-    
+
     /**
      * 获取当前风格ID（供程序调用）
      * @param {number} pid 进程ID（可选，用于权限检查）
@@ -6957,13 +7005,13 @@ class ProcessManager {
             }
             ProcessManager._logProgramAction(pid, 'getCurrentStyleId', {});
         }
-        
+
         const themeManager = ProcessManager._getThemeManager();
         if (!themeManager) {
             ProcessManager._log(1, "ThemeManager 不可用");
             return 'ubuntu';
         }
-        
+
         try {
             return themeManager.getCurrentStyleId();
         } catch (e) {
@@ -6971,7 +7019,7 @@ class ProcessManager {
             return 'ubuntu';
         }
     }
-    
+
     /**
      * 获取当前风格配置（供程序调用）
      * @param {number} pid 进程ID（可选，用于权限检查）
@@ -6989,13 +7037,13 @@ class ProcessManager {
                 ProcessManager._logProgramAction(pid, 'getCurrentStyle', {});
             }
         }
-        
+
         const themeManager = ProcessManager._getThemeManager();
         if (!themeManager) {
             ProcessManager._log(1, "ThemeManager 不可用");
             return null;
         }
-        
+
         // 确保 ThemeManager 已初始化
         if (!themeManager._initialized) {
             ProcessManager._log(1, "ThemeManager 尚未初始化，尝试初始化");
@@ -7003,7 +7051,7 @@ class ProcessManager {
             // 程序可以在稍后重试
             return null;
         }
-        
+
         try {
             return themeManager.getCurrentStyle();
         } catch (e) {
@@ -7012,7 +7060,7 @@ class ProcessManager {
             return null;
         }
     }
-    
+
     /**
      * 获取所有风格列表（供程序调用）
      * @param {number} pid 进程ID（可选，用于权限检查）
@@ -7030,13 +7078,13 @@ class ProcessManager {
                 ProcessManager._logProgramAction(pid, 'getAllStyles', {});
             }
         }
-        
+
         const themeManager = ProcessManager._getThemeManager();
         if (!themeManager) {
             ProcessManager._log(1, "ThemeManager 不可用");
             return [];
         }
-        
+
         try {
             return themeManager.getAllStyles();
         } catch (e) {
@@ -7044,7 +7092,7 @@ class ProcessManager {
             return [];
         }
     }
-    
+
     /**
      * 获取指定风格配置（供程序调用）
      * @param {string} styleId 风格ID
@@ -7055,7 +7103,7 @@ class ProcessManager {
         if (!styleId || typeof styleId !== 'string') {
             throw new Error('styleId 必须是字符串');
         }
-        
+
         // 如果提供了 PID，验证进程是否存在
         if (pid !== null) {
             const processInfo = ProcessManager.PROCESS_TABLE.get(pid);
@@ -7064,13 +7112,13 @@ class ProcessManager {
             }
             ProcessManager._logProgramAction(pid, 'getStyle', { styleId });
         }
-        
+
         const themeManager = ProcessManager._getThemeManager();
         if (!themeManager) {
             ProcessManager._log(1, "ThemeManager 不可用");
             return null;
         }
-        
+
         try {
             return themeManager.getStyle(styleId);
         } catch (e) {
@@ -7078,7 +7126,7 @@ class ProcessManager {
             return null;
         }
     }
-    
+
     /**
      * 设置风格（供程序调用）
      * @param {string} styleId 风格ID
@@ -7089,7 +7137,7 @@ class ProcessManager {
         if (!styleId || typeof styleId !== 'string') {
             throw new Error('styleId 必须是字符串');
         }
-        
+
         // 如果提供了 PID，验证进程是否存在
         if (pid !== null) {
             const processInfo = ProcessManager.PROCESS_TABLE.get(pid);
@@ -7098,26 +7146,26 @@ class ProcessManager {
             }
             ProcessManager._logProgramAction(pid, 'setStyle', { styleId });
         }
-        
+
         const themeManager = ProcessManager._getThemeManager();
         if (!themeManager) {
             ProcessManager._log(1, "ThemeManager 不可用");
             return false;
         }
-        
+
         try {
             // 确保 ThemeManager 已初始化
             if (!themeManager._initialized) {
                 await themeManager.init();
             }
-            
+
             return await themeManager.setStyle(styleId);
         } catch (e) {
             ProcessManager._log(1, `设置风格失败: ${e.message}`);
             return false;
         }
     }
-    
+
     /**
      * 获取当前桌面背景图ID（供程序调用）
      * @param {number} pid 进程ID（可选，用于权限检查）
@@ -7135,13 +7183,13 @@ class ProcessManager {
                 ProcessManager._logProgramAction(pid, 'getCurrentDesktopBackground', {});
             }
         }
-        
+
         const themeManager = ProcessManager._getThemeManager();
         if (!themeManager) {
             ProcessManager._log(1, "ThemeManager 不可用");
             return null;
         }
-        
+
         try {
             return themeManager.getCurrentDesktopBackground();
         } catch (e) {
@@ -7149,7 +7197,7 @@ class ProcessManager {
             return null;
         }
     }
-    
+
     /**
      * 获取所有桌面背景图列表（供程序调用）
      * @param {number} pid 进程ID（可选，用于权限检查）
@@ -7167,13 +7215,13 @@ class ProcessManager {
                 ProcessManager._logProgramAction(pid, 'getAllDesktopBackgrounds', {});
             }
         }
-        
+
         const themeManager = ProcessManager._getThemeManager();
         if (!themeManager) {
             ProcessManager._log(1, "ThemeManager 不可用");
             return [];
         }
-        
+
         try {
             return themeManager.getAllDesktopBackgrounds();
         } catch (e) {
@@ -7181,7 +7229,7 @@ class ProcessManager {
             return [];
         }
     }
-    
+
     /**
      * 获取指定桌面背景图信息（供程序调用）
      * @param {string} backgroundId 背景图ID
@@ -7192,7 +7240,7 @@ class ProcessManager {
         if (!backgroundId || typeof backgroundId !== 'string') {
             throw new Error('backgroundId 必须是字符串');
         }
-        
+
         // 如果提供了 PID，验证进程是否存在
         if (pid !== null) {
             const processInfo = ProcessManager.PROCESS_TABLE.get(pid);
@@ -7204,13 +7252,13 @@ class ProcessManager {
                 ProcessManager._logProgramAction(pid, 'getDesktopBackground', { backgroundId });
             }
         }
-        
+
         const themeManager = ProcessManager._getThemeManager();
         if (!themeManager) {
             ProcessManager._log(1, "ThemeManager 不可用");
             return null;
         }
-        
+
         try {
             return themeManager.getDesktopBackground(backgroundId);
         } catch (e) {
@@ -7218,7 +7266,7 @@ class ProcessManager {
             return null;
         }
     }
-    
+
     /**
      * 设置桌面背景图（供程序调用）
      * @param {string} backgroundId 背景图ID
@@ -7229,7 +7277,7 @@ class ProcessManager {
         if (!backgroundId || typeof backgroundId !== 'string') {
             throw new Error('backgroundId 必须是字符串');
         }
-        
+
         // 如果提供了 PID，验证进程是否存在
         if (pid !== null) {
             const processInfo = ProcessManager.PROCESS_TABLE.get(pid);
@@ -7238,26 +7286,26 @@ class ProcessManager {
             }
             ProcessManager._logProgramAction(pid, 'setDesktopBackground', { backgroundId });
         }
-        
+
         const themeManager = ProcessManager._getThemeManager();
         if (!themeManager) {
             ProcessManager._log(1, "ThemeManager 不可用");
             return false;
         }
-        
+
         try {
             // 确保 ThemeManager 已初始化
             if (!themeManager._initialized) {
                 await themeManager.init();
             }
-            
+
             return await themeManager.setDesktopBackground(backgroundId);
         } catch (e) {
             ProcessManager._log(1, `设置桌面背景失败: ${e.message}`);
             return false;
         }
     }
-    
+
     /**
      * 获取当前动画预设配置（供程序调用）
      * @param {number} pid 进程ID（可选，用于权限检查）
@@ -7272,13 +7320,13 @@ class ProcessManager {
             }
             ProcessManager._logProgramAction(pid, 'getCurrentAnimationPreset', {});
         }
-        
+
         const themeManager = ProcessManager._getThemeManager();
         if (!themeManager) {
             ProcessManager._log(1, "ThemeManager 不可用");
             return null;
         }
-        
+
         try {
             return themeManager.getCurrentAnimationPreset();
         } catch (e) {
@@ -7286,7 +7334,7 @@ class ProcessManager {
             return null;
         }
     }
-    
+
     /**
      * 获取所有动画预设列表（供程序调用）
      * @param {number} pid 进程ID（可选，用于权限检查）
@@ -7304,13 +7352,13 @@ class ProcessManager {
                 ProcessManager._logProgramAction(pid, 'getAllAnimationPresets', {});
             }
         }
-        
+
         const themeManager = ProcessManager._getThemeManager();
         if (!themeManager) {
             ProcessManager._log(1, "ThemeManager 不可用");
             return [];
         }
-        
+
         try {
             return themeManager.getAllAnimationPresets();
         } catch (e) {
@@ -7318,7 +7366,7 @@ class ProcessManager {
             return [];
         }
     }
-    
+
     /**
      * 获取指定动画预设配置（供程序调用）
      * @param {string} presetId 预设ID
@@ -7329,7 +7377,7 @@ class ProcessManager {
         if (!presetId || typeof presetId !== 'string') {
             throw new Error('presetId 必须是字符串');
         }
-        
+
         // 如果提供了 PID，验证进程是否存在
         if (pid !== null) {
             const processInfo = ProcessManager.PROCESS_TABLE.get(pid);
@@ -7338,13 +7386,13 @@ class ProcessManager {
             }
             ProcessManager._logProgramAction(pid, 'getAnimationPreset', { presetId });
         }
-        
+
         const themeManager = ProcessManager._getThemeManager();
         if (!themeManager) {
             ProcessManager._log(1, "ThemeManager 不可用");
             return null;
         }
-        
+
         try {
             return themeManager.getAnimationPreset(presetId);
         } catch (e) {
@@ -7352,7 +7400,7 @@ class ProcessManager {
             return null;
         }
     }
-    
+
     /**
      * 设置动画预设（供程序调用）
      * @param {string} presetId 预设ID
@@ -7363,7 +7411,7 @@ class ProcessManager {
         if (!presetId || typeof presetId !== 'string') {
             throw new Error('presetId 必须是字符串');
         }
-        
+
         // 如果提供了 PID，验证进程是否存在
         if (pid !== null) {
             const processInfo = ProcessManager.PROCESS_TABLE.get(pid);
@@ -7372,26 +7420,26 @@ class ProcessManager {
             }
             ProcessManager._logProgramAction(pid, 'setAnimationPreset', { presetId });
         }
-        
+
         const themeManager = ProcessManager._getThemeManager();
         if (!themeManager) {
             ProcessManager._log(1, "ThemeManager 不可用");
             return false;
         }
-        
+
         try {
             // 确保 ThemeManager 已初始化
             if (!themeManager._initialized) {
                 await themeManager.init();
             }
-            
+
             return await themeManager.setAnimationPreset(presetId);
         } catch (e) {
             ProcessManager._log(1, `设置动画预设失败: ${e.message}`);
             return false;
         }
     }
-    
+
     /**
      * 监听动画预设变更（供程序调用）
      * @param {Function} listener 监听器函数
@@ -7402,7 +7450,7 @@ class ProcessManager {
         if (typeof listener !== 'function') {
             throw new Error('listener 必须是函数');
         }
-        
+
         // 如果提供了 PID，验证进程是否存在
         if (pid !== null) {
             const processInfo = ProcessManager.PROCESS_TABLE.get(pid);
@@ -7411,21 +7459,21 @@ class ProcessManager {
             }
             ProcessManager._logProgramAction(pid, 'onAnimationPresetChange', {});
         }
-        
+
         const themeManager = ProcessManager._getThemeManager();
         if (!themeManager) {
             ProcessManager._log(1, "ThemeManager 不可用");
-            return () => {};
+            return () => { };
         }
-        
+
         try {
             return themeManager.onAnimationPresetChange(listener);
         } catch (e) {
             ProcessManager._log(1, `注册动画预设变更监听器失败: ${e.message}`);
-            return () => {};
+            return () => { };
         }
     }
-    
+
     /**
      * 监听风格变更（供程序调用）
      * @param {Function} listener 监听器函数
@@ -7436,7 +7484,7 @@ class ProcessManager {
         if (typeof listener !== 'function') {
             throw new Error('listener 必须是函数');
         }
-        
+
         // 如果提供了 PID，验证进程是否存在
         if (pid !== null) {
             const processInfo = ProcessManager.PROCESS_TABLE.get(pid);
@@ -7448,21 +7496,21 @@ class ProcessManager {
                 ProcessManager._logProgramAction(pid, 'onStyleChange', {});
             }
         }
-        
+
         const themeManager = ProcessManager._getThemeManager();
         if (!themeManager) {
             ProcessManager._log(1, "ThemeManager 不可用");
-            return () => {};
+            return () => { };
         }
-        
+
         try {
             return themeManager.onStyleChange(listener);
         } catch (e) {
             ProcessManager._log(1, `注册风格变更监听器失败: ${e.message}`);
-            return () => {};
+            return () => { };
         }
     }
-    
+
     /**
      * 获取系统图标路径（供程序调用）
      * @param {string} iconName 图标名称（如 'network', 'battery'）
@@ -7474,7 +7522,7 @@ class ProcessManager {
         if (!iconName || typeof iconName !== 'string') {
             throw new Error('iconName 必须是字符串');
         }
-        
+
         // 如果提供了 PID，验证进程是否存在
         if (pid !== null) {
             const processInfo = ProcessManager.PROCESS_TABLE.get(pid);
@@ -7483,13 +7531,13 @@ class ProcessManager {
             }
             ProcessManager._logProgramAction(pid, 'getSystemIconPath', { iconName, styleId });
         }
-        
+
         const themeManager = ProcessManager._getThemeManager();
         if (!themeManager) {
             ProcessManager._log(1, "ThemeManager 不可用");
             return '';
         }
-        
+
         try {
             return themeManager.getSystemIconPath(iconName, styleId);
         } catch (e) {
@@ -7497,7 +7545,7 @@ class ProcessManager {
             return '';
         }
     }
-    
+
     /**
      * 获取系统图标SVG内容（供程序调用）
      * @param {string} iconName 图标名称
@@ -7509,7 +7557,7 @@ class ProcessManager {
         if (!iconName || typeof iconName !== 'string') {
             throw new Error('iconName 必须是字符串');
         }
-        
+
         // 如果提供了 PID，验证进程是否存在
         if (pid !== null) {
             const processInfo = ProcessManager.PROCESS_TABLE.get(pid);
@@ -7518,13 +7566,13 @@ class ProcessManager {
             }
             ProcessManager._logProgramAction(pid, 'getSystemIconSVG', { iconName, styleId });
         }
-        
+
         const themeManager = ProcessManager._getThemeManager();
         if (!themeManager) {
             ProcessManager._log(1, "ThemeManager 不可用");
             return '';
         }
-        
+
         try {
             return await themeManager.getSystemIconSVG(iconName, styleId);
         } catch (e) {
@@ -7532,7 +7580,7 @@ class ProcessManager {
             return '';
         }
     }
-    
+
     /**
      * 获取程序信息（通过 __info__ 方法）
      * @param {string} programName 程序名称
@@ -7542,15 +7590,15 @@ class ProcessManager {
         if (!programName || typeof programName !== 'string') {
             return null;
         }
-        
+
         const programNameUpper = programName.toUpperCase();
-        const programClass = (typeof window !== 'undefined' && window[programNameUpper]) || 
-                            (typeof globalThis !== 'undefined' && globalThis[programNameUpper]);
-        
+        const programClass = (typeof window !== 'undefined' && window[programNameUpper]) ||
+            (typeof globalThis !== 'undefined' && globalThis[programNameUpper]);
+
         if (!programClass) {
             return null;
         }
-        
+
         // 调用程序的 __info__ 方法
         if (typeof programClass.__info__ === 'function') {
             try {
@@ -7560,7 +7608,7 @@ class ProcessManager {
                 return null;
             }
         }
-        
+
         // 如果没有 __info__ 方法，返回基本信息
         return {
             name: programName,
@@ -7570,7 +7618,7 @@ class ProcessManager {
             hasInfoMethod: false
         };
     }
-    
+
     /**
      * 检查共享空间的使用情况
      * @returns {Object} 共享空间使用情况报告
@@ -7583,19 +7631,19 @@ class ProcessManager {
                 message: "共享空间不可用"
             };
         }
-        
+
         if (typeof POOL === 'undefined' || typeof POOL.__GET__ !== 'function') {
             return {
                 available: false,
                 message: "POOL 不可用"
             };
         }
-        
+
         try {
             // 获取共享空间中的所有键
             const sharedPool = POOL.__GET__("APPLICATION_SHARED_POOL");
             const keys = [];
-            
+
             // 尝试获取所有键（如果 POOL 支持）
             if (sharedPool && typeof sharedPool === 'object') {
                 for (const key in sharedPool) {
@@ -7604,7 +7652,7 @@ class ProcessManager {
                     }
                 }
             }
-            
+
             return {
                 available: true,
                 keys: keys,
@@ -7618,7 +7666,7 @@ class ProcessManager {
             };
         }
     }
-    
+
     /**
      * 初始化 DOM 观察器（观察 document.body 的变化）
      */
@@ -7626,18 +7674,18 @@ class ProcessManager {
         if (typeof document === 'undefined' || !document.body) {
             return;
         }
-        
+
         // 如果已经初始化，跳过
         if (ProcessManager._globalDOMObserver) {
             return;
         }
-        
+
         // 创建全局 MutationObserver
         ProcessManager._globalDOMObserver = new MutationObserver((mutations) => {
             // 当 DOM 发生变化时，可以在这里处理
             // 目前主要用于跟踪，不需要特别处理
         });
-        
+
         // 开始观察 document.body
         ProcessManager._globalDOMObserver.observe(document.body, {
             childList: true,
@@ -7645,10 +7693,10 @@ class ProcessManager {
             attributes: true,
             attributeFilter: ['data-pid']
         });
-        
+
         ProcessManager._log(2, "DOM 观察器已初始化");
     }
-    
+
     /**
      * 清理程序创建的 GUI 元素
      * @param {number} pid 进程 ID
@@ -7664,14 +7712,14 @@ class ProcessManager {
                 ProcessManager._log(1, `清理 GUI 元素失败: ${e.message}`);
             }
         }
-        
+
         // 清理进程的 DOM 元素集合
         const processInfo = ProcessManager.PROCESS_TABLE.get(pid);
         if (processInfo && processInfo.domElements) {
             processInfo.domElements.clear();
         }
     }
-    
+
     /**
      * 初始化共享空间
      */
@@ -7680,15 +7728,15 @@ class ProcessManager {
             ProcessManager._log(1, "POOL 不可用，无法初始化共享空间");
             return;
         }
-        
+
         // 确保 APPLICATION_SHARED_POOL 类别存在
         if (!POOL.__HAS__("APPLICATION_SHARED_POOL")) {
             POOL.__INIT__("APPLICATION_SHARED_POOL");
         }
-        
+
         ProcessManager._log(2, "共享空间已初始化");
     }
-    
+
     /**
      * 获取共享空间对象
      * @returns {Object|null} 共享空间对象
@@ -7697,14 +7745,14 @@ class ProcessManager {
         if (typeof POOL === 'undefined' || typeof POOL.__GET__ !== 'function') {
             return null;
         }
-        
+
         try {
             return POOL.__GET__("APPLICATION_SHARED_POOL");
         } catch (e) {
             return null;
         }
     }
-    
+
     /**
      * 获取 GUI 容器（所有 GUI 程序应该在这个容器内渲染）
      * @returns {HTMLElement|null} GUI 容器元素
@@ -7713,10 +7761,10 @@ class ProcessManager {
         if (typeof document === 'undefined') {
             return null;
         }
-        
+
         // 尝试获取 GUI 容器
         let guiContainer = document.getElementById('gui-container');
-        
+
         // 如果不存在，尝试创建（降级方案）
         if (!guiContainer) {
             // 检查沙盒容器是否存在
@@ -7732,7 +7780,7 @@ class ProcessManager {
                     kernelContent.style.flexDirection = 'column';
                     sandboxContainer.appendChild(kernelContent);
                 }
-                
+
                 // 创建 GUI 容器
                 guiContainer = document.createElement('div');
                 guiContainer.id = 'gui-container';
@@ -7743,7 +7791,7 @@ class ProcessManager {
                 guiContainer.style.width = '100%';
                 guiContainer.style.height = 'calc(100% - 40px)';
                 kernelContent.appendChild(guiContainer);
-                
+
                 // 创建任务栏（如果不存在）
                 let taskbar = document.getElementById('taskbar');
                 if (!taskbar) {
@@ -7761,16 +7809,16 @@ class ProcessManager {
                     taskbar.style.zIndex = '9999';
                     kernelContent.appendChild(taskbar);
                 }
-                
+
                 ProcessManager._log(2, `已创建 GUI 容器（降级方案）`);
             } else {
                 ProcessManager._log(1, `沙盒容器不存在，无法创建 GUI 容器`);
             }
         }
-        
+
         return guiContainer;
     }
-    
+
     /**
      * 在共享空间中设置数据
      * @param {string} key 键名
@@ -7782,11 +7830,11 @@ class ProcessManager {
             ProcessManager._log(1, "共享空间不可用");
             return false;
         }
-        
+
         sharedSpace[key] = value;
         return true;
     }
-    
+
     /**
      * 从共享空间获取数据
      * @param {string} key 键名
@@ -7797,7 +7845,7 @@ class ProcessManager {
         if (!sharedSpace) {
             return null;
         }
-        
+
         return sharedSpace[key];
     }
 }

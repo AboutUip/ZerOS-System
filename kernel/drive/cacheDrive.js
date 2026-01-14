@@ -10,13 +10,13 @@ KernelLogger.info("CacheDrive", "模块初始化");
 class CacheDrive {
     // 缓存分区（始终使用系统盘D:）
     static _cachePartition = "D:";
-    
+
     // 缓存目录路径（始终使用系统盘D:）
     static CACHE_DIR = "D:/cache/";
-    
+
     // 缓存管理文件路径（始终使用系统盘D:）
     static CACHE_METADATA_FILE = "D:/LocalCache.json";
-    
+
     /**
      * 获取缓存分区路径（始终返回系统盘D:）
      * @returns {string} 分区路径（始终为 "D:"）
@@ -24,7 +24,7 @@ class CacheDrive {
     static _getCachePartition() {
         return CacheDrive._cachePartition;
     }
-    
+
     /**
      * 等待分区可用（用于等待 D: 分区初始化完成）
      * @param {string} partitionName 分区名称（如 "D:"）
@@ -47,7 +47,7 @@ class CacheDrive {
                 return false;
             }
         }
-        
+
         // 首先等待 Disk 初始化完成
         let diskInitialized = false;
         for (let i = 0; i < 100; i++) {
@@ -61,18 +61,18 @@ class CacheDrive {
             }
             await new Promise(resolve => setTimeout(resolve, 50));
         }
-        
+
         if (!diskInitialized) {
             KernelLogger.debug("CacheDrive", "Disk 初始化未完成，但继续检查分区");
         }
-        
+
         // 然后检查分区是否存在
         for (let i = 0; i < maxRetries; i++) {
             try {
                 const diskMap = Disk.diskSeparateMap;
                 const diskSize = Disk.diskSeparateSize;
-                const hasPartition = (diskMap && diskMap.has(partitionName)) || 
-                                   (diskSize && diskSize.has(partitionName));
+                const hasPartition = (diskMap && diskMap.has(partitionName)) ||
+                    (diskSize && diskSize.has(partitionName));
                 if (hasPartition) {
                     if (i > 0 || !diskInitialized) {
                         KernelLogger.info("CacheDrive", `分区 ${partitionName} 已可用（重试 ${i + 1} 次后）`);
@@ -84,29 +84,29 @@ class CacheDrive {
             } catch (e) {
                 KernelLogger.debug("CacheDrive", `检查分区 ${partitionName} 时出错: ${e.message}`);
             }
-            
+
             if (i < maxRetries - 1) {
                 await new Promise(resolve => setTimeout(resolve, retryDelay));
             }
         }
-        
+
         // 如果分区仍然不可用，检查所有可用分区
         try {
             const diskMap = Disk.diskSeparateMap;
             const diskSize = Disk.diskSeparateSize;
-            const availablePartitions = diskMap && diskMap.size > 0 
+            const availablePartitions = diskMap && diskMap.size > 0
                 ? Array.from(diskMap.keys()).join(', ')
-                : (diskSize && diskSize.size > 0 
+                : (diskSize && diskSize.size > 0
                     ? Array.from(diskSize.keys()).join(', ')
                     : '无');
             KernelLogger.warn("CacheDrive", `分区 ${partitionName} 在 ${maxRetries} 次重试（约 ${(maxRetries * retryDelay) / 1000} 秒）后仍不可用（可用分区: ${availablePartitions}）`);
         } catch (e) {
             KernelLogger.warn("CacheDrive", `分区 ${partitionName} 在 ${maxRetries} 次重试（约 ${(maxRetries * retryDelay) / 1000} 秒）后仍不可用`);
         }
-        
+
         return false;
     }
-    
+
     /**
      * 检测并设置缓存分区
      * 始终使用系统盘 D: 分区（所有缓存都应该从系统磁盘D加载）
@@ -118,16 +118,16 @@ class CacheDrive {
         CacheDrive.CACHE_DIR = 'D:/cache/';
         CacheDrive.CACHE_METADATA_FILE = 'D:/LocalCache.json';
         KernelLogger.info("CacheDrive", `使用系统盘缓存分区: D:`);
-        
+
         // 不等待 D: 分区（因为这是代码问题，不是时序问题）
         // 如果 D: 分区不可用，init() 方法会抛出错误
-        
+
         return 'D:';
     }
-    
+
     // PHP 服务地址
     static PHP_SERVICE_URL = "/system/service/FSDirve.php";
-    
+
     /**
      * 规范化路径，去掉末尾的斜杠（除非是根路径如 "D:" 或 "C:"）
      * 用于避免 SpringBoot 后端路径拼接时出现双斜杠
@@ -145,7 +145,7 @@ class CacheDrive {
         // 去掉末尾的斜杠
         return path.replace(/\/+$/, '');
     }
-    
+
     // 缓存元数据结构
     // {
     //     system: {
@@ -172,14 +172,14 @@ class CacheDrive {
     static _cacheMetadata = null;
     static _initialized = false;
     static _initializing = false;
-    
+
     // 请求缓存（避免频繁读取文件）
     static _requestCache = {
         metadata: null,
         timestamp: 0,
         cacheTTL: 1000 // 1秒缓存
     };
-    
+
     /**
      * 从 PID 获取程序名称
      * @param {number} pid 程序 PID
@@ -189,15 +189,15 @@ class CacheDrive {
         if (typeof ProcessManager === 'undefined' || !ProcessManager.PROCESS_TABLE) {
             return null;
         }
-        
+
         const processInfo = ProcessManager.PROCESS_TABLE.get(pid);
         if (processInfo && processInfo.programName) {
             return processInfo.programName;
         }
-        
+
         return null;
     }
-    
+
     /**
      * 初始化缓存驱动
      * @returns {Promise<void>}
@@ -212,28 +212,28 @@ class CacheDrive {
             return;
         }
         CacheDrive._initializing = true;
-        
+
         KernelLogger.info("CacheDrive", "初始化缓存驱动");
-        
+
         try {
             // 强制使用系统盘 D: 分区（所有缓存都必须从系统磁盘D加载）
             CacheDrive._cachePartition = 'D:';
             CacheDrive.CACHE_DIR = 'D:/cache/';
             CacheDrive.CACHE_METADATA_FILE = 'D:/LocalCache.json';
-            
+
             // 检测并设置缓存分区（始终使用D:系统盘）
             await CacheDrive._detectCachePartition();
-            
+
             // 验证 D: 分区是否可用（不等待，因为这是代码问题，不是时序问题）
             if (typeof Disk !== 'undefined') {
                 const diskMap = Disk.diskSeparateMap;
                 const diskSize = Disk.diskSeparateSize;
-                const hasPartition = (diskMap && diskMap.has('D:')) || 
-                                   (diskSize && diskSize.has('D:'));
+                const hasPartition = (diskMap && diskMap.has('D:')) ||
+                    (diskSize && diskSize.has('D:'));
                 if (!hasPartition) {
-                    const availablePartitions = diskMap && diskMap.size > 0 
+                    const availablePartitions = diskMap && diskMap.size > 0
                         ? Array.from(diskMap.keys()).join(', ')
-                        : (diskSize && diskSize.size > 0 
+                        : (diskSize && diskSize.size > 0
                             ? Array.from(diskSize.keys()).join(', ')
                             : '无');
                     KernelLogger.error("CacheDrive", `系统盘 D: 分区不可用（可用分区: ${availablePartitions}）`);
@@ -242,17 +242,27 @@ class CacheDrive {
                     throw new Error(`系统盘 D: 分区不可用（可用分区: ${availablePartitions}）。所有系统资源都必须从系统磁盘D加载。这是一个代码问题：D: 分区在 Disk 初始化时没有被正确创建，请检查 Disk 初始化日志。`);
                 }
             }
-            
+
             // 确保缓存目录存在
             await CacheDrive._ensureCacheDirectory();
-            
+
             // 加载缓存元数据（可能触发过期清理），允许在初始化阶段保存
             await CacheDrive._loadCacheMetadata();
-            
+
             CacheDrive._initialized = true;
             KernelLogger.info("CacheDrive", "缓存驱动初始化完成");
         } catch (error) {
-            KernelLogger.error("CacheDrive", `初始化失败: ${error.message}`, error);
+            // 报告异常
+            if (typeof ExceptionHandler !== 'undefined') {
+                ExceptionHandler.reportException(
+                    ExceptionHandler.ExceptionLevel.SYSTEM,
+                    `CacheDrive.初始化失败: ${error.message}`,
+                    { error: error.message, stack: error.stack }
+                ).catch(() => { });
+            } else {
+                KernelLogger.error("CacheDrive", `初始化失败: ${error.message}`, error);
+            }
+
             // 如果是分区不存在错误，不标记为已初始化，让后续调用可以重试
             if (error.message && error.message.includes('分区不可用')) {
                 CacheDrive._initialized = false;
@@ -268,7 +278,7 @@ class CacheDrive {
             CacheDrive._initializing = false;
         }
     }
-    
+
     /**
      * 确保缓存目录存在
      * @returns {Promise<void>}
@@ -287,7 +297,7 @@ class CacheDrive {
             // 不抛出错误，允许继续执行
         }
     }
-    
+
     /**
      * 检查目录是否存在
      * @param {string} path 目录路径
@@ -299,7 +309,7 @@ class CacheDrive {
                 KernelLogger.warn("CacheDrive", "ProcessManager 未加载，无法检查目录是否存在");
                 return false;
             }
-            
+
             const pid = ProcessManager.EXPLOIT_PID || 10000;
             const result = await ProcessManager.callKernelAPI(pid, 'FileSystem.list', [path]);
             return result !== null && result !== undefined;
@@ -308,7 +318,7 @@ class CacheDrive {
             return false;
         }
     }
-    
+
     /**
      * 创建目录
      * @param {string} path 目录路径
@@ -319,7 +329,7 @@ class CacheDrive {
             if (typeof ProcessManager === 'undefined') {
                 throw new Error('ProcessManager 未加载');
             }
-            
+
             const pid = ProcessManager.EXPLOIT_PID || 10000;
             await ProcessManager.callKernelAPI(pid, 'FileSystem.create', [path, 'directory']);
         } catch (error) {
@@ -327,7 +337,7 @@ class CacheDrive {
             throw error;
         }
     }
-    
+
     /**
      * 通过 PHP 服务读取文件
      * @param {string} path 文件路径
@@ -336,22 +346,22 @@ class CacheDrive {
      */
     static async _readFileFromPHP(path, fileName) {
         try {
-            const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+            const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject)
                 ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
-                : new URL(CacheDrive.PHP_SERVICE_URL, (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                : new URL(CacheDrive.PHP_SERVICE_URL, (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin)
                     ? SystemInformation.getOrigin()
                     : window.location.origin);
             url.searchParams.set('action', 'read_file');
             url.searchParams.set('path', CacheDrive._normalizePath(path));
             url.searchParams.set('fileName', fileName);
-            
+
             const response = await fetch(url.toString(), {
                 method: 'GET',
                 headers: {
                     'Content-Type': 'application/json'
                 }
             });
-            
+
             if (!response.ok) {
                 if (response.status === 404) {
                     KernelLogger.debug("CacheDrive", `文件不存在: ${path}/${fileName}`);
@@ -365,21 +375,21 @@ class CacheDrive {
                 }
                 throw new Error(errorText);
             }
-            
+
             // 检查响应类型
             const contentType = response.headers.get('content-type');
             if (!contentType || !contentType.includes('application/json')) {
                 const text = await response.text();
                 throw new Error(`PHP 返回了非 JSON 响应: ${text.substring(0, 500)}`);
             }
-            
+
             // 先读取文本内容，检查是否为空
             const responseText = await response.text();
             if (!responseText || responseText.trim() === '') {
                 KernelLogger.debug("CacheDrive", `PHP 返回空响应: ${path}/${fileName}`);
                 return null;
             }
-            
+
             // 尝试解析 JSON
             let result;
             try {
@@ -394,11 +404,11 @@ class CacheDrive {
                 }
                 throw new Error(`JSON 解析失败: ${jsonError.message}`);
             }
-            
+
             if (result.status === 'success' && result.data && result.data.content !== undefined) {
                 const fileContent = result.data.content;
                 // 检查内容是否为空
-                if (fileContent === null || fileContent === undefined || 
+                if (fileContent === null || fileContent === undefined ||
                     (typeof fileContent === 'string' && fileContent.trim() === '')) {
                     KernelLogger.debug("CacheDrive", `文件内容为空: ${path}/${fileName}`);
                     return null;
@@ -420,7 +430,7 @@ class CacheDrive {
             throw error;
         }
     }
-    
+
     /**
      * 通过 PHP 服务写入文件
      * @param {string} path 文件路径
@@ -430,22 +440,22 @@ class CacheDrive {
      */
     static async _writeFileToPHP(path, fileName, content) {
         try {
-            const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+            const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject)
                 ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
-                : new URL(CacheDrive.PHP_SERVICE_URL, (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                : new URL(CacheDrive.PHP_SERVICE_URL, (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin)
                     ? SystemInformation.getOrigin()
                     : window.location.origin);
             url.searchParams.set('action', 'write_file');
             url.searchParams.set('path', CacheDrive._normalizePath(path));
             url.searchParams.set('fileName', fileName);
             url.searchParams.set('writeMod', 'overwrite');
-            
+
             const contentSize = typeof content === 'string' ? content.length : JSON.stringify(content).length;
             KernelLogger.debug("CacheDrive", `准备写入文件: ${path}/${fileName}, 内容大小: ${contentSize} 字节`);
-            
+
             // 使用 POST 请求传递内容（避免 URL 过长）
             const requestBody = JSON.stringify({ content: content });
-            
+
             const response = await fetch(url.toString(), {
                 method: 'POST',
                 headers: {
@@ -453,9 +463,9 @@ class CacheDrive {
                 },
                 body: requestBody
             });
-            
+
             KernelLogger.debug("CacheDrive", `PHP 响应状态: ${response.status} ${response.statusText}`);
-            
+
             if (!response.ok) {
                 // 尝试读取错误响应内容
                 const contentType = response.headers.get('content-type');
@@ -475,7 +485,7 @@ class CacheDrive {
                 KernelLogger.error("CacheDrive", `PHP 写入文件失败: ${errorText}`);
                 throw new Error(errorText);
             }
-            
+
             // 检查响应类型
             const contentType = response.headers.get('content-type');
             if (!contentType || !contentType.includes('application/json')) {
@@ -483,7 +493,7 @@ class CacheDrive {
                 KernelLogger.error("CacheDrive", `PHP 返回了非 JSON 响应: ${text.substring(0, 500)}`);
                 throw new Error(`PHP 返回了非 JSON 响应: ${text.substring(0, 500)}`);
             }
-            
+
             // 读取响应内容
             const responseText = await response.text();
             if (!responseText || responseText.trim() === '') {
@@ -491,7 +501,7 @@ class CacheDrive {
                 // 空响应可能表示写入失败，但某些情况下也可能是成功
                 return true;
             }
-            
+
             // 尝试解析 JSON
             let result;
             try {
@@ -501,7 +511,7 @@ class CacheDrive {
                 // JSON 解析失败，但可能是写入成功（某些 PHP 实现可能返回非标准响应）
                 return true;
             }
-            
+
             if (result.status === 'success') {
                 return true;
             } else {
@@ -514,7 +524,7 @@ class CacheDrive {
             throw error;
         }
     }
-    
+
     /**
      * 加载缓存元数据
      * @param {boolean} forceReload 是否强制重新加载
@@ -523,18 +533,18 @@ class CacheDrive {
     static async _loadCacheMetadata(forceReload = false) {
         // 检查请求缓存
         const now = Date.now();
-        if (!forceReload && CacheDrive._requestCache.metadata && 
+        if (!forceReload && CacheDrive._requestCache.metadata &&
             (now - CacheDrive._requestCache.timestamp) < CacheDrive._requestCache.cacheTTL) {
             CacheDrive._cacheMetadata = CacheDrive._requestCache.metadata;
             return;
         }
-        
+
         try {
             const path = CacheDrive.CACHE_METADATA_FILE.substring(0, CacheDrive.CACHE_METADATA_FILE.lastIndexOf('/') + 1);
             const fileName = CacheDrive.CACHE_METADATA_FILE.substring(CacheDrive.CACHE_METADATA_FILE.lastIndexOf('/') + 1);
-            
+
             const content = await CacheDrive._readFileFromPHP(path, fileName);
-            
+
             if (content === null || content === undefined) {
                 // 文件不存在，使用空数据结构
                 CacheDrive._cacheMetadata = {
@@ -542,7 +552,7 @@ class CacheDrive {
                     programs: {}
                 };
                 KernelLogger.debug("CacheDrive", "缓存元数据文件不存在，使用空数据结构");
-                
+
                 // 文件不存在时，清理缓存目录中可能存在的过期文件
                 await CacheDrive._cleanOrphanedCacheFiles();
             } else {
@@ -556,7 +566,7 @@ class CacheDrive {
                     KernelLogger.debug("CacheDrive", "缓存元数据文件内容为空，使用空数据结构");
                     return;
                 }
-                
+
                 // 解析 JSON
                 let parsedContent;
                 if (typeof content === 'string') {
@@ -579,7 +589,7 @@ class CacheDrive {
                 } else {
                     parsedContent = content;
                 }
-                
+
                 // 验证数据结构
                 if (parsedContent && typeof parsedContent === 'object') {
                     if (!parsedContent.system) parsedContent.system = {};
@@ -593,11 +603,11 @@ class CacheDrive {
                     };
                 }
             }
-            
+
             // 更新请求缓存
             CacheDrive._requestCache.metadata = CacheDrive._cacheMetadata;
             CacheDrive._requestCache.timestamp = now;
-            
+
             // 清理过期缓存（只有在成功加载元数据时才清理）
             if (CacheDrive._cacheMetadata && typeof CacheDrive._cacheMetadata === 'object') {
                 await CacheDrive._cleanExpiredCache();
@@ -610,7 +620,7 @@ class CacheDrive {
             };
         }
     }
-    
+
     /**
      * 保存缓存元数据
      * @returns {Promise<void>}
@@ -620,14 +630,14 @@ class CacheDrive {
             KernelLogger.warn("CacheDrive", "未初始化，无法保存");
             throw new Error("CacheDrive 未初始化");
         }
-        
+
         try {
             // 数据完整性检查：防止保存空数据或无效数据
             if (!CacheDrive._cacheMetadata || typeof CacheDrive._cacheMetadata !== 'object') {
                 KernelLogger.error("CacheDrive", "缓存元数据无效或为空，拒绝保存以防止数据丢失");
                 throw new Error("缓存元数据无效或为空，无法保存");
             }
-            
+
             // 确保 system 和 programs 存在
             if (!CacheDrive._cacheMetadata.system || typeof CacheDrive._cacheMetadata.system !== 'object') {
                 KernelLogger.warn("CacheDrive", "system 数据无效，使用空对象");
@@ -637,26 +647,26 @@ class CacheDrive {
                 KernelLogger.warn("CacheDrive", "programs 数据无效，使用空对象");
                 CacheDrive._cacheMetadata.programs = {};
             }
-            
+
             const path = CacheDrive.CACHE_METADATA_FILE.substring(0, CacheDrive.CACHE_METADATA_FILE.lastIndexOf('/') + 1);
             const fileName = CacheDrive.CACHE_METADATA_FILE.substring(CacheDrive.CACHE_METADATA_FILE.lastIndexOf('/') + 1);
-            
+
             const content = JSON.stringify(CacheDrive._cacheMetadata, null, 2);
             KernelLogger.debug("CacheDrive", `准备保存缓存元数据: ${path}/${fileName}, JSON 大小: ${content.length} 字节`);
-            
+
             await CacheDrive._writeFileToPHP(path, fileName, content);
-            
+
             // 更新请求缓存
             CacheDrive._requestCache.metadata = CacheDrive._cacheMetadata;
             CacheDrive._requestCache.timestamp = Date.now();
-            
+
             KernelLogger.debug("CacheDrive", "缓存元数据已保存");
         } catch (error) {
             KernelLogger.error("CacheDrive", `保存缓存元数据失败: ${error.message}`, error);
             throw error;
         }
     }
-    
+
     /**
      * 估算值的大小（字节）
      * @param {any} value 值
@@ -671,7 +681,7 @@ class CacheDrive {
             return 1024; // 默认 1KB
         }
     }
-    
+
     /**
      * 检查缓存是否过期
      * @param {Object} cacheEntry 缓存条目
@@ -681,14 +691,14 @@ class CacheDrive {
         if (!cacheEntry || !cacheEntry.expiresAt) {
             return false; // 没有过期时间，永不过期
         }
-        
+
         if (cacheEntry.expiresAt === 0) {
             return false; // 0 表示永不过期
         }
-        
+
         return Date.now() > cacheEntry.expiresAt;
     }
-    
+
     /**
      * 清理缓存目录中的孤立文件（元数据文件不存在时的清理）
      * @returns {Promise<void>}
@@ -701,37 +711,37 @@ class CacheDrive {
                 KernelLogger.debug("CacheDrive", "缓存目录不存在，跳过清理孤立文件");
                 return;
             }
-            
+
             // 使用 FileSystem API 列出缓存目录中的文件
             if (typeof ProcessManager === 'undefined') {
                 KernelLogger.debug("CacheDrive", "ProcessManager 不可用，跳过清理孤立文件");
                 return;
             }
-            
+
             try {
                 const pid = ProcessManager.EXPLOIT_PID || 10000;
                 const listResult = await ProcessManager.callKernelAPI(pid, 'FileSystem.list', [CacheDrive.CACHE_DIR]);
-                
+
                 if (!listResult || !Array.isArray(listResult)) {
                     KernelLogger.debug("CacheDrive", "无法列出缓存目录文件，跳过清理");
                     return;
                 }
-                
+
                 let cleanedCount = 0;
-                
+
                 for (const fileInfo of listResult) {
                     if (!fileInfo || fileInfo.type !== 'file') {
                         continue;
                     }
-                    
+
                     const fileName = fileInfo.name;
                     const filePath = `${CacheDrive.CACHE_DIR}${fileName}`;
-                    
+
                     // 跳过元数据文件本身
                     if (fileName === 'LocalCache.json' || fileName.startsWith('LocalCache_')) {
                         continue;
                     }
-                    
+
                     // 如果元数据文件不存在，说明所有缓存文件都是孤立的，可以全部清理
                     try {
                         KernelLogger.debug("CacheDrive", `清理孤立缓存文件: ${fileName}`);
@@ -741,7 +751,7 @@ class CacheDrive {
                         KernelLogger.debug("CacheDrive", `删除孤立文件失败: ${fileName}, 错误: ${deleteError.message}`);
                     }
                 }
-                
+
                 if (cleanedCount > 0) {
                     KernelLogger.info("CacheDrive", `已清理 ${cleanedCount} 个孤立缓存文件（元数据文件不存在）`);
                 } else {
@@ -755,7 +765,7 @@ class CacheDrive {
             // 不抛出错误，允许继续执行
         }
     }
-    
+
     /**
      * 清理过期缓存
      * @returns {Promise<void>}
@@ -764,7 +774,7 @@ class CacheDrive {
         if (!CacheDrive._cacheMetadata || typeof CacheDrive._cacheMetadata !== 'object') {
             return;
         }
-        
+
         // 确保数据结构正确
         if (!CacheDrive._cacheMetadata.system) {
             CacheDrive._cacheMetadata.system = {};
@@ -772,9 +782,9 @@ class CacheDrive {
         if (!CacheDrive._cacheMetadata.programs) {
             CacheDrive._cacheMetadata.programs = {};
         }
-        
+
         let cleanedCount = 0;
-        
+
         // 清理系统缓存
         if (CacheDrive._cacheMetadata.system) {
             for (const key in CacheDrive._cacheMetadata.system) {
@@ -785,7 +795,7 @@ class CacheDrive {
                 }
             }
         }
-        
+
         // 清理程序缓存
         if (CacheDrive._cacheMetadata.programs) {
             for (const programName in CacheDrive._cacheMetadata.programs) {
@@ -798,7 +808,7 @@ class CacheDrive {
                             cleanedCount++;
                         }
                     }
-                    
+
                     // 如果程序缓存为空，删除程序缓存对象
                     if (Object.keys(programCache).length === 0) {
                         delete CacheDrive._cacheMetadata.programs[programName];
@@ -806,7 +816,7 @@ class CacheDrive {
                 }
             }
         }
-        
+
         if (cleanedCount > 0) {
             KernelLogger.debug("CacheDrive", `已清理 ${cleanedCount} 个过期缓存条目`);
             try {
@@ -817,7 +827,7 @@ class CacheDrive {
             }
         }
     }
-    
+
     /**
      * 设置缓存值
      * @param {string} key 缓存键
@@ -829,76 +839,90 @@ class CacheDrive {
      * @returns {Promise<void>}
      */
     static async set(key, value, options = {}) {
-        await CacheDrive._ensureInitialized();
-        
-        if (!key || typeof key !== 'string') {
-            throw new Error('缓存键必须是字符串');
-        }
-        
-        // 确保 _cacheMetadata 已初始化
-        if (!CacheDrive._cacheMetadata) {
-            await CacheDrive._loadCacheMetadata(true);
-        }
-        
-        // 再次检查（防止加载失败）
-        if (!CacheDrive._cacheMetadata || typeof CacheDrive._cacheMetadata !== 'object') {
-            CacheDrive._cacheMetadata = {
-                system: {},
-                programs: {}
+        try {
+            await CacheDrive._ensureInitialized();
+
+            if (!key || typeof key !== 'string') {
+                throw new Error('缓存键必须是字符串');
+            }
+
+            // 确保 _cacheMetadata 已初始化
+            if (!CacheDrive._cacheMetadata) {
+                await CacheDrive._loadCacheMetadata(true);
+            }
+
+            // 再次检查（防止加载失败）
+            if (!CacheDrive._cacheMetadata || typeof CacheDrive._cacheMetadata !== 'object') {
+                CacheDrive._cacheMetadata = {
+                    system: {},
+                    programs: {}
+                };
+            }
+
+            const { ttl = 0, pid = null, programName = null } = options;
+
+            // 确定程序名称：优先使用 programName，如果没有则从 pid 获取
+            let finalProgramName = null;
+            if (programName && typeof programName === 'string') {
+                finalProgramName = programName;
+            } else if (pid !== null && typeof pid === 'number') {
+                finalProgramName = CacheDrive._getProgramNameFromPid(pid);
+                if (!finalProgramName) {
+                    KernelLogger.warn("CacheDrive", `无法从 PID ${pid} 获取程序名称，将使用系统缓存`);
+                }
+            }
+
+            const now = Date.now();
+            const expiresAt = ttl > 0 ? now + ttl : 0;
+            const size = CacheDrive._estimateSize(value);
+
+            const cacheEntry = {
+                value,
+                expiresAt,
+                createdAt: now,
+                updatedAt: now,
+                size
             };
-        }
-        
-        const { ttl = 0, pid = null, programName = null } = options;
-        
-        // 确定程序名称：优先使用 programName，如果没有则从 pid 获取
-        let finalProgramName = null;
-        if (programName && typeof programName === 'string') {
-            finalProgramName = programName;
-        } else if (pid !== null && typeof pid === 'number') {
-            finalProgramName = CacheDrive._getProgramNameFromPid(pid);
-            if (!finalProgramName) {
-                KernelLogger.warn("CacheDrive", `无法从 PID ${pid} 获取程序名称，将使用系统缓存`);
+
+            // 重新加载元数据（确保使用最新数据）
+            await CacheDrive._loadCacheMetadata(true);
+
+            // 确保数据结构正确
+            if (!CacheDrive._cacheMetadata.system) {
+                CacheDrive._cacheMetadata.system = {};
             }
-        }
-        
-        const now = Date.now();
-        const expiresAt = ttl > 0 ? now + ttl : 0;
-        const size = CacheDrive._estimateSize(value);
-        
-        const cacheEntry = {
-            value,
-            expiresAt,
-            createdAt: now,
-            updatedAt: now,
-            size
-        };
-        
-        // 重新加载元数据（确保使用最新数据）
-        await CacheDrive._loadCacheMetadata(true);
-        
-        // 确保数据结构正确
-        if (!CacheDrive._cacheMetadata.system) {
-            CacheDrive._cacheMetadata.system = {};
-        }
-        if (!CacheDrive._cacheMetadata.programs) {
-            CacheDrive._cacheMetadata.programs = {};
-        }
-        
-        if (finalProgramName) {
-            // 程序缓存
-            if (!CacheDrive._cacheMetadata.programs[finalProgramName]) {
-                CacheDrive._cacheMetadata.programs[finalProgramName] = {};
+            if (!CacheDrive._cacheMetadata.programs) {
+                CacheDrive._cacheMetadata.programs = {};
             }
-            CacheDrive._cacheMetadata.programs[finalProgramName][key] = cacheEntry;
-        } else {
-            // 系统缓存
-            CacheDrive._cacheMetadata.system[key] = cacheEntry;
+
+            if (finalProgramName) {
+                // 程序缓存
+                if (!CacheDrive._cacheMetadata.programs[finalProgramName]) {
+                    CacheDrive._cacheMetadata.programs[finalProgramName] = {};
+                }
+                CacheDrive._cacheMetadata.programs[finalProgramName][key] = cacheEntry;
+            } else {
+                // 系统缓存
+                CacheDrive._cacheMetadata.system[key] = cacheEntry;
+            }
+
+            await CacheDrive._saveCacheMetadata();
+            KernelLogger.debug("CacheDrive", `缓存已设置: ${key}${finalProgramName ? ` (程序: ${finalProgramName})` : ' (系统)'}`);
+        } catch (e) {
+            // 报告异常
+            if (typeof ExceptionHandler !== 'undefined') {
+                ExceptionHandler.reportException(
+                    ExceptionHandler.ExceptionLevel.SERVICE,
+                    `CacheDrive.set 失败: ${e.message}`,
+                    { key, error: e.message, stack: e.stack }
+                ).catch(() => { });
+            } else if (typeof KernelLogger !== 'undefined') {
+                KernelLogger.error("CacheDrive", `设置缓存失败: ${e.message}`, e);
+            }
+            throw e;
         }
-        
-        await CacheDrive._saveCacheMetadata();
-        KernelLogger.debug("CacheDrive", `缓存已设置: ${key}${finalProgramName ? ` (程序: ${finalProgramName})` : ' (系统)'}`);
     }
-    
+
     /**
      * 获取缓存值
      * @param {string} key 缓存键
@@ -909,84 +933,99 @@ class CacheDrive {
      * @returns {Promise<any>} 缓存值或默认值
      */
     static async get(key, defaultValue = null, options = {}) {
-        await CacheDrive._ensureInitialized();
-        
-        if (!key || typeof key !== 'string') {
-            throw new Error('缓存键必须是字符串');
-        }
-        
-        // 确保 _cacheMetadata 已初始化
-        if (!CacheDrive._cacheMetadata) {
+        try {
+            await CacheDrive._ensureInitialized();
+
+            if (!key || typeof key !== 'string') {
+                throw new Error('缓存键必须是字符串');
+            }
+
+            // 确保 _cacheMetadata 已初始化
+            if (!CacheDrive._cacheMetadata) {
+                await CacheDrive._loadCacheMetadata(true);
+            }
+
+            // 再次检查（防止加载失败）
+            if (!CacheDrive._cacheMetadata || typeof CacheDrive._cacheMetadata !== 'object') {
+                KernelLogger.debug("CacheDrive", `缓存元数据未初始化，返回默认值: ${key}`);
+                return defaultValue;
+            }
+
+            const { pid = null, programName = null } = options;
+
+            // 确定程序名称：优先使用 programName，如果没有则从 pid 获取
+            let finalProgramName = null;
+            if (programName && typeof programName === 'string') {
+                finalProgramName = programName;
+            } else if (pid !== null && typeof pid === 'number') {
+                finalProgramName = CacheDrive._getProgramNameFromPid(pid);
+            }
+
+            // 重新加载元数据（确保使用最新数据）
             await CacheDrive._loadCacheMetadata(true);
-        }
-        
-        // 再次检查（防止加载失败）
-        if (!CacheDrive._cacheMetadata || typeof CacheDrive._cacheMetadata !== 'object') {
-            KernelLogger.debug("CacheDrive", `缓存元数据未初始化，返回默认值: ${key}`);
-            return defaultValue;
-        }
-        
-        const { pid = null, programName = null } = options;
-        
-        // 确定程序名称：优先使用 programName，如果没有则从 pid 获取
-        let finalProgramName = null;
-        if (programName && typeof programName === 'string') {
-            finalProgramName = programName;
-        } else if (pid !== null && typeof pid === 'number') {
-            finalProgramName = CacheDrive._getProgramNameFromPid(pid);
-        }
-        
-        // 重新加载元数据（确保使用最新数据）
-        await CacheDrive._loadCacheMetadata(true);
-        
-        // 确保数据结构正确
-        if (!CacheDrive._cacheMetadata.system) {
-            CacheDrive._cacheMetadata.system = {};
-        }
-        if (!CacheDrive._cacheMetadata.programs) {
-            CacheDrive._cacheMetadata.programs = {};
-        }
-        
-        let cacheEntry = null;
-        
-        if (finalProgramName) {
-            // 程序缓存
-            if (CacheDrive._cacheMetadata.programs[finalProgramName] && 
-                CacheDrive._cacheMetadata.programs[finalProgramName][key]) {
-                cacheEntry = CacheDrive._cacheMetadata.programs[finalProgramName][key];
+
+            // 确保数据结构正确
+            if (!CacheDrive._cacheMetadata.system) {
+                CacheDrive._cacheMetadata.system = {};
             }
-        } else {
-            // 系统缓存
-            if (CacheDrive._cacheMetadata.system && CacheDrive._cacheMetadata.system[key]) {
-                cacheEntry = CacheDrive._cacheMetadata.system[key];
+            if (!CacheDrive._cacheMetadata.programs) {
+                CacheDrive._cacheMetadata.programs = {};
             }
-        }
-        
-        if (!cacheEntry) {
-            KernelLogger.debug("CacheDrive", `缓存不存在: ${key}${finalProgramName ? ` (程序: ${finalProgramName})` : ' (系统)'}`);
-            return defaultValue;
-        }
-        
-        // 检查是否过期
-        if (CacheDrive._isExpired(cacheEntry)) {
-            KernelLogger.debug("CacheDrive", `缓存已过期: ${key}${finalProgramName ? ` (程序: ${finalProgramName})` : ' (系统)'}`);
-            // 删除过期缓存
+
+            let cacheEntry = null;
+
             if (finalProgramName) {
-                if (CacheDrive._cacheMetadata.programs[finalProgramName]) {
-                    delete CacheDrive._cacheMetadata.programs[finalProgramName][key];
+                // 程序缓存
+                if (CacheDrive._cacheMetadata.programs[finalProgramName] &&
+                    CacheDrive._cacheMetadata.programs[finalProgramName][key]) {
+                    cacheEntry = CacheDrive._cacheMetadata.programs[finalProgramName][key];
                 }
             } else {
-                if (CacheDrive._cacheMetadata.system) {
-                    delete CacheDrive._cacheMetadata.system[key];
+                // 系统缓存
+                if (CacheDrive._cacheMetadata.system && CacheDrive._cacheMetadata.system[key]) {
+                    cacheEntry = CacheDrive._cacheMetadata.system[key];
                 }
             }
-            await CacheDrive._saveCacheMetadata();
+
+            if (!cacheEntry) {
+                KernelLogger.debug("CacheDrive", `缓存不存在: ${key}${finalProgramName ? ` (程序: ${finalProgramName})` : ' (系统)'}`);
+                return defaultValue;
+            }
+
+            // 检查是否过期
+            if (CacheDrive._isExpired(cacheEntry)) {
+                KernelLogger.debug("CacheDrive", `缓存已过期: ${key}${finalProgramName ? ` (程序: ${finalProgramName})` : ' (系统)'}`);
+                // 删除过期缓存
+                if (finalProgramName) {
+                    if (CacheDrive._cacheMetadata.programs[finalProgramName]) {
+                        delete CacheDrive._cacheMetadata.programs[finalProgramName][key];
+                    }
+                } else {
+                    if (CacheDrive._cacheMetadata.system) {
+                        delete CacheDrive._cacheMetadata.system[key];
+                    }
+                }
+                await CacheDrive._saveCacheMetadata();
+                return defaultValue;
+            }
+
+            return cacheEntry.value;
+        } catch (e) {
+            // 报告异常
+            if (typeof ExceptionHandler !== 'undefined') {
+                ExceptionHandler.reportException(
+                    ExceptionHandler.ExceptionLevel.SERVICE,
+                    `CacheDrive.get 失败: ${e.message}`,
+                    { key, error: e.message, stack: e.stack }
+                ).catch(() => { });
+            } else if (typeof KernelLogger !== 'undefined') {
+                KernelLogger.error("CacheDrive", `获取缓存失败: ${e.message}`, e);
+            }
+            // 返回默认值而不是抛出异常
             return defaultValue;
         }
-        
-        return cacheEntry.value;
     }
-    
+
     /**
      * 检查缓存是否存在且未过期
      * @param {string} key 缓存键
@@ -997,23 +1036,23 @@ class CacheDrive {
      */
     static async has(key, options = {}) {
         await CacheDrive._ensureInitialized();
-        
+
         if (!key || typeof key !== 'string') {
             return false;
         }
-        
+
         // 确保 _cacheMetadata 已初始化
         if (!CacheDrive._cacheMetadata) {
             await CacheDrive._loadCacheMetadata(true);
         }
-        
+
         // 再次检查（防止加载失败）
         if (!CacheDrive._cacheMetadata || typeof CacheDrive._cacheMetadata !== 'object') {
             return false;
         }
-        
+
         const { pid = null, programName = null } = options;
-        
+
         // 确定程序名称：优先使用 programName，如果没有则从 pid 获取
         let finalProgramName = null;
         if (programName && typeof programName === 'string') {
@@ -1021,10 +1060,10 @@ class CacheDrive {
         } else if (pid !== null && typeof pid === 'number') {
             finalProgramName = CacheDrive._getProgramNameFromPid(pid);
         }
-        
+
         // 重新加载元数据
         await CacheDrive._loadCacheMetadata(true);
-        
+
         // 确保数据结构正确
         if (!CacheDrive._cacheMetadata.system) {
             CacheDrive._cacheMetadata.system = {};
@@ -1032,11 +1071,11 @@ class CacheDrive {
         if (!CacheDrive._cacheMetadata.programs) {
             CacheDrive._cacheMetadata.programs = {};
         }
-        
+
         let cacheEntry = null;
-        
+
         if (finalProgramName) {
-            if (CacheDrive._cacheMetadata.programs[finalProgramName] && 
+            if (CacheDrive._cacheMetadata.programs[finalProgramName] &&
                 CacheDrive._cacheMetadata.programs[finalProgramName][key]) {
                 cacheEntry = CacheDrive._cacheMetadata.programs[finalProgramName][key];
             }
@@ -1045,11 +1084,11 @@ class CacheDrive {
                 cacheEntry = CacheDrive._cacheMetadata.system[key];
             }
         }
-        
+
         if (!cacheEntry) {
             return false;
         }
-        
+
         // 检查是否过期
         if (CacheDrive._isExpired(cacheEntry)) {
             // 删除过期缓存
@@ -1065,10 +1104,10 @@ class CacheDrive {
             await CacheDrive._saveCacheMetadata();
             return false;
         }
-        
+
         return true;
     }
-    
+
     /**
      * 删除缓存
      * @param {string} key 缓存键
@@ -1079,23 +1118,23 @@ class CacheDrive {
      */
     static async delete(key, options = {}) {
         await CacheDrive._ensureInitialized();
-        
+
         if (!key || typeof key !== 'string') {
             return false;
         }
-        
+
         // 确保 _cacheMetadata 已初始化
         if (!CacheDrive._cacheMetadata) {
             await CacheDrive._loadCacheMetadata(true);
         }
-        
+
         // 再次检查（防止加载失败）
         if (!CacheDrive._cacheMetadata || typeof CacheDrive._cacheMetadata !== 'object') {
             return false;
         }
-        
+
         const { pid = null, programName = null } = options;
-        
+
         // 确定程序名称：优先使用 programName，如果没有则从 pid 获取
         let finalProgramName = null;
         if (programName && typeof programName === 'string') {
@@ -1103,10 +1142,10 @@ class CacheDrive {
         } else if (pid !== null && typeof pid === 'number') {
             finalProgramName = CacheDrive._getProgramNameFromPid(pid);
         }
-        
+
         // 重新加载元数据
         await CacheDrive._loadCacheMetadata(true);
-        
+
         // 确保数据结构正确
         if (!CacheDrive._cacheMetadata.system) {
             CacheDrive._cacheMetadata.system = {};
@@ -1114,15 +1153,15 @@ class CacheDrive {
         if (!CacheDrive._cacheMetadata.programs) {
             CacheDrive._cacheMetadata.programs = {};
         }
-        
+
         let deleted = false;
-        
+
         if (finalProgramName) {
-            if (CacheDrive._cacheMetadata.programs[finalProgramName] && 
+            if (CacheDrive._cacheMetadata.programs[finalProgramName] &&
                 CacheDrive._cacheMetadata.programs[finalProgramName][key]) {
                 delete CacheDrive._cacheMetadata.programs[finalProgramName][key];
                 deleted = true;
-                
+
                 // 如果程序缓存为空，删除程序缓存对象
                 if (Object.keys(CacheDrive._cacheMetadata.programs[finalProgramName]).length === 0) {
                     delete CacheDrive._cacheMetadata.programs[finalProgramName];
@@ -1134,15 +1173,15 @@ class CacheDrive {
                 deleted = true;
             }
         }
-        
+
         if (deleted) {
             await CacheDrive._saveCacheMetadata();
             KernelLogger.debug("CacheDrive", `缓存已删除: ${key}${finalProgramName ? ` (程序: ${finalProgramName})` : ' (系统)'}`);
         }
-        
+
         return deleted;
     }
-    
+
     /**
      * 清空缓存
      * @param {Object} options 选项
@@ -1153,19 +1192,19 @@ class CacheDrive {
      */
     static async clear(options = {}) {
         await CacheDrive._ensureInitialized();
-        
+
         // 确保 _cacheMetadata 已初始化
         if (!CacheDrive._cacheMetadata) {
             await CacheDrive._loadCacheMetadata(true);
         }
-        
+
         // 再次检查（防止加载失败）
         if (!CacheDrive._cacheMetadata || typeof CacheDrive._cacheMetadata !== 'object') {
             return 0;
         }
-        
+
         const { pid = null, programName = null, expiredOnly = false } = options;
-        
+
         // 确定程序名称：优先使用 programName，如果没有则从 pid 获取
         let finalProgramName = null;
         if (programName && typeof programName === 'string') {
@@ -1173,10 +1212,10 @@ class CacheDrive {
         } else if (pid !== null && typeof pid === 'number') {
             finalProgramName = CacheDrive._getProgramNameFromPid(pid);
         }
-        
+
         // 重新加载元数据
         await CacheDrive._loadCacheMetadata(true);
-        
+
         // 确保数据结构正确
         if (!CacheDrive._cacheMetadata.system) {
             CacheDrive._cacheMetadata.system = {};
@@ -1184,9 +1223,9 @@ class CacheDrive {
         if (!CacheDrive._cacheMetadata.programs) {
             CacheDrive._cacheMetadata.programs = {};
         }
-        
+
         let clearedCount = 0;
-        
+
         if (finalProgramName) {
             // 清空程序缓存
             if (CacheDrive._cacheMetadata.programs[finalProgramName]) {
@@ -1220,15 +1259,15 @@ class CacheDrive {
                 }
             }
         }
-        
+
         if (clearedCount > 0) {
             await CacheDrive._saveCacheMetadata();
             KernelLogger.info("CacheDrive", `已清空 ${clearedCount} 个缓存${expiredOnly ? '（仅过期）' : ''}${finalProgramName ? ` (程序: ${finalProgramName})` : ' (系统)'}`);
         }
-        
+
         return clearedCount;
     }
-    
+
     /**
      * 获取缓存统计信息
      * @param {Object} options 选项
@@ -1238,12 +1277,12 @@ class CacheDrive {
      */
     static async getStats(options = {}) {
         await CacheDrive._ensureInitialized();
-        
+
         // 确保 _cacheMetadata 已初始化
         if (!CacheDrive._cacheMetadata) {
             await CacheDrive._loadCacheMetadata(true);
         }
-        
+
         // 再次检查（防止加载失败）
         if (!CacheDrive._cacheMetadata || typeof CacheDrive._cacheMetadata !== 'object') {
             return {
@@ -1255,9 +1294,9 @@ class CacheDrive {
                 validSize: 0
             };
         }
-        
+
         const { pid = null, programName = null } = options;
-        
+
         // 确定程序名称：优先使用 programName，如果没有则从 pid 获取
         let finalProgramName = null;
         if (programName && typeof programName === 'string') {
@@ -1265,13 +1304,13 @@ class CacheDrive {
         } else if (pid !== null && typeof pid === 'number') {
             finalProgramName = CacheDrive._getProgramNameFromPid(pid);
         }
-        
+
         // 重新加载元数据
         await CacheDrive._loadCacheMetadata(true);
-        
+
         // 清理过期缓存
         await CacheDrive._cleanExpiredCache();
-        
+
         // 确保数据结构正确
         if (!CacheDrive._cacheMetadata.system) {
             CacheDrive._cacheMetadata.system = {};
@@ -1279,12 +1318,12 @@ class CacheDrive {
         if (!CacheDrive._cacheMetadata.programs) {
             CacheDrive._cacheMetadata.programs = {};
         }
-        
+
         let totalCount = 0;
         let totalSize = 0;
         let expiredCount = 0;
         let expiredSize = 0;
-        
+
         if (finalProgramName) {
             // 程序缓存统计
             if (CacheDrive._cacheMetadata.programs[finalProgramName]) {
@@ -1293,7 +1332,7 @@ class CacheDrive {
                     if (entry && typeof entry === 'object') {
                         totalCount++;
                         totalSize += entry.size || 0;
-                        
+
                         if (CacheDrive._isExpired(entry)) {
                             expiredCount++;
                             expiredSize += entry.size || 0;
@@ -1309,7 +1348,7 @@ class CacheDrive {
                     if (entry && typeof entry === 'object') {
                         totalCount++;
                         totalSize += entry.size || 0;
-                        
+
                         if (CacheDrive._isExpired(entry)) {
                             expiredCount++;
                             expiredSize += entry.size || 0;
@@ -1318,7 +1357,7 @@ class CacheDrive {
                 }
             }
         }
-        
+
         return {
             totalCount,
             totalSize,
@@ -1328,7 +1367,7 @@ class CacheDrive {
             validSize: totalSize - expiredSize
         };
     }
-    
+
     /**
      * 确保已初始化
      * @returns {Promise<void>}

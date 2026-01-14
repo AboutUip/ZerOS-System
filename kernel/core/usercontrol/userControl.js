@@ -362,7 +362,16 @@ class UserControl {
                 UserControl._initialized = true;
                 KernelLogger.info("UserControl", "用户控制系统初始化完成");
             } catch (e) {
-                KernelLogger.error("UserControl", `初始化失败: ${e.message}`, e);
+                // 报告异常
+                if (typeof ExceptionHandler !== 'undefined') {
+                    ExceptionHandler.reportException(
+                        ExceptionHandler.ExceptionLevel.SYSTEM,
+                        `UserControl.初始化失败: ${e.message}`,
+                        { error: e.message, stack: e.stack }
+                    ).catch(() => { });
+                } else {
+                    KernelLogger.error("UserControl", `初始化失败: ${e.message}`, e);
+                }
                 // 即使初始化失败，也标记为已初始化，避免阻塞系统
                 UserControl._initialized = true;
             } finally {
@@ -497,7 +506,16 @@ class UserControl {
                 KernelLogger.warn("UserControl", `没有保存的用户数据或数据格式不正确: ${saved ? typeof saved : 'null/undefined'}`);
             }
         } catch (e) {
-            KernelLogger.error("UserControl", `加载用户数据失败: ${e.message}`, e);
+            // 报告异常
+            if (typeof ExceptionHandler !== 'undefined') {
+                ExceptionHandler.reportException(
+                    ExceptionHandler.ExceptionLevel.SYSTEM,
+                    `UserControl.加载用户数据失败: ${e.message}`,
+                    { error: e.message, stack: e.stack }
+                ).catch(() => { });
+            } else {
+                KernelLogger.error("UserControl", `加载用户数据失败: ${e.message}`, e);
+            }
         }
     }
     

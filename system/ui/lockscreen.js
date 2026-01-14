@@ -31,6 +31,9 @@ KernelLogger.info("LockScreen", "模块初始化");
         static _clickHandler = null; // 容器点击事件处理器引用（用于移除监听器）
         static _userSwitchKeydownHandler = null; // 用户切换快捷键处理器引用（用于移除监听器）
         static _keyPressed = false; // 是否已按下任意键（用于首次按键显示登录界面）
+        static _powerButton = null; // 电源按钮
+        static _powerMenu = null; // 电源菜单
+        static _powerMenuVisible = false; // 电源菜单是否可见
         
         /**
          * 初始化锁屏界面
@@ -677,6 +680,9 @@ KernelLogger.info("LockScreen", "模块初始化");
             
             LockScreen.container.appendChild(hintContainer);
             
+            // 电源按钮（右下角，Windows风格）
+            LockScreen._createPowerButton();
+            
             // 初始化快捷键提示
             setTimeout(() => {
                 LockScreen._updateShortcutHint();
@@ -723,6 +729,391 @@ KernelLogger.info("LockScreen", "模块初始化");
             } else {
                 shortcutHint.style.display = 'none';
             }
+        }
+        
+        /**
+         * 创建电源按钮（右下角，Windows风格）
+         */
+        static _createPowerButton() {
+            // 电源按钮容器
+            const powerButtonContainer = document.createElement('div');
+            powerButtonContainer.className = 'lockscreen-power-container';
+            powerButtonContainer.id = 'lockscreen-power-container';
+            powerButtonContainer.style.cssText = `
+                position: absolute;
+                bottom: 20px;
+                right: 20px;
+                z-index: 100;
+            `;
+            
+            // 电源按钮
+            const powerButton = document.createElement('button');
+            powerButton.className = 'lockscreen-power-button';
+            powerButton.id = 'lockscreen-power-button';
+            powerButton.setAttribute('aria-label', '电源选项');
+            powerButton.style.cssText = `
+                width: 48px;
+                height: 48px;
+                border-radius: 50%;
+                background: rgba(255, 255, 255, 0.15);
+                backdrop-filter: blur(10px);
+                -webkit-backdrop-filter: blur(10px);
+                border: 1px solid rgba(255, 255, 255, 0.2);
+                color: rgba(255, 255, 255, 0.9);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                cursor: pointer;
+                transition: all 0.3s ease;
+                outline: none;
+                padding: 0;
+            `;
+            
+            // 电源图标容器
+            const powerIconContainer = document.createElement('div');
+            powerIconContainer.className = 'lockscreen-power-icon';
+            powerIconContainer.style.cssText = `
+                width: 24px;
+                height: 24px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            `;
+            
+            // 尝试加载系统图标
+            if (typeof TaskbarManager !== 'undefined' && typeof TaskbarManager._loadSystemIcon === 'function') {
+                TaskbarManager._loadSystemIcon('power', powerIconContainer, true).catch(e => {
+                    // 如果加载失败，使用默认SVG
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.warn("LockScreen", `加载电源图标失败: ${e.message}，使用默认图标`);
+                    }
+                    powerIconContainer.innerHTML = `
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M12 2V12M18 8C18 13.5228 13.5228 18 8 18C2.47715 18 -2 13.5228 -2 8C-2 2.47715 2.47715 -2 8 -2C13.5228 -2 18 2.47715 18 8Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    `;
+                });
+            } else {
+                // 使用默认SVG
+                powerIconContainer.innerHTML = `
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 2V12M18 8C18 13.5228 13.5228 18 8 18C2.47715 18 -2 13.5228 -2 8C-2 2.47715 2.47715 -2 8 -2C13.5228 -2 18 2.47715 18 8Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                `;
+            }
+            
+            powerButton.appendChild(powerIconContainer);
+            
+            // 悬停效果
+            powerButton.addEventListener('mouseenter', () => {
+                powerButton.style.background = 'rgba(255, 255, 255, 0.25)';
+                powerButton.style.transform = 'scale(1.1)';
+            });
+            powerButton.addEventListener('mouseleave', () => {
+                powerButton.style.background = 'rgba(255, 255, 255, 0.15)';
+                powerButton.style.transform = 'scale(1)';
+            });
+            
+            // 点击事件：显示电源菜单
+            powerButton.addEventListener('click', (e) => {
+                e.stopPropagation();
+                LockScreen._togglePowerMenu();
+            });
+            
+            powerButtonContainer.appendChild(powerButton);
+            
+            // 电源菜单（初始隐藏）
+            const powerMenu = document.createElement('div');
+            powerMenu.className = 'lockscreen-power-menu';
+            powerMenu.id = 'lockscreen-power-menu';
+            powerMenu.style.cssText = `
+                position: absolute;
+                bottom: 60px;
+                right: 0;
+                background: rgba(0, 0, 0, 0.8);
+                backdrop-filter: blur(20px);
+                -webkit-backdrop-filter: blur(20px);
+                border: 1px solid rgba(255, 255, 255, 0.2);
+                border-radius: 12px;
+                padding: 8px;
+                min-width: 180px;
+                display: none;
+                flex-direction: column;
+                gap: 4px;
+                z-index: 101;
+                box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+            `;
+            
+            // 重启选项
+            const restartOption = document.createElement('div');
+            restartOption.className = 'lockscreen-power-menu-item';
+            restartOption.style.cssText = `
+                padding: 12px 16px;
+                border-radius: 8px;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                transition: all 0.2s ease;
+                color: rgba(255, 255, 255, 0.9);
+            `;
+            
+            const restartIcon = document.createElement('div');
+            restartIcon.style.cssText = `
+                width: 20px;
+                height: 20px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            `;
+            
+            // 尝试加载系统图标
+            if (typeof TaskbarManager !== 'undefined' && typeof TaskbarManager._loadSystemIcon === 'function') {
+                TaskbarManager._loadSystemIcon('restart', restartIcon, true).catch(e => {
+                    restartIcon.innerHTML = `
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12C21 16.9706 16.9706 21 12 21" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            <path d="M12 3V9M12 9L16 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    `;
+                });
+            } else {
+                restartIcon.innerHTML = `
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12C21 16.9706 16.9706 21 12 21" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path d="M12 3V9M12 9L16 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                `;
+            }
+            
+            const restartText = document.createElement('span');
+            restartText.textContent = '重启';
+            restartText.style.cssText = `
+                font-size: 14px;
+                font-weight: 400;
+            `;
+            
+            restartOption.appendChild(restartIcon);
+            restartOption.appendChild(restartText);
+            
+            restartOption.addEventListener('mouseenter', () => {
+                restartOption.style.background = 'rgba(255, 255, 255, 0.15)';
+            });
+            restartOption.addEventListener('mouseleave', () => {
+                restartOption.style.background = 'transparent';
+            });
+            restartOption.addEventListener('click', () => {
+                LockScreen._restartSystem();
+            });
+            
+            powerMenu.appendChild(restartOption);
+            
+            // 关机选项
+            const shutdownOption = document.createElement('div');
+            shutdownOption.className = 'lockscreen-power-menu-item lockscreen-power-menu-item-danger';
+            shutdownOption.style.cssText = `
+                padding: 12px 16px;
+                border-radius: 8px;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                transition: all 0.2s ease;
+                color: rgba(255, 255, 255, 0.9);
+            `;
+            
+            const shutdownIcon = document.createElement('div');
+            shutdownIcon.style.cssText = `
+                width: 20px;
+                height: 20px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            `;
+            
+            // 尝试加载系统图标
+            if (typeof TaskbarManager !== 'undefined' && typeof TaskbarManager._loadSystemIcon === 'function') {
+                TaskbarManager._loadSystemIcon('shutdown', shutdownIcon, true).catch(e => {
+                    shutdownIcon.innerHTML = `
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M12 2V12M18 8C18 13.5228 13.5228 18 8 18C2.47715 18 -2 13.5228 -2 8C-2 2.47715 2.47715 -2 8 -2C13.5228 -2 18 2.47715 18 8Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    `;
+                });
+            } else {
+                shutdownIcon.innerHTML = `
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 2V12M18 8C18 13.5228 13.5228 18 8 18C2.47715 18 -2 13.5228 -2 8C-2 2.47715 2.47715 -2 8 -2C13.5228 -2 18 2.47715 18 8Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                `;
+            }
+            
+            const shutdownText = document.createElement('span');
+            shutdownText.textContent = '关机';
+            shutdownText.style.cssText = `
+                font-size: 14px;
+                font-weight: 400;
+            `;
+            
+            shutdownOption.appendChild(shutdownIcon);
+            shutdownOption.appendChild(shutdownText);
+            
+            shutdownOption.addEventListener('mouseenter', () => {
+                shutdownOption.style.background = 'rgba(255, 100, 100, 0.2)';
+            });
+            shutdownOption.addEventListener('mouseleave', () => {
+                shutdownOption.style.background = 'transparent';
+            });
+            shutdownOption.addEventListener('click', () => {
+                LockScreen._shutdownSystem();
+            });
+            
+            powerMenu.appendChild(shutdownOption);
+            
+            powerButtonContainer.appendChild(powerMenu);
+            LockScreen.container.appendChild(powerButtonContainer);
+            
+            // 保存引用
+            LockScreen._powerButton = powerButton;
+            LockScreen._powerMenu = powerMenu;
+            LockScreen._powerMenuVisible = false;
+            
+            // 点击外部区域关闭菜单
+            document.addEventListener('click', (e) => {
+                if (LockScreen._powerMenuVisible && 
+                    !powerButtonContainer.contains(e.target)) {
+                    LockScreen._hidePowerMenu();
+                }
+            });
+        }
+        
+        /**
+         * 切换电源菜单显示/隐藏
+         */
+        static _togglePowerMenu() {
+            if (LockScreen._powerMenuVisible) {
+                LockScreen._hidePowerMenu();
+            } else {
+                LockScreen._showPowerMenu();
+            }
+        }
+        
+        /**
+         * 显示电源菜单
+         */
+        static _showPowerMenu() {
+            if (!LockScreen._powerMenu) {
+                return;
+            }
+            
+            LockScreen._powerMenuVisible = true;
+            LockScreen._powerMenu.style.display = 'flex';
+            
+            // 添加动画
+            requestAnimationFrame(() => {
+                LockScreen._powerMenu.style.opacity = '0';
+                LockScreen._powerMenu.style.transform = 'translateY(10px)';
+                LockScreen._powerMenu.style.transition = 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
+                
+                requestAnimationFrame(() => {
+                    LockScreen._powerMenu.style.opacity = '1';
+                    LockScreen._powerMenu.style.transform = 'translateY(0)';
+                });
+            });
+        }
+        
+        /**
+         * 隐藏电源菜单
+         */
+        static _hidePowerMenu() {
+            if (!LockScreen._powerMenu) {
+                return;
+            }
+            
+            LockScreen._powerMenuVisible = false;
+            
+            // 添加淡出动画
+            LockScreen._powerMenu.style.opacity = '0';
+            LockScreen._powerMenu.style.transform = 'translateY(10px)';
+            LockScreen._powerMenu.style.transition = 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
+            
+            setTimeout(() => {
+                if (LockScreen._powerMenu) {
+                    LockScreen._powerMenu.style.display = 'none';
+                }
+            }, 300);
+        }
+        
+        /**
+         * 重启系统
+         */
+        static async _restartSystem() {
+            if (typeof KernelLogger !== 'undefined') {
+                KernelLogger.info("LockScreen", "系统重启请求");
+            }
+            
+            // 隐藏电源菜单
+            LockScreen._hidePowerMenu();
+            
+            // 显示确认对话框
+            let confirmed = false;
+            if (typeof GUIManager !== 'undefined' && typeof GUIManager.showConfirm === 'function') {
+                confirmed = await GUIManager.showConfirm(
+                    '确定要重启系统吗？所有未保存的数据将丢失。',
+                    '确认重启',
+                    'danger'
+                );
+            } else {
+                confirmed = confirm('确定要重启系统吗？所有未保存的数据将丢失。');
+            }
+            if (!confirmed) {
+                return;
+            }
+            
+            // 执行重启（重新加载页面）
+            if (typeof KernelLogger !== 'undefined') {
+                KernelLogger.info("LockScreen", "正在重启系统...");
+            }
+            window.location.reload();
+        }
+        
+        /**
+         * 关闭系统
+         */
+        static async _shutdownSystem() {
+            if (typeof KernelLogger !== 'undefined') {
+                KernelLogger.info("LockScreen", "系统关闭请求");
+            }
+            
+            // 隐藏电源菜单
+            LockScreen._hidePowerMenu();
+            
+            // 显示确认对话框
+            let confirmed = false;
+            if (typeof GUIManager !== 'undefined' && typeof GUIManager.showConfirm === 'function') {
+                confirmed = await GUIManager.showConfirm(
+                    '确定要关闭系统吗？所有未保存的数据将丢失。',
+                    '确认关闭',
+                    'danger'
+                );
+            } else {
+                confirmed = confirm('确定要关闭系统吗？所有未保存的数据将丢失。');
+            }
+            if (!confirmed) {
+                return;
+            }
+            
+            // 执行关闭
+            if (typeof KernelLogger !== 'undefined') {
+                KernelLogger.info("LockScreen", "正在关闭系统...");
+            }
+            
+            // 显示关闭消息
+            setTimeout(() => {
+                document.body.innerHTML = '<div style="display: flex; justify-content: center; align-items: center; height: 100vh; font-family: monospace; color: #00ff00; font-size: 24px;">System Shutdown Complete<br/><span style="font-size: 16px; color: #888;">Please close this window manually</span></div>';
+                // 尝试关闭窗口（大多数浏览器会阻止此操作）
+                window.close();
+            }, 1000);
         }
         
         /**

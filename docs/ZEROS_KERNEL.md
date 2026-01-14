@@ -39,6 +39,10 @@ ZerOS/
 │   │   ├── applicationAssets.js # 应用程序资源映射
 │   │   └── programCategories.js # 程序分类
 │   ├── core/              # 核心模块
+│   │   ├── exceptionHM/   # 异常处理
+│   │   │   └── exceptionHandler.js # 异常处理管理器（结构化异常处理SEH）
+│   │   ├── safemode/      # 安全模式
+│   │   │   └── safeModeManager.js # 安全模式管理器
 │   │   └── usercontrol/  # 用户控制
 │   │       ├── userControl.js # 用户控制系统
 │   │       └── userGroup.js   # 用户组管理系统
@@ -263,6 +267,28 @@ ZerOS 内核的安全核心组件，负责管理所有程序的内核操作权�
 - **强制权限验证**：所有需要权限的内核 API 调用都必须经过验证
 
 详细 API 文档请参考 [PermissionManager API](API/PermissionManager.md)
+
+### 4.2 异常处理 (ExceptionHandler)
+
+结构化异常处理（SEH）机制，提供统一的异常报告和处理系统。
+
+**特性**：
+- **4种异常等级**：
+  - **内核异常 (KERNEL)**：严重不可修复，进入BIOS安全模式，阻止正常启动
+  - **系统异常 (SYSTEM)**：蓝屏界面，强制停止所有程序，系统自检后重启
+  - **程序异常 (PROGRAM)**：强制终止异常程序，通知用户
+  - **服务异常 (SERVICE)**：仅记录日志，不影响系统运行
+- **自动处理**：根据异常等级自动执行相应的处理流程
+- **BIOS集成**：内核异常与BIOS管理器集成，支持清除异常标志
+- **启动检查**：系统启动时自动检查内核异常标志，阻止正常启动
+
+**异常处理流程**：
+- 内核异常：设置持久化标志 → 进入BIOS安全模式 → 阻止正常启动
+- 系统异常：强制停止所有程序 → 显示蓝屏 → 系统自检 → 自动重启
+- 程序异常：强制终止程序 → 显示通知 → 记录日志
+- 服务异常：仅记录日志
+
+详细 API 文档请参考 [ExceptionHandler API](API/ExceptionHandler.md)
 
 ### 5. 应用程序资源管理 (ApplicationAssetManager)
 

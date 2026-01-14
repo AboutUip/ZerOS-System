@@ -111,7 +111,16 @@ class ScheduleTaskManager {
             ScheduleTaskManager._initialized = true;
             KernelLogger.info("ScheduleTaskManager", "计划任务管理器初始化完成");
         } catch (error) {
-            KernelLogger.error("ScheduleTaskManager", `初始化失败: ${error.message}`, error);
+            // 报告异常
+            if (typeof ExceptionHandler !== 'undefined') {
+                ExceptionHandler.reportException(
+                    ExceptionHandler.ExceptionLevel.SYSTEM,
+                    `ScheduleTaskManager.初始化失败: ${error.message}`,
+                    { error: error.message, stack: error.stack }
+                ).catch(() => { });
+            } else {
+                KernelLogger.error("ScheduleTaskManager", `初始化失败: ${error.message}`, error);
+            }
             ScheduleTaskManager._initialized = true; // 即使失败也标记为已初始化，允许后续操作
         } finally {
             ScheduleTaskManager._initializing = false;
@@ -271,7 +280,16 @@ class ScheduleTaskManager {
             // 启动所有启用的时间任务
             ScheduleTaskManager._startTimeTasks();
         } catch (error) {
-            KernelLogger.error("ScheduleTaskManager", `加载计划任务失败: ${error.message}`, error);
+            // 报告异常
+            if (typeof ExceptionHandler !== 'undefined') {
+                ExceptionHandler.reportException(
+                    ExceptionHandler.ExceptionLevel.SYSTEM,
+                    `ScheduleTaskManager.加载计划任务失败: ${error.message}`,
+                    { error: error.message, stack: error.stack }
+                ).catch(() => { });
+            } else {
+                KernelLogger.error("ScheduleTaskManager", `加载计划任务失败: ${error.message}`, error);
+            }
             ScheduleTaskManager._tasks.clear();
         }
     }
@@ -295,7 +313,16 @@ class ScheduleTaskManager {
             
             KernelLogger.debug("ScheduleTaskManager", `已保存 ${tasksArray.length} 个计划任务`);
         } catch (error) {
-            KernelLogger.error("ScheduleTaskManager", `保存计划任务失败: ${error.message}`, error);
+            // 报告异常
+            if (typeof ExceptionHandler !== 'undefined') {
+                ExceptionHandler.reportException(
+                    ExceptionHandler.ExceptionLevel.SYSTEM,
+                    `ScheduleTaskManager.保存计划任务失败: ${error.message}`,
+                    { error: error.message, stack: error.stack }
+                ).catch(() => { });
+            } else {
+                KernelLogger.error("ScheduleTaskManager", `保存计划任务失败: ${error.message}`, error);
+            }
             throw error; // 重新抛出错误，让调用者知道保存失败
         }
     }
@@ -699,7 +726,16 @@ class ScheduleTaskManager {
             
             KernelLogger.info("ScheduleTaskManager", `计划任务执行成功: ${taskId}`);
         } catch (error) {
-            KernelLogger.error("ScheduleTaskManager", `执行计划任务失败: ${taskId}`, error);
+            // 报告异常
+            if (typeof ExceptionHandler !== 'undefined') {
+                ExceptionHandler.reportException(
+                    ExceptionHandler.ExceptionLevel.PROGRAM,
+                    `ScheduleTaskManager.执行计划任务失败: ${taskId}`,
+                    { taskId, taskType: task.taskType, programName: task.programName, command: task.command, error: error.message, stack: error.stack }
+                ).catch(() => { });
+            } else {
+                KernelLogger.error("ScheduleTaskManager", `执行计划任务失败: ${taskId}`, error);
+            }
             throw error;
         }
     }

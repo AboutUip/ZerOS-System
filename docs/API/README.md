@@ -11,6 +11,9 @@
 - [ProcessManager.md](./ProcessManager.md) - 进程生命周期管理 ✅
 - [PermissionManager.md](./PermissionManager.md) - 权限管理 ✅
 
+### 异常处理
+- [ExceptionHandler.md](./ExceptionHandler.md) - 异常处理管理器（结构化异常处理SEH） ✅
+
 ### 用户控制
 - [UserControl.md](./UserControl.md) - 用户控制系统 ✅
 - [UserGroup.md](./UserGroup.md) - 用户组管理系统 ✅
@@ -87,6 +90,9 @@
 - MemoryManager
 - KernelMemory
 
+**异常处理**
+- ExceptionHandler
+
 **用户界面**
 - GUIManager
 - NotificationManager
@@ -129,6 +135,7 @@
 - DependencyConfig
 - Starter
 - ApplicationAssetManager
+- ExceptionHandler
 
 ## 文档状态
 

@@ -1719,7 +1719,16 @@ class NotificationManager {
                 POOL.__ADD__('KERNEL_GLOBAL_POOL', 'NotificationManager', NotificationManager);
                 KernelLogger.debug("NotificationManager", "已注册到 POOL");
             } catch (e) {
-                KernelLogger.warn("NotificationManager", `注册到 POOL 失败: ${e.message}`);
+                // 报告异常
+                if (typeof ExceptionHandler !== 'undefined') {
+                    ExceptionHandler.reportException(
+                        ExceptionHandler.ExceptionLevel.SERVICE,
+                        `NotificationManager.POOL注册失败: ${e.message}`,
+                        { error: e.message, stack: e.stack }
+                    ).catch(() => { });
+                } else {
+                    KernelLogger.warn("NotificationManager", `注册到 POOL 失败: ${e.message}`);
+                }
             }
         }
     }

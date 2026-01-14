@@ -1867,7 +1867,16 @@ if (typeof POOL !== 'undefined' && typeof POOL.__ADD__ === 'function') {
         }
         POOL.__ADD__("KERNEL_GLOBAL_POOL", "PermissionManager", PermissionManager);
     } catch (e) {
-        KernelLogger.error("PermissionManager", `注册到 POOL 失败: ${e.message}`);
+        // 报告异常
+        if (typeof ExceptionHandler !== 'undefined') {
+            ExceptionHandler.reportException(
+                ExceptionHandler.ExceptionLevel.SERVICE,
+                `PermissionManager.POOL注册失败: ${e.message}`,
+                { error: e.message, stack: e.stack }
+            ).catch(() => { });
+        } else {
+            KernelLogger.error("PermissionManager", `注册到 POOL 失败: ${e.message}`);
+        }
     }
 }
 

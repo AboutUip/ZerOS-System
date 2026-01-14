@@ -1401,6 +1401,49 @@ await ThemeManager.setLocalImageAsBackground('D:/images/wallpaper.jpg');
 
 始终使用 try-catch 处理异步操作。
 
+**异常报告**：对于严重错误，可以使用异常处理管理器报告异常：
+
+```javascript
+// 报告程序异常（程序将被自动终止）
+try {
+    await someCriticalOperation();
+} catch (error) {
+    await KernelAPI.call('Exception.report', [
+        'PROGRAM',
+        `程序崩溃: ${error.message}`,
+        {
+            errorCode: 'CRASH_001',
+            stack: error.stack,
+            timestamp: Date.now()
+        }
+    ]);
+    // 程序将被自动终止
+}
+
+// 报告服务异常（仅记录日志，不影响系统运行）
+try {
+    await networkService.connect();
+} catch (error) {
+    await KernelAPI.call('Exception.report', [
+        'SERVICE',
+        '网络服务连接失败',
+        {
+            service: 'NetworkService',
+            endpoint: endpoint,
+            error: error.message
+        }
+    ]);
+}
+```
+
+**异常等级说明**：
+- **PROGRAM**：程序异常，程序将被自动终止
+- **SERVICE**：服务异常，仅记录日志，不影响系统运行
+- **SYSTEM**：系统异常，会显示蓝屏并重启系统（谨慎使用）
+- **KERNEL**：内核异常，会进入BIOS安全模式（仅内核模块使用）
+
+详细说明请参考 [ExceptionHandler API 文档](API/ExceptionHandler.md)
+
 ### 4. 资源清理
 
 在 `__exit__` 中清理所有资源，确保没有内存泄漏：

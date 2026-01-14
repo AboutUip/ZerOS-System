@@ -52,6 +52,7 @@ html, body {
     z-index: 10000;
     gap: 50px;
     overflow: hidden;
+    cursor: none;
 }
 
 /* 动态背景网格 */
@@ -1214,6 +1215,43 @@ html, body {
 .taskbar-right .taskbar-battery-display {
     width: 100%;
     padding: 8px 4px;
+}
+
+/* 侧边任务栏时的亮度显示样式 */
+.taskbar-left .taskbar-brightness-display,
+.taskbar-right .taskbar-brightness-display {
+    width: 100%;
+    padding: 8px 4px;
+}
+
+/* 亮度显示组件样式 */
+.taskbar-brightness-display {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 12px;
+    min-width: 48px;
+    height: 48px;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    user-select: none;
+}
+
+.taskbar-brightness-display:hover {
+    background: var(--theme-primary-light, rgba(139, 92, 246, 0.15));
+}
+
+.taskbar-brightness-icon {
+    width: 24px;
+    height: 24px;
+    color: var(--theme-text, rgba(215, 224, 221, 0.9));
+    transition: all 0.3s ease;
+}
+
+.taskbar-brightness-display:hover .taskbar-brightness-icon {
+    color: var(--theme-primary, rgba(139, 92, 246, 1));
+    transform: scale(1.1);
 }
 
 .taskbar-network-display:hover {

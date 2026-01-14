@@ -538,7 +538,16 @@ class AnimateManager {
                 }
             }
         } catch (error) {
-            KernelLogger.error("AnimateManager", `加载 anime.js 失败: ${error.message}`);
+            // 报告异常
+            if (typeof ExceptionHandler !== 'undefined') {
+                ExceptionHandler.reportException(
+                    ExceptionHandler.ExceptionLevel.SERVICE,
+                    `AnimateManager.加载anime.js失败: ${error.message}`,
+                    { error: error.message, stack: error.stack }
+                ).catch(() => { });
+            } else {
+                KernelLogger.error("AnimateManager", `加载 anime.js 失败: ${error.message}`);
+            }
             // 尝试从全局获取作为降级方案
             if (typeof window !== 'undefined' && window.anime) {
                 const animeFunc = AnimateManager._extractAnimeFunction(window.anime);

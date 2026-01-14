@@ -236,7 +236,16 @@ if (typeof window !== 'undefined') {
                 }
             }
         } catch (e) {
-            KernelLogger.error("DependencyConfig", `同步等待依赖失败: ${name}`, String(e));
+            // 报告异常
+            if (typeof ExceptionHandler !== 'undefined') {
+                ExceptionHandler.reportException(
+                    ExceptionHandler.ExceptionLevel.SERVICE,
+                    `DependencyConfig.syncWaitForDependency 失败: ${e.message}`,
+                    { dependencyName: name, error: e.message, stack: e.stack }
+                ).catch(() => { });
+            } else {
+                KernelLogger.error("DependencyConfig", `同步等待依赖失败: ${name}`, String(e));
+            }
             return false;
         }
     };

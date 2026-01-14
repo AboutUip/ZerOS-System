@@ -1,13 +1,23 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-  <polyline points="14 2 14 8 20 8"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+  <defs>
+    <linearGradient id="audioFileGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#9B59B6;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#7D3C98;stop-opacity:1" />
+    </linearGradient>
+    <filter id="audioFileShadow">
+      <feDropShadow dx="0" dy="1" stdDeviation="1.5" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+  <!-- 文件主体 -->
+  <path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6z" 
+        fill="url(#audioFileGradient)" 
+        filter="url(#audioFileShadow)"/>
+  <!-- 文件折角 -->
+  <path d="M14 2v6h6" fill="none" stroke="#5B2C6F" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
   <!-- 音频波形 -->
-  <path d="M9 12v4"/>
-  <path d="M11 10v8"/>
-  <path d="M13 11v6"/>
-  <path d="M15 9v10"/>
+  <path d="M9 11v2M10 9v6M11 10v4M12 8v8M13 9v6M14 11v2" stroke="#FFFFFF" stroke-width="1.5" stroke-linecap="round" stroke-opacity="0.9"/>
   <!-- 音符 -->
-  <circle cx="17" cy="14" r="1.5" fill="currentColor"/>
-  <path d="M17 12v2"/>
-  <line x1="17" y1="12" x2="19" y2="10"/>
+  <circle cx="16.5" cy="13.5" r="1.5" fill="#FFFFFF" fill-opacity="0.9"/>
+  <path d="M16.5 11.5v2" stroke="#FFFFFF" stroke-width="1.5" stroke-linecap="round" stroke-opacity="0.9"/>
+  <line x1="16.5" y1="11.5" x2="18.5" y2="9.5" stroke="#FFFFFF" stroke-width="1.5" stroke-linecap="round" stroke-opacity="0.9"/>
 </svg>

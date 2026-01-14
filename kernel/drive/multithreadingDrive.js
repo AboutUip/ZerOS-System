@@ -335,7 +335,16 @@ class MultithreadingDrive {
             
             return threadId;
         } catch (e) {
-            KernelLogger.error("MultithreadingDrive", `创建线程失败: ${e.message}`, e);
+            // 报告异常
+            if (typeof ExceptionHandler !== 'undefined') {
+                ExceptionHandler.reportException(
+                    ExceptionHandler.ExceptionLevel.SYSTEM,
+                    `MultithreadingDrive.创建线程失败: ${e.message}`,
+                    { error: e.message, stack: e.stack }
+                ).catch(() => { });
+            } else {
+                KernelLogger.error("MultithreadingDrive", `创建线程失败: ${e.message}`, e);
+            }
             throw new Error(`创建线程失败: ${e.message}`);
         }
     }
@@ -415,7 +424,16 @@ class MultithreadingDrive {
             
             KernelLogger.info("MultithreadingDrive", `终止线程: ${threadId}`);
         } catch (e) {
-            KernelLogger.error("MultithreadingDrive", `终止线程失败: ${e.message}`, e);
+            // 报告异常
+            if (typeof ExceptionHandler !== 'undefined') {
+                ExceptionHandler.reportException(
+                    ExceptionHandler.ExceptionLevel.SERVICE,
+                    `MultithreadingDrive.终止线程失败: ${e.message}`,
+                    { threadId, error: e.message, stack: e.stack }
+                ).catch(() => { });
+            } else {
+                KernelLogger.error("MultithreadingDrive", `终止线程失败: ${e.message}`, e);
+            }
         }
     }
     
@@ -634,7 +652,16 @@ class MultithreadingDrive {
                     args: task.args
                 });
             } catch (e) {
-                KernelLogger.error("MultithreadingDrive", `发送任务到线程失败: ${e.message}`, e);
+                // 报告异常
+                if (typeof ExceptionHandler !== 'undefined') {
+                    ExceptionHandler.reportException(
+                        ExceptionHandler.ExceptionLevel.SERVICE,
+                        `MultithreadingDrive.发送任务到线程失败: ${e.message}`,
+                        { taskId: task.taskId, threadId, error: e.message, stack: e.stack }
+                    ).catch(() => { });
+                } else {
+                    KernelLogger.error("MultithreadingDrive", `发送任务到线程失败: ${e.message}`, e);
+                }
                 task.reject(new Error(`发送任务失败: ${e.message}`));
                 MultithreadingDrive._tasks.delete(task.taskId);
                 if (threadInfo) {

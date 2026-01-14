@@ -149,6 +149,7 @@ KernelLogger.info("BIOSManager", "模块初始化");
                     items: [
                         { id: 'log-level', label: 'Log Level Settings', page: 'log-level' },
                         { id: 'system-info', label: 'System Information', page: 'system-info' },
+                        { id: 'disk-info', label: 'Disk Information', page: 'disk-info' },
                         { id: 'kernel-config', label: 'Kernel Configuration', page: 'kernel-config' },
                         { id: 'advanced', label: 'Advanced Settings', page: 'advanced' },
                         { id: 'testing', label: 'Testing', page: 'testing' },
@@ -177,6 +178,16 @@ KernelLogger.info("BIOSManager", "模块初始化");
                         { id: 'back', label: 'Back', action: 'back' }
                     ]
                 },
+                'disk-info': {
+                    title: 'Disk Information',
+                    items: [
+                        { id: 'disk-total-size', label: 'Total Disk Size', type: 'info', value: null },
+                        { id: 'disk-partition-count', label: 'Partition Count', type: 'info', value: null },
+                        { id: 'disk-status', label: 'Disk Status', type: 'info', value: null },
+                        { id: 'disk-partitions', label: 'Partitions', type: 'disk-partitions', value: null },
+                        { id: 'back', label: 'Back', action: 'back' }
+                    ]
+                },
                 'kernel-config': {
                     title: 'Kernel Configuration',
                     items: [
@@ -190,6 +201,8 @@ KernelLogger.info("BIOSManager", "模块初始化");
                     items: [
                         { id: 'advanced-registry', label: 'Registry Editor', page: 'registry' },
                         { id: 'advanced-security', label: 'Security Settings', page: 'security' },
+                        { id: 'advanced-refresh-data', label: 'Refresh Data (Clear localStorage)', action: 'refresh-data' },
+                        { id: 'advanced-clear-kernel-exception', label: 'Clear Kernel Exception Flag & Force Boot', action: 'clear-kernel-exception' },
                         { id: 'back', label: 'Back', action: 'back' }
                     ]
                 },
@@ -294,6 +307,29 @@ KernelLogger.info("BIOSManager", "模块初始化");
                 systemInfo = await BIOSManager._getSystemInfo();
             }
             
+            // 获取磁盘信息（如果是磁盘信息页面）
+            let diskInfo = null;
+            if (pageId === 'disk-info') {
+                diskInfo = await BIOSManager._getDiskInfo();
+                // 如果有分区信息，动态添加分区列表项
+                if (diskInfo && diskInfo.partitions && diskInfo.partitions.length > 0) {
+                    // 找到 disk-partitions 项的位置
+                    const partitionsIndex = page.items.findIndex(item => item.id === 'disk-partitions');
+                    if (partitionsIndex !== -1) {
+                        // 在 disk-partitions 项之后插入详细的分区项
+                        const partitionItems = diskInfo.partitions.map((partition, idx) => ({
+                            id: `partition-${partition.name.replace(':', '')}`,
+                            label: `${partition.name}: ${partition.size} (Used: ${partition.usedPercent}%, Free: ${partition.free})`,
+                            type: 'info',
+                            value: null,
+                            partitionData: partition
+                        }));
+                        // 插入分区项（在 disk-partitions 之后）
+                        page.items.splice(partitionsIndex + 1, 0, ...partitionItems);
+                    }
+                }
+            }
+            
             // 获取注册表项（如果是注册表页面）
             let registryKeys = [];
             let registryData = {};
@@ -320,6 +356,7 @@ KernelLogger.info("BIOSManager", "模块初始化");
                     page.items = registryKeys.map(key => {
                         const value = registryData[key];
                         const isObject = BIOSManager._isRegistryObject(value);
+                        const isBoolean = typeof value === 'boolean';
                         return {
                             id: `registry-${key}`,
                             label: key,
@@ -327,6 +364,7 @@ KernelLogger.info("BIOSManager", "模块初始化");
                             key: key,
                             value: value,
                             isObject: isObject,
+                            isBoolean: isBoolean,
                             path: [...BIOSManager._registryPathStack, key]
                         };
                     });
@@ -362,14 +400,33 @@ KernelLogger.info("BIOSManager", "模块初始化");
                 
                 let label = item.label;
                 if (item.type === 'info') {
-                    // 如果value为null，尝试从systemInfo获取
+                    // 如果value为null，尝试从systemInfo或diskInfo获取
                     let value = item.value;
                     if (value === null && systemInfo) {
                         value = systemInfo[item.id] || 'N/A';
                     }
-                    if (value) {
+                    if (value === null && diskInfo) {
+                        value = diskInfo[item.id] || 'N/A';
+                    }
+                    // 对于警告信息，直接显示标签，不添加值
+                    if (item.id && (item.id.includes('warning') || item.id.includes('message'))) {
+                        // 警告或消息类型，直接显示标签
+                        label = item.label;
+                    } else if (value && value !== 'N/A') {
                         label += `: ${value}`;
                     }
+                } else if (item.type === 'disk-partitions') {
+                    // 磁盘分区列表：显示分区数量
+                    if (diskInfo && diskInfo.partitions && diskInfo.partitions.length > 0) {
+                        label = `${label}: ${diskInfo.partitions.length} partition(s)`;
+                        menuItem.classList.add('disk-partitions-header');
+                    } else {
+                        label = `${label}: No partitions found`;
+                    }
+                } else if (item.partitionData) {
+                    // 分区详细信息项：显示分区数据
+                    const p = item.partitionData;
+                    label = `${p.name} - Size: ${p.size}, Used: ${p.used} (${p.usedPercent}%), Free: ${p.free}`;
                 } else if (item.type === 'radio') {
                     if (currentLogLevel !== null && item.value === currentLogLevel) {
                         menuItem.classList.add('checked');
@@ -387,6 +444,11 @@ KernelLogger.info("BIOSManager", "模块初始化");
                         const isArrayLike = keys.length > 0 && keys.every((k, idx) => k === String(idx));
                         const typeLabel = isArrayLike ? 'array' : 'object';
                         label = `> ${label} [${typeLabel}, ${keyCount} items]`;
+                    } else if (item.isBoolean) {
+                        // 布尔类型：显示当前值，并提示可以使用左右键切换
+                        const boolValue = item.value ? 'true' : 'false';
+                        label = `${label}: [${boolValue}] (Use ← → to toggle)`;
+                        menuItem.classList.add('registry-boolean');
                     } else {
                         // 如果是普通值，显示值的预览
                         let valuePreview = BIOSManager._formatRegistryValue(item.value);
@@ -410,7 +472,15 @@ KernelLogger.info("BIOSManager", "模块初始化");
             // 添加帮助信息
             const help = document.createElement('div');
             help.className = 'bios-help';
-            help.innerHTML = '↑↓: Navigate  Enter: Select  Esc: Back  F10: Save & Exit';
+            let helpText = '↑↓: Navigate  Enter: Select  Esc: Back  F10: Save & Exit';
+            // 如果是注册表页面，检查当前选中项是否为布尔类型
+            if (pageId === 'registry' && page.items && page.items.length > 0) {
+                const currentItem = page.items[BIOSManager._currentItemIndex];
+                if (currentItem && currentItem.type === 'registry-item' && currentItem.isBoolean) {
+                    helpText += '  ← →: Toggle Boolean';
+                }
+            }
+            help.innerHTML = helpText;
             BIOSManager._container.appendChild(help);
         }
         
@@ -533,6 +603,84 @@ KernelLogger.info("BIOSManager", "模块初始化");
         }
         
         /**
+         * 切换注册表布尔值
+         * @param {Object} item 注册表项
+         * @param {boolean} direction true表示向右（设为true），false表示向左（设为false）
+         */
+        static async _toggleRegistryBoolean(item, direction) {
+            try {
+                if (!item || !item.path || item.path.length === 0) {
+                    return;
+                }
+                
+                // 构建注册表键路径
+                // 路径格式：['system', 'registry', 'key'] -> 'system.registry.key'
+                const registryKey = item.path.join('.');
+                
+                // 确定新值：direction为true时设为true，为false时设为false
+                const newValue = direction;
+                
+                // 获取LStorage
+                let LStorage = null;
+                if (typeof POOL !== 'undefined' && typeof POOL.__GET__ === 'function') {
+                    try {
+                        LStorage = POOL.__GET__("KERNEL_GLOBAL_POOL", "LStorage");
+                    } catch (e) {
+                        // POOL中没有，继续尝试其他方法
+                    }
+                }
+                
+                // 如果POOL中没有，尝试从全局对象获取
+                if (!LStorage && typeof window !== 'undefined' && window.LStorage) {
+                    LStorage = window.LStorage;
+                }
+                
+                if (!LStorage || typeof LStorage.setSystemStorage !== 'function') {
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.error("BIOSManager", "LStorage不可用，无法保存布尔值");
+                    }
+                    return;
+                }
+                
+                // 保存新值
+                await LStorage.setSystemStorage(registryKey, newValue);
+                
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.info("BIOSManager", `已更新注册表键 ${registryKey} 为 ${newValue}`);
+                }
+                
+                // 更新当前项的值
+                item.value = newValue;
+                
+                // 保存当前选中项的key，以便刷新后恢复选中
+                const currentKey = item.key;
+                const currentIndex = BIOSManager._currentItemIndex;
+                
+                // 刷新页面以显示新值
+                await BIOSManager._renderPage('registry');
+                
+                // 尝试恢复选中项（通过key查找）
+                const page = BIOSManager._pages['registry'];
+                if (page && page.items) {
+                    const itemIndex = page.items.findIndex(i => i.key === currentKey);
+                    if (itemIndex !== -1) {
+                        BIOSManager._currentItemIndex = itemIndex;
+                        BIOSManager._updateSelection();
+                    } else if (currentIndex < page.items.length) {
+                        // 如果找不到，尝试使用原来的索引
+                        BIOSManager._currentItemIndex = currentIndex;
+                        BIOSManager._updateSelection();
+                    }
+                }
+                
+            } catch (e) {
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error("BIOSManager", `切换注册表布尔值失败: ${e.message}`, e);
+                }
+            }
+        }
+        
+        /**
          * 获取系统信息
          * @returns {Promise<Object>} 系统信息对象
          */
@@ -583,6 +731,139 @@ KernelLogger.info("BIOSManager", "模块初始化");
             }
             
             return info;
+        }
+        
+        /**
+         * 获取磁盘信息
+         * @returns {Promise<Object>} 磁盘信息对象
+         */
+        static async _getDiskInfo() {
+            const info = {};
+            
+            try {
+                // 尝试从POOL获取Disk对象
+                let Disk = null;
+                if (typeof POOL !== 'undefined' && typeof POOL.__GET__ === 'function') {
+                    try {
+                        Disk = POOL.__GET__("KERNEL_GLOBAL_POOL", "Disk");
+                    } catch (e) {
+                        // POOL中没有，继续尝试其他方法
+                    }
+                }
+                
+                // 如果POOL中没有，尝试从全局对象获取
+                if (!Disk && typeof window !== 'undefined' && window.Disk) {
+                    Disk = window.Disk;
+                }
+                
+                if (!Disk) {
+                    // Disk未加载，返回默认值
+                    info['disk-total-size'] = 'N/A (Disk not loaded)';
+                    info['disk-partition-count'] = '0';
+                    info['disk-status'] = 'Not Available';
+                    info['partitions'] = [];
+                    return info;
+                }
+                
+                // 获取磁盘总大小
+                const totalSize = Disk.diskSize || 0;
+                info['disk-total-size'] = BIOSManager._formatBytes(totalSize);
+                
+                // 获取磁盘状态
+                const canUsed = Disk.canUsed !== undefined ? Disk.canUsed : false;
+                info['disk-status'] = canUsed ? 'Available' : 'Not Available';
+                
+                // 获取分区信息
+                const partitions = [];
+                let partitionCount = 0;
+                
+                try {
+                    // 获取分区映射表
+                    const diskSeparateMap = Disk.diskSeparateMap;
+                    const diskSeparateSize = Disk.diskSeparateSize;
+                    const diskFreeMap = Disk.diskFreeMap;
+                    const diskUsedMap = Disk.diskUsedMap;
+                    
+                    if (diskSeparateMap && diskSeparateMap instanceof Map) {
+                        partitionCount = diskSeparateMap.size;
+                        
+                        // 遍历所有分区
+                        diskSeparateMap.forEach((nodeTree, partitionName) => {
+                            const size = diskSeparateSize ? (diskSeparateSize.get(partitionName) || 0) : 0;
+                            const used = diskUsedMap ? (diskUsedMap.get(partitionName) || 0) : 0;
+                            const free = diskFreeMap ? (diskFreeMap.get(partitionName) || 0) : (size - used);
+                            
+                            partitions.push({
+                                name: partitionName,
+                                size: BIOSManager._formatBytes(size),
+                                used: BIOSManager._formatBytes(used),
+                                free: BIOSManager._formatBytes(free),
+                                usedPercent: size > 0 ? ((used / size) * 100).toFixed(1) : '0.0'
+                            });
+                        });
+                    } else if (diskSeparateSize && diskSeparateSize instanceof Map) {
+                        // 如果diskSeparateMap不可用，但diskSeparateSize可用，从diskSeparateSize获取
+                        partitionCount = diskSeparateSize.size;
+                        
+                        diskSeparateSize.forEach((size, partitionName) => {
+                            const used = diskUsedMap ? (diskUsedMap.get(partitionName) || 0) : 0;
+                            const free = diskFreeMap ? (diskFreeMap.get(partitionName) || 0) : (size - used);
+                            
+                            partitions.push({
+                                name: partitionName,
+                                size: BIOSManager._formatBytes(size),
+                                used: BIOSManager._formatBytes(used),
+                                free: BIOSManager._formatBytes(free),
+                                usedPercent: size > 0 ? ((used / size) * 100).toFixed(1) : '0.0'
+                            });
+                        });
+                    }
+                    
+                    // 按分区名称排序
+                    partitions.sort((a, b) => {
+                        // D: 分区优先，然后按字母顺序
+                        if (a.name === 'D:') return -1;
+                        if (b.name === 'D:') return 1;
+                        return a.name.localeCompare(b.name);
+                    });
+                } catch (e) {
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.warn("BIOSManager", `获取分区信息失败: ${e.message}`);
+                    }
+                }
+                
+                info['disk-partition-count'] = partitionCount.toString();
+                info['partitions'] = partitions;
+                
+            } catch (e) {
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error("BIOSManager", `获取磁盘信息失败: ${e.message}`, e);
+                }
+                // 返回错误信息
+                info['disk-total-size'] = 'Error';
+                info['disk-partition-count'] = '0';
+                info['disk-status'] = 'Error';
+                info['partitions'] = [];
+            }
+            
+            return info;
+        }
+        
+        /**
+         * 格式化字节数为可读格式
+         * @param {number} bytes 字节数
+         * @returns {string} 格式化后的字符串
+         */
+        static _formatBytes(bytes) {
+            if (bytes === 0 || bytes === null || bytes === undefined) {
+                return '0 B';
+            }
+            
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
         }
         
         /**
@@ -722,6 +1003,42 @@ KernelLogger.info("BIOSManager", "模块初始化");
                 await BIOSManager._testBackendService('spring');
                 return;
             }
+            
+            // 刷新数据操作（清除localStorage）
+            if (item.action === 'refresh-data') {
+                await BIOSManager._refreshData();
+                return;
+            }
+            
+            // 确认刷新数据
+            if (item.action === 'confirm-refresh-data') {
+                await BIOSManager._confirmRefreshData();
+                return;
+            }
+            
+            // 取消刷新数据
+            if (item.action === 'cancel-refresh-data') {
+                await BIOSManager._cancelRefreshData();
+                return;
+            }
+            
+            // 清除内核异常标志并强制进入系统
+            if (item.action === 'clear-kernel-exception') {
+                await BIOSManager._clearKernelExceptionFlag();
+                return;
+            }
+            
+            // 确认清除内核异常标志
+            if (item.action === 'confirm-clear-kernel-exception') {
+                await BIOSManager._confirmClearKernelException();
+                return;
+            }
+            
+            // 取消清除内核异常标志
+            if (item.action === 'cancel-clear-kernel-exception') {
+                await BIOSManager._cancelClearKernelException();
+                return;
+            }
         }
         
         /**
@@ -855,17 +1172,43 @@ KernelLogger.info("BIOSManager", "模块初始化");
         }
         
         /**
-         * 导航：向左（预留）
+         * 导航：向左（用于切换布尔值）
          */
-        static _navigateLeft() {
-            // 预留功能
+        static async _navigateLeft() {
+            const page = BIOSManager._pages[BIOSManager._currentPage];
+            if (!page || page.items.length === 0) {
+                return;
+            }
+            
+            const item = page.items[BIOSManager._currentItemIndex];
+            if (!item) {
+                return;
+            }
+            
+            // 如果是注册表页面且当前项是布尔类型，切换值
+            if (BIOSManager._currentPage === 'registry' && item.type === 'registry-item' && item.isBoolean) {
+                await BIOSManager._toggleRegistryBoolean(item, false);
+            }
         }
         
         /**
-         * 导航：向右（预留）
+         * 导航：向右（用于切换布尔值）
          */
-        static _navigateRight() {
-            // 预留功能
+        static async _navigateRight() {
+            const page = BIOSManager._pages[BIOSManager._currentPage];
+            if (!page || page.items.length === 0) {
+                return;
+            }
+            
+            const item = page.items[BIOSManager._currentItemIndex];
+            if (!item) {
+                return;
+            }
+            
+            // 如果是注册表页面且当前项是布尔类型，切换值
+            if (BIOSManager._currentPage === 'registry' && item.type === 'registry-item' && item.isBoolean) {
+                await BIOSManager._toggleRegistryBoolean(item, true);
+            }
         }
         
         /**
@@ -894,6 +1237,22 @@ KernelLogger.info("BIOSManager", "模块初始化");
                     block: 'nearest',
                     inline: 'nearest'
                 });
+            }
+            
+            // 更新帮助信息（如果是注册表页面）
+            if (BIOSManager._currentPage === 'registry') {
+                const help = BIOSManager._container.querySelector('.bios-help');
+                if (help) {
+                    const page = BIOSManager._pages[BIOSManager._currentPage];
+                    let helpText = '↑↓: Navigate  Enter: Select  Esc: Back  F10: Save & Exit';
+                    if (page && page.items && page.items.length > 0) {
+                        const currentItem = page.items[BIOSManager._currentItemIndex];
+                        if (currentItem && currentItem.type === 'registry-item' && currentItem.isBoolean) {
+                            helpText += '  ← →: Toggle Boolean';
+                        }
+                    }
+                    help.innerHTML = helpText;
+                }
             }
         }
         
@@ -1082,6 +1441,279 @@ KernelLogger.info("BIOSManager", "模块初始化");
                     
                     const detailDiv = document.createElement('div');
                     detailDiv.className = 'test-detail';
+                    detailDiv.style.cssText = `
+                        margin-top: 10px;
+                        padding: 10px;
+                        background: rgba(0, 255, 0, 0.05);
+                        border: 1px solid rgba(0, 255, 0, 0.2);
+                        font-size: 14px;
+                        line-height: 1.6;
+                        white-space: pre-wrap;
+                        color: rgba(0, 255, 0, 0.8);
+                    `;
+                    detailDiv.textContent = lines.slice(1).join('\n');
+                    statusItem.parentElement.insertBefore(detailDiv, statusItem.nextSibling);
+                }
+            }
+        }
+        
+        /**
+         * 刷新数据（清除localStorage）
+         */
+        static async _refreshData() {
+            // 显示确认页面
+            BIOSManager._pages['refresh-data-confirm'] = {
+                title: 'Refresh Data - Clear localStorage',
+                items: [
+                    { id: 'confirm-warning', label: 'WARNING: This will clear ALL localStorage data!', type: 'info' },
+                    { id: 'confirm-message', label: 'This action cannot be undone. System will reload after clearing.', type: 'info' },
+                    { id: 'confirm-yes', label: 'Yes, Clear All Data', action: 'confirm-refresh-data' },
+                    { id: 'confirm-no', label: 'No, Cancel', action: 'cancel-refresh-data' }
+                ]
+            };
+            
+            // 切换到确认页面
+            BIOSManager._pageStack.push(BIOSManager._currentPage);
+            await BIOSManager._renderPage('refresh-data-confirm');
+        }
+        
+        /**
+         * 确认清除localStorage
+         */
+        static async _confirmRefreshData() {
+            try {
+                // 显示处理中页面
+                BIOSManager._pages['refresh-data-processing'] = {
+                    title: 'Refreshing Data...',
+                    items: [
+                        { id: 'process-status', label: 'Clearing localStorage...', type: 'info' },
+                        { id: 'back', label: 'Back', action: 'back' }
+                    ]
+                };
+                
+                await BIOSManager._renderPage('refresh-data-processing');
+                
+                // 清除localStorage
+                if (typeof localStorage !== 'undefined') {
+                    try {
+                        // 获取localStorage中的所有键
+                        const keys = [];
+                        for (let i = 0; i < localStorage.length; i++) {
+                            const key = localStorage.key(i);
+                            if (key) {
+                                keys.push(key);
+                            }
+                        }
+                        
+                        // 清除所有键
+                        keys.forEach(key => {
+                            try {
+                                localStorage.removeItem(key);
+                            } catch (e) {
+                                if (typeof KernelLogger !== 'undefined') {
+                                    KernelLogger.warn("BIOSManager", `清除localStorage键失败: ${key}, ${e.message}`);
+                                }
+                            }
+                        });
+                        
+                        // 也尝试使用clear方法（如果可用）
+                        try {
+                            localStorage.clear();
+                        } catch (e) {
+                            // 忽略错误，因为我们已经逐个删除了
+                        }
+                        
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.info("BIOSManager", `已清除 ${keys.length} 个localStorage键`);
+                        }
+                        
+                        // 更新状态
+                        BIOSManager._updateRefreshDataStatus(`Success! Cleared ${keys.length} items from localStorage.\nSystem will reload in 3 seconds...`);
+                        
+                        // 等待3秒后重新加载页面
+                        setTimeout(() => {
+                            if (typeof window !== 'undefined' && window.location) {
+                                window.location.reload();
+                            }
+                        }, 3000);
+                        
+                    } catch (e) {
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.error("BIOSManager", `清除localStorage失败: ${e.message}`, e);
+                        }
+                        BIOSManager._updateRefreshDataStatus(`Error: ${e.message}`);
+                    }
+                } else {
+                    BIOSManager._updateRefreshDataStatus('Error: localStorage is not available');
+                }
+            } catch (e) {
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error("BIOSManager", `刷新数据操作失败: ${e.message}`, e);
+                }
+            }
+        }
+        
+        /**
+         * 取消刷新数据
+         */
+        static async _cancelRefreshData() {
+            // 返回上一页
+            if (BIOSManager._pageStack.length > 0) {
+                const previousPage = BIOSManager._pageStack.pop();
+                await BIOSManager._renderPage(previousPage, true);
+            } else {
+                await BIOSManager._renderPage('advanced', true);
+            }
+        }
+        
+        /**
+         * 更新刷新数据状态显示
+         */
+        static _updateRefreshDataStatus(statusText) {
+            if (!BIOSManager._container) {
+                return;
+            }
+            
+            const statusItem = BIOSManager._container.querySelector('[data-item-id="process-status"]');
+            if (statusItem) {
+                // 将多行文本转换为显示格式
+                const lines = statusText.split('\n');
+                statusItem.textContent = lines[0]; // 第一行作为主标签
+                if (lines.length > 1) {
+                    // 如果有更多行，创建一个详细信息的显示
+                    const oldDetail = statusItem.parentElement.querySelector('.refresh-detail');
+                    if (oldDetail) {
+                        oldDetail.remove();
+                    }
+                    
+                    const detailDiv = document.createElement('div');
+                    detailDiv.className = 'refresh-detail';
+                    detailDiv.style.cssText = `
+                        margin-top: 10px;
+                        padding: 10px;
+                        background: rgba(0, 255, 0, 0.05);
+                        border: 1px solid rgba(0, 255, 0, 0.2);
+                        font-size: 14px;
+                        line-height: 1.6;
+                        white-space: pre-wrap;
+                        color: rgba(0, 255, 0, 0.8);
+                    `;
+                    detailDiv.textContent = lines.slice(1).join('\n');
+                    statusItem.parentElement.insertBefore(detailDiv, statusItem.nextSibling);
+                }
+            }
+        }
+        
+        /**
+         * 清除内核异常标志并强制进入系统
+         * 在BIOS中选择立即全面自检并强制进入系统时调用
+         */
+        static async _clearKernelExceptionFlag() {
+            // 显示确认页面
+            BIOSManager._pages['clear-kernel-exception-confirm'] = {
+                title: 'Clear Kernel Exception Flag',
+                items: [
+                    { id: 'confirm-warning', label: 'WARNING: This will clear the kernel exception flag and force system boot!', type: 'info' },
+                    { id: 'confirm-message', label: 'This action will allow the system to boot normally. System will reload after clearing.', type: 'info' },
+                    { id: 'confirm-yes', label: 'Yes, Clear Flag & Force Boot', action: 'confirm-clear-kernel-exception' },
+                    { id: 'confirm-no', label: 'No, Cancel', action: 'cancel-clear-kernel-exception' }
+                ]
+            };
+            
+            // 切换到确认页面
+            BIOSManager._pageStack.push(BIOSManager._currentPage);
+            await BIOSManager._renderPage('clear-kernel-exception-confirm');
+        }
+        
+        /**
+         * 确认清除内核异常标志
+         */
+        static async _confirmClearKernelException() {
+            try {
+                // 显示处理中页面
+                BIOSManager._pages['clear-kernel-exception-processing'] = {
+                    title: 'Clearing Kernel Exception Flag...',
+                    items: [
+                        { id: 'process-status', label: 'Clearing kernel exception flag...', type: 'info' },
+                        { id: 'back', label: 'Back', action: 'back' }
+                    ]
+                };
+                
+                await BIOSManager._renderPage('clear-kernel-exception-processing');
+                
+                // 调用ExceptionHandler清除标志（现在是异步的）
+                if (typeof ExceptionHandler !== 'undefined') {
+                    await ExceptionHandler.clearKernelExceptionFlag();
+                    
+                    // 同时清除安全模式标志
+                    try {
+                        if (typeof SafeModeManager !== 'undefined' && typeof SafeModeManager.disableSafeMode === 'function') {
+                            SafeModeManager.disableSafeMode();
+                        } else {
+                            if (typeof sessionStorage !== 'undefined') {
+                                sessionStorage.removeItem('__ZEROS_SAFE_MODE__');
+                            }
+                        }
+                    } catch (e) {
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn("BIOSManager", `清除安全模式标志失败: ${e.message}`);
+                        }
+                    }
+                    
+                    BIOSManager._updateClearKernelExceptionStatus('Success! Kernel exception flag cleared.\nSafe mode flag cleared.\nSystem will reload in 3 seconds...');
+                    
+                    // 等待3秒后重新加载页面
+                    setTimeout(() => {
+                        if (typeof window !== 'undefined' && window.location) {
+                            window.location.reload();
+                        }
+                    }, 3000);
+                } else {
+                    BIOSManager._updateClearKernelExceptionStatus('Error: ExceptionHandler module not available');
+                }
+            } catch (e) {
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error("BIOSManager", `清除内核异常标志失败: ${e.message}`, e);
+                }
+                BIOSManager._updateClearKernelExceptionStatus(`Error: ${e.message}`);
+            }
+        }
+        
+        /**
+         * 取消清除内核异常标志
+         */
+        static async _cancelClearKernelException() {
+            // 返回上一页
+            if (BIOSManager._pageStack.length > 0) {
+                const previousPage = BIOSManager._pageStack.pop();
+                await BIOSManager._renderPage(previousPage, true);
+            } else {
+                await BIOSManager._renderPage('advanced', true);
+            }
+        }
+        
+        /**
+         * 更新清除内核异常标志状态显示
+         */
+        static _updateClearKernelExceptionStatus(statusText) {
+            if (!BIOSManager._container) {
+                return;
+            }
+            
+            const statusItem = BIOSManager._container.querySelector('[data-item-id="process-status"]');
+            if (statusItem) {
+                // 将多行文本转换为显示格式
+                const lines = statusText.split('\n');
+                statusItem.textContent = lines[0]; // 第一行作为主标签
+                if (lines.length > 1) {
+                    // 如果有更多行，创建一个详细信息的显示
+                    const oldDetail = statusItem.parentElement.querySelector('.clear-kernel-exception-detail');
+                    if (oldDetail) {
+                        oldDetail.remove();
+                    }
+                    
+                    const detailDiv = document.createElement('div');
+                    detailDiv.className = 'clear-kernel-exception-detail';
                     detailDiv.style.cssText = `
                         margin-top: 10px;
                         padding: 10px;

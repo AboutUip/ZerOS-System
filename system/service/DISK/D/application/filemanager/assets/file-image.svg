@@ -1,7 +1,21 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-  <polyline points="14 2 14 8 20 8"/>
-  <circle cx="10" cy="13" r="2"/>
-  <path d="m20 17-1.09-1.09a2 2 0 0 0-2.82 0L10 22l-6-6h16z"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+  <defs>
+    <linearGradient id="imageFileGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#4ECDC4;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#2E9B94;stop-opacity:1" />
+    </linearGradient>
+    <filter id="imageFileShadow">
+      <feDropShadow dx="0" dy="1" stdDeviation="1.5" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+  <!-- 文件主体 -->
+  <path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6z" 
+        fill="url(#imageFileGradient)" 
+        filter="url(#imageFileShadow)"/>
+  <!-- 文件折角 -->
+  <path d="M14 2v6h6" fill="none" stroke="#1E6B66" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- 图片图标 -->
+  <rect x="8" y="10" width="8" height="6" rx="1" fill="#FFFFFF" fill-opacity="0.9"/>
+  <circle cx="10.5" cy="12.5" r="1" fill="#2E9B94"/>
+  <path d="M8 16l3-3 2 2 3-3 2 2v2H8v-2z" fill="#2E9B94" fill-opacity="0.6"/>
 </svg>
-

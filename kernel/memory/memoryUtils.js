@@ -195,7 +195,16 @@ class MemoryUtils {
             // 反序列化
             return JSON.parse(jsonStr);
         } catch (e) {
-            KernelLogger.error("MemoryUtils", `loadData 失败: ${e.message}`);
+            // 报告异常
+            if (typeof ExceptionHandler !== 'undefined') {
+                ExceptionHandler.reportException(
+                    ExceptionHandler.ExceptionLevel.SERVICE,
+                    `MemoryUtils.loadData失败: ${e.message}`,
+                    { pid, key, error: e.message, stack: e.stack }
+                ).catch(() => { });
+            } else {
+                KernelLogger.error("MemoryUtils", `loadData 失败: ${e.message}`);
+            }
             return null;
         }
     }
@@ -238,7 +247,16 @@ class MemoryUtils {
             const newAddr = MemoryUtils.storeData(pid, key, data);
             return newAddr !== null;
         } catch (e) {
-            KernelLogger.error("MemoryUtils", `updateData 失败: ${e.message}`);
+            // 报告异常
+            if (typeof ExceptionHandler !== 'undefined') {
+                ExceptionHandler.reportException(
+                    ExceptionHandler.ExceptionLevel.SERVICE,
+                    `MemoryUtils.updateData失败: ${e.message}`,
+                    { pid, key, error: e.message, stack: e.stack }
+                ).catch(() => { });
+            } else {
+                KernelLogger.error("MemoryUtils", `updateData 失败: ${e.message}`);
+            }
             return false;
         }
     }
@@ -462,6 +480,14 @@ if (typeof POOL !== 'undefined' && typeof POOL.__ADD__ === 'function') {
         }
         POOL.__ADD__("KERNEL_GLOBAL_POOL", "MemoryUtils", MemoryUtils);
     } catch (e) {
+        // 报告异常
+        if (typeof ExceptionHandler !== 'undefined') {
+            ExceptionHandler.reportException(
+                ExceptionHandler.ExceptionLevel.SERVICE,
+                `MemoryUtils.POOL注册失败: ${e.message}`,
+                { error: e.message, stack: e.stack }
+            ).catch(() => { });
+        }
         // 静默失败
     }
 }

@@ -2417,6 +2417,14 @@ if (typeof POOL !== 'undefined' && typeof POOL.__ADD__ === 'function') {
         }
         POOL.__ADD__("KERNEL_GLOBAL_POOL", "NodeTreeCollection", NodeTreeCollection);
     } catch (e) {
+        // 报告异常
+        if (typeof ExceptionHandler !== 'undefined') {
+            ExceptionHandler.reportException(
+                ExceptionHandler.ExceptionLevel.SERVICE,
+                `NodeTree.POOL注册失败: ${e.message}`,
+                { error: e.message, stack: e.stack }
+            ).catch(() => { });
+        }
         // POOL 可能还未完全初始化，暂时导出到全局作为降级方案
         if (typeof window !== 'undefined') {
             window.NodeTreeCollection = NodeTreeCollection;
