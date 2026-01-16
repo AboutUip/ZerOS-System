@@ -11,11 +11,12 @@
         // - POOL: 在 HTML 中直接加载（依赖 KernelLogger 和 DependencyConfig）
         // 这些模块不在此依赖图中
         
-        // 第一层：基础枚举管理器和系统信息模块（依赖 pool）
-        // 注意：pool、DependencyConfig 已在 HTML 中加载，不需要在依赖图中
-        // SystemInformation 需要在 bootloader 阶段尽早加载，以便 BIOS 可以使用后端服务配置
-        "../kernel/core/typePool/enumManager.js": [],
+        // 第一层：系统信息模块（必须在最早期加载，供其他模块使用）
         "../kernel/SystemInformation.js": [],
+        
+        // 第一层：基础枚举管理器（依赖 pool）
+        // 注意：pool、DependencyConfig 已在 HTML 中加载，不需要在依赖图中
+        "../kernel/core/typePool/enumManager.js": [],
         
         // 第三层：依赖 enumManager 的枚举
         "../kernel/core/typePool/logLevel.js": ["../kernel/core/typePool/enumManager.js"],

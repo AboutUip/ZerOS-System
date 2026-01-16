@@ -1350,23 +1350,16 @@ KernelLogger.info("BIOSManager", "模块初始化");
             await BIOSManager._renderPage(pageId);
             
             try {
-                // 使用 SystemInformation 获取后端服务URL（如果可用）
+                // 使用 SystemInformation 构建测试URL（根据后端类型自动选择端口和路径）
                 let testUrl;
-                if (typeof SystemInformation !== 'undefined') {
-                    // 设置后端类型
-                    const backendTypeEnum = backendType === 'php' 
-                        ? SystemInformation.BACKEND_TYPE.PHP 
-                        : SystemInformation.BACKEND_TYPE.SPRINGBOOT;
-                    SystemInformation.setBackendType(backendTypeEnum);
-                    
-                    // 使用 SystemInformation 构建服务URL
-                    // test服务路径：/system/service/test.php 或 /system/service/test
+                if (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrl) {
+                    // 使用 SystemInformation 构建服务路径
                     const servicePath = backendType === 'php' 
                         ? '/system/service/test.php' 
                         : '/system/service/test';
                     testUrl = SystemInformation.buildServiceUrl(servicePath);
                 } else {
-                    // 降级：SystemInformation 未加载，使用默认方式
+                    // 降级方案：手动构建URL
                     const origin = typeof window !== 'undefined' && window.location 
                         ? window.location.origin 
                         : 'http://localhost:8089';

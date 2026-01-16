@@ -5,7 +5,7 @@ KernelLogger.info("SystemInformation", "模块初始化");
 
 class SystemInformation {
     // 系统版本
-    static SYSTEM_VERSION = '0.6.1';
+    static SYSTEM_VERSION = '0.6.2';
     
     // 内核版本
     static KERNEL_VERSION = '0.6.3';
@@ -32,6 +32,11 @@ class SystemInformation {
             name: 'yan'
         },
         {
+            organization: 'KitePromiss 工作室',
+            role: '后端开发者',
+            name: 'xianyu'
+        },
+        {
             organization: '个人开发者',
             role: '内核开发',
             name: '默默'
@@ -56,7 +61,7 @@ class SystemInformation {
     
     // 后端配置（可通过 LStorage 或环境变量配置）
     static _backendConfig = {
-        type: SystemInformation.BACKEND_TYPE.PHP,
+        type: SystemInformation.BACKEND_TYPE.SPRINGBOOT,
         phpPort: 8089,                              // PHP 默认端口
         springBootPort: 8080                        // SpringBoot 默认端口
     };
@@ -67,7 +72,8 @@ class SystemInformation {
         COMPRESSION_DIRVE: 'CompressionDirve',
         IMAGE_PROXY: 'ImageProxy',
         AUDIO_PROXY: 'audio-proxy',
-        MODULE_PROXY: 'module-proxy'
+        MODULE_PROXY: 'module-proxy',
+        DISKMANAGER: 'DISKMANAGER'
     };
     
     // 服务基础路径

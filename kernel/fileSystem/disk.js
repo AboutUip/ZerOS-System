@@ -850,10 +850,17 @@ class Disk {
             }
 
             // 通过 DISKMANAGER API 检查分区是否存在
-            const origin = (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin)
-                ? SystemInformation.getOrigin()
-                : (typeof window !== 'undefined' && window.location) ? window.location.origin : 'http://localhost:8089';
-            const diskManagerUrl = new URL('/system/service/DISKMANAGER.php', origin);
+            // 使用 SystemInformation 构建服务路径（根据后端类型自动添加后缀）
+            let diskManagerUrl;
+            if (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) {
+                diskManagerUrl = SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.DISKMANAGER);
+            } else {
+                // 降级方案：使用默认 PHP 路径
+                const origin = (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin)
+                    ? SystemInformation.getOrigin()
+                    : (typeof window !== 'undefined' && window.location) ? window.location.origin : 'http://localhost:8089';
+                diskManagerUrl = new URL('/system/service/DISKMANAGER.php', origin);
+            }
 
             // 先检查分区是否存在
             const checkUrl = new URL(diskManagerUrl);
