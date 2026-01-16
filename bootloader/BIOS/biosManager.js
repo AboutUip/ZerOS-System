@@ -1350,19 +1350,34 @@ KernelLogger.info("BIOSManager", "模块初始化");
             await BIOSManager._renderPage(pageId);
             
             try {
-                // 获取基础URL
-                const origin = typeof window !== 'undefined' && window.location 
-                    ? window.location.origin 
-                    : 'http://localhost:8089';
-                
-                // 构建测试URL
+                // 使用 SystemInformation 获取后端服务URL（如果可用）
                 let testUrl;
-                if (backendType === 'php') {
-                    testUrl = `${origin}/system/service/test.php`;
-                } else if (backendType === 'spring') {
-                    testUrl = `${origin}/system/service/test`;
+                if (typeof SystemInformation !== 'undefined') {
+                    // 设置后端类型
+                    const backendTypeEnum = backendType === 'php' 
+                        ? SystemInformation.BACKEND_TYPE.PHP 
+                        : SystemInformation.BACKEND_TYPE.SPRINGBOOT;
+                    SystemInformation.setBackendType(backendTypeEnum);
+                    
+                    // 使用 SystemInformation 构建服务URL
+                    // test服务路径：/system/service/test.php 或 /system/service/test
+                    const servicePath = backendType === 'php' 
+                        ? '/system/service/test.php' 
+                        : '/system/service/test';
+                    testUrl = SystemInformation.buildServiceUrl(servicePath);
                 } else {
-                    throw new Error(`Unknown backend type: ${backendType}`);
+                    // 降级：SystemInformation 未加载，使用默认方式
+                    const origin = typeof window !== 'undefined' && window.location 
+                        ? window.location.origin 
+                        : 'http://localhost:8089';
+                    
+                    if (backendType === 'php') {
+                        testUrl = `${origin}/system/service/test.php`;
+                    } else if (backendType === 'spring') {
+                        testUrl = `${origin}/system/service/test`;
+                    } else {
+                        throw new Error(`Unknown backend type: ${backendType}`);
+                    }
                 }
                 
                 BIOSManager._updateTestStatus(`Testing ${backendType.toUpperCase()} backend...\nURL: ${testUrl}`);
