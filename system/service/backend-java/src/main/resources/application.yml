@@ -18,13 +18,13 @@ spring:
 # 如果作为 jar 包运行，建议使用绝对路径或相对于 jar 包位置的路径
 disk:
   base-path: ../DISK
-  c-path: ${disk.base-path}/C
-  d-path: ${disk.base-path}/D
+  system-partition: D
+  system-resource-zip: ../test/assets/SYSTEMRESOURCE.zip
 
 logging:
   level:
-    cn.zeros: error
-    org.springframework.web: error
+    cn.zeros: info
+    org.springframework.web: info
 
 
 

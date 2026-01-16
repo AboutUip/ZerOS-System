@@ -1,6 +1,6 @@
 package cn.zeros.controller;
 
-import cn.zeros.constant.CommonConstants;
+import cn.zeros.constant.HttpConstants;
 import cn.zeros.constant.FileConstants;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.*;
@@ -13,21 +13,21 @@ import java.time.Duration;
 
 /**
  * 图片代理控制器
- * 
+ *
  * @author zeros
- * @date 2024
+ * @date 2026-01-16
  */
 @RestController
 @RequestMapping("/ImageProxy")
 @Slf4j
 public class ImageProxyController {
-    
+
     private final WebClient webClient;
-    
+
     public ImageProxyController() {
         this.webClient = WebClient.builder()
                 .defaultHeader(HttpHeaders.USER_AGENT, "ZerOS-ImageProxy/1.0")
-                .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(CommonConstants.DEFAULT_MAX_IN_MEMORY_SIZE))
+                .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(HttpConstants.DEFAULT_MAX_IN_MEMORY_SIZE))
                 .build();
     }
     
@@ -69,7 +69,7 @@ public class ImageProxyController {
                                         
                                         HttpHeaders headers = new HttpHeaders();
                                         headers.setContentType(MediaType.parseMediaType(detectedContentType));
-                                        headers.setCacheControl(CacheControl.maxAge(Duration.ofHours(CommonConstants.CACHE_MAX_AGE_HOURS)));
+                                        headers.setCacheControl(CacheControl.maxAge(Duration.ofHours(HttpConstants.CACHE_MAX_AGE_HOURS)));
                                         
                                         return ResponseEntity.ok()
                                                 .headers(headers)
@@ -83,7 +83,7 @@ public class ImageProxyController {
                                             .body(("{\"error\":\"Failed to fetch image\",\"http_code\":" + status.value() + "}").getBytes()));
                         }
                     })
-                    .timeout(Duration.ofSeconds(CommonConstants.WEB_CLIENT_TIMEOUT_SECONDS))
+                    .timeout(Duration.ofSeconds(HttpConstants.WEB_CLIENT_TIMEOUT_SECONDS))
                     .onErrorResume(e -> Mono.just(ResponseEntity.status(HttpStatus.BAD_GATEWAY)
                             .contentType(MediaType.APPLICATION_JSON)
                             .body(("{\"error\":\"Failed to fetch image\",\"message\":\"" + e.getMessage() + "\"}").getBytes())));

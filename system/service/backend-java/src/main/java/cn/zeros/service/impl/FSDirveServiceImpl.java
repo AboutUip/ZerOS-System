@@ -2,6 +2,7 @@ package cn.zeros.service.impl;
 
 import cn.zeros.config.DiskConfig;
 import cn.zeros.constant.CommonConstants;
+import cn.zeros.constant.DiskConstants;
 import cn.zeros.constant.FileConstants;
 import cn.zeros.service.IFSDirveService;
 import cn.zeros.util.PathUtil;
@@ -21,25 +22,25 @@ import java.util.stream.Stream;
 
 /**
  * 文件系统驱动服务实现类
- * 
+ *
  * @author zeros
- * @date 2024
+ * @date 2026-01-16
  */
 @Slf4j
 @Service
 public class FSDirveServiceImpl implements IFSDirveService {
-    
+
     private final DiskConfig diskConfig;
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern(CommonConstants.DATE_TIME_FORMAT);
-    
+
     public FSDirveServiceImpl(DiskConfig diskConfig) {
         this.diskConfig = diskConfig;
     }
-    
+
     // ============ 目录操作 ============
-    
+
     public Map<String, Object> createDirectory(String path, String name) throws IOException {
-        Path dirPath = PathUtil.convertVirtualPath(path, diskConfig.getDiskCPath(), diskConfig.getDiskDPath());
+        Path dirPath = PathUtil.convertVirtualPath(path, diskConfig);
         Path newDirPath = dirPath.resolve(name).normalize();
         
         if (!Files.exists(dirPath)) {
@@ -64,7 +65,7 @@ public class FSDirveServiceImpl implements IFSDirveService {
     }
     
     public Map<String, Object> deleteDirectory(String path) throws IOException {
-        Path dirPath = PathUtil.convertVirtualPath(path, diskConfig.getDiskCPath(), diskConfig.getDiskDPath());
+        Path dirPath = PathUtil.convertVirtualPath(path, diskConfig);
         
         if (!Files.exists(dirPath) || !Files.isDirectory(dirPath)) {
             throw new IOException("目录不存在: " + path);
@@ -84,7 +85,7 @@ public class FSDirveServiceImpl implements IFSDirveService {
     }
     
     public Map<String, Object> deleteDirectoryRecursive(String path) throws IOException {
-        Path dirPath = PathUtil.convertVirtualPath(path, diskConfig.getDiskCPath(), diskConfig.getDiskDPath());
+        Path dirPath = PathUtil.convertVirtualPath(path, diskConfig);
         
         if (!Files.exists(dirPath) || !Files.isDirectory(dirPath)) {
             throw new IOException("目录不存在: " + path);
@@ -110,7 +111,7 @@ public class FSDirveServiceImpl implements IFSDirveService {
     }
     
     public Map<String, Object> listDirectory(String path) throws IOException {
-        Path dirPath = PathUtil.convertVirtualPath(path, diskConfig.getDiskCPath(), diskConfig.getDiskDPath());
+        Path dirPath = PathUtil.convertVirtualPath(path, diskConfig);
         if (!Files.exists(dirPath) || !Files.isDirectory(dirPath)) {
             throw new IOException("目录不存在: " + path);
         }
@@ -168,7 +169,7 @@ public class FSDirveServiceImpl implements IFSDirveService {
     }
     
     public Map<String, Object> renameDirectory(String path, String oldName, String newName) throws IOException {
-        Path dirPath = PathUtil.convertVirtualPath(path, diskConfig.getDiskCPath(), diskConfig.getDiskDPath());
+        Path dirPath = PathUtil.convertVirtualPath(path, diskConfig);
         Path oldDirPath = dirPath.resolve(oldName).normalize();
         Path newDirPath = dirPath.resolve(newName).normalize();
         
@@ -190,8 +191,8 @@ public class FSDirveServiceImpl implements IFSDirveService {
     }
     
     public Map<String, Object> moveDirectory(String sourcePath, String targetPath) throws IOException {
-        Path sourceDirPath = PathUtil.convertVirtualPath(sourcePath, diskConfig.getDiskCPath(), diskConfig.getDiskDPath());
-        Path targetDirPath = PathUtil.convertVirtualPath(targetPath, diskConfig.getDiskCPath(), diskConfig.getDiskDPath());
+        Path sourceDirPath = PathUtil.convertVirtualPath(sourcePath, diskConfig);
+        Path targetDirPath = PathUtil.convertVirtualPath(targetPath, diskConfig);
         
         if (!Files.exists(sourceDirPath) || !Files.isDirectory(sourceDirPath)) {
             throw new IOException("源目录不存在: " + sourcePath);
@@ -217,8 +218,8 @@ public class FSDirveServiceImpl implements IFSDirveService {
     }
     
     public Map<String, Object> copyDirectory(String sourcePath, String targetPath) throws IOException {
-        Path sourceDirPath = PathUtil.convertVirtualPath(sourcePath, diskConfig.getDiskCPath(), diskConfig.getDiskDPath());
-        Path targetDirPath = PathUtil.convertVirtualPath(targetPath, diskConfig.getDiskCPath(), diskConfig.getDiskDPath());
+        Path sourceDirPath = PathUtil.convertVirtualPath(sourcePath, diskConfig);
+        Path targetDirPath = PathUtil.convertVirtualPath(targetPath, diskConfig);
         
         if (!Files.exists(sourceDirPath) || !Files.isDirectory(sourceDirPath)) {
             throw new IOException("源目录不存在: " + sourcePath);
@@ -264,7 +265,7 @@ public class FSDirveServiceImpl implements IFSDirveService {
     // ============ 文件操作 ============
     
     public Map<String, Object> createFile(String path, String fileName, String content) throws IOException {
-        Path dirPath = PathUtil.convertVirtualPath(path, diskConfig.getDiskCPath(), diskConfig.getDiskDPath());
+        Path dirPath = PathUtil.convertVirtualPath(path, diskConfig);
         Path filePath = dirPath.resolve(fileName).normalize();
         
         // 验证文件名
@@ -291,7 +292,7 @@ public class FSDirveServiceImpl implements IFSDirveService {
     }
     
     public Map<String, Object> readFile(String path, String fileName, boolean asBase64) throws IOException {
-        Path dirPath = PathUtil.convertVirtualPath(path, diskConfig.getDiskCPath(), diskConfig.getDiskDPath());
+        Path dirPath = PathUtil.convertVirtualPath(path, diskConfig);
         Path filePath = dirPath.resolve(fileName).normalize();
         
         if (!Files.exists(filePath)) {
@@ -332,7 +333,7 @@ public class FSDirveServiceImpl implements IFSDirveService {
     }
     
     public Map<String, Object> writeFile(String path, String fileName, String content, String writeMod, boolean isBase64) throws IOException {
-        Path dirPath = PathUtil.convertVirtualPath(path, diskConfig.getDiskCPath(), diskConfig.getDiskDPath());
+        Path dirPath = PathUtil.convertVirtualPath(path, diskConfig);
         Path filePath = dirPath.resolve(fileName).normalize();
         
         // 验证文件名
@@ -393,7 +394,7 @@ public class FSDirveServiceImpl implements IFSDirveService {
     }
     
     public Map<String, Object> deleteFile(String path, String fileName) throws IOException {
-        Path dirPath = PathUtil.convertVirtualPath(path, diskConfig.getDiskCPath(), diskConfig.getDiskDPath());
+        Path dirPath = PathUtil.convertVirtualPath(path, diskConfig);
         Path filePath = dirPath.resolve(fileName).normalize();
         
         if (!Files.exists(filePath) || !Files.isRegularFile(filePath)) {
@@ -409,7 +410,7 @@ public class FSDirveServiceImpl implements IFSDirveService {
     }
     
     public Map<String, Object> renameFile(String path, String oldFileName, String newFileName) throws IOException {
-        Path dirPath = PathUtil.convertVirtualPath(path, diskConfig.getDiskCPath(), diskConfig.getDiskDPath());
+        Path dirPath = PathUtil.convertVirtualPath(path, diskConfig);
         Path oldFilePath = dirPath.resolve(oldFileName).normalize();
         Path newFilePath = dirPath.resolve(newFileName).normalize();
         
@@ -431,8 +432,8 @@ public class FSDirveServiceImpl implements IFSDirveService {
     }
     
     public Map<String, Object> moveFile(String sourcePath, String sourceFileName, String targetPath, String targetFileName) throws IOException {
-        Path sourceDirPath = PathUtil.convertVirtualPath(sourcePath, diskConfig.getDiskCPath(), diskConfig.getDiskDPath());
-        Path targetDirPath = PathUtil.convertVirtualPath(targetPath, diskConfig.getDiskCPath(), diskConfig.getDiskDPath());
+        Path sourceDirPath = PathUtil.convertVirtualPath(sourcePath, diskConfig);
+        Path targetDirPath = PathUtil.convertVirtualPath(targetPath, diskConfig);
         
         Path sourceFilePath = sourceDirPath.resolve(sourceFileName).normalize();
         String finalTargetFileName = targetFileName != null ? targetFileName : sourceFileName;
@@ -459,8 +460,8 @@ public class FSDirveServiceImpl implements IFSDirveService {
     }
     
     public Map<String, Object> copyFile(String sourcePath, String sourceFileName, String targetPath, String targetFileName) throws IOException {
-        Path sourceDirPath = PathUtil.convertVirtualPath(sourcePath, diskConfig.getDiskCPath(), diskConfig.getDiskDPath());
-        Path targetDirPath = PathUtil.convertVirtualPath(targetPath, diskConfig.getDiskCPath(), diskConfig.getDiskDPath());
+        Path sourceDirPath = PathUtil.convertVirtualPath(sourcePath, diskConfig);
+        Path targetDirPath = PathUtil.convertVirtualPath(targetPath, diskConfig);
         
         Path sourceFilePath = sourceDirPath.resolve(sourceFileName).normalize();
         String finalTargetFileName = targetFileName != null ? targetFileName : sourceFileName;
@@ -487,7 +488,7 @@ public class FSDirveServiceImpl implements IFSDirveService {
     }
     
     public Map<String, Object> getFileInfo(String path, String fileName) throws IOException {
-        Path dirPath = PathUtil.convertVirtualPath(path, diskConfig.getDiskCPath(), diskConfig.getDiskDPath());
+        Path dirPath = PathUtil.convertVirtualPath(path, diskConfig);
         Path filePath = dirPath.resolve(fileName).normalize();
         
         if (!Files.exists(filePath) || !Files.isRegularFile(filePath)) {
@@ -511,7 +512,7 @@ public class FSDirveServiceImpl implements IFSDirveService {
     
     public Map<String, Object> checkPathExists(String path) {
         try {
-            Path realPath = PathUtil.convertVirtualPath(path, diskConfig.getDiskCPath(), diskConfig.getDiskDPath());
+            Path realPath = PathUtil.convertVirtualPath(path, diskConfig);
             boolean exists = Files.exists(realPath);
             boolean isDir = exists && Files.isDirectory(realPath);
             boolean isFile = exists && Files.isRegularFile(realPath);
@@ -546,7 +547,7 @@ public class FSDirveServiceImpl implements IFSDirveService {
     }
     
     public Map<String, Object> getDiskInfo(String disk) throws IOException {
-        Path diskPath = CommonConstants.DISK_C.equals(disk) ? diskConfig.getDiskCPath() : diskConfig.getDiskDPath();
+        Path diskPath = diskConfig.getPartitionPath(disk);
         
         if (!Files.exists(diskPath) || !Files.isDirectory(diskPath)) {
             throw new IOException("磁盘目录不存在: " + disk);

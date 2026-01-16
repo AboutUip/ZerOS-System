@@ -2,12 +2,24 @@ package cn.zeros.service.impl;
 
 import cn.zeros.config.DiskConfig;
 import cn.zeros.service.ICompressionDirveService;
+import cn.zeros.util.CompressionUtil;
 import cn.zeros.util.PathUtil;
+import net.lingala.zip4j.ZipFile;
+import net.lingala.zip4j.model.ZipParameters;
+import net.lingala.zip4j.model.enums.CompressionLevel;
+import net.lingala.zip4j.model.enums.CompressionMethod;
+import net.lingala.zip4j.model.enums.EncryptionMethod;
+import org.apache.commons.compress.archivers.sevenz.SevenZArchiveEntry;
+import org.apache.commons.compress.archivers.sevenz.SevenZFile;
+import org.apache.commons.compress.archivers.sevenz.SevenZOutputFile;
+import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
+import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
+import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
+import org.apache.commons.compress.compressors.gzip.GzipCompressorInputStream;
+import org.apache.commons.compress.compressors.gzip.GzipCompressorOutputStream;
 import org.springframework.stereotype.Service;
 
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
+import java.io.*;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -22,6 +34,13 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
 
+/**
+ * 压缩服务实现类
+ * 使用 CompressionUtil 工具类减少重复代码
+ *
+ * @author zeros
+ * @date 2026-01-16
+ */
 @Service
 public class CompressionDirveServiceImpl implements ICompressionDirveService {
 
@@ -34,113 +53,61 @@ public class CompressionDirveServiceImpl implements ICompressionDirveService {
     // ============ ZIP 操作 ============
 
     @Override
-    public Map<String, Object> compressZip(String targetPath,
-                                          String sourcePath,
-                                          List<String> sourcePaths,
-                                          Map<String, Object> options) throws IOException {
-        Path targetRealPath = PathUtil.convertVirtualPath(targetPath, diskConfig.getDiskCPath(), diskConfig.getDiskDPath());
+    public Map<String, Object> compressZip(String targetPath, String sourcePath,
+                                           List<String> sourcePaths, Map<String, Object> options) throws IOException {
+        Path targetRealPath = PathUtil.convertVirtualPath(targetPath, diskConfig);
+        List<String> finalSourcePaths = CompressionUtil.getFinalSourcePaths(sourcePath, sourcePaths);
+        List<Path> sourceRealPaths = CompressionUtil.resolveSourcePaths(sourcePath, sourcePaths, diskConfig);
 
-        // 确定源路径列表
-        List<String> finalSourcePaths = new ArrayList<>();
-        if (sourcePaths != null && !sourcePaths.isEmpty()) {
-            finalSourcePaths.addAll(sourcePaths);
-        } else if (sourcePath != null && !sourcePath.isEmpty()) {
-            finalSourcePaths.add(sourcePath);
-        } else {
-            throw new IOException("缺少源路径参数");
-        }
+        CompressionUtil.ensureTargetReady(targetRealPath, targetPath);
 
-        // 转换为实际路径
-        List<Path> sourceRealPaths = new ArrayList<>();
-        for (String sp : finalSourcePaths) {
-            sourceRealPaths.add(PathUtil.convertVirtualPath(sp, diskConfig.getDiskCPath(), diskConfig.getDiskDPath()));
-        }
-
-        // 检查源路径是否存在
-        for (Path sp : sourceRealPaths) {
-            if (!Files.exists(sp)) {
-                throw new IOException("源路径不存在: " + sp);
-            }
-        }
-
-        // 检查目标文件是否存在
-        if (Files.exists(targetRealPath)) {
-            throw new IOException("目标文件已存在: " + targetPath);
-        }
-
-        // 确保父目录存在
-        Path parent = targetRealPath.getParent();
-        if (parent != null) {
-            Files.createDirectories(parent);
-        }
-
-        // 获取选项
-        List<String> exclude = getStringList(options != null ? options.get("exclude") : null);
-        int compressionLevel = parseInt(options != null ? options.get("compressionLevel") : null, 6);
+        List<String> exclude = CompressionUtil.getStringList(options != null ? options.get("exclude") : null);
+        int compressionLevel = CompressionUtil.parseInt(options != null ? options.get("compressionLevel") : null, 6);
         compressionLevel = Math.max(0, Math.min(9, compressionLevel));
 
-        // 创建 ZIP 文件
         try (ZipOutputStream zos = new ZipOutputStream(new FileOutputStream(targetRealPath.toFile()))) {
-            // ZipOutputStream 支持设置压缩级别（0-9）
             zos.setLevel(compressionLevel);
 
             for (Path sourceRealPath : sourceRealPaths) {
-                if (Files.isRegularFile(sourceRealPath)) {
-                    // 单个文件（保持原行为：仅使用文件名，可能在多源时存在重名覆盖风险）
-                    addFileToZip(zos, sourceRealPath, sourceRealPath.getFileName().toString());
-                } else if (Files.isDirectory(sourceRealPath)) {
-                    // 目录：保持原行为（目录作为顶层文件夹）
-                    String baseName = sourceRealPath.getFileName().toString();
-                    String basePrefix = baseName + "/";
-
-                    Files.walkFileTree(sourceRealPath, new SimpleFileVisitor<>() {
-                        @Override
-                        public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
-                            Path relativePath = sourceRealPath.relativize(file);
-                            String relative = relativePath.toString().replace("\\", "/");
-
-                            if (shouldExclude(relative, exclude)) {
-                                return FileVisitResult.CONTINUE;
-                            }
-
-                            String zipPath = basePrefix + relative;
-                            addFileToZip(zos, file, zipPath);
-                            return FileVisitResult.CONTINUE;
-                        }
-
-                        @Override
-                        public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
-                            if (dir.equals(sourceRealPath)) {
-                                return FileVisitResult.CONTINUE;
-                            }
-
-                            Path relativePath = sourceRealPath.relativize(dir);
-                            String relative = relativePath.toString().replace("\\", "/");
-
-                            if (!shouldExclude(relative, exclude)) {
-                                String zipPath = basePrefix + relative + "/";
-                                zos.putNextEntry(new ZipEntry(zipPath));
-                                zos.closeEntry();
-                            }
-                            return FileVisitResult.CONTINUE;
-                        }
-                    });
-                }
+                compressToZip(zos, sourceRealPath, exclude);
             }
         }
 
-        long fileSize = Files.size(targetRealPath);
-
-        Map<String, Object> result = new HashMap<>();
-        result.put("sourcePaths", finalSourcePaths);
-        if (finalSourcePaths.size() == 1) {
-            result.put("sourcePath", finalSourcePaths.get(0));
-        }
-        result.put("targetPath", targetPath);
-        result.put("size", fileSize);
+        Map<String, Object> result = CompressionUtil.buildCompressResult(finalSourcePaths, targetPath, Files.size(targetRealPath));
         result.put("compressionLevel", compressionLevel);
-        result.put("sourceCount", finalSourcePaths.size());
         return result;
+    }
+
+    private void compressToZip(ZipOutputStream zos, Path sourceRealPath, List<String> exclude) throws IOException {
+        if (Files.isRegularFile(sourceRealPath)) {
+            addFileToZip(zos, sourceRealPath, sourceRealPath.getFileName().toString());
+        } else if (Files.isDirectory(sourceRealPath)) {
+            String baseName = sourceRealPath.getFileName().toString();
+            String basePrefix = baseName + "/";
+
+            Files.walkFileTree(sourceRealPath, new SimpleFileVisitor<>() {
+                @Override
+                public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+                    String relative = sourceRealPath.relativize(file).toString().replace("\\", "/");
+                    if (!CompressionUtil.shouldExclude(relative, exclude)) {
+                        addFileToZip(zos, file, basePrefix + relative);
+                    }
+                    return FileVisitResult.CONTINUE;
+                }
+
+                @Override
+                public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
+                    if (!dir.equals(sourceRealPath)) {
+                        String relative = sourceRealPath.relativize(dir).toString().replace("\\", "/");
+                        if (!CompressionUtil.shouldExclude(relative, exclude)) {
+                            zos.putNextEntry(new ZipEntry(basePrefix + relative + "/"));
+                            zos.closeEntry();
+                        }
+                    }
+                    return FileVisitResult.CONTINUE;
+                }
+            });
+        }
     }
 
     private void addFileToZip(ZipOutputStream zos, Path file, String zipPath) throws IOException {
@@ -149,32 +116,15 @@ public class CompressionDirveServiceImpl implements ICompressionDirveService {
         zos.closeEntry();
     }
 
-    private boolean shouldExclude(String path, List<String> exclude) {
-        for (String pattern : exclude) {
-            String normalizedPattern = pattern.replace("\\", "/");
-            if (path.startsWith(normalizedPattern) || path.equals(normalizedPattern)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
     @Override
     public Map<String, Object> extractZip(String sourcePath, String targetPath, Map<String, Object> options) throws IOException {
-        Path sourceRealPath = PathUtil.convertVirtualPath(sourcePath, diskConfig.getDiskCPath(), diskConfig.getDiskDPath());
-        Path targetRealPath = PathUtil.convertVirtualPath(targetPath, diskConfig.getDiskCPath(), diskConfig.getDiskDPath());
-
-        if (!Files.exists(sourceRealPath) || !Files.isRegularFile(sourceRealPath)) {
-            throw new IOException("压缩文件不存在: " + sourcePath);
-        }
-
-        // 确保目标目录存在
+        Path sourceRealPath = CompressionUtil.validateSourceFile(sourcePath, diskConfig);
+        Path targetRealPath = PathUtil.convertVirtualPath(targetPath, diskConfig);
         Files.createDirectories(targetRealPath);
 
-        List<String> filesToExtract = getStringList(options != null ? options.get("files") : null);
-        boolean overwrite = parseBoolean(options != null ? options.get("overwrite") : null, false);
+        List<String> filesToExtract = CompressionUtil.getStringList(options != null ? options.get("files") : null);
+        boolean overwrite = CompressionUtil.parseBoolean(options != null ? options.get("overwrite") : null, false);
 
-        int extractedCount = 0;
         List<String> extractedFiles = new ArrayList<>();
 
         try (ZipInputStream zis = new ZipInputStream(new FileInputStream(sourceRealPath.toFile()))) {
@@ -182,15 +132,12 @@ public class CompressionDirveServiceImpl implements ICompressionDirveService {
             while ((entry = zis.getNextEntry()) != null) {
                 String entryName = entry.getName();
 
-                // 如果指定了文件列表，只解压指定的文件
                 if (!filesToExtract.isEmpty() && !filesToExtract.contains(entryName)) {
                     zis.closeEntry();
                     continue;
                 }
 
                 Path entryPath = targetRealPath.resolve(entryName).normalize();
-
-                // 安全检查：确保路径在目标目录内（防 Zip Slip）
                 if (!entryPath.startsWith(targetRealPath.normalize())) {
                     zis.closeEntry();
                     continue;
@@ -203,36 +150,23 @@ public class CompressionDirveServiceImpl implements ICompressionDirveService {
                         zis.closeEntry();
                         continue;
                     }
-
                     Path entryParent = entryPath.getParent();
                     if (entryParent != null) {
                         Files.createDirectories(entryParent);
                     }
                     Files.copy(zis, entryPath, StandardCopyOption.REPLACE_EXISTING);
                     extractedFiles.add(entryName);
-                    extractedCount++;
                 }
-
                 zis.closeEntry();
             }
         }
 
-        Map<String, Object> result = new HashMap<>();
-        result.put("sourcePath", sourcePath);
-        result.put("targetPath", targetPath);
-        result.put("extractedCount", extractedCount);
-        result.put("extractedFiles", extractedFiles);
-        return result;
+        return CompressionUtil.buildExtractResult(sourcePath, targetPath, extractedFiles.size(), extractedFiles);
     }
 
     @Override
     public Map<String, Object> listZip(String sourcePath) throws IOException {
-        Path sourceRealPath = PathUtil.convertVirtualPath(sourcePath, diskConfig.getDiskCPath(), diskConfig.getDiskDPath());
-
-        if (!Files.exists(sourceRealPath) || !Files.isRegularFile(sourceRealPath)) {
-            throw new IOException("压缩文件不存在: " + sourcePath);
-        }
-
+        Path sourceRealPath = CompressionUtil.validateSourceFile(sourcePath, diskConfig);
         List<Map<String, Object>> files = new ArrayList<>();
 
         try (ZipInputStream zis = new ZipInputStream(new FileInputStream(sourceRealPath.toFile()))) {
@@ -249,11 +183,7 @@ public class CompressionDirveServiceImpl implements ICompressionDirveService {
             }
         }
 
-        Map<String, Object> result = new HashMap<>();
-        result.put("sourcePath", sourcePath);
-        result.put("files", files);
-        result.put("count", files.size());
-        return result;
+        return CompressionUtil.buildListResult(sourcePath, files);
     }
 
     // ============ RAR 操作 ============
@@ -261,81 +191,430 @@ public class CompressionDirveServiceImpl implements ICompressionDirveService {
     @Override
     public Map<String, Object> checkSupport() {
         Map<String, Object> result = new HashMap<>();
-        // ZIP 支持（Java 标准库支持）
         result.put("zip", true);
-        // RAR 支持（需要 junrar 库，目前未完全实现）
+        result.put("zip_encrypted", true);
         result.put("rar", false);
+        result.put("7z", true);
+        result.put("tar", true);
+        result.put("targz", true);
         return result;
     }
 
     @Override
     public Map<String, Object> extractRar(String sourcePath, String targetPath, Map<String, Object> options) throws IOException {
-        // 使用 junrar 库实现
         throw new IOException("RAR 解压功能需要使用 junrar 库，暂未完全实现");
     }
 
     @Override
     public Map<String, Object> compressRar(String sourcePath, String targetPath, Map<String, Object> options) throws IOException {
-        // RAR 压缩需要外部工具
         throw new IOException("RAR 压缩功能需要外部工具，暂未实现");
     }
 
     @Override
     public Map<String, Object> listRar(String sourcePath) throws IOException {
-        // 使用 junrar 库实现
         throw new IOException("RAR 列表功能需要使用 junrar 库，暂未完全实现");
     }
 
-    private static int parseInt(Object value, int defaultValue) {
-        if (value == null) {
-            return defaultValue;
-        }
-        if (value instanceof Number) {
-            return ((Number) value).intValue();
-        }
-        if (value instanceof String) {
-            try {
-                return Integer.parseInt(((String) value).trim());
-            } catch (NumberFormatException ignored) {
-                return defaultValue;
+    // ============ TAR 操作 ============
+
+    @Override
+    public Map<String, Object> compressTar(String targetPath, String sourcePath, List<String> sourcePaths, Map<String, Object> options) throws IOException {
+        Path targetRealPath = PathUtil.convertVirtualPath(targetPath, diskConfig);
+        List<String> finalSourcePaths = CompressionUtil.getFinalSourcePaths(sourcePath, sourcePaths);
+        List<Path> sourceRealPaths = CompressionUtil.resolveSourcePaths(sourcePath, sourcePaths, diskConfig);
+
+        CompressionUtil.ensureTargetReady(targetRealPath, targetPath);
+
+        List<String> exclude = CompressionUtil.getStringList(options != null ? options.get("exclude") : null);
+
+        try (TarArchiveOutputStream taos = new TarArchiveOutputStream(new FileOutputStream(targetRealPath.toFile()))) {
+            taos.setLongFileMode(TarArchiveOutputStream.LONGFILE_POSIX);
+            taos.setBigNumberMode(TarArchiveOutputStream.BIGNUMBER_POSIX);
+
+            for (Path sourceRealPath : sourceRealPaths) {
+                compressToTar(taos, sourceRealPath, exclude);
             }
         }
-        return defaultValue;
+
+        return CompressionUtil.buildCompressResult(finalSourcePaths, targetPath, Files.size(targetRealPath));
     }
 
-    private static boolean parseBoolean(Object value, boolean defaultValue) {
-        if (value == null) {
-            return defaultValue;
+    private void compressToTar(TarArchiveOutputStream taos, Path sourceRealPath, List<String> exclude) throws IOException {
+        if (Files.isRegularFile(sourceRealPath)) {
+            addFileToTar(taos, sourceRealPath, sourceRealPath.getFileName().toString());
+        } else if (Files.isDirectory(sourceRealPath)) {
+            String baseName = sourceRealPath.getFileName().toString();
+            String basePrefix = baseName + "/";
+
+            Files.walkFileTree(sourceRealPath, new SimpleFileVisitor<>() {
+                @Override
+                public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+                    String relative = sourceRealPath.relativize(file).toString().replace("\\", "/");
+                    if (!CompressionUtil.shouldExclude(relative, exclude)) {
+                        addFileToTar(taos, file, basePrefix + relative);
+                    }
+                    return FileVisitResult.CONTINUE;
+                }
+
+                @Override
+                public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
+                    if (!dir.equals(sourceRealPath)) {
+                        String relative = sourceRealPath.relativize(dir).toString().replace("\\", "/");
+                        if (!CompressionUtil.shouldExclude(relative, exclude)) {
+                            TarArchiveEntry entry = new TarArchiveEntry(basePrefix + relative + "/");
+                            taos.putArchiveEntry(entry);
+                            taos.closeArchiveEntry();
+                        }
+                    }
+                    return FileVisitResult.CONTINUE;
+                }
+            });
         }
-        if (value instanceof Boolean) {
-            return (Boolean) value;
-        }
-        if (value instanceof Number) {
-            return ((Number) value).intValue() != 0;
-        }
-        if (value instanceof String) {
-            String s = ((String) value).trim();
-            return "true".equalsIgnoreCase(s) || "1".equals(s);
-        }
-        return defaultValue;
     }
 
-    private static List<String> getStringList(Object value) {
-        if (value == null) {
-            return new ArrayList<>();
+    private void addFileToTar(TarArchiveOutputStream taos, Path file, String tarPath) throws IOException {
+        TarArchiveEntry entry = new TarArchiveEntry(file.toFile(), tarPath);
+        taos.putArchiveEntry(entry);
+        Files.copy(file, taos);
+        taos.closeArchiveEntry();
+    }
+
+    @Override
+    public Map<String, Object> extractTar(String sourcePath, String targetPath, Map<String, Object> options) throws IOException {
+        Path sourceRealPath = CompressionUtil.validateSourceFile(sourcePath, diskConfig);
+        Path targetRealPath = PathUtil.convertVirtualPath(targetPath, diskConfig);
+        Files.createDirectories(targetRealPath);
+
+        List<String> filesToExtract = CompressionUtil.getStringList(options != null ? options.get("files") : null);
+        boolean overwrite = CompressionUtil.parseBoolean(options != null ? options.get("overwrite") : null, false);
+
+        List<String> extractedFiles = new ArrayList<>();
+
+        try (TarArchiveInputStream tais = new TarArchiveInputStream(new FileInputStream(sourceRealPath.toFile()))) {
+            extractFromTar(tais, targetRealPath, filesToExtract, overwrite, extractedFiles);
         }
-        if (value instanceof List<?>) {
-            List<?> list = (List<?>) value;
-            List<String> result = new ArrayList<>(list.size());
-            for (Object item : list) {
-                if (item != null) {
-                    result.add(String.valueOf(item));
+
+        return CompressionUtil.buildExtractResult(sourcePath, targetPath, extractedFiles.size(), extractedFiles);
+    }
+
+    private void extractFromTar(TarArchiveInputStream tais, Path targetRealPath, List<String> filesToExtract,
+                                boolean overwrite, List<String> extractedFiles) throws IOException {
+        TarArchiveEntry entry;
+        while ((entry = tais.getNextTarEntry()) != null) {
+            String entryName = entry.getName();
+
+            if (!filesToExtract.isEmpty() && !filesToExtract.contains(entryName)) {
+                continue;
+            }
+
+            Path entryPath = targetRealPath.resolve(entryName).normalize();
+            if (!entryPath.startsWith(targetRealPath.normalize())) {
+                continue;
+            }
+
+            if (entry.isDirectory()) {
+                Files.createDirectories(entryPath);
+            } else {
+                if (Files.exists(entryPath) && !overwrite) {
+                    continue;
+                }
+                Path entryParent = entryPath.getParent();
+                if (entryParent != null) {
+                    Files.createDirectories(entryParent);
+                }
+                Files.copy(tais, entryPath, StandardCopyOption.REPLACE_EXISTING);
+                extractedFiles.add(entryName);
+            }
+        }
+    }
+
+    @Override
+    public Map<String, Object> listTar(String sourcePath) throws IOException {
+        Path sourceRealPath = CompressionUtil.validateSourceFile(sourcePath, diskConfig);
+        List<Map<String, Object>> files = new ArrayList<>();
+
+        try (TarArchiveInputStream tais = new TarArchiveInputStream(new FileInputStream(sourceRealPath.toFile()))) {
+            TarArchiveEntry entry;
+            while ((entry = tais.getNextTarEntry()) != null) {
+                Map<String, Object> fileInfo = new HashMap<>();
+                fileInfo.put("name", entry.getName());
+                fileInfo.put("size", entry.getSize());
+                fileInfo.put("directory", entry.isDirectory());
+                fileInfo.put("time", entry.getModTime().getTime());
+                files.add(fileInfo);
+            }
+        }
+
+        return CompressionUtil.buildListResult(sourcePath, files);
+    }
+
+    // ============ TAR.GZ 操作 ============
+
+    @Override
+    public Map<String, Object> compressTarGz(String targetPath, String sourcePath, List<String> sourcePaths, Map<String, Object> options) throws IOException {
+        Path targetRealPath = PathUtil.convertVirtualPath(targetPath, diskConfig);
+        List<String> finalSourcePaths = CompressionUtil.getFinalSourcePaths(sourcePath, sourcePaths);
+        List<Path> sourceRealPaths = CompressionUtil.resolveSourcePaths(sourcePath, sourcePaths, diskConfig);
+
+        CompressionUtil.ensureTargetReady(targetRealPath, targetPath);
+
+        List<String> exclude = CompressionUtil.getStringList(options != null ? options.get("exclude") : null);
+
+        try (GzipCompressorOutputStream gcos = new GzipCompressorOutputStream(new FileOutputStream(targetRealPath.toFile()));
+             TarArchiveOutputStream taos = new TarArchiveOutputStream(gcos)) {
+            taos.setLongFileMode(TarArchiveOutputStream.LONGFILE_POSIX);
+            taos.setBigNumberMode(TarArchiveOutputStream.BIGNUMBER_POSIX);
+
+            for (Path sourceRealPath : sourceRealPaths) {
+                compressToTar(taos, sourceRealPath, exclude);
+            }
+        }
+
+        return CompressionUtil.buildCompressResult(finalSourcePaths, targetPath, Files.size(targetRealPath));
+    }
+
+    @Override
+    public Map<String, Object> extractTarGz(String sourcePath, String targetPath, Map<String, Object> options) throws IOException {
+        Path sourceRealPath = CompressionUtil.validateSourceFile(sourcePath, diskConfig);
+        Path targetRealPath = PathUtil.convertVirtualPath(targetPath, diskConfig);
+        Files.createDirectories(targetRealPath);
+
+        List<String> filesToExtract = CompressionUtil.getStringList(options != null ? options.get("files") : null);
+        boolean overwrite = CompressionUtil.parseBoolean(options != null ? options.get("overwrite") : null, false);
+
+        List<String> extractedFiles = new ArrayList<>();
+
+        try (GzipCompressorInputStream gcis = new GzipCompressorInputStream(new FileInputStream(sourceRealPath.toFile()));
+             TarArchiveInputStream tais = new TarArchiveInputStream(gcis)) {
+            extractFromTar(tais, targetRealPath, filesToExtract, overwrite, extractedFiles);
+        }
+
+        return CompressionUtil.buildExtractResult(sourcePath, targetPath, extractedFiles.size(), extractedFiles);
+    }
+
+    @Override
+    public Map<String, Object> listTarGz(String sourcePath) throws IOException {
+        Path sourceRealPath = CompressionUtil.validateSourceFile(sourcePath, diskConfig);
+        List<Map<String, Object>> files = new ArrayList<>();
+
+        try (GzipCompressorInputStream gcis = new GzipCompressorInputStream(new FileInputStream(sourceRealPath.toFile()));
+             TarArchiveInputStream tais = new TarArchiveInputStream(gcis)) {
+            TarArchiveEntry entry;
+            while ((entry = tais.getNextTarEntry()) != null) {
+                Map<String, Object> fileInfo = new HashMap<>();
+                fileInfo.put("name", entry.getName());
+                fileInfo.put("size", entry.getSize());
+                fileInfo.put("directory", entry.isDirectory());
+                fileInfo.put("time", entry.getModTime().getTime());
+                files.add(fileInfo);
+            }
+        }
+
+        return CompressionUtil.buildListResult(sourcePath, files);
+    }
+
+    // ============ 7Z 操作 ============
+
+    @Override
+    public Map<String, Object> compress7z(String targetPath, String sourcePath, List<String> sourcePaths, Map<String, Object> options) throws IOException {
+        Path targetRealPath = PathUtil.convertVirtualPath(targetPath, diskConfig);
+        List<String> finalSourcePaths = CompressionUtil.getFinalSourcePaths(sourcePath, sourcePaths);
+        List<Path> sourceRealPaths = CompressionUtil.resolveSourcePaths(sourcePath, sourcePaths, diskConfig);
+
+        CompressionUtil.ensureTargetReady(targetRealPath, targetPath);
+
+        List<String> exclude = CompressionUtil.getStringList(options != null ? options.get("exclude") : null);
+
+        try (SevenZOutputFile sevenZOutput = new SevenZOutputFile(targetRealPath.toFile())) {
+            for (Path sourceRealPath : sourceRealPaths) {
+                compressTo7z(sevenZOutput, sourceRealPath, exclude);
+            }
+        }
+
+        return CompressionUtil.buildCompressResult(finalSourcePaths, targetPath, Files.size(targetRealPath));
+    }
+
+    private void compressTo7z(SevenZOutputFile sevenZOutput, Path sourceRealPath, List<String> exclude) throws IOException {
+        if (Files.isRegularFile(sourceRealPath)) {
+            addFileTo7z(sevenZOutput, sourceRealPath, sourceRealPath.getFileName().toString());
+        } else if (Files.isDirectory(sourceRealPath)) {
+            String baseName = sourceRealPath.getFileName().toString();
+            String basePrefix = baseName + "/";
+
+            Files.walkFileTree(sourceRealPath, new SimpleFileVisitor<>() {
+                @Override
+                public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+                    String relative = sourceRealPath.relativize(file).toString().replace("\\", "/");
+                    if (!CompressionUtil.shouldExclude(relative, exclude)) {
+                        addFileTo7z(sevenZOutput, file, basePrefix + relative);
+                    }
+                    return FileVisitResult.CONTINUE;
+                }
+
+                @Override
+                public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
+                    if (!dir.equals(sourceRealPath)) {
+                        String relative = sourceRealPath.relativize(dir).toString().replace("\\", "/");
+                        if (!CompressionUtil.shouldExclude(relative, exclude)) {
+                            SevenZArchiveEntry entry = sevenZOutput.createArchiveEntry(dir.toFile(), basePrefix + relative + "/");
+                            sevenZOutput.putArchiveEntry(entry);
+                            sevenZOutput.closeArchiveEntry();
+                        }
+                    }
+                    return FileVisitResult.CONTINUE;
+                }
+            });
+        }
+    }
+
+    private void addFileTo7z(SevenZOutputFile sevenZOutput, Path file, String entryName) throws IOException {
+        SevenZArchiveEntry entry = sevenZOutput.createArchiveEntry(file.toFile(), entryName);
+        sevenZOutput.putArchiveEntry(entry);
+        try (InputStream is = Files.newInputStream(file)) {
+            byte[] buffer = new byte[8192];
+            int len;
+            while ((len = is.read(buffer)) != -1) {
+                sevenZOutput.write(buffer, 0, len);
+            }
+        }
+        sevenZOutput.closeArchiveEntry();
+    }
+
+    @Override
+    public Map<String, Object> extract7z(String sourcePath, String targetPath, Map<String, Object> options) throws IOException {
+        Path sourceRealPath = CompressionUtil.validateSourceFile(sourcePath, diskConfig);
+        Path targetRealPath = PathUtil.convertVirtualPath(targetPath, diskConfig);
+        Files.createDirectories(targetRealPath);
+
+        List<String> filesToExtract = CompressionUtil.getStringList(options != null ? options.get("files") : null);
+        boolean overwrite = CompressionUtil.parseBoolean(options != null ? options.get("overwrite") : null, false);
+
+        List<String> extractedFiles = new ArrayList<>();
+
+        try (SevenZFile sevenZFile = new SevenZFile(sourceRealPath.toFile())) {
+            SevenZArchiveEntry entry;
+            while ((entry = sevenZFile.getNextEntry()) != null) {
+                String entryName = entry.getName();
+
+                if (!filesToExtract.isEmpty() && !filesToExtract.contains(entryName)) {
+                    continue;
+                }
+
+                Path entryPath = targetRealPath.resolve(entryName).normalize();
+                if (!entryPath.startsWith(targetRealPath.normalize())) {
+                    continue;
+                }
+
+                if (entry.isDirectory()) {
+                    Files.createDirectories(entryPath);
+                } else {
+                    if (Files.exists(entryPath) && !overwrite) {
+                        continue;
+                    }
+                    Path entryParent = entryPath.getParent();
+                    if (entryParent != null) {
+                        Files.createDirectories(entryParent);
+                    }
+                    try (OutputStream os = Files.newOutputStream(entryPath)) {
+                        byte[] buffer = new byte[8192];
+                        int len;
+                        while ((len = sevenZFile.read(buffer)) != -1) {
+                            os.write(buffer, 0, len);
+                        }
+                    }
+                    extractedFiles.add(entryName);
                 }
             }
-            return result;
         }
-        return new ArrayList<>();
+
+        return CompressionUtil.buildExtractResult(sourcePath, targetPath, extractedFiles.size(), extractedFiles);
+    }
+
+    @Override
+    public Map<String, Object> list7z(String sourcePath) throws IOException {
+        Path sourceRealPath = CompressionUtil.validateSourceFile(sourcePath, diskConfig);
+        List<Map<String, Object>> files = new ArrayList<>();
+
+        try (SevenZFile sevenZFile = new SevenZFile(sourceRealPath.toFile())) {
+            SevenZArchiveEntry entry;
+            while ((entry = sevenZFile.getNextEntry()) != null) {
+                Map<String, Object> fileInfo = new HashMap<>();
+                fileInfo.put("name", entry.getName());
+                fileInfo.put("size", entry.getSize());
+                fileInfo.put("directory", entry.isDirectory());
+                fileInfo.put("time", entry.getLastModifiedDate() != null ? entry.getLastModifiedDate().getTime() : 0);
+                files.add(fileInfo);
+            }
+        }
+
+        return CompressionUtil.buildListResult(sourcePath, files);
+    }
+
+    // ============ 加密 ZIP 操作 ============
+
+    @Override
+    public Map<String, Object> compressZipEncrypted(String targetPath, String sourcePath, List<String> sourcePaths, Map<String, Object> options) throws IOException {
+        Path targetRealPath = PathUtil.convertVirtualPath(targetPath, diskConfig);
+        List<String> finalSourcePaths = CompressionUtil.getFinalSourcePaths(sourcePath, sourcePaths);
+        List<Path> sourceRealPaths = CompressionUtil.resolveSourcePaths(sourcePath, sourcePaths, diskConfig);
+
+        String password = options != null ? (String) options.get("password") : null;
+        if (password == null || password.isEmpty()) {
+            throw new IOException("加密 ZIP 需要提供密码");
+        }
+
+        CompressionUtil.ensureTargetReady(targetRealPath, targetPath);
+
+        int compressionLevel = CompressionUtil.parseInt(options.get("compressionLevel"), 6);
+        compressionLevel = Math.max(0, Math.min(9, compressionLevel));
+
+        ZipParameters zipParameters = new ZipParameters();
+        zipParameters.setCompressionMethod(CompressionMethod.DEFLATE);
+        zipParameters.setCompressionLevel(CompressionLevel.values()[Math.min(compressionLevel, CompressionLevel.values().length - 1)]);
+        zipParameters.setEncryptFiles(true);
+        zipParameters.setEncryptionMethod(EncryptionMethod.AES);
+
+        try (ZipFile zipFile = new ZipFile(targetRealPath.toFile(), password.toCharArray())) {
+            for (Path sourceRealPath : sourceRealPaths) {
+                if (Files.isRegularFile(sourceRealPath)) {
+                    zipFile.addFile(sourceRealPath.toFile(), zipParameters);
+                } else if (Files.isDirectory(sourceRealPath)) {
+                    zipFile.addFolder(sourceRealPath.toFile(), zipParameters);
+                }
+            }
+        }
+
+        Map<String, Object> result = CompressionUtil.buildCompressResult(finalSourcePaths, targetPath, Files.size(targetRealPath));
+        result.put("encrypted", true);
+        return result;
+    }
+
+    @Override
+    public Map<String, Object> extractZipEncrypted(String sourcePath, String targetPath, Map<String, Object> options) throws IOException {
+        Path sourceRealPath = CompressionUtil.validateSourceFile(sourcePath, diskConfig);
+        Path targetRealPath = PathUtil.convertVirtualPath(targetPath, diskConfig);
+
+        String password = options != null ? (String) options.get("password") : null;
+        if (password == null || password.isEmpty()) {
+            throw new IOException("解压加密 ZIP 需要提供密码");
+        }
+
+        Files.createDirectories(targetRealPath);
+
+        List<String> extractedFiles = new ArrayList<>();
+
+        try (ZipFile zipFile = new ZipFile(sourceRealPath.toFile(), password.toCharArray())) {
+            zipFile.extractAll(targetRealPath.toString());
+
+            for (var header : zipFile.getFileHeaders()) {
+                if (!header.isDirectory()) {
+                    extractedFiles.add(header.getFileName());
+                }
+            }
+        }
+
+        Map<String, Object> result = CompressionUtil.buildExtractResult(sourcePath, targetPath, extractedFiles.size(), extractedFiles);
+        result.put("encrypted", true);
+        return result;
     }
 }
-
-

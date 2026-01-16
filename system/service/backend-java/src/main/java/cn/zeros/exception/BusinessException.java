@@ -6,7 +6,7 @@ import cn.zeros.constant.ErrorCode;
  * 业务异常类
  * 
  * @author zeros
- * @date 2024
+ * @date 2026-01-16
  */
 public class BusinessException extends RuntimeException {
     

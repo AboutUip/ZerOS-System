@@ -7,7 +7,7 @@ import lombok.Getter;
  * 文件写入模式枚举
  * 
  * @author zeros
- * @date 2024
+ * @date 2026-01-16
  */
 @Getter
 @AllArgsConstructor
