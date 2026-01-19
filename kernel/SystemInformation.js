@@ -61,7 +61,7 @@ class SystemInformation {
     
     // 后端配置（可通过 LStorage 或环境变量配置）
     static _backendConfig = {
-        type: SystemInformation.BACKEND_TYPE.SPRINGBOOT,
+        type: SystemInformation.BACKEND_TYPE.PHP,
         phpPort: 8089,                              // PHP 默认端口
         springBootPort: 8080                        // SpringBoot 默认端口
     };
