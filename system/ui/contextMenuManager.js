@@ -1,4 +1,4 @@
-﻿// 全局右键菜单管理器
+// 全局右键菜单管理器
 // 由 Exploit 程序管理，负责在沙盒环境中显示上下文相关的右键菜单
 
 KernelLogger.info("ContextMenuManager", "模块初始化");
@@ -12,6 +12,20 @@ class ContextMenuManager {
     static _programMenus = new Map();
     // 菜单ID计数器（用于生成唯一ID）
     static _menuIdCounter = 0;
+
+    /**
+     * 多语言文案：优先使用 LanguagesExpansion，否则返回 fallback
+     * @param {string} key 语言包常量名
+     * @param {string} fallback 无语言包时的中文回退
+     * @returns {string}
+     */
+    static _getText(key, fallback) {
+        if (typeof LanguagesExpansion !== 'undefined' && typeof LanguagesExpansion.getText === 'function') {
+            const value = LanguagesExpansion.getText(key);
+            if (value && value !== key) return value;
+        }
+        return fallback || key;
+    }
     
     /**
      * 初始化全局右键菜单系统
@@ -444,7 +458,7 @@ class ContextMenuManager {
                 if (iconData && iconData.type && (iconData.type === 'file' || iconData.type === 'directory')) {
                     // 打开选项
                     items.push({
-                        label: '打开',
+                        label: ContextMenuManager._getText('KEY_OPEN', '打开'),
                         icon: iconData.type === 'directory' ? '📂' : '📄',
                         action: () => {
                             if (typeof DesktopManager !== 'undefined' && typeof DesktopManager._handleFileOrFolderIconClick === 'function') {
@@ -458,7 +472,7 @@ class ContextMenuManager {
                     
                     // 重命名选项
                     items.push({
-                        label: '重命名',
+                        label: ContextMenuManager._getText('DESKTOP_RENAME', '重命名'),
                         icon: '✏️',
                         action: () => {
                             if (typeof DesktopManager !== 'undefined' && typeof DesktopManager._renameIcon === 'function') {
@@ -470,7 +484,7 @@ class ContextMenuManager {
                     
                     // 删除选项
                     items.push({
-                        label: '删除',
+                        label: ContextMenuManager._getText('KEY_DELETE', '删除'),
                         icon: '🗑️',
                         danger: true,
                         action: async () => {
@@ -486,7 +500,7 @@ class ContextMenuManager {
                     
                     // 文件属性选项
                     items.push({
-                        label: '文件属性',
+                        label: ContextMenuManager._getText('DESKTOP_FILE_PROPERTIES', '文件属性'),
                         icon: '📋',
                         action: async () => {
                             ContextMenuManager._hideMenu();
@@ -517,7 +531,7 @@ class ContextMenuManager {
                     
                     // 程序详情
                     items.push({
-                        label: '程序详情',
+                        label: ContextMenuManager._getText('DESKTOP_PROGRAM_DETAILS', '程序详情'),
                         icon: 'ℹ',
                         action: () => {
                             ContextMenuManager._showProgramDetails(programName, pid);
@@ -527,7 +541,7 @@ class ContextMenuManager {
                     
                     // 打开程序源地址（使用文件管理器打开目录）
                     items.push({
-                        label: '打开程序源地址',
+                        label: ContextMenuManager._getText('DESKTOP_OPEN_SOURCE_PATH', '打开程序源地址'),
                         icon: '📁',
                         action: async () => {
                             try {
@@ -616,7 +630,7 @@ class ContextMenuManager {
                     
                     // 打开程序源文件
                     items.push({
-                        label: '打开程序源文件',
+                        label: ContextMenuManager._getText('DESKTOP_OPEN_SOURCE_FILE', '打开程序源文件'),
                         icon: '📝',
                         action: async () => {
                             try {
@@ -714,7 +728,7 @@ class ContextMenuManager {
                 
                 // 添加"删除该快捷方式"功能
                 items.push({
-                    label: '删除该快捷方式',
+                    label: ContextMenuManager._getText('DESKTOP_REMOVE_SHORTCUT', '删除该快捷方式'),
                     icon: '🗑',
                     danger: true,
                     action: () => {
@@ -727,14 +741,14 @@ class ContextMenuManager {
         
         // 桌面菜单项
         items.push({
-            label: '刷新',
+            label: ContextMenuManager._getText('KEY_REFRESH', '刷新'),
             icon: '↻',
             action: () => {
                 ContextMenuManager.refreshDesktop();
             }
         });
         items.push({
-            label: '主题管理',
+            label: ContextMenuManager._getText('DESKTOP_THEME_MANAGER', '主题管理'),
             icon: '🎨',
             action: () => {
                 // 启动主题管理器程序
@@ -753,7 +767,7 @@ class ContextMenuManager {
             }
         });
         items.push({
-            label: '查看',
+            label: ContextMenuManager._getText('KEY_VIEW', '查看'),
             icon: '👁',
             submenu: () => {
                 // 动态获取当前状态
@@ -763,7 +777,7 @@ class ContextMenuManager {
                 
                 return [
                     {
-                        label: '大图标',
+                        label: ContextMenuManager._getText('DESKTOP_ICON_LARGE', '大图标'),
                         checked: currentIconSize === 'large',
                         action: () => {
                             if (typeof DesktopManager !== 'undefined') {
@@ -772,7 +786,7 @@ class ContextMenuManager {
                         }
                     },
                     {
-                        label: '中等图标',
+                        label: ContextMenuManager._getText('DESKTOP_ICON_MEDIUM', '中等图标'),
                         checked: currentIconSize === 'medium',
                         action: () => {
                             if (typeof DesktopManager !== 'undefined') {
@@ -781,7 +795,7 @@ class ContextMenuManager {
                         }
                     },
                     {
-                        label: '小图标',
+                        label: ContextMenuManager._getText('DESKTOP_ICON_SMALL', '小图标'),
                         checked: currentIconSize === 'small',
                         action: () => {
                             if (typeof DesktopManager !== 'undefined') {
@@ -791,7 +805,7 @@ class ContextMenuManager {
                     },
                     { type: 'separator' },
                     {
-                        label: '自动排列',
+                        label: ContextMenuManager._getText('DESKTOP_AUTO_ARRANGE', '自动排列'),
                         checked: currentAutoArrange && currentArrangementMode === 'grid',
                         action: () => {
                             if (typeof DesktopManager !== 'undefined') {
@@ -801,7 +815,7 @@ class ContextMenuManager {
                         }
                     },
                     {
-                        label: '列表排列',
+                        label: ContextMenuManager._getText('DESKTOP_LIST_ARRANGE', '列表排列'),
                         checked: currentArrangementMode === 'list',
                         action: () => {
                             if (typeof DesktopManager !== 'undefined') {
@@ -811,7 +825,7 @@ class ContextMenuManager {
                         }
                     },
                     {
-                        label: '自由排列',
+                        label: ContextMenuManager._getText('DESKTOP_FREE_ARRANGE', '自由排列'),
                         checked: currentArrangementMode === 'auto' && !currentAutoArrange,
                         action: () => {
                             if (typeof DesktopManager !== 'undefined') {
@@ -859,7 +873,7 @@ class ContextMenuManager {
         
         // 程序详情（始终显示）
         items.push({
-            label: '程序详情',
+            label: ContextMenuManager._getText('DESKTOP_PROGRAM_DETAILS', '程序详情'),
             icon: 'ℹ',
             action: () => {
                 ContextMenuManager._showProgramDetails(programName, pid);
@@ -874,7 +888,7 @@ class ContextMenuManager {
             if (processInfo && processInfo.status === 'running') {
                 if (processInfo.isMinimized) {
                     items.push({
-                        label: '恢复',
+                        label: ContextMenuManager._getText('KEY_RESTORE', '恢复'),
                         action: () => {
                             if (typeof TaskbarManager !== 'undefined') {
                                 TaskbarManager._restoreProgram(pid);
@@ -883,7 +897,7 @@ class ContextMenuManager {
                     });
                 } else {
                     items.push({
-                        label: '最小化',
+                        label: ContextMenuManager._getText('KEY_MINIMIZE', '最小化'),
                         action: () => {
                             if (typeof TaskbarManager !== 'undefined') {
                                 TaskbarManager._minimizeProgram(pid);
@@ -895,7 +909,7 @@ class ContextMenuManager {
                 items.push({ type: 'separator' });
                 
                 items.push({
-                    label: '关闭',
+                    label: ContextMenuManager._getText('KEY_CLOSE', '关闭'),
                     danger: true,
                     action: () => {
                         if (typeof ProcessManager !== 'undefined' && typeof ProcessManager.killProgram === 'function') {
@@ -905,7 +919,7 @@ class ContextMenuManager {
                 });
             } else {
                 items.push({
-                    label: '启动',
+                    label: ContextMenuManager._getText('DESKTOP_START', '启动'),
                     action: () => {
                         if (typeof ProcessManager !== 'undefined' && typeof ProcessManager.startProgram === 'function') {
                             ProcessManager.startProgram(programName, {});
@@ -915,7 +929,7 @@ class ContextMenuManager {
             }
         } else {
             items.push({
-                label: '启动',
+                label: ContextMenuManager._getText('DESKTOP_START', '启动'),
                 action: () => {
                     if (typeof ProcessManager !== 'undefined' && typeof ProcessManager.startProgram === 'function') {
                         ProcessManager.startProgram(programName, {});
@@ -928,7 +942,7 @@ class ContextMenuManager {
         items.push({ type: 'separator' });
         if (isPinned) {
             items.push({
-                label: '取消任务栏固定',
+                label: ContextMenuManager._getText('DESKTOP_UNPIN_TASKBAR', '取消任务栏固定'),
                 icon: '📌',
                 action: async () => {
                     if (typeof TaskbarManager !== 'undefined' && typeof TaskbarManager.unpinProgram === 'function') {
@@ -947,7 +961,7 @@ class ContextMenuManager {
             });
         } else {
             items.push({
-                label: '固定到任务栏',
+                label: ContextMenuManager._getText('DESKTOP_PIN_TASKBAR', '固定到任务栏'),
                 icon: '📌',
                 action: async () => {
                     if (typeof TaskbarManager !== 'undefined' && typeof TaskbarManager.pinProgram === 'function') {
@@ -968,7 +982,7 @@ class ContextMenuManager {
         
         // 添加"发送到桌面"功能
         items.push({
-            label: '发送到桌面',
+            label: ContextMenuManager._getText('DESKTOP_SEND_TO_DESKTOP', '发送到桌面'),
             icon: '📌',
             action: () => {
                 ContextMenuManager._addToDesktop(programName);
@@ -987,7 +1001,7 @@ class ContextMenuManager {
         return {
             items: [
                 {
-                    label: '所有程序',
+                    label: ContextMenuManager._getText('DESKTOP_ALL_PROGRAMS', '所有程序'),
                     action: () => {
                         // 切换应用程序菜单
                         if (typeof TaskbarManager !== 'undefined') {
@@ -1012,11 +1026,11 @@ class ContextMenuManager {
         
         // 切换任务栏位置
         items.push({
-            label: '切换任务栏位置',
+            label: ContextMenuManager._getText('DESKTOP_TASKBAR_POSITION', '切换任务栏位置'),
             icon: '⇄',
             submenu: [
                 {
-                    label: '顶部',
+                    label: ContextMenuManager._getText('DESKTOP_TOP', '顶部'),
                     icon: '↑',
                     action: () => {
                         if (typeof TaskbarManager !== 'undefined') {
@@ -1025,7 +1039,7 @@ class ContextMenuManager {
                     }
                 },
                 {
-                    label: '底部',
+                    label: ContextMenuManager._getText('DESKTOP_BOTTOM', '底部'),
                     icon: '↓',
                     action: () => {
                         if (typeof TaskbarManager !== 'undefined') {
@@ -1034,7 +1048,7 @@ class ContextMenuManager {
                     }
                 },
                 {
-                    label: '左侧',
+                    label: ContextMenuManager._getText('DESKTOP_LEFT', '左侧'),
                     icon: '←',
                     action: () => {
                         if (typeof TaskbarManager !== 'undefined') {
@@ -1043,7 +1057,7 @@ class ContextMenuManager {
                     }
                 },
                 {
-                    label: '右侧',
+                    label: ContextMenuManager._getText('DESKTOP_RIGHT', '右侧'),
                     icon: '→',
                     action: () => {
                         if (typeof TaskbarManager !== 'undefined') {
@@ -1059,7 +1073,7 @@ class ContextMenuManager {
         
         // 打开任务管理器
         items.push({
-            label: '打开任务管理器',
+            label: ContextMenuManager._getText('DESKTOP_TASK_MANAGER', '打开任务管理器'),
             icon: '⚙',
             action: async () => {
                 if (typeof ProcessManager !== 'undefined') {
@@ -1140,7 +1154,7 @@ class ContextMenuManager {
         
         // 程序详情（始终显示，无论是否运行）
         items.push({
-            label: '程序详情',
+            label: ContextMenuManager._getText('DESKTOP_PROGRAM_DETAILS', '程序详情'),
             icon: 'ℹ',
             action: () => {
                 ContextMenuManager._showProgramDetails(programName, pid);
@@ -1156,7 +1170,7 @@ class ContextMenuManager {
         if (!processInfo || !pid) {
             items.push({ type: 'separator' });
             items.push({
-                label: '启动',
+                label: ContextMenuManager._getText('DESKTOP_START', '启动'),
                 action: () => {
                     if (typeof ProcessManager !== 'undefined' && typeof ProcessManager.startProgram === 'function') {
                         ProcessManager.startProgram(programName, {});
@@ -1173,7 +1187,7 @@ class ContextMenuManager {
             items.push({ type: 'separator' });
             if (isPinned) {
                 items.push({
-                    label: '取消任务栏固定',
+                    label: ContextMenuManager._getText('DESKTOP_UNPIN_TASKBAR', '取消任务栏固定'),
                     icon: '📌',
                     action: async () => {
                         if (typeof TaskbarManager !== 'undefined' && typeof TaskbarManager.unpinProgram === 'function') {
@@ -1195,7 +1209,7 @@ class ContextMenuManager {
                 });
             } else {
                 items.push({
-                    label: '固定到任务栏',
+                    label: ContextMenuManager._getText('DESKTOP_PIN_TASKBAR', '固定到任务栏'),
                     icon: '📌',
                     action: async () => {
                         if (typeof TaskbarManager !== 'undefined' && typeof TaskbarManager.pinProgram === 'function') {
@@ -1219,7 +1233,7 @@ class ContextMenuManager {
             
             // 添加"发送到桌面"功能
             items.push({
-                label: '发送到桌面',
+                label: ContextMenuManager._getText('DESKTOP_SEND_TO_DESKTOP', '发送到桌面'),
                 icon: '📌',
                 action: () => {
                     ContextMenuManager._addToDesktop(programName);
@@ -1237,7 +1251,7 @@ class ContextMenuManager {
         
         if (processInfo.isMinimized) {
             items.push({
-                label: '恢复',
+                label: ContextMenuManager._getText('KEY_RESTORE', '恢复'),
                 action: () => {
                     if (typeof TaskbarManager !== 'undefined') {
                         TaskbarManager._restoreProgram(pid);
@@ -1246,7 +1260,7 @@ class ContextMenuManager {
             });
         } else {
             items.push({
-                label: '最小化',
+                label: ContextMenuManager._getText('KEY_MINIMIZE', '最小化'),
                 action: () => {
                     if (typeof TaskbarManager !== 'undefined') {
                         TaskbarManager._minimizeProgram(pid);
@@ -1258,7 +1272,7 @@ class ContextMenuManager {
         items.push({ type: 'separator' });
         
         items.push({
-            label: '关闭',
+            label: ContextMenuManager._getText('KEY_CLOSE', '关闭'),
             danger: true,
             action: () => {
                 if (typeof ProcessManager !== 'undefined' && typeof ProcessManager.killProgram === 'function') {
@@ -1276,7 +1290,7 @@ class ContextMenuManager {
         items.push({ type: 'separator' });
         if (isPinned) {
             items.push({
-                label: '取消任务栏固定',
+                label: ContextMenuManager._getText('DESKTOP_UNPIN_TASKBAR', '取消任务栏固定'),
                 icon: '📌',
                 action: async () => {
                     if (typeof TaskbarManager !== 'undefined' && typeof TaskbarManager.unpinProgram === 'function') {
@@ -1298,7 +1312,7 @@ class ContextMenuManager {
             });
         } else {
             items.push({
-                label: '固定到任务栏',
+                label: ContextMenuManager._getText('DESKTOP_PIN_TASKBAR', '固定到任务栏'),
                 icon: '📌',
                 action: async () => {
                     if (typeof TaskbarManager !== 'undefined' && typeof TaskbarManager.pinProgram === 'function') {
@@ -1322,7 +1336,7 @@ class ContextMenuManager {
         
         // 添加"发送到桌面"功能
         items.push({
-            label: '发送到桌面',
+            label: ContextMenuManager._getText('DESKTOP_SEND_TO_DESKTOP', '发送到桌面'),
             icon: '📌',
             action: () => {
                 ContextMenuManager._addToDesktop(programName);
@@ -1363,7 +1377,7 @@ class ContextMenuManager {
         
         // 程序详情
         items.push({
-            label: '程序详情',
+            label: ContextMenuManager._getText('DESKTOP_PROGRAM_DETAILS', '程序详情'),
             icon: 'ℹ',
             action: () => {
                 ContextMenuManager._showProgramDetails(programName, pid);
@@ -1374,7 +1388,7 @@ class ContextMenuManager {
         
         if (processInfo.isMinimized) {
             items.push({
-                label: '恢复',
+                label: ContextMenuManager._getText('KEY_RESTORE', '恢复'),
                 action: () => {
                     if (typeof TaskbarManager !== 'undefined') {
                         TaskbarManager._restoreProgram(pid);
@@ -1383,7 +1397,7 @@ class ContextMenuManager {
             });
         } else {
             items.push({
-                label: '最小化',
+                label: ContextMenuManager._getText('KEY_MINIMIZE', '最小化'),
                 action: () => {
                     if (typeof TaskbarManager !== 'undefined') {
                         TaskbarManager._minimizeProgram(pid);
@@ -1393,7 +1407,7 @@ class ContextMenuManager {
         }
         
         items.push({
-            label: '最大化',
+            label: ContextMenuManager._getText('KEY_MAXIMIZE', '最大化'),
             action: () => {
                 // TODO: 实现最大化功能
             }
@@ -1402,7 +1416,7 @@ class ContextMenuManager {
         items.push({ type: 'separator' });
         
         items.push({
-            label: '关闭',
+            label: ContextMenuManager._getText('KEY_CLOSE', '关闭'),
             danger: true,
             action: () => {
                 // 检查是否是Exploit程序（PID 10000），如果是，只关闭窗口，不kill进程
@@ -2154,33 +2168,33 @@ class ContextMenuManager {
         
         const basicInfoTitle = document.createElement('div');
         basicInfoTitle.className = 'program-details-section-title';
-        basicInfoTitle.textContent = '基本信息';
+        basicInfoTitle.textContent = ContextMenuManager._getText('PROGDETAILS_BASIC_INFO', '基本信息');
         basicInfoSection.appendChild(basicInfoTitle);
         
         const basicInfoList = document.createElement('div');
         basicInfoList.className = 'program-details-info-list';
         
         // 程序名称
-        basicInfoList.appendChild(ContextMenuManager._createInfoItem('程序名称', programName));
+        basicInfoList.appendChild(ContextMenuManager._createInfoItem(ContextMenuManager._getText('PROGDETAILS_PROGRAM_NAME', '程序名称'), programName));
         
         // 描述
         if (programInfo?.metadata?.description) {
-            basicInfoList.appendChild(ContextMenuManager._createInfoItem('描述', programInfo.metadata.description));
+            basicInfoList.appendChild(ContextMenuManager._createInfoItem(ContextMenuManager._getText('PROGDETAILS_DESCRIPTION', '描述'), programInfo.metadata.description));
         }
         
         // 脚本路径
         if (programInfo?.script) {
-            basicInfoList.appendChild(ContextMenuManager._createInfoItem('脚本路径', programInfo.script));
+            basicInfoList.appendChild(ContextMenuManager._createInfoItem(ContextMenuManager._getText('PROGDETAILS_SCRIPT_PATH', '脚本路径'), programInfo.script));
         }
         
         // 图标路径
         if (programInfo?.icon) {
-            basicInfoList.appendChild(ContextMenuManager._createInfoItem('图标', programInfo.icon));
+            basicInfoList.appendChild(ContextMenuManager._createInfoItem(ContextMenuManager._getText('PROGDETAILS_ICON', '图标'), programInfo.icon));
         }
         
         // 样式文件
         if (programInfo?.styles && programInfo.styles.length > 0) {
-            basicInfoList.appendChild(ContextMenuManager._createInfoItem('样式文件', programInfo.styles.join(', ')));
+            basicInfoList.appendChild(ContextMenuManager._createInfoItem(ContextMenuManager._getText('PROGDETAILS_STYLES', '样式文件'), programInfo.styles.join(', ')));
         }
         
         basicInfoSection.appendChild(basicInfoList);
@@ -2192,7 +2206,7 @@ class ContextMenuManager {
         
         const summaryTitle = document.createElement('div');
         summaryTitle.className = 'program-details-section-title';
-        summaryTitle.textContent = '程序摘要';
+        summaryTitle.textContent = ContextMenuManager._getText('PROGDETAILS_SUMMARY', '程序摘要');
         summarySection.appendChild(summaryTitle);
         
         const summaryContent = document.createElement('div');
@@ -2211,19 +2225,19 @@ class ContextMenuManager {
                 }
                 
                 if (programSummary.version) {
-                    summaryContent.appendChild(ContextMenuManager._createInfoItem('版本', programSummary.version));
+                    summaryContent.appendChild(ContextMenuManager._createInfoItem(ContextMenuManager._getText('PROGDETAILS_VERSION', '版本'), programSummary.version));
                 }
                 
                 if (programSummary.author) {
-                    summaryContent.appendChild(ContextMenuManager._createInfoItem('作者', programSummary.author));
+                    summaryContent.appendChild(ContextMenuManager._createInfoItem(ContextMenuManager._getText('PROGDETAILS_AUTHOR', '作者'), programSummary.author));
                 }
                 
                 if (programSummary.copyright) {
-                    summaryContent.appendChild(ContextMenuManager._createInfoItem('版权', programSummary.copyright));
+                    summaryContent.appendChild(ContextMenuManager._createInfoItem(ContextMenuManager._getText('PROGDETAILS_COPYRIGHT', '版权'), programSummary.copyright));
                 }
                 
                 if (programSummary.type) {
-                    summaryContent.appendChild(ContextMenuManager._createInfoItem('类型', programSummary.type));
+                    summaryContent.appendChild(ContextMenuManager._createInfoItem(ContextMenuManager._getText('PROGDETAILS_TYPE', '类型'), programSummary.type));
                 }
             }
         } else {
@@ -2237,21 +2251,21 @@ class ContextMenuManager {
                 }
                 
                 if (programInfo.metadata.version) {
-                    summaryContent.appendChild(ContextMenuManager._createInfoItem('版本', programInfo.metadata.version));
+                    summaryContent.appendChild(ContextMenuManager._createInfoItem(ContextMenuManager._getText('PROGDETAILS_VERSION', '版本'), programInfo.metadata.version));
                 }
                 
                 if (programInfo.metadata.author) {
-                    summaryContent.appendChild(ContextMenuManager._createInfoItem('作者', programInfo.metadata.author));
+                    summaryContent.appendChild(ContextMenuManager._createInfoItem(ContextMenuManager._getText('PROGDETAILS_AUTHOR', '作者'), programInfo.metadata.author));
                 }
                 
                 if (programInfo.metadata.type) {
-                    summaryContent.appendChild(ContextMenuManager._createInfoItem('类型', programInfo.metadata.type));
+                    summaryContent.appendChild(ContextMenuManager._createInfoItem(ContextMenuManager._getText('PROGDETAILS_TYPE', '类型'), programInfo.metadata.type));
                 }
             }
             
             // 如果仍然没有信息，显示提示
             if (summaryContent.children.length === 0) {
-                summaryContent.textContent = '暂无程序摘要信息';
+                summaryContent.textContent = ContextMenuManager._getText('PROGDETAILS_NO_SUMMARY', '暂无程序摘要信息');
                 summaryContent.style.color = 'var(--theme-text-muted, rgba(215, 224, 221, 0.5))';
                 summaryContent.style.fontStyle = 'italic';
             }
@@ -2259,7 +2273,7 @@ class ContextMenuManager {
         
         // 添加多实例支持信息
         const allowMultipleInstances = programInfo?.metadata?.allowMultipleInstances ?? programSummary?.metadata?.allowMultipleInstances ?? false;
-        summaryContent.appendChild(ContextMenuManager._createInfoItem('支持多实例', allowMultipleInstances ? '是' : '否'));
+        summaryContent.appendChild(ContextMenuManager._createInfoItem(ContextMenuManager._getText('PROGDETAILS_MULTI_INSTANCE', '支持多实例'), allowMultipleInstances ? ContextMenuManager._getText('KEY_YES', '是') : ContextMenuManager._getText('KEY_NO', '否')));
         
         summarySection.appendChild(summaryContent);
         content.appendChild(summarySection);
@@ -2271,19 +2285,19 @@ class ContextMenuManager {
             
             const processTitle = document.createElement('div');
             processTitle.className = 'program-details-section-title';
-            processTitle.textContent = '进程信息';
+            processTitle.textContent = ContextMenuManager._getText('PROGDETAILS_PROCESS_INFO', '进程信息');
             processSection.appendChild(processTitle);
             
             const processList = document.createElement('div');
             processList.className = 'program-details-info-list';
             
-            processList.appendChild(ContextMenuManager._createInfoItem('进程ID', pid.toString()));
-            processList.appendChild(ContextMenuManager._createInfoItem('状态', processInfo.status || 'unknown'));
-            processList.appendChild(ContextMenuManager._createInfoItem('是否最小化', processInfo.isMinimized ? '是' : '否'));
+            processList.appendChild(ContextMenuManager._createInfoItem(ContextMenuManager._getText('PROGDETAILS_PID', '进程ID'), pid.toString()));
+            processList.appendChild(ContextMenuManager._createInfoItem(ContextMenuManager._getText('PROGDETAILS_STATUS', '状态'), processInfo.status || 'unknown'));
+            processList.appendChild(ContextMenuManager._createInfoItem(ContextMenuManager._getText('PROGDETAILS_MINIMIZED', '是否最小化'), processInfo.isMinimized ? ContextMenuManager._getText('KEY_YES', '是') : ContextMenuManager._getText('KEY_NO', '否')));
             
             if (processInfo.startTime) {
                 const startDate = new Date(processInfo.startTime);
-                processList.appendChild(ContextMenuManager._createInfoItem('启动时间', startDate.toLocaleString()));
+                processList.appendChild(ContextMenuManager._createInfoItem(ContextMenuManager._getText('PROGDETAILS_START_TIME', '启动时间'), startDate.toLocaleString()));
             }
             
             // 内存信息
@@ -2293,10 +2307,10 @@ class ContextMenuManager {
                     if (memoryInfo && memoryInfo.programs && memoryInfo.programs.length > 0) {
                         const memData = memoryInfo.programs[0];
                         if (memData.heapSize) {
-                            processList.appendChild(ContextMenuManager._createInfoItem('堆内存', `${(memData.heapSize / 1024).toFixed(2)} KB`));
+                            processList.appendChild(ContextMenuManager._createInfoItem(ContextMenuManager._getText('PROGDETAILS_HEAP_MEMORY', '堆内存'), `${(memData.heapSize / 1024).toFixed(2)} KB`));
                         }
                         if (memData.shedSize) {
-                            processList.appendChild(ContextMenuManager._createInfoItem('栈内存', `${memData.shedSize} items`));
+                            processList.appendChild(ContextMenuManager._createInfoItem(ContextMenuManager._getText('PROGDETAILS_STACK_MEMORY', '栈内存'), `${memData.shedSize} items`));
                         }
                     }
                 } catch (e) {
@@ -2315,7 +2329,7 @@ class ContextMenuManager {
             
             const metadataTitle = document.createElement('div');
             metadataTitle.className = 'program-details-section-title';
-            metadataTitle.textContent = '元数据';
+            metadataTitle.textContent = ContextMenuManager._getText('PROGDETAILS_METADATA', '元数据');
             metadataSection.appendChild(metadataTitle);
             
             const metadataList = document.createElement('div');
@@ -2340,7 +2354,7 @@ class ContextMenuManager {
             
             const permissionTitle = document.createElement('div');
             permissionTitle.className = 'program-details-section-title';
-            permissionTitle.textContent = '权限信息';
+            permissionTitle.textContent = ContextMenuManager._getText('PROGDETAILS_PERMISSIONS', '权限信息');
             permissionSection.appendChild(permissionTitle);
             
             const permissionList = document.createElement('div');
@@ -2440,7 +2454,7 @@ class ContextMenuManager {
                 // 显示已声明的权限
                 if (declaredPermissions.length > 0) {
                     const declaredTitle = document.createElement('div');
-                    declaredTitle.textContent = '已声明权限:';
+                    declaredTitle.textContent = ContextMenuManager._getText('PROGDETAILS_DECLARED_PERMS', '已声明权限:');
                     declaredTitle.style.cssText = `
                         color: #aab2c0;
                         font-size: 13px;
@@ -2452,8 +2466,8 @@ class ContextMenuManager {
                     
                     declaredPermissions.forEach(perm => {
                         const level = PermissionManager.PERMISSION_LEVEL_MAP[perm] || PermissionManager.PERMISSION_LEVEL.NORMAL;
-                        const levelText = level === PermissionManager.PERMISSION_LEVEL.NORMAL ? '普通' :
-                                        level === PermissionManager.PERMISSION_LEVEL.SPECIAL ? '特殊' : '危险';
+                        const levelText = level === PermissionManager.PERMISSION_LEVEL.NORMAL ? ContextMenuManager._getText('PROGDETAILS_LEVEL_NORMAL', '普通') :
+                                        level === PermissionManager.PERMISSION_LEVEL.SPECIAL ? ContextMenuManager._getText('PROGDETAILS_LEVEL_SPECIAL', '特殊') : ContextMenuManager._getText('PROGDETAILS_LEVEL_DANGEROUS', '危险');
                         const levelColor = level === PermissionManager.PERMISSION_LEVEL.NORMAL ? '#4caf50' :
                                          level === PermissionManager.PERMISSION_LEVEL.SPECIAL ? '#ff9800' : '#f44336';
                         const permName = permNameMap[perm] || perm;
@@ -2504,7 +2518,7 @@ class ContextMenuManager {
                         
                         if (isGranted) {
                             const grantedBadge = document.createElement('span');
-                            grantedBadge.textContent = '已授予';
+                            grantedBadge.textContent = ContextMenuManager._getText('PROGDETAILS_GRANTED', '已授予');
                             grantedBadge.style.cssText = `
                                 padding: 4px 8px;
                                 border-radius: 4px;
@@ -2540,7 +2554,7 @@ class ContextMenuManager {
                 const extraPermissions = grantedPermissions.filter(p => !declaredPermissions.includes(p));
                 if (extraPermissions.length > 0) {
                     const extraTitle = document.createElement('div');
-                    extraTitle.textContent = '额外授予权限:';
+                    extraTitle.textContent = ContextMenuManager._getText('PROGDETAILS_EXTRA_PERMS', '额外授予权限:');
                     extraTitle.style.cssText = `
                         color: #aab2c0;
                         font-size: 13px;
@@ -2552,8 +2566,8 @@ class ContextMenuManager {
                     
                     extraPermissions.forEach(perm => {
                         const level = PermissionManager.PERMISSION_LEVEL_MAP[perm] || PermissionManager.PERMISSION_LEVEL.NORMAL;
-                        const levelText = level === PermissionManager.PERMISSION_LEVEL.NORMAL ? '普通' :
-                                        level === PermissionManager.PERMISSION_LEVEL.SPECIAL ? '特殊' : '危险';
+                        const levelText = level === PermissionManager.PERMISSION_LEVEL.NORMAL ? ContextMenuManager._getText('PROGDETAILS_LEVEL_NORMAL', '普通') :
+                                        level === PermissionManager.PERMISSION_LEVEL.SPECIAL ? ContextMenuManager._getText('PROGDETAILS_LEVEL_SPECIAL', '特殊') : ContextMenuManager._getText('PROGDETAILS_LEVEL_DANGEROUS', '危险');
                         const levelColor = level === PermissionManager.PERMISSION_LEVEL.NORMAL ? '#4caf50' :
                                          level === PermissionManager.PERMISSION_LEVEL.SPECIAL ? '#ff9800' : '#f44336';
                         const permName = permNameMap[perm] || perm;
@@ -2602,7 +2616,7 @@ class ContextMenuManager {
                         `;
                         
                         const grantedBadge = document.createElement('span');
-                        grantedBadge.textContent = '已授予';
+                        grantedBadge.textContent = ContextMenuManager._getText('PROGDETAILS_GRANTED', '已授予');
                         grantedBadge.style.cssText = `
                             padding: 4px 8px;
                             border-radius: 4px;
@@ -2635,7 +2649,7 @@ class ContextMenuManager {
                 }
             } else {
                 const noPerms = document.createElement('div');
-                noPerms.textContent = '该程序未声明任何权限';
+                noPerms.textContent = ContextMenuManager._getText('PROGDETAILS_NO_PERMS', '该程序未声明任何权限');
                 noPerms.style.cssText = `
                     color: #aab2c0;
                     font-size: 13px;
@@ -2667,7 +2681,7 @@ class ContextMenuManager {
             const programTitle = programInfo?.metadata?.name || programName;
             
             const windowInfo = GUIManager.registerWindow(exploitPid, windowElement, {
-                title: `程序详情 - ${programTitle}`,
+                title: ContextMenuManager._getText('PROGDETAILS_TITLE', '程序详情 - {0}').replace('{0}', programTitle),
                 icon: programIcon,
                 onClose: () => {
                     // 只关闭窗口，不kill Exploit进程

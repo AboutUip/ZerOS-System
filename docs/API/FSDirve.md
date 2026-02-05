@@ -63,14 +63,17 @@ Body: { "content": "..." }
 
 ## 路径格式
 
-所有路径使用虚拟路径格式：
-- 磁盘根目录：`A:` 到 `Z:`（支持 A-Z 共 26 个分区）
+所有路径使用虚拟路径格式，**根路径必须为 `A:` 或 `A:/` 形式**（PHP 后端会校验 `/^[A-Z]:(\/|$)/`）：
+
+- 磁盘根目录：`A:` 到 `Z:` 或 `A:/` 到 `Z:/`（支持 A-Z 共 26 个分区）
 - 子目录：`C:/path/to/dir` 或 `D:/path/to/dir` 等
 - 路径会自动转换为实际文件系统路径：
-  - `C:` → `system/service/DISK/C/`
-  - `D:` → `system/service/DISK/D/`（D: 是系统盘）
-  - `E:` → `system/service/DISK/E/`
+  - `C:` / `C:/` → `system/service/DISK/C/`
+  - `D:` / `D:/` → `system/service/DISK/D/`（D: 是系统盘）
+  - `E:` / `E:/` → `system/service/DISK/E/`
   - `D:/application` → `system/service/DISK/D/application/`
+
+**说明**：NodeTree 在从 PHP 重建目录树（`_rebuildFromPHP`）时会使用 `list_dir`，并会将无冒号盘符（如 `D`）规范为 `D:/` 再请求，以保证与 FSDirve 路径校验一致。
 
 ## 目录操作
 

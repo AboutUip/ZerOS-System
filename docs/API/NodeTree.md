@@ -259,24 +259,40 @@ if (dPartition.hasNode("D:/Documents")) {
   - `NO_MOVE` (位 8): 不可移动
   - `NO_RENAME` (位 16): 不可重命名
 
+## 初始化与数据来源
+
+NodeTreeCollection 在创建时会等待 FileType 等依赖加载完成，然后按以下顺序加载数据：
+
+1. **从本地快照加载**：调用 `_loadFromLocalStorage()`，从后端（FSDirve）读取 `${separateName}/filesystem_${safeName}.json`。若文件存在且有效，则反序列化得到完整节点树。
+2. **无有效快照时从 PHP 重建**：加载完成后若当前仅有根节点（`nodes.size <= 1`），会调用 `_ensureTreeFromPHP()`，内部再调用 `_rebuildFromPHP()`，通过 FSDirve 的 `list_dir` 递归拉取真实目录结构并写回 `nodes`。这样可保证如 `D:/plugins` 等目录在无本地快照时也能被正确创建，避免 `list_file` 报「节点不存在」。
+
+**内部方法说明**（内核/系统模块使用，应用层无需直接调用）：
+
+- **`_ensureTreeFromPHP()`**：在 `_loadFromLocalStorage` 完成后调用；若 `nodes.size <= 1` 则从 PHP 服务重建整棵树。
+- **`_rebuildFromPHP(rootPath?)`**：清空除根节点外的所有节点，从 `rootPath` 或 `separateName` 起递归调用 FSDirve `list_dir`，按返回的目录/文件重建节点并标记 `initialized = true`。ProcessManager 在 `FileSystem.read/write/create/list` 等发现分区未初始化时也会调用此方法。
+
+**请求 PHP 时的路径格式**：FSDirve 要求根路径为 `A:` 或 `A:/` 形式。`_rebuildDirectoryFromPHP` 会将 `D:` 转为 `D:/`、单字母 `D` 转为 `D:/` 再请求，以保证 PHP 校验通过。
+
 ## 持久化
 
-NodeTreeCollection 会自动将文件系统结构保存到后端文件系统（通过 `FSDirve.php`），并在下次启动时恢复。
+NodeTreeCollection 会将文件系统结构保存到后端文件系统（通过 FSDirve），并在下次启动时优先从本地快照恢复。无论分区名是 `"D"` 还是 `"D:"`，对 FSDirve 的实际请求都会将根路径规范为 `"D:/"` 等形式，与 FSDirve 的路径校验保持一致。
 
-**存储位置**: `${separateName}/filesystem_${safeName}.json`（其中 `safeName = separateName.replace(':', '_')`）
+**存储位置**: 逻辑上为 `${separateName}/filesystem_${safeName}.json`（其中 `safeName = separateName.replace(':', '_')`，对 FSDirve 请求时会按上文所述规范根路径格式）
 
 例如：
 - `C:/filesystem_C_.json`
 - `D:/filesystem_D_.json`
 
+若无该文件或反序列化后仅有根节点，会通过 `_ensureTreeFromPHP` 从 PHP 服务按真实目录结构重建，再正常使用。
+
 ## 注意事项
 
-1. **初始化**: NodeTreeCollection 在创建时会自动初始化，等待 FileType 加载完成
-2. **路径格式**: 路径使用 `/` 分隔，根路径为盘符（如 `"D:"`）
-3. **文件对象**: 创建文件时必须使用 `FileFormwork` 创建文件对象
-4. **写入模式**: 写入文件时需指定写入模式（覆盖或追加）
-5. **属性检查**: 删除、重命名等操作会检查文件/目录属性，如果设置了相应标志会拒绝操作
-6. **持久化**: 文件系统会自动保存到 localStorage，无需手动保存
+1. **初始化**: NodeTreeCollection 在创建时会自动初始化，等待 FileType 加载完成后先加载本地快照，无有效快照时自动从 PHP 重建。
+2. **路径格式**: 路径使用 `/` 分隔，根路径为盘符（如 `"D:"`）；请求 PHP 时根路径会规范为 `D:/` 形式。
+3. **文件对象**: 创建文件时必须使用 `FileFormwork` 创建文件对象。
+4. **写入模式**: 写入文件时需指定写入模式（覆盖或追加）。
+5. **属性检查**: 删除、重命名等操作会检查文件/目录属性，如果设置了相应标志会拒绝操作。
+6. **持久化**: 文件系统会通过 FSDirve 保存/加载快照，无需应用层手动保存。
 
 ## 相关文档
 

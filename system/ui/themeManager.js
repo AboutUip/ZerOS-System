@@ -1,4 +1,4 @@
-﻿// 主题管理器
+// 主题管理器
 // 负责统一管理整个系统的GUI主题与风格
 // 依赖 LStorage 保存主题设置到 D:/LocalSData.json
 // 支持主题（颜色）和风格（GUI样式）的独立管理
@@ -41,6 +41,134 @@ class ThemeManager {
     
     // 动画预设变更监听器
     static _animationPresetChangeListeners = [];
+    
+    /**
+     * 多语言文案：优先使用 LanguagesExpansion，否则返回 fallback
+     * @param {string} key 语言包常量名
+     * @param {string} fallback 无语言包时的回退文案
+     * @returns {string}
+     */
+    static _getText(key, fallback) {
+        if (typeof LanguagesExpansion !== 'undefined' && typeof LanguagesExpansion.getText === 'function') {
+            const value = LanguagesExpansion.getText(key);
+            if (value && value !== key) return value;
+        }
+        return fallback || key;
+    }
+    
+    /**
+     * 将 id（如 deep-blue）转为语言包键中缀（如 DEEP_BLUE）
+     * @param {string} id
+     * @returns {string}
+     */
+    static _getIdKey(id) {
+        return (id || '').replace(/-/g, '_').toUpperCase();
+    }
+    
+    /**
+     * 获取主题显示名称（多语言）
+     * @param {string} themeId
+     * @returns {string}
+     */
+    static getThemeDisplayName(themeId) {
+        const theme = ThemeManager._themes.get(themeId);
+        if (!theme) return themeId || '';
+        return ThemeManager._getText('THEME_' + ThemeManager._getIdKey(themeId) + '_NAME', theme.name);
+    }
+    
+    /**
+     * 获取主题显示描述（多语言）
+     * @param {string} themeId
+     * @returns {string}
+     */
+    static getThemeDisplayDescription(themeId) {
+        const theme = ThemeManager._themes.get(themeId);
+        if (!theme) return '';
+        return ThemeManager._getText('THEME_' + ThemeManager._getIdKey(themeId) + '_DESC', theme.description);
+    }
+    
+    /**
+     * 获取风格显示名称（多语言）
+     * @param {string} styleId
+     * @returns {string}
+     */
+    static getStyleDisplayName(styleId) {
+        const style = ThemeManager._styles.get(styleId);
+        if (!style) return styleId || '';
+        return ThemeManager._getText('STYLE_' + ThemeManager._getIdKey(styleId) + '_NAME', style.name);
+    }
+    
+    /**
+     * 获取风格显示描述（多语言）
+     * @param {string} styleId
+     * @returns {string}
+     */
+    static getStyleDisplayDescription(styleId) {
+        const style = ThemeManager._styles.get(styleId);
+        if (!style) return '';
+        return ThemeManager._getText('STYLE_' + ThemeManager._getIdKey(styleId) + '_DESC', style.description);
+    }
+    
+    /**
+     * 获取桌面背景显示名称（多语言；本地背景按 path 与当前语言生成）
+     * @param {string} backgroundId
+     * @returns {string}
+     */
+    static getDesktopBackgroundDisplayName(backgroundId) {
+        const bg = ThemeManager._desktopBackgrounds.get(backgroundId);
+        if (!bg) return backgroundId || '';
+        if ((backgroundId || '').startsWith('local_')) {
+            const path = bg.path || '';
+            const fileName = path.split(/[/\\]/).pop();
+            if (fileName) return fileName;
+            const ext = path.toLowerCase().split('.').pop() || '';
+            const isVideo = ['mp4', 'webm', 'ogg'].includes(ext);
+            const key = isVideo ? 'THEME_LOCAL_VIDEO' : (ext === 'gif' ? 'THEME_LOCAL_GIF' : 'THEME_LOCAL_IMAGE');
+            return ThemeManager._getText(key, key === 'THEME_LOCAL_VIDEO' ? '本地视频' : (key === 'THEME_LOCAL_GIF' ? '本地GIF动图' : '本地图片'));
+        }
+        return ThemeManager._getText('BG_' + ThemeManager._getIdKey(backgroundId) + '_NAME', bg.name);
+    }
+    
+    /**
+     * 获取桌面背景显示描述（多语言；本地背景按 path 与当前语言生成）
+     * @param {string} backgroundId
+     * @returns {string}
+     */
+    static getDesktopBackgroundDisplayDescription(backgroundId) {
+        const bg = ThemeManager._desktopBackgrounds.get(backgroundId);
+        if (!bg) return '';
+        if ((backgroundId || '').startsWith('local_')) {
+            const path = bg.path || '';
+            const ext = path.toLowerCase().split('.').pop() || '';
+            const isVideo = ['mp4', 'webm', 'ogg'].includes(ext);
+            const key = isVideo ? 'THEME_LOCAL_VIDEO_DESC' : (ext === 'gif' ? 'THEME_LOCAL_GIF_DESC' : 'THEME_LOCAL_IMAGE_DESC');
+            const fallback = isVideo ? '本地视频: {0}（静音循环播放）' : (ext === 'gif' ? '本地GIF动图: {0}' : '本地图片: {0}');
+            return ThemeManager._getText(key, fallback).replace('{0}', path);
+        }
+        return ThemeManager._getText('BG_' + ThemeManager._getIdKey(backgroundId) + '_DESC', bg.description);
+    }
+    
+    /**
+     * 获取动画预设显示名称（多语言）
+     * @param {string} presetId
+     * @returns {string}
+     */
+    static getAnimationPresetDisplayName(presetId) {
+        const preset = ThemeManager._animationPresets.get(presetId);
+        if (!preset) return presetId || '';
+        return ThemeManager._getText('ANIM_' + ThemeManager._getIdKey(presetId) + '_NAME', preset.name);
+    }
+    
+    /**
+     * 获取动画预设显示描述（多语言）
+     * @param {string} presetId
+     * @returns {string}
+     */
+    static getAnimationPresetDisplayDescription(presetId) {
+        const preset = ThemeManager._animationPresets.get(presetId);
+        if (!preset) return '';
+        return ThemeManager._getText('ANIM_' + ThemeManager._getIdKey(presetId) + '_DESC', preset.description);
+    }
     
     /**
      * 初始化主题管理器
@@ -97,7 +225,7 @@ class ThemeManager {
                         ThemeManager.registerDesktopBackground(bg.id, {
                             id: bg.id,
                             name: bg.name || bg.id,
-                            description: bg.description || `本地图片: ${bg.path}`,
+                            description: bg.description || ThemeManager._getText('THEME_LOCAL_IMAGE_DESC', '本地图片: {0}').replace('{0}', bg.path),
                             path: bg.path
                         });
                         registeredLocalCount++;
@@ -124,7 +252,7 @@ class ThemeManager {
                                 ThemeManager.registerDesktopBackground(localBg.id, {
                                     id: localBg.id,
                                     name: localBg.name || localBg.id,
-                                    description: localBg.description || `本地图片: ${localBg.path}`,
+                                    description: localBg.description || ThemeManager._getText('THEME_LOCAL_IMAGE_DESC', '本地图片: {0}').replace('{0}', localBg.path),
                                     path: localBg.path
                                 });
                                 ThemeManager._currentDesktopBackgroundId = trimmedId;
@@ -1915,10 +2043,16 @@ class ThemeManager {
     
     /**
      * 获取当前主题配置
-     * @returns {Object|null} 当前主题配置
+     * @returns {Object|null} 当前主题配置（name/description 已多语言）
      */
     static getCurrentTheme() {
-        return ThemeManager._themes.get(ThemeManager._currentThemeId) || null;
+        const themeId = ThemeManager._currentThemeId;
+        const theme = ThemeManager._themes.get(themeId) || null;
+        if (!theme) return null;
+        return Object.assign({}, theme, {
+            name: ThemeManager.getThemeDisplayName(themeId),
+            description: ThemeManager.getThemeDisplayDescription(themeId)
+        });
     }
     
     /**
@@ -1931,10 +2065,16 @@ class ThemeManager {
     
     /**
      * 获取当前风格配置
-     * @returns {Object|null} 当前风格配置
+     * @returns {Object|null} 当前风格配置（name/description 已多语言）
      */
     static getCurrentStyle() {
-        return ThemeManager._styles.get(ThemeManager._currentStyleId) || null;
+        const styleId = ThemeManager._currentStyleId;
+        const style = ThemeManager._styles.get(styleId) || null;
+        if (!style) return null;
+        return Object.assign({}, style, {
+            name: ThemeManager.getStyleDisplayName(styleId),
+            description: ThemeManager.getStyleDisplayDescription(styleId)
+        });
     }
     
     /**
@@ -1942,15 +2082,25 @@ class ThemeManager {
      * @returns {Array<Object>} 主题列表（包含完整主题信息）
      */
     static getAllThemes() {
-        return Array.from(ThemeManager._themes.values());
+        return Array.from(ThemeManager._themes.values()).map(function (t) {
+            return Object.assign({}, t, {
+                name: ThemeManager.getThemeDisplayName(t.id),
+                description: ThemeManager.getThemeDisplayDescription(t.id)
+            });
+        });
     }
     
     /**
      * 获取所有风格列表
-     * @returns {Array<Object>} 风格列表（包含完整风格信息）
+     * @returns {Array<Object>} 风格列表（包含完整风格信息，name/description 已多语言）
      */
     static getAllStyles() {
-        return Array.from(ThemeManager._styles.values());
+        return Array.from(ThemeManager._styles.values()).map(function (s) {
+            return Object.assign({}, s, {
+                name: ThemeManager.getStyleDisplayName(s.id),
+                description: ThemeManager.getStyleDisplayDescription(s.id)
+            });
+        });
     }
     
     /**
@@ -2277,16 +2427,18 @@ class ThemeManager {
     
     /**
      * 获取当前动画预设配置
-     * @returns {Object|null} 当前动画预设配置
+     * @returns {Object|null} 当前动画预设配置（name/description 已多语言）
      */
     static getCurrentAnimationPreset() {
         const presetId = ThemeManager._currentAnimationPresetId || 'smooth';
         const preset = ThemeManager._animationPresets.get(presetId);
-        // 如果预设不存在，尝试返回默认预设
-        if (!preset && presetId !== 'smooth') {
-            return ThemeManager._animationPresets.get('smooth') || null;
-        }
-        return preset || null;
+        const resolved = preset || (presetId !== 'smooth' ? ThemeManager._animationPresets.get('smooth') : null);
+        if (!resolved) return null;
+        const id = resolved.id;
+        return Object.assign({}, resolved, {
+            name: ThemeManager.getAnimationPresetDisplayName(id),
+            description: ThemeManager.getAnimationPresetDisplayDescription(id)
+        });
     }
     
     /**
@@ -2294,20 +2446,27 @@ class ThemeManager {
      * @returns {Array<Object>} 动画预设列表
      */
     static getAllAnimationPresets() {
-        return Array.from(ThemeManager._animationPresets.values()).map(preset => ({
-            id: preset.id,
-            name: preset.name,
-            description: preset.description
-        }));
+        return Array.from(ThemeManager._animationPresets.values()).map(function (preset) {
+            return {
+                id: preset.id,
+                name: ThemeManager.getAnimationPresetDisplayName(preset.id),
+                description: ThemeManager.getAnimationPresetDisplayDescription(preset.id)
+            };
+        });
     }
     
     /**
      * 获取动画预设配置
      * @param {string} presetId 预设ID
-     * @returns {Object|null} 动画预设配置
+     * @returns {Object|null} 动画预设配置（name/description 已多语言）
      */
     static getAnimationPreset(presetId) {
-        return ThemeManager._animationPresets.get(presetId) || null;
+        const preset = ThemeManager._animationPresets.get(presetId) || null;
+        if (!preset) return null;
+        return Object.assign({}, preset, {
+            name: ThemeManager.getAnimationPresetDisplayName(presetId),
+            description: ThemeManager.getAnimationPresetDisplayDescription(presetId)
+        });
     }
     
     /**
@@ -2755,16 +2914,16 @@ class ThemeManager {
         const backgroundId = `local_${imagePath.replace(/[^a-zA-Z0-9]/g, '_')}`;
         
         // 从路径中提取文件名作为名称
-        const fileName = imagePath.split(/[/\\]/).pop() || (isVideo ? '本地视频' : '本地图片');
+        const fileName = imagePath.split(/[/\\]/).pop() || (isVideo ? ThemeManager._getText('THEME_LOCAL_VIDEO', '本地视频') : ThemeManager._getText('THEME_LOCAL_IMAGE', '本地图片'));
         
         // 生成描述
         let description;
         if (isVideo) {
-            description = `本地视频: ${imagePath}（静音循环播放）`;
+            description = ThemeManager._getText('THEME_LOCAL_VIDEO_DESC', '本地视频: {0}（静音循环播放）').replace('{0}', imagePath);
         } else if (extension === 'gif') {
-            description = `本地GIF动图: ${imagePath}`;
+            description = ThemeManager._getText('THEME_LOCAL_GIF_DESC', '本地GIF动图: {0}').replace('{0}', imagePath);
         } else {
-            description = `本地图片: ${imagePath}`;
+            description = ThemeManager._getText('THEME_LOCAL_IMAGE_DESC', '本地图片: {0}').replace('{0}', imagePath);
         }
         
         // 注册或更新本地背景
@@ -2899,10 +3058,10 @@ class ThemeManager {
         const backgroundId = `local_${videoPath.replace(/[^a-zA-Z0-9]/g, '_')}`;
         
         // 从路径中提取文件名作为名称
-        const fileName = videoPath.split(/[/\\]/).pop() || '本地视频';
+        const fileName = videoPath.split(/[/\\]/).pop() || ThemeManager._getText('THEME_LOCAL_VIDEO', '本地视频');
         
         // 生成描述
-        const description = `本地视频: ${videoPath}（静音循环播放）`;
+        const description = ThemeManager._getText('THEME_LOCAL_VIDEO_DESC', '本地视频: {0}（静音循环播放）').replace('{0}', videoPath);
         
         // 注册或更新本地背景
         ThemeManager.registerDesktopBackground(backgroundId, {
@@ -3018,34 +3177,54 @@ class ThemeManager {
      * @returns {Array<Object>} 桌面背景图数组
      */
     static getAllDesktopBackgrounds() {
-        return Array.from(ThemeManager._desktopBackgrounds.values());
+        return Array.from(ThemeManager._desktopBackgrounds.values()).map(function (bg) {
+            return Object.assign({}, bg, {
+                name: ThemeManager.getDesktopBackgroundDisplayName(bg.id),
+                description: ThemeManager.getDesktopBackgroundDisplayDescription(bg.id)
+            });
+        });
     }
     
     /**
      * 获取桌面背景图信息
      * @param {string} backgroundId 背景图ID
-     * @returns {Object|null} 桌面背景图信息
+     * @returns {Object|null} 桌面背景图信息（name/description 已多语言）
      */
     static getDesktopBackground(backgroundId) {
-        return ThemeManager._desktopBackgrounds.get(backgroundId) || null;
+        const bg = ThemeManager._desktopBackgrounds.get(backgroundId) || null;
+        if (!bg) return null;
+        return Object.assign({}, bg, {
+            name: ThemeManager.getDesktopBackgroundDisplayName(backgroundId),
+            description: ThemeManager.getDesktopBackgroundDisplayDescription(backgroundId)
+        });
     }
     
     /**
      * 获取主题配置
      * @param {string} themeId 主题ID
-     * @returns {Object|null} 主题配置
+     * @returns {Object|null} 主题配置（name/description 已多语言）
      */
     static getTheme(themeId) {
-        return ThemeManager._themes.get(themeId) || null;
+        const theme = ThemeManager._themes.get(themeId) || null;
+        if (!theme) return null;
+        return Object.assign({}, theme, {
+            name: ThemeManager.getThemeDisplayName(themeId),
+            description: ThemeManager.getThemeDisplayDescription(themeId)
+        });
     }
     
     /**
      * 获取风格配置
      * @param {string} styleId 风格ID
-     * @returns {Object|null} 风格配置
+     * @returns {Object|null} 风格配置（name/description 已多语言）
      */
     static getStyle(styleId) {
-        return ThemeManager._styles.get(styleId) || null;
+        const style = ThemeManager._styles.get(styleId) || null;
+        if (!style) return null;
+        return Object.assign({}, style, {
+            name: ThemeManager.getStyleDisplayName(styleId),
+            description: ThemeManager.getStyleDisplayDescription(styleId)
+        });
     }
     
     /**

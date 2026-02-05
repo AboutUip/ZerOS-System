@@ -1,4 +1,4 @@
-﻿// 进程管理器：负责程序的执行与卸载
+// 进程管理器：负责程序的执行与卸载
 // 管理进程的启动、PID分配、内存分配和程序生命周期
 
 KernelLogger.info("ProcessManager", "模块初始化");
@@ -3028,6 +3028,14 @@ class ProcessManager {
 
             // 异常处理API（普通权限，自动授予）
             'Exception.report': PermissionManager.PERMISSION.SYSTEM_NOTIFICATION, // 使用通知权限作为普通权限
+
+            // 语言包API（语言扩展）
+            'Languages.loadPack': PermissionManager.PERMISSION.LANGUAGES_WRITE,
+            'Languages.setCurrent': PermissionManager.PERMISSION.LANGUAGES_WRITE,
+            'Languages.getText': PermissionManager.PERMISSION.LANGUAGES_READ,
+            'Languages.listPacks': PermissionManager.PERMISSION.LANGUAGES_READ,
+            'Languages.getCurrentLocale': PermissionManager.PERMISSION.LANGUAGES_READ,
+            'Languages.getLoadedLocales': PermissionManager.PERMISSION.LANGUAGES_READ,
         };
 
         return apiPermissionMap[apiName] || null;
@@ -5083,10 +5091,10 @@ class ProcessManager {
                     throw new Error('Drag.unregisterDropZone: dropZoneSelector 必须是字符串选择器');
                 }
 
-                // 查找放置区域元素
+                // 查找放置区域元素；关闭窗口时 DOM 可能已移除，找不到则静默返回（no-op）
                 const element = document.querySelector(dropZoneSelector);
                 if (!element) {
-                    throw new Error(`Drag.unregisterDropZone: 找不到元素: ${dropZoneSelector}`);
+                    return true;
                 }
 
                 DragDrive.unregisterDropZone(element);
@@ -5686,6 +5694,44 @@ class ProcessManager {
 
                 // 调用异常处理器的报告方法
                 await ExceptionHandler.reportException(level, message, exceptionDetails, exceptionPid);
+            },
+
+            // 语言扩展 API（委托给 LanguagesExpansion，运行时需已加载）
+            'Languages.loadPack': async (locale) => {
+                if (typeof LanguagesExpansion === 'undefined') {
+                    throw new Error('Languages.loadPack: LanguagesExpansion 未加载');
+                }
+                return await LanguagesExpansion.loadLanguagePack(locale);
+            },
+            'Languages.setCurrent': async (locale) => {
+                if (typeof LanguagesExpansion === 'undefined') {
+                    throw new Error('Languages.setCurrent: LanguagesExpansion 未加载');
+                }
+                return await LanguagesExpansion.setLanguagePack(locale);
+            },
+            'Languages.getText': (constantName, locale) => {
+                if (typeof LanguagesExpansion === 'undefined') {
+                    throw new Error('Languages.getText: LanguagesExpansion 未加载');
+                }
+                return LanguagesExpansion.getText(constantName, locale);
+            },
+            'Languages.listPacks': async () => {
+                if (typeof LanguagesExpansion === 'undefined') {
+                    throw new Error('Languages.listPacks: LanguagesExpansion 未加载');
+                }
+                return await LanguagesExpansion.listPacks();
+            },
+            'Languages.getCurrentLocale': () => {
+                if (typeof LanguagesExpansion === 'undefined') {
+                    throw new Error('Languages.getCurrentLocale: LanguagesExpansion 未加载');
+                }
+                return LanguagesExpansion.getCurrentLocale();
+            },
+            'Languages.getLoadedLocales': () => {
+                if (typeof LanguagesExpansion === 'undefined') {
+                    throw new Error('Languages.getLoadedLocales: LanguagesExpansion 未加载');
+                }
+                return LanguagesExpansion.getLoadedLocales();
             },
 
             // 其他API可以在这里添加

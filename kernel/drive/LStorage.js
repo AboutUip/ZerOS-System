@@ -1,4 +1,4 @@
-﻿// 本地存储管理器
+// 本地存储管理器
 // 负责本地数据的管理、注册等操作
 // 所有系统依赖的本地数据和程序的本地数据都存储在 {partition}/LocalSData.json 文件中（支持A-Z所有分区）
 // 通过 PHP 服务 (FSDirve.php) 进行文件读写操作
@@ -1390,6 +1390,19 @@ class LStorage {
                     // 不是 ExceptionHandler 模块调用，继续后续验证
                     KernelLogger.debug("LStorage", `系统加载中，但调用栈检查未通过，继续后续验证流程`);
                 }
+            } else if (key === 'languagesExpansion' && !currentPid) {
+                // 语言扩展在引导阶段初始化时无 PID，调用栈可能只含文件名；允许其读写自身键
+                const hasLanguagesExpansion = /languagesExpansion\.js/i.test(fullCallStack) || /loadCurrentLocaleFromStorage/i.test(fullCallStack) || /saveCurrentLocaleToStorage/i.test(fullCallStack);
+                if (hasLanguagesExpansion) {
+                    KernelLogger.debug("LStorage", `语言扩展初始化访问键 ${key}，允许读取（无 PID）`);
+                    try {
+                        const value = LStorage._storageData.system[key] ?? null;
+                        return value;
+                    } catch (error) {
+                        KernelLogger.error("LStorage", `读取系统存储失败: ${error.message}`, error);
+                        throw error;
+                    }
+                }
             } else {
                 // 用户程序调用：需要基础权限（SYSTEM_STORAGE_READ，普通权限，自动授予）
                 if (typeof PermissionManager !== 'undefined' && currentPid) {
@@ -1481,11 +1494,13 @@ class LStorage {
                 // - kernel/core/, kernel/process/, kernel/filesystem/, kernel/dynamicModule/
                 // - kernel/drive/ (驱动模块，如 cryptDrive.js, LStorage.js 等)
                 // - system/ui/ (系统UI模块，如 themeManager.js, desktop.js, taskbarManager.js 等)
+                // - system/expansion/ (系统扩展，如 languagesExpansion.js 语言包管理器)
                 // 但排除 kernel/drive/LStorage.js 本身的调用栈行（已在上面跳过）
                 const kernelModulePatterns = [
                     /kernel[\/\\](core|process|filesystem|dynamicModule)[\/\\]/,  // 核心模块
                     /kernel[\/\\]drive[\/\\]/,                                    // 驱动模块（排除 LStorage.js 本身）
-                    /system[\/\\]ui[\/\\]/                                        // 系统UI模块
+                    /system[\/\\]ui[\/\\]/,                                       // 系统UI模块
+                    /system[\/\\]expansion[\/\\]/                                 // 系统扩展（如语言扩展）
                 ];
 
                 for (const pattern of kernelModulePatterns) {

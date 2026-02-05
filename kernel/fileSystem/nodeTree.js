@@ -248,7 +248,7 @@ class Node {
                     node: node,
                 };
                 break;
-            case FileType.DIR_OPS.DELETE:
+            case FileTypeRef.DIR_OPS.DELETE:
                 // 检查目录属性：如果目录设置了 NO_DELETE 标志，则拒绝删除
                 if (node && typeof node === "object" && node.__meta && node.__meta.dirAttributes !== undefined) {
                     const attrs = FileTypeRef.DIR_ATTRIBUTES || FileTypeRef.FILE_ATTRIBUTES;
@@ -269,7 +269,7 @@ class Node {
                     node: node,
                 };
                 break;
-            case FileType.DIR_OPS.RENAME:
+            case FileTypeRef.DIR_OPS.RENAME:
                 // 重命名目录：更新children中的键
                 const oldName = node.oldName || node.name;
                 const newName = node.newName;
@@ -384,7 +384,7 @@ class NodeTreeCollection {
                     entry.loaded = true;
                     KernelLogger.debug("NodeTree", `fileType 已加载，直接初始化 ${separateName}`);
                     this.initialized = true;
-                    this._loadFromLocalStorage().catch(e => {
+                    this._loadFromLocalStorage().then(() => this._ensureTreeFromPHP()).catch(e => {
                         KernelLogger.warn("NodeTree", `加载文件系统数据失败: ${e.message}`);
                     });
                 } else {
@@ -393,11 +393,11 @@ class NodeTreeCollection {
                         interval: 50,
                         timeout: 2000,
                     })
-                    .then(() => {
+                        .then(() => {
                         this.initialized = true;
                         KernelLogger.info("NodeTree", `collection deps loaded ${separateName}`);
                         // 从 PHP 文件系统加载数据
-                        this._loadFromLocalStorage().catch(e => {
+                        this._loadFromLocalStorage().then(() => this._ensureTreeFromPHP()).catch(e => {
                             KernelLogger.warn("NodeTree", `加载文件系统数据失败: ${e.message}`);
                         });
                     })
@@ -405,7 +405,7 @@ class NodeTreeCollection {
                         KernelLogger.warn("NodeTree", `等待 fileType 超时，直接初始化 ${separateName}`, String(e));
                         // 即使失败也标记为已初始化，避免阻塞
                         this.initialized = true;
-                        this._loadFromLocalStorage().catch(e => {
+                        this._loadFromLocalStorage().then(() => this._ensureTreeFromPHP()).catch(e => {
                             KernelLogger.warn("NodeTree", `加载文件系统数据失败: ${e.message}`);
                         });
                     });
@@ -436,27 +436,35 @@ class NodeTreeCollection {
                     KernelLogger.debug("NodeTree", `Dependency 不可用，直接初始化 ${separateName}`);
                 }
                 this.initialized = true;
-                this._loadFromLocalStorage().catch(e => {
+                this._loadFromLocalStorage().then(() => this._ensureTreeFromPHP()).catch(e => {
                     KernelLogger.warn("NodeTree", `加载文件系统数据失败: ${e.message}`);
                 });
             }
         } catch (e) {
             KernelLogger.error("NodeTree", `等待依赖失败 ${separateName}`, String(e));
             this.initialized = true;
-            this._loadFromLocalStorage().catch(e => {
+            this._loadFromLocalStorage().then(() => this._ensureTreeFromPHP()).catch(e => {
                 KernelLogger.warn("NodeTree", `加载文件系统数据失败: ${e.message}`);
             });
         }
     }
     
+    /**
+     * 获取发给 PHP 的分区根路径（FSDirve 要求 A: 或 A:/ 格式，单字母 D 转为 D:/）
+     * @returns {string}
+     */
+    _getPHPRootPath() {
+        const base = /^[A-Z]$/.test(this.separateName) ? this.separateName + ':' : this.separateName;
+        return base + '/';
+    }
+
     // 保存到 PHP 文件系统（通过 FSDirve.php）
     async _saveToLocalStorage() {
         try {
             // 将 separateName 中的冒号替换为下划线，避免文件名中的冒号问题
             const safeName = this.separateName.replace(':', '_');
             const fileName = `filesystem_${safeName}.json`;
-            // 根据 separateName 决定存储路径（C: 或 D:）
-            const filePath = `${this.separateName}/`;
+            const filePath = this._getPHPRootPath();
             const serialized = this._serialize();
             
             // 使用 PHP 服务保存文件
@@ -516,11 +524,9 @@ class NodeTreeCollection {
     // 从 PHP 文件系统加载（通过 FSDirve.php）
     async _loadFromLocalStorage() {
         try {
-            // 将 separateName 中的冒号替换为下划线，避免文件名中的冒号问题
             const safeName = this.separateName.replace(':', '_');
             const fileName = `filesystem_${safeName}.json`;
-            // 根据 separateName 决定存储路径（C: 或 D:）
-            const filePath = `${this.separateName}/`;
+            const filePath = this._getPHPRootPath();
             
             // 先检查文件是否存在，避免 404 错误
             const phpServiceUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.getFSDirvePath) 
@@ -603,6 +609,23 @@ class NodeTreeCollection {
             // 静默处理所有错误（文件不存在是正常的）
             KernelLogger.debug("NodeTree", `加载文件系统数据失败（已忽略）: ${this.separateName}`);
         }
+    }
+
+    /**
+     * 若当前仅有根节点（无本地快照或快照为空），则从 PHP 服务重建整棵树，确保 D:/plugins 等目录存在
+     * 在 _loadFromLocalStorage 完成后调用
+     * @returns {Promise<void>}
+     */
+    _ensureTreeFromPHP() {
+        if (this.nodes.size <= 1 && typeof this._rebuildFromPHP === 'function') {
+            KernelLogger.debug("NodeTree", `无有效快照（仅根节点），从 PHP 重建: ${this.separateName}`);
+            return this._rebuildFromPHP().catch(e => {
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.warn("NodeTree", "无快照时从 PHP 重建失败: " + (e && e.message));
+                }
+            });
+        }
+        return Promise.resolve();
     }
     
     // 通过 PHP 服务创建真实目录
@@ -1152,10 +1175,12 @@ class NodeTreeCollection {
                     ? SystemInformation.getOrigin()
                     : window.location.origin);
             url.searchParams.set('action', 'list_dir');
-            // 确保路径格式正确：如果是分区根目录（A: 到 Z:），转换为 A:/ 到 Z:/（支持所有分区A-Z）
+            // 确保路径格式正确：PHP 要求 A: 或 A:/ 格式；无冒号盘符（如 D）转为 D:/
             let phpPath = dirPath;
             if (/^[A-Z]:$/.test(phpPath)) {
                 phpPath = phpPath + '/';
+            } else if (/^[A-Z]$/.test(phpPath)) {
+                phpPath = phpPath + ':/';
             }
             url.searchParams.set('path', phpPath);
             

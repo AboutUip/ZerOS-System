@@ -10,6 +10,21 @@ KernelLogger.info("LockScreen", "模块初始化");
     class LockScreen {
         static container = null;
         static currentUser = null;
+        
+        /**
+         * 多语言文案：优先使用 LanguagesExpansion，否则返回 fallback
+         * @param {string} key 语言包常量名
+         * @param {string} fallback 无语言包时的回退文案
+         * @returns {string}
+         */
+        static _getText(key, fallback) {
+            if (typeof LanguagesExpansion !== 'undefined' && typeof LanguagesExpansion.getText === 'function') {
+                const value = LanguagesExpansion.getText(key);
+                if (value && value !== key) return value;
+            }
+            return fallback || key;
+        }
+        
         static passwordInput = null;
         static loginButton = null;
         static isPasswordMode = false;
@@ -259,7 +274,7 @@ KernelLogger.info("LockScreen", "模块初始化");
                         if (typeof KernelLogger !== 'undefined') {
                             KernelLogger.debug('LockScreen', 'API返回空内容，使用默认文本');
                         }
-                        quoteText.textContent = '简单就是幸福，幸福却不简单。';
+                        quoteText.textContent = LockScreen._getText('LOCKSCREEN_DEFAULT_QUOTE', '简单就是幸福，幸福却不简单。');
                     }
                     
                     // 获取后立即预加载下一次的每日一言
@@ -275,13 +290,13 @@ KernelLogger.info("LockScreen", "模块初始化");
                 }
                 const quoteText = document.getElementById('lockscreen-daily-quote-text');
                 if (quoteText) {
-                    quoteText.textContent = '简单就是幸福，幸福却不简单。';
+                    quoteText.textContent = LockScreen._getText('LOCKSCREEN_DEFAULT_QUOTE', '简单就是幸福，幸福却不简单。');
                 } else {
                     // 如果元素不存在，尝试重新查找（可能容器还未添加到DOM）
                     setTimeout(() => {
                         const retryText = document.getElementById('lockscreen-daily-quote-text');
                         if (retryText) {
-                            retryText.textContent = '简单就是幸福，幸福却不简单。';
+                            retryText.textContent = LockScreen._getText('LOCKSCREEN_DEFAULT_QUOTE', '简单就是幸福，幸福却不简单。');
                         }
                     }, 500);
                 }
@@ -443,7 +458,7 @@ KernelLogger.info("LockScreen", "模块初始化");
                 word-wrap: break-word;
                 word-break: break-all;
             `;
-            quoteText.textContent = '加载中...';
+            quoteText.textContent = LockScreen._getText('KEY_LOADING', '加载中...');
             quoteContainer.appendChild(quoteText);
             
             LockScreen.container.appendChild(quoteContainer);
@@ -461,7 +476,7 @@ KernelLogger.info("LockScreen", "模块初始化");
                         // 即使出错也显示默认文本
                         const textEl = document.getElementById('lockscreen-daily-quote-text');
                         if (textEl) {
-                            textEl.textContent = '简单就是幸福，幸福却不简单。';
+                            textEl.textContent = LockScreen._getText('LOCKSCREEN_DEFAULT_QUOTE', '简单就是幸福，幸福却不简单。');
                         }
                     }
                 }, 200);
@@ -497,7 +512,7 @@ KernelLogger.info("LockScreen", "模块初始化");
             const userName = document.createElement('div');
             userName.className = 'lockscreen-username';
             userName.id = 'lockscreen-username';
-            userName.textContent = '用户';
+            userName.textContent = LockScreen._getText('LOCKSCREEN_USER', '用户');
             userNameContainer.appendChild(userName);
             
             // 用户切换按钮（如果有多个用户）
@@ -569,9 +584,9 @@ KernelLogger.info("LockScreen", "模块初始化");
             passwordInput.type = 'password';
             passwordInput.className = 'lockscreen-password-input';
             passwordInput.id = 'lockscreen-password-input';
-            passwordInput.placeholder = '输入密码（按 Enter 登录，Esc 取消）';
+            passwordInput.placeholder = LockScreen._getText('LOCKSCREEN_PASSWORD_PLACEHOLDER', '输入密码（按 Enter 登录，Esc 取消）');
             passwordInput.autocomplete = 'off';
-            passwordInput.setAttribute('aria-label', '密码输入框');
+            passwordInput.setAttribute('aria-label', LockScreen._getText('LOCKSCREEN_PASSWORD_ARIA', '密码输入框'));
             // 添加额外的键盘事件处理（用于更好的用户体验）
             passwordInput.addEventListener('keydown', (e) => {
                 // 允许标准文本编辑快捷键
@@ -591,7 +606,7 @@ KernelLogger.info("LockScreen", "模块初始化");
             const togglePasswordButton = document.createElement('button');
             togglePasswordButton.className = 'lockscreen-toggle-password';
             togglePasswordButton.id = 'lockscreen-toggle-password';
-            togglePasswordButton.setAttribute('aria-label', '显示/隐藏密码');
+            togglePasswordButton.setAttribute('aria-label', LockScreen._getText('LOCKSCREEN_TOGGLE_PASSWORD_ARIA', '显示/隐藏密码'));
             togglePasswordButton.innerHTML = `
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path d="M1 12C1 12 5 4 12 4C19 4 23 12 23 12C23 12 19 20 12 20C5 20 1 12 1 12Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
@@ -665,7 +680,7 @@ KernelLogger.info("LockScreen", "模块初始化");
             const hintText = document.createElement('div');
             hintText.className = 'lockscreen-hint';
             hintText.id = 'lockscreen-hint';
-            hintText.textContent = '按任意键继续';
+            hintText.textContent = LockScreen._getText('LOCKSCREEN_HINT_PRESS_KEY', '按任意键继续');
             hintContainer.appendChild(hintText);
             
             // 快捷键提示（动态更新）
@@ -702,25 +717,25 @@ KernelLogger.info("LockScreen", "模块初始化");
             
             // 如果有多个用户，显示切换用户提示
             if (LockScreen._userList.length > 1) {
-                hints.push('Tab 切换用户');
-                hints.push('Ctrl+U 显示用户列表');
+                hints.push(LockScreen._getText('LOCKSCREEN_TAB_SWITCH_USER', 'Tab 切换用户'));
+                hints.push(LockScreen._getText('LOCKSCREEN_CTRLU_USER_LIST', 'Ctrl+U 显示用户列表'));
             }
             
             // 如果密码输入框可见
             if (LockScreen._passwordInputVisible) {
                 if (LockScreen.isPasswordMode) {
-                    hints.push('Enter 登录');
-                    hints.push('Esc 取消');
+                    hints.push(LockScreen._getText('LOCKSCREEN_ENTER_SIGNIN', 'Enter 登录'));
+                    hints.push(LockScreen._getText('LOCKSCREEN_ESC_CANCEL', 'Esc 取消'));
                 } else {
-                    hints.push('Enter 或任意键登录');
+                    hints.push(LockScreen._getText('LOCKSCREEN_ENTER_OR_KEY', 'Enter 或任意键登录'));
                 }
             }
             
             // 如果用户列表显示
             if (LockScreen._showUserList) {
-                hints.push('↑↓ 导航');
-                hints.push('Enter 确认');
-                hints.push('Esc 关闭');
+                hints.push(LockScreen._getText('LOCKSCREEN_ARROW_NAV', '↑↓ 导航'));
+                hints.push(LockScreen._getText('LOCKSCREEN_ENTER_CONFIRM', 'Enter 确认'));
+                hints.push(LockScreen._getText('LOCKSCREEN_ESC_CLOSE', 'Esc 关闭'));
             }
             
             if (hints.length > 0) {
@@ -750,7 +765,7 @@ KernelLogger.info("LockScreen", "模块初始化");
             const powerButton = document.createElement('button');
             powerButton.className = 'lockscreen-power-button';
             powerButton.id = 'lockscreen-power-button';
-            powerButton.setAttribute('aria-label', '电源选项');
+            powerButton.setAttribute('aria-label', LockScreen._getText('LOCKSCREEN_POWER_ARIA', '电源选项'));
             powerButton.style.cssText = `
                 width: 48px;
                 height: 48px;
@@ -887,7 +902,7 @@ KernelLogger.info("LockScreen", "模块初始化");
             }
             
             const restartText = document.createElement('span');
-            restartText.textContent = '重启';
+            restartText.textContent = LockScreen._getText('KEY_RESTART', '重启');
             restartText.style.cssText = `
                 font-size: 14px;
                 font-weight: 400;
@@ -949,7 +964,7 @@ KernelLogger.info("LockScreen", "模块初始化");
             }
             
             const shutdownText = document.createElement('span');
-            shutdownText.textContent = '关机';
+            shutdownText.textContent = LockScreen._getText('KEY_SHUTDOWN', '关机');
             shutdownText.style.cssText = `
                 font-size: 14px;
                 font-weight: 400;
@@ -1059,12 +1074,12 @@ KernelLogger.info("LockScreen", "模块初始化");
             let confirmed = false;
             if (typeof GUIManager !== 'undefined' && typeof GUIManager.showConfirm === 'function') {
                 confirmed = await GUIManager.showConfirm(
-                    '确定要重启系统吗？所有未保存的数据将丢失。',
-                    '确认重启',
+                    LockScreen._getText('TASKBAR_CONFIRM_RESTART_MSG', '确定要重启系统吗？所有未保存的数据将丢失。'),
+                    LockScreen._getText('TASKBAR_CONFIRM_RESTART_TITLE', '确认重启'),
                     'danger'
                 );
             } else {
-                confirmed = confirm('确定要重启系统吗？所有未保存的数据将丢失。');
+                confirmed = confirm(LockScreen._getText('TASKBAR_CONFIRM_RESTART_MSG', '确定要重启系统吗？所有未保存的数据将丢失。'));
             }
             if (!confirmed) {
                 return;
@@ -1092,12 +1107,12 @@ KernelLogger.info("LockScreen", "模块初始化");
             let confirmed = false;
             if (typeof GUIManager !== 'undefined' && typeof GUIManager.showConfirm === 'function') {
                 confirmed = await GUIManager.showConfirm(
-                    '确定要关闭系统吗？所有未保存的数据将丢失。',
-                    '确认关闭',
+                    LockScreen._getText('TASKBAR_CONFIRM_SHUTDOWN_MSG', '确定要关闭系统吗？所有未保存的数据将丢失。'),
+                    LockScreen._getText('TASKBAR_CONFIRM_SHUTDOWN_TITLE', '确认关闭'),
                     'danger'
                 );
             } else {
-                confirmed = confirm('确定要关闭系统吗？所有未保存的数据将丢失。');
+                confirmed = confirm(LockScreen._getText('TASKBAR_CONFIRM_SHUTDOWN_MSG', '确定要关闭系统吗？所有未保存的数据将丢失。'));
             }
             if (!confirmed) {
                 return;
@@ -1110,7 +1125,9 @@ KernelLogger.info("LockScreen", "模块初始化");
             
             // 显示关闭消息
             setTimeout(() => {
-                document.body.innerHTML = '<div style="display: flex; justify-content: center; align-items: center; height: 100vh; font-family: monospace; color: #00ff00; font-size: 24px;">System Shutdown Complete<br/><span style="font-size: 16px; color: #888;">Please close this window manually</span></div>';
+                const shutdownComplete = LockScreen._getText('LOCKSCREEN_SHUTDOWN_COMPLETE', 'System Shutdown Complete');
+                const closeManual = LockScreen._getText('LOCKSCREEN_SHUTDOWN_CLOSE_MANUAL', 'Please close this window manually');
+                document.body.innerHTML = '<div style="display: flex; justify-content: center; align-items: center; height: 100vh; font-family: monospace; color: #00ff00; font-size: 24px;">' + shutdownComplete + '<br/><span style="font-size: 16px; color: #888;">' + closeManual + '</span></div>';
                 // 尝试关闭窗口（大多数浏览器会阻止此操作）
                 window.close();
             }, 1000);
@@ -1142,12 +1159,15 @@ KernelLogger.info("LockScreen", "模块初始化");
             
             const dateEl = document.getElementById('lockscreen-date');
             if (dateEl) {
-                const weekdays = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
+                const weekdaysFallback = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
                 const year = now.getFullYear();
                 const month = now.getMonth() + 1;
                 const date = now.getDate();
-                const weekday = weekdays[now.getDay()];
-                dateEl.textContent = `${year}年${month}月${date}日 ${weekday}`;
+                const weekday = LockScreen._getText('CALENDAR_WEEKDAY_' + now.getDay(), weekdaysFallback[now.getDay()]);
+                const monthName = LockScreen._getText('CALENDAR_MONTH_' + month, String(month));
+                const dateLine = LockScreen._getText('LOCKSCREEN_DATE_LINE', '{0}年{1}月{2}日 {3}')
+                    .replace('{0}', String(year)).replace('{1}', monthName).replace('{2}', String(date)).replace('{3}', weekday);
+                dateEl.textContent = dateLine;
             }
         }
         
@@ -1655,7 +1675,7 @@ KernelLogger.info("LockScreen", "模块初始化");
             // 显示提示文字
             const hintText = document.getElementById('lockscreen-hint');
             if (hintText) {
-                hintText.textContent = '按任意键继续';
+                hintText.textContent = LockScreen._getText('LOCKSCREEN_HINT_PRESS_KEY', '按任意键继续');
                 hintText.style.display = 'block';
             }
             
@@ -1832,7 +1852,7 @@ KernelLogger.info("LockScreen", "模块初始化");
             }
             
             // 显示加载蒙版
-            LockScreen._showLoadingOverlay('正在加载...');
+            LockScreen._showLoadingOverlay(LockScreen._getText('LOCKSCREEN_LOADING', '正在加载...'));
             
             // 延迟显示，让用户看到加载状态
             setTimeout(() => {
@@ -1877,7 +1897,7 @@ KernelLogger.info("LockScreen", "模块初始化");
                         LockScreen._togglePasswordButton.style.display = 'none';
                     }
                     if (hintText) {
-                        hintText.textContent = '按回车键或任意键登录';
+                        hintText.textContent = LockScreen._getText('LOCKSCREEN_ENTER_OR_KEY', 'Enter 或任意键登录');
                     }
                     // 隐藏加载蒙版
                     setTimeout(() => {
@@ -1894,7 +1914,9 @@ KernelLogger.info("LockScreen", "模块初始化");
          * 显示加载蒙版
          * @param {string} message 加载提示信息
          */
-        static _showLoadingOverlay(message = '正在验证...') {
+        static _showLoadingOverlay(message) {
+            const defaultMessage = LockScreen._getText('LOCKSCREEN_VERIFYING', '正在验证...');
+            if (message === undefined || message === null) message = defaultMessage;
             if (LockScreen._isLoading || !LockScreen.container) {
                 return;
             }
@@ -1976,7 +1998,9 @@ KernelLogger.info("LockScreen", "模块初始化");
             }
             
             // 显示加载蒙版
-            const loadingMessage = LockScreen.isPasswordMode ? '正在验证密码...' : '正在登录...';
+            const loadingMessage = LockScreen.isPasswordMode 
+                ? LockScreen._getText('LOCKSCREEN_VERIFYING_PASSWORD', '正在验证密码...') 
+                : LockScreen._getText('LOCKSCREEN_LOGGING_IN', '正在登录...');
             LockScreen._showLoadingOverlay(loadingMessage);
             
             try {
@@ -2335,7 +2359,7 @@ KernelLogger.info("LockScreen", "模块初始化");
                                 const hintText = document.getElementById('lockscreen-hint');
                                 if (hintText) {
                                     hintText.style.display = 'block';
-                                    hintText.textContent = '按任意键继续';
+                                    hintText.textContent = LockScreen._getText('LOCKSCREEN_HINT_PRESS_KEY', '按任意键继续');
                                 }
                             } else {
                                 // 有密码模式，保持输入框显示但清空内容

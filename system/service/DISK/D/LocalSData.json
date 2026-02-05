@@ -1,6 +1,10 @@
 {
   "system": {
-    "permissionManager.permissions": {},
+    "permissionManager.permissions": {
+      "ps": [
+        "EVENT_LISTENER"
+      ]
+    },
     "system.style": "macos",
     "desktop.icons": [
       {
@@ -14,18 +18,6 @@
           "y": 471.6805725097656
         },
         "createdAt": 1768574357268
-      },
-      {
-        "id": 4,
-        "programName": "testapp",
-        "name": "泥嚎",
-        "icon": "D:/application/testapp/testapp.svg",
-        "description": "Hello程序",
-        "position": {
-          "x": 100,
-          "y": 100
-        },
-        "createdAt": 1770215176880
       }
     ],
     "musicplayer.settings": {
@@ -193,14 +185,14 @@
         "password": "61b249bf6d604d14120821f43625e84e",
         "avatar": "avatar_root_1766272534753.jpg",
         "createdAt": 1766271155991,
-        "lastLogin": 1770216734674
+        "lastLogin": 1770304512760
       },
       "TestUser": {
         "level": "USER",
         "password": null,
         "avatar": null,
         "createdAt": 1766271155991,
-        "lastLogin": 1768067914456
+        "lastLogin": 1770286342394
       }
     },
     "userControl.currentUser": "root",
@@ -256,7 +248,10 @@
       "test": true
     },
     "exceptionHandler.kernelExceptionTimestamp": 1768413452064,
-    "exceptionHandler.blockNormalBoot": false
+    "exceptionHandler.blockNormalBoot": false,
+    "languagesExpansion": {
+      "currentLocale": "zh-CN"
+    }
   },
   "programs": {}
 }

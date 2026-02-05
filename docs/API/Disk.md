@@ -313,7 +313,7 @@ if (cTree) {
 2. **格式化**: 格式化会清空分区数据，请谨慎操作
 3. **更新**: 文件操作后建议调用 `update()` 更新磁盘使用情况
 4. **分区大小**: 所有分区大小之和不能超过 `Disk.diskSize`（3GB）
-5. **文件操作**: 文件操作通过 `NodeTreeCollection` 进行，而不是直接通过 Disk
+5. **文件操作**: 文件操作通过 `NodeTreeCollection` 进行，而不是直接通过 Disk；NodeTree 在无有效本地快照或仅含根节点时会从 FSDirve 重建目录树，详见 [NodeTree.md](./NodeTree.md)
 6. **多分区支持**: 系统支持 A-Z 共 26 个分区，D: 是系统盘，优先使用
 
 ## 相关文档

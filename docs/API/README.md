@@ -67,6 +67,9 @@
 ### 应用程序资源
 - [ApplicationAssetManager.md](./ApplicationAssetManager.md) - 应用程序资源管理 ✅
 
+### 系统扩展
+- [LanguagesExpansion.md](./LanguagesExpansion.md) - 语言包管理器（加载/设置语言、按常量名获取文本） ✅
+
 ## 使用说明
 
 每个 API 文档包含：
@@ -137,12 +140,16 @@
 - ApplicationAssetManager
 - ExceptionHandler
 
+**系统扩展**
+- LanguagesExpansion（语言包管理器）
+
 ## 文档状态
 
 - ✅ 所有 API 文档已创建完成
 
 ## 其他文档
 
+- [LanguagePack.md](../LanguagePack.md) - 语言包格式说明（存放位置与 JSON 格式）
 - [TERMINAL_COMMANDS.md](../TERMINAL_COMMANDS.md) - 终端命令参考（完整的命令列表和使用说明）
 
 ## 相关文档

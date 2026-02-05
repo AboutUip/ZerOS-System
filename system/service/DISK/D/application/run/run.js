@@ -18,6 +18,20 @@
         _heap: null,
         _shed: null,
         
+        /**
+         * 多语言文案：优先使用 LanguagesExpansion，否则返回 fallback
+         * @param {string} key 语言包常量名
+         * @param {string} fallback 无语言包时的回退文案
+         * @returns {string}
+         */
+        _getText: function(key, fallback) {
+            if (typeof LanguagesExpansion !== 'undefined' && typeof LanguagesExpansion.getText === 'function') {
+                const value = LanguagesExpansion.getText(key);
+                if (value && value !== key) return value;
+            }
+            return fallback || key;
+        },
+        
         __init__: async function(pid, initArgs) {
             this.pid = pid;
             
@@ -47,7 +61,7 @@
                 }
                 
                 const windowInfo = GUIManager.registerWindow(pid, this.window, {
-                    title: '运行',
+                    title: this._getText('RUN_TITLE', '运行'),
                     icon: icon,
                     onClose: () => {
                         // onClose 回调只做清理工作，不调用 _closeWindow 或 unregisterWindow
@@ -125,7 +139,7 @@
             
             // 标签
             const label = document.createElement('div');
-            label.textContent = '请输入程序名称:';
+            label.textContent = this._getText('RUN_LABEL', '请输入程序名称:');
             label.style.cssText = `
                 font-size: 14px;
                 color: rgba(255, 255, 255, 0.8);
@@ -144,7 +158,7 @@
             // 输入框
             const input = document.createElement('input');
             input.type = 'text';
-            input.placeholder = '例如: terminal, about, filemanager...';
+            input.placeholder = this._getText('RUN_PLACEHOLDER', '例如: terminal, about, filemanager...');
             input.className = 'run-input';
             input.style.cssText = `
                 width: 100%;
@@ -352,7 +366,7 @@
             
             // 确定按钮
             const okButton = document.createElement('button');
-            okButton.textContent = '确定';
+            okButton.textContent = this._getText('KEY_OK', '确定');
             okButton.className = 'run-ok-button';
             okButton.style.cssText = `
                 padding: 10px 24px;
@@ -392,7 +406,7 @@
             
             // 取消按钮
             const cancelButton = document.createElement('button');
-            cancelButton.textContent = '取消';
+            cancelButton.textContent = this._getText('KEY_CANCEL', '取消');
             cancelButton.className = 'run-cancel-button';
             cancelButton.style.cssText = `
                 padding: 10px 24px;
@@ -616,13 +630,13 @@
             
             if (!programName) {
                 // 如果输入为空，显示提示
-                this._showMessage('请输入程序名称', 'error');
+                this._showMessage(this._getText('RUN_ENTER_NAME', '请输入程序名称'), 'error');
                 return;
             }
             
             // 检查 ProcessManager 是否可用
             if (typeof ProcessManager === 'undefined') {
-                this._showMessage('ProcessManager 不可用', 'error');
+                this._showMessage(this._getText('RUN_PM_UNAVAILABLE', 'ProcessManager 不可用'), 'error');
                 return;
             }
             
@@ -636,8 +650,9 @@
                 })
                 .catch((error) => {
                     // 程序启动失败，显示错误信息
-                    const errorMessage = error.message || '程序启动失败';
-                    this._showMessage(`无法启动程序 "${programName}": ${errorMessage}`, 'error');
+                    const errorMessage = error.message || this._getText('RUN_LAUNCH_FAILED', '程序启动失败');
+                    const msg = this._getText('RUN_LAUNCH_FAILED_MSG', '无法启动程序 "{0}": {1}').replace('{0}', programName).replace('{1}', errorMessage);
+                    this._showMessage(msg, 'error');
                 });
         },
         
@@ -698,10 +713,10 @@
          */
         __info__: function() {
             return {
-                name: '运行',
+                name: this._getText('RUN_TITLE', '运行'),
                 type: 'GUI',
                 version: '1.0.0',
-                description: '运行程序 - 快速启动程序对话框',
+                description: this._getText('RUN_DESCRIPTION', '运行程序 - 快速启动程序对话框'),
                 author: 'ZerOS Team',
                 copyright: '© 2025 ZerOS',
                 permissions: typeof PermissionManager !== 'undefined' ? [

@@ -526,6 +526,12 @@ const allProcesses = ProcessManager.getProcessInfo();
 - `ScheduleTask.get` - 获取计划任务信息（无需权限）
 - `ScheduleTask.getAll` - 获取所有计划任务（无需权限）
 - `ScheduleTask.setEnabled` - 启用/禁用计划任务（需要 `SCHEDULE_TASK_MANAGE` 权限）
+- `Languages.loadPack` - 加载语言包（需要 `LANGUAGES_WRITE` 权限）
+- `Languages.setCurrent` - 设置当前语言（需要 `LANGUAGES_WRITE` 权限）
+- `Languages.getText` - 按常量名获取本地化文本（需要 `LANGUAGES_READ` 权限）
+- `Languages.listPacks` - 列出语言包文件（需要 `LANGUAGES_READ` 权限）
+- `Languages.getCurrentLocale` - 获取当前语言（需要 `LANGUAGES_READ` 权限）
+- `Languages.getLoadedLocales` - 获取已加载语言列表（需要 `LANGUAGES_READ` 权限）
 
 **示例**:
 ```javascript
@@ -566,6 +572,7 @@ try {
 - 普通权限会自动授予，特殊权限需要用户确认
 - 权限被拒绝时，API 调用会立即抛出错误
 - 详细权限列表请参考 [PermissionManager API 文档](./PermissionManager.md)
+- `FileSystem.*` 依赖各分区的 NodeTree；当某分区 NodeTree 未初始化时，ProcessManager 会尝试从 FSDirve 重建该分区树，详见 [NodeTree.md](./NodeTree.md)。语言包相关 API 见 [LanguagesExpansion.md](./LanguagesExpansion.md)。
 
 ### 其他方法
 

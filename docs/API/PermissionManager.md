@@ -122,6 +122,13 @@ PermissionManager.PERMISSION.SPEECH_RECOGNITION       // 语音识别
 PermissionManager.PERMISSION.MEDIA_ACCESS            // 访问摄像头和麦克风
 ```
 
+### 语言包权限
+
+```javascript
+PermissionManager.PERMISSION.LANGUAGES_READ           // 读取语言包、按常量名获取文本、列出语言包
+PermissionManager.PERMISSION.LANGUAGES_WRITE          // 加载语言包、设置当前语言
+```
+
 ## 初始化
 
 权限管理器在系统启动时自动初始化，无需手动调用。
