@@ -9,8 +9,23 @@
         "name": "文件管理器",
         "icon": "D:/application/filemanager/filemanager.svg",
         "description": "文件管理器",
-        "position": null,
+        "position": {
+          "x": 693.4027709960938,
+          "y": 471.6805725097656
+        },
         "createdAt": 1768574357268
+      },
+      {
+        "id": 4,
+        "programName": "testapp",
+        "name": "泥嚎",
+        "icon": "D:/application/testapp/testapp.svg",
+        "description": "Hello程序",
+        "position": {
+          "x": 100,
+          "y": 100
+        },
+        "createdAt": 1770215176880
       }
     ],
     "musicplayer.settings": {
@@ -150,7 +165,7 @@
       }
     ],
     "taskbarPosition": "bottom",
-    "system.animationPreset": "smooth",
+    "system.animationPreset": "elegant",
     "desktop.autoArrange": true,
     "desktop.arrangement": "list",
     "system.theme": "default",
@@ -178,7 +193,7 @@
         "password": "61b249bf6d604d14120821f43625e84e",
         "avatar": "avatar_root_1766272534753.jpg",
         "createdAt": 1766271155991,
-        "lastLogin": 1768818923214
+        "lastLogin": 1770216734674
       },
       "TestUser": {
         "level": "USER",

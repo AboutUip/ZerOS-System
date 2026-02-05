@@ -1865,7 +1865,7 @@ class DesktopManager {
                     await DesktopManager._openMarkdownInTerminal(iconData.targetPath);
                     return; // 直接返回，不继续执行后续逻辑
                 } else if (fileType === 'TEXT' || fileType === 'CODE') {
-                    programName = 'vim';
+                    programName = 'notepad';
                     programArgs = [iconData.targetPath];
                 } else {
                     // 未知格式：使用文件管理器打开文件所在位置

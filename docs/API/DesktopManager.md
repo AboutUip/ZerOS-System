@@ -241,33 +241,42 @@ await ProcessManager.callKernelAPI(pid, 'Desktop.setAutoArrange', [true]);
 
 ### 桌面组件管理
 
-#### `addComponent(pid, options)`
+#### `createComponent(pid, options)`
 
-添加桌面组件（供程序使用）。
+创建桌面组件（供程序使用）。
 
 **参数**:
 - `pid` (number): 进程 ID
 - `options` (Object): 选项对象
-  - `element` (HTMLElement): 组件元素（必需）
-  - `position` (Object): 位置 `{x, y}`（可选）
+  - `type` (string): 组件类型（可选，用于标识）
+  - `position` (Object): 位置 `{x, y}`（可选，默认自动避开图标）
   - `size` (Object): 尺寸 `{width, height}`（可选）
-  - `draggable` (boolean): 是否可拖动（可选，默认 true）
+  - `style` (Object): 自定义样式（可选）
   - `persistent` (boolean): 是否持久化（可选，默认 false）
+  - `draggable` (boolean): 是否可拖动（可选，默认 true）
 
 **返回值**: `string` - 组件 ID
 
 **示例**:
 ```javascript
-const componentElement = document.createElement('div');
-componentElement.innerHTML = '<div>我的桌面组件</div>';
-
-const componentId = DesktopManager.addComponent(pid, {
-    element: componentElement,
+const componentId = DesktopManager.createComponent(pid, {
+    type: 'widget',
     position: { x: 200, y: 200 },
     size: { width: 300, height: 200 },
+    style: {
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        borderRadius: '8px',
+        padding: '20px',
+        color: 'white'
+    },
     draggable: true,
     persistent: false
 });
+
+const container = DesktopManager.getComponentContentContainer(componentId);
+if (container) {
+    container.innerHTML = '<div>我的桌面组件</div>';
+}
 ```
 
 #### `removeComponent(componentId, force)`
@@ -344,6 +353,74 @@ DesktopManager.updateComponentStyle(componentId, {
 });
 ```
 
+#### `getComponentsByPid(pid)`
+
+获取程序创建的所有组件 ID。
+
+**参数**:
+- `pid` (number): 进程 ID
+
+**返回值**: `Array<string>` - 组件 ID 数组
+
+**示例**:
+```javascript
+const componentIds = DesktopManager.getComponentsByPid(pid);
+```
+
+#### `getComponentInfo(componentId)`
+
+获取组件信息。
+
+**参数**:
+- `componentId` (string): 组件 ID
+
+**返回值**: `Object|null` - 组件信息或 null
+
+**示例**:
+```javascript
+const info = DesktopManager.getComponentInfo(componentId);
+```
+
+#### `getAllComponents(pid)`
+
+获取所有组件信息。
+
+**参数**:
+- `pid` (number|null): 可选，传入时仅返回该程序的组件
+
+**返回值**: `Array<Object>` - 组件信息数组
+
+**示例**:
+```javascript
+const allComponents = DesktopManager.getAllComponents();
+```
+
+#### `cleanupProgramComponents(pid)`
+
+清理程序创建的所有非持久化组件。
+
+**参数**:
+- `pid` (number): 进程 ID
+
+**示例**:
+```javascript
+DesktopManager.cleanupProgramComponents(pid);
+```
+
+#### `hasComponent(componentId)`
+
+检查组件是否存在。
+
+**参数**:
+- `componentId` (string): 组件 ID
+
+**返回值**: `boolean`
+
+**示例**:
+```javascript
+const exists = DesktopManager.hasComponent(componentId);
+```
+
 ### 其他方法
 
 #### `refresh()`
@@ -363,7 +440,7 @@ await ProcessManager.callKernelAPI(pid, 'Desktop.refresh', []);
 
 ## 通过 ProcessManager 调用
 
-所有桌面管理 API 都可以通过 `ProcessManager.callKernelAPI` 调用，并自动进行权限检查：
+桌面图标与配置相关 API 可通过 `ProcessManager.callKernelAPI` 调用，并自动进行权限检查。桌面组件相关 API 仅支持直接调用 `DesktopManager`。
 
 ```javascript
 // 添加桌面快捷方式
@@ -451,21 +528,17 @@ DesktopManager.setAutoArrange(true);
 __init__: async function(pid, initArgs) {
     this.pid = pid;
     
-    // 创建桌面组件
-    const componentElement = document.createElement('div');
-    componentElement.style.cssText = `
-        background: rgba(0, 0, 0, 0.5);
-        border-radius: 8px;
-        padding: 20px;
-        color: white;
-    `;
-    componentElement.innerHTML = '<h3>我的桌面组件</h3><p>这是一个桌面组件示例</p>';
-    
     // 添加到桌面
-    this.componentId = DesktopManager.addComponent(pid, {
-        element: componentElement,
+    this.componentId = DesktopManager.createComponent(pid, {
+        type: 'widget',
         position: { x: 100, y: 100 },
         size: { width: 300, height: 200 },
+        style: {
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            borderRadius: '8px',
+            padding: '20px',
+            color: 'white'
+        },
         draggable: true,
         persistent: false
     });
@@ -473,7 +546,7 @@ __init__: async function(pid, initArgs) {
     // 获取内容容器并更新内容
     const container = DesktopManager.getComponentContentContainer(this.componentId);
     if (container) {
-        container.innerHTML = '<div>更新后的内容</div>';
+        container.innerHTML = '<h3>我的桌面组件</h3><p>这是一个桌面组件示例</p>';
     }
 }
 
@@ -544,4 +617,3 @@ DesktopManager.STORAGE_KEY_AUTO_ARRANGE = 'desktop.autoArrange';
 - [ProcessManager.md](./ProcessManager.md) - 进程管理器 API
 - [ContextMenuManager.md](./ContextMenuManager.md) - 上下文菜单管理器 API
 - [ThemeManager.md](./ThemeManager.md) - 主题管理器 API
-

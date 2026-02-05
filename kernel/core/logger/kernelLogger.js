@@ -40,7 +40,7 @@
         
         // 日志存储（内存中，不进行文件备份和永久存储）
         static _logBuffer = [];
-        static _maxBufferSize = 10000;  // 最多存储10000条日志
+        static _maxBufferSize = 100000;  // 最多存储10000条日志
         static _enableCollection = true;  // 是否启用日志收集
         
         // 日志分类索引（内存中）

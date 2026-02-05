@@ -4,6 +4,8 @@
 
 `NodeTree` 是 ZerOS 内核的文件树结构，用于管理虚拟文件系统的目录和文件。提供目录和文件的创建、删除、读取、写入、重命名等操作。
 
+注意：`NodeTreeCollection` 更偏向内核内部/系统模块使用。普通应用程序进行文件读写，优先使用 `ProcessManager.callKernelAPI` 暴露的 `FileSystem.*` 接口（会自动做权限检查与兼容处理）。
+
 ## 依赖
 
 - `FileType` - 文件类型枚举（用于文件操作类型）
@@ -108,7 +110,9 @@ dPartition.delete_dir("D:/Documents");
 
 **参数**:
 - `path` (string): 目录路径
-- `file` (FileFormwork): 文件对象
+- `file` (FileFormwork|string): 文件对象或文件名字符串（传字符串会创建空文件）
+
+**返回值**: `Promise<void>`
 
 **示例**:
 ```javascript
@@ -118,7 +122,7 @@ const file = new FileFormwork(
     "Hello, World!",
     "D:/Documents/test.txt"
 );
-dPartition.create_file("D:/Documents", file);
+await dPartition.create_file("D:/Documents", file);
 ```
 
 #### `delete_file(path, fileName)`
@@ -160,13 +164,15 @@ console.log('文件内容:', content);
 - `newContent` (string): 新内容
 - `writeMod` (number): 写入模式（`FileType.WRITE_MODES.OVERWRITE` 或 `FileType.WRITE_MODES.APPEND`）
 
+**返回值**: `Promise<void>`
+
 **示例**:
 ```javascript
 // 覆盖模式
-dPartition.write_file("D:/Documents", "test.txt", "New content", FileType.WRITE_MODES.OVERWRITE);
+await dPartition.write_file("D:/Documents", "test.txt", "New content", FileType.WRITE_MODES.OVERWRITE);
 
 // 追加模式
-dPartition.write_file("D:/Documents", "test.txt", "\nAppended content", FileType.WRITE_MODES.APPEND);
+await dPartition.write_file("D:/Documents", "test.txt", "\nAppended content", FileType.WRITE_MODES.APPEND);
 ```
 
 ## 使用示例
@@ -187,7 +193,7 @@ const file = new FileFormwork(
     "This is a readme file.",
     "D:/Documents/Projects/readme.txt"
 );
-dPartition.create_file("D:/Documents/Projects", file);
+await dPartition.create_file("D:/Documents/Projects", file);
 ```
 
 ### 示例 2: 读取和写入文件
@@ -200,10 +206,10 @@ const content = dPartition.read_file("D:/Documents/Projects", "readme.txt");
 console.log('文件内容:', content);
 
 // 写入文件（覆盖）
-dPartition.write_file("D:/Documents/Projects", "readme.txt", "Updated content", FileType.WRITE_MODES.OVERWRITE);
+await dPartition.write_file("D:/Documents/Projects", "readme.txt", "Updated content", FileType.WRITE_MODES.OVERWRITE);
 
 // 追加内容
-dPartition.write_file("D:/Documents/Projects", "readme.txt", "\nMore content", FileType.WRITE_MODES.APPEND);
+await dPartition.write_file("D:/Documents/Projects", "readme.txt", "\nMore content", FileType.WRITE_MODES.APPEND);
 ```
 
 ### 示例 3: 删除文件和目录
@@ -255,13 +261,13 @@ if (dPartition.hasNode("D:/Documents")) {
 
 ## 持久化
 
-NodeTreeCollection 会自动将文件系统保存到 localStorage，并在下次启动时恢复。
+NodeTreeCollection 会自动将文件系统结构保存到后端文件系统（通过 `FSDirve.php`），并在下次启动时恢复。
 
-**存储键**: `filesystem_{separateName}`
+**存储位置**: `${separateName}/filesystem_${safeName}.json`（其中 `safeName = separateName.replace(':', '_')`）
 
 例如：
-- `filesystem_C:`
-- `filesystem_D:`
+- `C:/filesystem_C_.json`
+- `D:/filesystem_D_.json`
 
 ## 注意事项
 
@@ -278,4 +284,3 @@ NodeTreeCollection 会自动将文件系统保存到 localStorage，并在下次
 - [DEVELOPER_GUIDE.md](../DEVELOPER_GUIDE.md) - 开发者指南
 - [Disk.md](./Disk.md) - 虚拟磁盘管理 API
 - [FileFramework.md](./FileFramework.md) - 文件对象模板 API
-

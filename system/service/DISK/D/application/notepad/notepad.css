@@ -1,0 +1,114 @@
+.notepad-window {
+    background: var(--theme-background-elevated, rgba(37, 43, 53, 0.98));
+    border: 1px solid var(--theme-border, rgba(139, 92, 246, 0.3));
+    color: var(--theme-text, #d7e0dd);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.notepad-toolbar {
+    height: 44px;
+    min-height: 44px;
+    max-height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 0 10px;
+    box-sizing: border-box;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    user-select: none;
+    flex-shrink: 0;
+}
+
+.notepad-toolbar-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 0 0 auto;
+}
+
+.notepad-toolbar-right {
+    min-width: 0;
+    flex: 1 1 auto;
+    display: flex;
+    justify-content: flex-end;
+}
+
+.notepad-path {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    opacity: 0.9;
+    font-size: 12px;
+}
+
+.notepad-btn {
+    padding: 6px 10px;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.06);
+    color: rgba(215, 224, 221, 0.95);
+    cursor: pointer;
+    font-size: 12px;
+}
+
+.notepad-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.notepad-btn:active {
+    transform: translateY(1px);
+}
+
+.notepad-editor {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    overflow: hidden;
+}
+
+.notepad-text-input {
+    width: 100%;
+    height: 100%;
+    box-sizing: border-box;
+    background: white;
+    border: none;
+    color: black;
+    outline: none;
+    resize: none;
+    font-size: 1.4rem;
+    font-family: 'Microsoft YaHei','Courier New', Courier, monospace;
+    padding: 10px 12px;
+    line-height: 1.5;
+}
+
+.notepad-editor.drag-over {
+    outline: 2px dashed rgba(108, 142, 255, 0.8);
+    outline-offset: -6px;
+}
+
+.notepad-statusbar {
+    height: 28px;
+    min-height: 28px;
+    max-height: 28px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 0 10px;
+    box-sizing: border-box;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    font-size: 12px;
+    opacity: 0.9;
+}
+
+.notepad-status-left,
+.notepad-status-right {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
