@@ -16,6 +16,9 @@
         /** 当前选中的服务 id */
         _selectedId: null,
 
+        /** 语言变更监听器取消函数 */
+        _languageChangeUnsubscribe: null,
+
         /** 获取 ServerExpansion（window 或 POOL） */
         _getServerExpansion: function () {
             if (typeof window !== 'undefined' && window.ServerExpansion) return window.ServerExpansion;
@@ -75,11 +78,24 @@
 
             this._registerEventHandlers();
             this._refreshServiceList();
+
+            var LanguagesExpansion = (typeof POOL !== 'undefined' && POOL && typeof POOL.__GET__ === 'function')
+                ? POOL.__GET__('KERNEL_GLOBAL_POOL', 'LanguagesExpansion')
+                : (typeof window !== 'undefined' ? window.LanguagesExpansion : null);
+            if (LanguagesExpansion && typeof LanguagesExpansion.onLanguageChange === 'function') {
+                this._languageChangeUnsubscribe = LanguagesExpansion.onLanguageChange(function () {
+                    this._refreshAllUITexts();
+                }.bind(this));
+            }
         },
 
         __exit__: async function () {
             if (typeof KernelLogger !== 'undefined') {
                 KernelLogger.info('SERVICEMANAGER', '系统服务管理程序退出');
+            }
+            if (this._languageChangeUnsubscribe && typeof this._languageChangeUnsubscribe === 'function') {
+                this._languageChangeUnsubscribe();
+                this._languageChangeUnsubscribe = null;
             }
             if (typeof EventManager !== 'undefined') {
                 for (var i = 0; i < this.eventHandlers.length; i++) {
@@ -121,7 +137,7 @@
         _buildUI: function () {
             var toolbar = document.createElement('div');
             toolbar.className = 'servicemanager-toolbar';
-            toolbar.style.cssText = 'flex-shrink: 0; height: 40px; display: flex; align-items: center; padding: 0 12px; gap: 8px; border-bottom: 1px solid var(--theme-border, rgba(139,92,246,0.25));';
+            toolbar.style.cssText = 'flex-shrink: 0; min-height: 40px; max-height: 40px; height: 40px; box-sizing: border-box; display: flex; align-items: center; padding: 0 12px; gap: 8px; border-bottom: 1px solid var(--theme-border, rgba(139,92,246,0.25));';
             var btnRefresh = document.createElement('button');
             btnRefresh.className = 'servicemanager-btn servicemanager-btn-refresh';
             btnRefresh.textContent = this._getText('SERVICEMANAGER_REFRESH', '刷新列表');
@@ -144,7 +160,7 @@
             var listBox = document.createElement('div');
             listBox.className = 'servicemanager-list';
             listBox.dataset.role = 'list';
-            listBox.style.cssText = 'flex: 1; overflow-y: auto; min-height: 200px; height: 280px;';
+            listBox.style.cssText = 'flex: 1; min-height: 0; overflow-y: auto;';
             listWrap.appendChild(listBox);
             main.appendChild(listWrap);
 
@@ -159,11 +175,25 @@
             var detailContent = document.createElement('div');
             detailContent.className = 'servicemanager-detail-content';
             detailContent.dataset.role = 'detail';
-            detailContent.style.cssText = 'flex: 1; overflow-y: auto; padding: 10px; min-height: 120px; height: 200px; box-sizing: border-box;';
+            detailContent.style.cssText = 'flex: 1; min-height: 0; overflow-y: auto; padding: 10px; box-sizing: border-box;';
             detailWrap.appendChild(detailContent);
             main.appendChild(detailWrap);
 
             this.window.appendChild(main);
+        },
+
+        /** 语言切换时刷新所有界面文案 */
+        _refreshAllUITexts: function () {
+            if (!this.window) return;
+            var titleEl = this.window.querySelector('.zos-window-title');
+            if (titleEl) titleEl.textContent = this._getText('SERVICEMANAGER_TITLE', '系统服务管理');
+            var refreshBtn = this.window.querySelector('.servicemanager-btn-refresh');
+            if (refreshBtn) refreshBtn.textContent = this._getText('SERVICEMANAGER_REFRESH', '刷新列表');
+            var listLabel = this.window.querySelector('.servicemanager-list-label');
+            if (listLabel) listLabel.textContent = this._getText('SERVICEMANAGER_SERVICES', '服务列表');
+            var detailLabel = this.window.querySelector('.servicemanager-detail-label');
+            if (detailLabel) detailLabel.textContent = this._getText('SERVICEMANAGER_DETAIL', '服务详情');
+            this._refreshServiceList();
         },
 
         _registerEventHandlers: function () {

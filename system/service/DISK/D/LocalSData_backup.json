@@ -1,28 +1,16 @@
 {
   "system": {
-    "permissionManager.permissions": {
-      "filemanager": [
-        "GUI_WINDOW_CREATE",
-        "KERNEL_DISK_READ",
-        "KERNEL_DISK_LIST",
-        "SYSTEM_NOTIFICATION",
-        "EVENT_LISTENER"
-      ],
-      "servicemanager": [
-        "GUI_WINDOW_CREATE",
-        "EVENT_LISTENER"
-      ]
-    },
+    "permissionManager.permissions": {},
     "system.style": "macos",
     "desktop.icons": [
       {
-        "id": 4,
+        "id": 8,
         "programName": "filemanager",
         "name": "文件管理器",
         "icon": "D:/application/filemanager/filemanager.svg",
         "description": "文件管理器",
         "position": null,
-        "createdAt": 1770373435109
+        "createdAt": 1770381245442
       }
     ],
     "musicplayer.settings": {
@@ -196,7 +184,7 @@
         "password": "61b249bf6d604d14120821f43625e84e",
         "avatar": "avatar_root_1766272534753.jpg",
         "createdAt": 1766271155991,
-        "lastLogin": 1770380059843
+        "lastLogin": 1770381254236
       },
       "TestUser": {
         "level": "USER",
@@ -261,7 +249,7 @@
     "exceptionHandler.kernelExceptionTimestamp": 1768413452064,
     "exceptionHandler.blockNormalBoot": false,
     "languagesExpansion": {
-      "currentLocale": "en"
+      "currentLocale": "zh-CN"
     }
   },
   "programs": {}

@@ -166,6 +166,8 @@ class LStorage {
         KernelLogger.info("LStorage", "初始化本地存储管理器");
 
         try {
+            // 先检测存储分区（确保使用 D: 或首个可用分区，与后续读写路径一致，避免重启后读不到数据）
+            await LStorage._detectStoragePartition();
             // 加载存储数据（允许在加载时保存新文件）
             await LStorage._loadStorageData(true);
             LStorage._initialized = true;
