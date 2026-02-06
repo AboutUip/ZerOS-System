@@ -35,7 +35,7 @@ import java.util.Map;
 public class TestController {
 
 
-    private static final String ANNOUNCEMENT_FILE_PATH = "../DISK/D/announcement/post.json";
+    private static final String ANNOUNCEMENT_FILE_PATH = "announcement/post.json";
 
     @RequestMapping(method = {RequestMethod.OPTIONS, RequestMethod.GET, RequestMethod.POST})
     public ResponseEntity<ApiResponse<Map<String, Object>>> handleRequest(
