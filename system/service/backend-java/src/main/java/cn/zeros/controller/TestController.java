@@ -100,12 +100,17 @@ public class TestController {
     @GetMapping("/announcement")
     public ResponseEntity<ApiResponse<Map<String, Object>>> getAnnouncement() {
         try {
-            // 1. 读取文件
+            // 1. 读取文件（相对路径，基于进程工作目录，如 /app/announcement/post.json）
             File file = new File(ANNOUNCEMENT_FILE_PATH);
 
             if (!file.exists()) {
-                return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                        .body(ApiResponse.error("公告文件未找到"));
+                // 文件不存在时返回空公告，避免前端 404（如未部署公告文件时）
+                Map<String, Object> empty = new LinkedHashMap<>();
+                empty.put("title", "");
+                empty.put("content", "");
+                empty.put("level", 0);
+                empty.put("subTime", System.currentTimeMillis());
+                return ResponseEntity.ok(ApiResponse.success("无公告", empty));
             }
 
             // 2. 读取并解析JSON
