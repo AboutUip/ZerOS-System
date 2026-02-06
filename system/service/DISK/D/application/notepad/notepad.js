@@ -161,8 +161,7 @@
                     PermissionManager.PERMISSION.EVENT_LISTENER
                 ] : []
             };
-        }
-        ,
+        },
 
         _bindUI: function() {
             if (!this.window) return;

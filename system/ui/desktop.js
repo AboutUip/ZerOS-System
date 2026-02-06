@@ -2103,17 +2103,6 @@ class DesktopManager {
      * @param {Event} e 事件对象
      * @param {Object} iconData 图标数据
      */
-    /**
-     * 多语言文案（与 ContextMenuManager._getText 一致）
-     */
-    static _getMenuText(key, fallback) {
-        if (typeof LanguagesExpansion !== 'undefined' && typeof LanguagesExpansion.getText === 'function') {
-            const value = LanguagesExpansion.getText(key);
-            if (value && value !== key) return value;
-        }
-        return fallback || key;
-    }
-
     static _showIconContextMenu(e, iconData) {
         if (typeof ContextMenuManager === 'undefined') {
             return;
@@ -2129,7 +2118,7 @@ class DesktopManager {
         const menuConfig = {
             items: [
                 {
-                    label: DesktopManager._getMenuText('KEY_OPEN', '打开'),
+                    label: '打开',
                     icon: '▶',
                     action: () => {
                         DesktopManager._handleIconClick(iconData);
@@ -2137,7 +2126,7 @@ class DesktopManager {
                     }
                 },
                 {
-                    label: DesktopManager._getMenuText('KEY_DELETE', '删除'),
+                    label: '删除',
                     icon: '🗑',
                     action: () => {
                         DesktopManager.removeShortcut(iconData.id);
@@ -2145,7 +2134,7 @@ class DesktopManager {
                     }
                 },
                 {
-                    label: DesktopManager._getMenuText('DESKTOP_RENAME', '重命名'),
+                    label: '重命名',
                     icon: '✏',
                     action: () => {
                         DesktopManager._renameIcon(iconData);
@@ -2153,7 +2142,7 @@ class DesktopManager {
                     }
                 },
                 {
-                    label: DesktopManager._getMenuText('DESKTOP_PROGRAM_DETAILS', '程序详情'),
+                    label: '程序详细',
                     icon: '📋',
                     action: () => {
                         DesktopManager._showProgramDetails(iconData);
@@ -2161,7 +2150,7 @@ class DesktopManager {
                     }
                 },
                 {
-                    label: DesktopManager._getMenuText('KEY_PROPERTIES', '属性'),
+                    label: '属性',
                     icon: 'ℹ',
                     action: () => {
                         DesktopManager._showIconProperties(iconData);
@@ -2188,7 +2177,7 @@ class DesktopManager {
         
         // 打开选项
         items.push({
-            label: DesktopManager._getMenuText('KEY_OPEN', '打开'),
+            label: '打开',
             icon: iconData.type === 'directory' ? '📂' : '📄',
             action: () => {
                 DesktopManager._handleFileOrFolderIconClick(iconData);
@@ -2200,7 +2189,7 @@ class DesktopManager {
         
         // 重命名选项
         items.push({
-            label: DesktopManager._getMenuText('DESKTOP_RENAME', '重命名'),
+            label: '重命名',
             icon: '✏️',
             action: () => {
                 DesktopManager._renameIcon(iconData);
@@ -2210,7 +2199,7 @@ class DesktopManager {
         
         // 删除选项
         items.push({
-            label: DesktopManager._getMenuText('KEY_DELETE', '删除'),
+            label: '删除',
             icon: '🗑️',
             danger: true,
             action: async () => {
@@ -2224,7 +2213,7 @@ class DesktopManager {
         
         // 文件属性选项
         items.push({
-            label: DesktopManager._getMenuText('DESKTOP_FILE_PROPERTIES', '文件属性'),
+            label: '文件属性',
             icon: '📋',
             action: async () => {
                 ContextMenuManager._hideMenu();
