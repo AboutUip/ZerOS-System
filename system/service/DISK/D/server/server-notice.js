@@ -6,7 +6,7 @@
     'use strict';
 
     /** 公告 API 地址（待定，正式上线前需替换） */
-    const ANNOUNCE_API_URL = 'http://127.0.0.1:8080/system/service/test/announcement';
+    const ANNOUNCE_API_URL = 'http://zeros.xin/system/service/test/announcement';
     /** 轮询间隔：3 分钟 */
     const POLL_INTERVAL_MS = 3 * 60 * 1000;
     /** 系统公告通知使用的 PID（D/server 服务约定使用 ProcessManager.SERVER_SERVICE_PID，内核对该 PID 放行） */
@@ -187,7 +187,7 @@
 
     function __info__() {
         return {
-            name: 'Announcement',
+            name: 'SystemNotice',
             version: '1.0',
             description: 'ZerOS系统公告通知获取'
         };

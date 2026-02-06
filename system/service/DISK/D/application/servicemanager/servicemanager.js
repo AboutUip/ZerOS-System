@@ -318,6 +318,28 @@
             }
         },
 
+        /** 对“自启且未运行”的服务调用 start（补足计划任务可能未执行到的 init/start） */
+        _startAutoStartServicesIfNeeded: async function (se, ids) {
+            if (!se || !ids || !Array.isArray(ids)) return;
+            for (var i = 0; i < ids.length; i++) {
+                var id = ids[i];
+                if (!this._autoStartMap[id]) continue;
+                if (se.isStarted && se.isStarted(id)) continue;
+                try {
+                    if (typeof se.start === 'function') {
+                        await se.start(id);
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.info('SERVICEMANAGER', '自启服务已拉起: ' + id);
+                        }
+                    }
+                } catch (e) {
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.warn('SERVICEMANAGER', '自启服务拉起失败: ' + id + ', ' + (e && e.message));
+                    }
+                }
+            }
+        },
+
         _refreshServiceList: async function () {
             var listEl = this.window.querySelector('[data-role="list"]');
             var detailEl = this.window.querySelector('[data-role="detail"]');
@@ -343,6 +365,8 @@
 
             await this._updateAutoStartMap();
             var ids = se.listServices();
+            // 为自启服务补调 init/start：计划任务可能在 ServerExpansion 未就绪时已执行，此处对“自启且未运行”的服务统一拉起
+            await this._startAutoStartServicesIfNeeded(se, ids);
             listEl.innerHTML = '';
             if (ids.length === 0) {
                 listEl.innerHTML = '<div class="servicemanager-empty">' + (this._getText('SERVICEMANAGER_NO_SERVICES', '暂无已加载的服务')) + '</div>';

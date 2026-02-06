@@ -539,19 +539,44 @@ class LStorage {
 
             // 解析 JSON
             try {
-                LStorage._storageData = JSON.parse(fileContent);
+                const parsed = JSON.parse(fileContent);
 
                 // 验证数据结构
-                if (!LStorage._storageData || typeof LStorage._storageData !== 'object') {
+                if (!parsed || typeof parsed !== 'object') {
                     throw new Error('数据结构无效');
                 }
 
-                if (!LStorage._storageData.system) {
-                    LStorage._storageData.system = {};
+                if (!parsed.system) {
+                    parsed.system = {};
                 }
-                if (!LStorage._storageData.programs) {
-                    LStorage._storageData.programs = {};
+                if (!parsed.programs) {
+                    parsed.programs = {};
                 }
+
+                // 若内存中已有桌面图标/注册表而解析结果缺失，则保留内存中的关键键，避免被空数据覆盖（多标签或旧文件）
+                const criticalKeys = ['desktop.icons', 'registry'];
+                const old = LStorage._storageData;
+                if (old && old.system && typeof old.system === 'object') {
+                    for (const key of criticalKeys) {
+                        const oldVal = old.system[key];
+                        const parsedVal = parsed.system[key];
+                        const oldHas = oldVal !== undefined && oldVal !== null &&
+                            (key === 'desktop.icons' ? (Array.isArray(oldVal) && oldVal.length > 0) : (typeof oldVal === 'object' && !Array.isArray(oldVal)));
+                        const parsedEmpty = parsedVal === undefined || parsedVal === null ||
+                            (key === 'desktop.icons' && (!Array.isArray(parsedVal) || parsedVal.length === 0)) ||
+                            (key === 'registry' && (typeof parsedVal !== 'object' || Array.isArray(parsedVal)));
+                        if (oldHas && parsedEmpty) {
+                            try {
+                                parsed.system[key] = JSON.parse(JSON.stringify(oldVal));
+                                KernelLogger.info("LStorage", `加载时保留内存中的关键键: ${key}，避免被文件空数据覆盖`);
+                            } catch (copyErr) {
+                                KernelLogger.debug("LStorage", `复制关键键 ${key} 失败: ${copyErr.message}`);
+                            }
+                        }
+                    }
+                }
+
+                LStorage._storageData = parsed;
 
                 // 更新缓存
                 LStorage._requestCache.readCache = LStorage._storageData;
@@ -672,6 +697,51 @@ class LStorage {
     }
 
     /**
+     * 保存前从磁盘文件合并关键键到内存，防止因内存缺失（多标签、并发、先读空文件等）导致保存时覆盖掉桌面图标、注册表等
+     * 仅当内存中缺少或为空时从文件补全，不覆盖内存中已有有效数据
+     * @param {string} filePath 存储路径
+     * @param {string} fileName 文件名
+     * @returns {Promise<void>}
+     */
+    static async _mergeCriticalKeysFromFileBeforeSave(filePath, fileName) {
+        const CRITICAL_KEYS = ['desktop.icons', 'registry'];
+        try {
+            const fileContent = await LStorage._readFileFromPHP(filePath, fileName);
+            if (!fileContent || fileContent.trim() === '') {
+                return;
+            }
+            const fileData = JSON.parse(fileContent);
+            if (!fileData || typeof fileData !== 'object' || !fileData.system || typeof fileData.system !== 'object') {
+                return;
+            }
+            const sys = LStorage._storageData.system;
+            for (const key of CRITICAL_KEYS) {
+                const fileVal = fileData.system[key];
+                const memVal = sys[key];
+                const fileHas = fileVal !== undefined && fileVal !== null;
+                const memEmpty = memVal === undefined || memVal === null ||
+                    (key === 'desktop.icons' && (!Array.isArray(memVal) || memVal.length === 0)) ||
+                    (key === 'registry' && (typeof memVal !== 'object' || Array.isArray(memVal)));
+                const fileNonEmpty = key === 'desktop.icons'
+                    ? (Array.isArray(fileVal) && fileVal.length > 0)
+                    : (key === 'registry' && typeof fileVal === 'object' && !Array.isArray(fileVal));
+                if (fileHas && fileNonEmpty && memEmpty) {
+                    try {
+                        sys[key] = key === 'desktop.icons'
+                            ? JSON.parse(JSON.stringify(fileVal))
+                            : (typeof fileVal === 'object' && !Array.isArray(fileVal) ? JSON.parse(JSON.stringify(fileVal)) : fileVal);
+                        KernelLogger.info("LStorage", `保存前从磁盘恢复关键键: ${key}，避免被覆盖丢失`);
+                    } catch (copyErr) {
+                        KernelLogger.debug("LStorage", `复制关键键 ${key} 失败: ${copyErr.message}`);
+                    }
+                }
+            }
+        } catch (e) {
+            KernelLogger.debug("LStorage", `保存前合并关键键失败（可忽略）: ${e.message}`);
+        }
+    }
+
+    /**
      * 保存存储数据到文件
      * @returns {Promise<void>}
      */
@@ -723,6 +793,9 @@ class LStorage {
 
             const filePath = LStorage.STORAGE_FILE_PATH;
             const fileName = LStorage.STORAGE_FILE_NAME;
+
+            // 保存前从磁盘合并关键键，防止因内存缺失（多标签/并发/先读空文件等）而覆盖丢失桌面图标、注册表等
+            await LStorage._mergeCriticalKeysFromFileBeforeSave(filePath, fileName);
 
             // 将数据转换为 JSON 字符串
             let jsonString;

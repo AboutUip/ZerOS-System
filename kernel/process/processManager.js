@@ -2869,6 +2869,19 @@ class ProcessManager {
                     return callerPids;
                 }
 
+                // 2.5) 匹配 D/bin/ProgramName.js（如 zominstall 从 D/bin/zominstall.js 加载）
+                const binMatch = line.match(/bin[\/\\]([^\/\\]+)\.js/i);
+                if (binMatch) {
+                    const programName = binMatch[1].toLowerCase();
+                    const callerPids = new Set();
+                    rawTable.forEach((info, pid) => {
+                        if (info && info.programName && info.programName.toLowerCase() === programName) {
+                            callerPids.add(pid);
+                        }
+                    });
+                    return callerPids;
+                }
+
                 // 3) 匹配 system/ui、system/expansion 等系统脚本路径，视为系统调用者
                 if (/system[\/\\](?:ui|expansion)[\/\\]/i.test(line)) {
                     return null;

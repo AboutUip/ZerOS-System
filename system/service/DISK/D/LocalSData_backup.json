@@ -4,21 +4,18 @@
       "servicemanager": [
         "GUI_WINDOW_CREATE",
         "EVENT_LISTENER"
-      ],
-      "scheduletask": [
-        "SYSTEM_NOTIFICATION"
       ]
     },
     "system.style": "macos",
     "desktop.icons": [
       {
-        "id": 0,
+        "id": 1,
         "programName": "filemanager",
         "name": "文件管理器",
         "icon": "D:/application/filemanager/filemanager.svg",
         "description": "文件管理器",
         "position": null,
-        "createdAt": 1770387033712
+        "createdAt": 1770396619925
       }
     ],
     "musicplayer.settings": {
@@ -192,7 +189,7 @@
         "password": "61b249bf6d604d14120821f43625e84e",
         "avatar": "avatar_root_1766272534753.jpg",
         "createdAt": 1766271155991,
-        "lastLogin": 1770387217938
+        "lastLogin": 1770397406784
       },
       "TestUser": {
         "level": "USER",
@@ -257,7 +254,7 @@
     "exceptionHandler.kernelExceptionTimestamp": 1768413452064,
     "exceptionHandler.blockNormalBoot": false,
     "languagesExpansion": {
-      "currentLocale": "zh-CN"
+      "currentLocale": "en"
     }
   },
   "programs": {}

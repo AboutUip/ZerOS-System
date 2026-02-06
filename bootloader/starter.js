@@ -159,11 +159,12 @@
         "../kernel/drive/speechDrive.js": [
             "../kernel/process/processManager.js"
         ],     
-        // 第十二层：计划任务管理器（依赖进程管理器、本地存储管理器和应用程序资源管理器）
+        // 第十二层：计划任务管理器（依赖进程管理器、本地存储、应用资源管理器及服务扩展，以便系统启动时能执行 SERVICE 自启任务）
         "../kernel/drive/scheduleTaskManager.js": [
             "../kernel/process/processManager.js",
             "../kernel/drive/LStorage.js",
-            "../kernel/process/applicationAssetManager.js"
+            "../kernel/process/applicationAssetManager.js",
+            "../system/expansion/serverExpansion.js"
         ],
     };
     
@@ -1312,6 +1313,15 @@
                 KernelLogger.info("BootLoader", "自动启动程序将在用户登录后启动");
             } else {
                 KernelLogger.error("BootLoader", "ProcessManager 未加载");
+            }
+            
+            // 计划任务：仅初始化，不在此执行系统启动任务；自启/系统启动任务仅在用户登录后执行（见 ScheduleTaskManager 监听 __IS_SYSTEM_LOADING__）
+            if (typeof ScheduleTaskManager !== 'undefined') {
+                try {
+                    await ScheduleTaskManager.init();
+                } catch (e) {
+                    KernelLogger.warn("BootLoader", "计划任务初始化失败: " + (e && e.message));
+                }
             }
             
             // 清理过期缓存（在文件系统初始化后执行）

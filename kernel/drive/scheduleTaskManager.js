@@ -142,26 +142,19 @@ class ScheduleTaskManager {
      * 设置系统事件监听
      */
     static _setupSystemListeners() {
-        // 监听系统启动完成事件
+        // 监听系统启动完成事件：仅当用户登录后（__IS_SYSTEM_LOADING__ 为 false）才执行 SYSTEM_STARTUP 任务，未登录不启动任何自启
         if (typeof POOL !== 'undefined' && typeof POOL.__GET__ === 'function') {
-            // 检查系统是否已启动
             const checkSystemStarted = () => {
                 if (typeof POOL !== 'undefined' && typeof POOL.__IS_SYSTEM_LOADING__ === 'function') {
                     if (!POOL.__IS_SYSTEM_LOADING__()) {
                         ScheduleTaskManager._onSystemStartup();
                     } else {
-                        // 系统还在加载，继续等待
                         setTimeout(checkSystemStarted, 500);
                     }
                 } else {
-                    // 如果无法检查，假设系统已启动
-                    setTimeout(() => {
-                        ScheduleTaskManager._onSystemStartup();
-                    }, 2000);
+                    setTimeout(() => ScheduleTaskManager._onSystemStartup(), 2000);
                 }
             };
-            
-            // 延迟检查，确保系统有时间初始化
             setTimeout(checkSystemStarted, 1000);
         }
         
@@ -198,6 +191,9 @@ class ScheduleTaskManager {
             KernelLogger.info("ScheduleTaskManager", "安全模式已启用，跳过计划任务执行");
             return;
         }
+        
+        // 执行前重新从 LStorage 加载任务列表，避免 init 时 LStorage/磁盘未就绪导致列表为空
+        await ScheduleTaskManager._loadTasks();
         
         KernelLogger.info("ScheduleTaskManager", "系统启动完成，执行启动任务");
         
@@ -761,13 +757,40 @@ class ScheduleTaskManager {
                     throw new Error("POOL 不可用");
                 }
 
-                const ServerExpansion = POOL.__GET__("KERNEL_GLOBAL_POOL", "ServerExpansion");
+                // 等待 ServerExpansion 就绪（系统启动时可能稍晚注册到 POOL）
+                let ServerExpansion = POOL.__GET__("KERNEL_GLOBAL_POOL", "ServerExpansion");
+                if (!ServerExpansion || typeof ServerExpansion.start !== 'function' || typeof ServerExpansion.stop !== 'function') {
+                    for (let wait = 0; wait < 4; wait++) {
+                        await new Promise(r => setTimeout(r, 500));
+                        ServerExpansion = POOL.__GET__("KERNEL_GLOBAL_POOL", "ServerExpansion");
+                        if (ServerExpansion && typeof ServerExpansion.start === 'function' && typeof ServerExpansion.stop === 'function') {
+                            break;
+                        }
+                    }
+                }
                 if (!ServerExpansion || typeof ServerExpansion.start !== 'function' || typeof ServerExpansion.stop !== 'function') {
                     throw new Error("ServerExpansion 未加载或不可用");
                 }
 
                 if (action === ScheduleTaskManager.SERVICE_ACTION.START) {
-                    await ServerExpansion.start(serviceId);
+                    let started = false;
+                    try {
+                        started = await ServerExpansion.start(serviceId);
+                    } catch (startErr) {
+                        const msg = (startErr && startErr.message) ? String(startErr.message) : '';
+                        if (typeof ServerExpansion.loadAll === 'function' && /未知服务|未加载|not found/i.test(msg)) {
+                            KernelLogger.info("ScheduleTaskManager", `服务 ${serviceId} 尚未加载，loadAll 后重试: ${msg}`);
+                            await ServerExpansion.loadAll();
+                            started = await ServerExpansion.start(serviceId);
+                        } else {
+                            throw startErr;
+                        }
+                    }
+                    if (started === false && typeof ServerExpansion.loadAll === 'function') {
+                        KernelLogger.info("ScheduleTaskManager", `服务 ${serviceId} 启动返回 false，loadAll 后重试`);
+                        await ServerExpansion.loadAll();
+                        await ServerExpansion.start(serviceId);
+                    }
                 } else {
                     await ServerExpansion.stop(serviceId);
                 }
@@ -961,16 +984,21 @@ class ScheduleTaskManager {
     }
 }
 
-// 自动初始化（如果模块已加载）
+// 自动初始化（不依赖 DOMContentLoaded：本脚本由 BootLoader 动态加载，可能晚于 DOMContentLoaded，若仅监听会导致 init 永不执行、自启服务不启动）
 if (typeof KernelLogger !== 'undefined') {
-    // 延迟初始化，确保依赖已加载
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', () => {
-            ScheduleTaskManager.init();
-        });
-    } else {
-        // DOM 已加载，直接初始化
+    const runInit = () => {
+        if (ScheduleTaskManager._initialized) return;
         ScheduleTaskManager.init();
+    };
+    if (typeof document !== 'undefined') {
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', runInit);
+            setTimeout(runInit, 5000);
+        } else {
+            setTimeout(runInit, 0);
+        }
+    } else {
+        setTimeout(runInit, 0);
     }
 }
 

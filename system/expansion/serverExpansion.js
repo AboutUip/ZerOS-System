@@ -151,6 +151,33 @@
     }
 
     /**
+     * 等待 D/server 可用（系统初始化后立刻可加载服务）
+     * @param {number} maxWaitMs 最大等待毫秒数
+     * @param {number} intervalMs 轮询间隔
+     * @returns {Promise<void>}
+     */
+    function waitForServerPathReady(maxWaitMs, intervalMs) {
+        maxWaitMs = maxWaitMs || 10000;
+        intervalMs = intervalMs || 200;
+        var start = Date.now();
+        return new Promise(function (resolve) {
+            function check() {
+                var ref = getNodeTreeForServer();
+                if (ref && ref.nodeTree && ref.nodeTree.initialized) {
+                    resolve();
+                    return;
+                }
+                if (Date.now() - start >= maxWaitMs) {
+                    resolve();
+                    return;
+                }
+                setTimeout(check, intervalMs);
+            }
+            check();
+        });
+    }
+
+    /**
      * 扫描 D/server 并加载所有 server-*.js，仅加载不调用任何方法
      * @returns {Promise<string[]>} 合规服务 id 列表
      */
@@ -203,7 +230,8 @@
                 if (typeof KernelLogger !== 'undefined') {
                     KernelLogger.warn("ServerExpansion", "start: 未知服务 " + id);
                 }
-                return Promise.resolve(false);
+                // 抛出以便计划任务等调用方可走 loadAll 后重试（若仅 return false 则不会触发重试）
+                return Promise.reject(new Error("未知服务 " + id));
             }
             var api = entry.api;
             return Promise.resolve().then(function () {
@@ -325,12 +353,14 @@
         },
 
         /**
-         * 初始化扩展：扫描并加载 D/server 下所有合规服务，不调用任何服务方法
+         * 初始化扩展：在系统（D/server）就绪后立刻扫描并加载所有合规服务脚本，不调用任何服务的 __init__/__start__
          * @returns {Promise<string[]>} 已加载的合规服务 id 列表
          */
         init: function () {
             var self = this;
-            return discoverAndLoad().then(function (ids) {
+            return waitForServerPathReady(10000, 200).then(function () {
+                return discoverAndLoad();
+            }).then(function (ids) {
                 if (typeof KernelLogger !== 'undefined') {
                     KernelLogger.info("ServerExpansion", "初始化完成，已加载服务: " + (ids.length ? ids.join(', ') : '(无)'));
                 }
@@ -339,6 +369,7 @@
         }
     };
 
+    // 系统初始化后立刻加载服务（仅加载脚本、不调用各服务的 init/start）
     ServerExpansion._ready = ServerExpansion.init();
 
     if (typeof window !== 'undefined') {
