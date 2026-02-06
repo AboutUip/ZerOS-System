@@ -67,6 +67,10 @@
 ### 应用程序资源
 - [ApplicationAssetManager.md](./ApplicationAssetManager.md) - 应用程序资源管理 ✅
 
+### 系统扩展
+- [LanguagesExpansion.md](./LanguagesExpansion.md) - 语言包管理器（加载/设置语言、按常量名获取文本） ✅
+- [ServerExpansion.md](./ServerExpansion.md) - 服务扩展（D/server 服务模块管理、start/stop 生命周期） ✅
+
 ## 使用说明
 
 每个 API 文档包含：
@@ -137,12 +141,19 @@
 - ApplicationAssetManager
 - ExceptionHandler
 
+**系统扩展**
+- LanguagesExpansion（语言包管理器）
+- ServerExpansion（D/server 服务模块管理）
+
 ## 文档状态
 
 - ✅ 所有 API 文档已创建完成
 
 ## 其他文档
 
+- [PLUGINS/README.md](../PLUGINS/README.md) - 扩展与插件索引（语言包、服务模块等）
+- [PLUGINS/LanguagePack.md](../PLUGINS/LanguagePack.md) - 语言包格式说明（存放位置与 JSON 格式）
+- [PLUGINS/ServiceModule.md](../PLUGINS/ServiceModule.md) - 服务模块编写指南（D/server）
 - [TERMINAL_COMMANDS.md](../TERMINAL_COMMANDS.md) - 终端命令参考（完整的命令列表和使用说明）
 
 ## 相关文档

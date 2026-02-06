@@ -46,6 +46,8 @@ ProcessManager.EXPLOIT_PID = 10000;  // Exploit 程序固定 PID
   - `cliProgramPid` (number): 关联的 CLI 程序 PID（内部使用）
   - `disableTabs` (boolean): 禁用标签页功能（内部使用）
 
+**说明**：内核在调用 `__init__(pid, initArgs)` 时会在 `initArgs` 中注入 `kernelAPI`（见下方「进程绑定 API」），程序可保存为 `this.kernelAPI` 后使用 `this.kernelAPI.call(apiName, args)` 调用内核 API，无需传 pid，可防 PID 伪造（CVS_ZEROS_009 方案三）。
+
 **返回值**: `Promise<number>` - 进程 ID
 
 **示例**:
@@ -419,6 +421,25 @@ const allProcesses = ProcessManager.getProcessInfo();
 
 ### 内核 API 调用
 
+#### 进程绑定 API（`initArgs.kernelAPI`）
+
+内核在程序 `__init__(pid, initArgs)` 时注入 `initArgs.kernelAPI`，提供**进程绑定**的内核 API 调用方式，无需传入 pid，由闭包绑定本进程 pid，可防止 PID 伪造（CVS_ZEROS_009 方案三）。推荐敏感或多实例程序使用。
+
+**用法**:
+- `initArgs.kernelAPI.call(apiName, args)` — 使用本进程 pid 调用内核 API，`args` 为参数数组（可选，默认 `[]`）
+
+**示例**:
+```javascript
+async __init__(pid, initArgs) {
+    this.pid = pid;
+    this.kernelAPI = initArgs.kernelAPI;  // 保存绑定 API
+    // 使用绑定 API 调用（无需传 pid）
+    const content = await this.kernelAPI.call('FileSystem.read', ['D:/myfile.txt']);
+}
+```
+
+**与 `callKernelAPI(pid, apiName, args)` 的关系**：两者都会做权限检查与执行；绑定 API 跳过「调用栈 vs pid」校验，仅能通过内核注入的令牌调用，不可伪造。现有 `callKernelAPI(this.pid, ...)` 用法仍可使用，无需强制迁移。
+
 #### `callKernelAPI(pid, apiName, args)`
 
 调用内核 API。所有内核 API 调用都会自动进行权限检查。
@@ -435,6 +456,11 @@ const allProcesses = ProcessManager.getProcessInfo();
 - 如果程序没有权限，API 调用会被拒绝并抛出错误
 - 权限检查是强制性的，不能绕过
 - Exploit 程序（PID 10000）享有直接通信权限，无需权限检查
+
+**安全说明（CVS-ZEROS-009 已修复）**:
+- 传入的 `pid` 会与调用栈解析出的调用者身份校验一致，否则拒绝（防止 PID 欺骗）
+- 应用层禁止使用 Exploit 进程 PID (10000) 调用内核 API（调用栈含 application 等应用目录时拒绝）
+- 推荐使用进程绑定 API `initArgs.kernelAPI.call(apiName, args)` 以绑定本进程，无需传 pid
 
 **可用 API**:
 - `FileSystem.read` - 读取文件（需要 `KERNEL_DISK_READ` 权限）
@@ -526,6 +552,12 @@ const allProcesses = ProcessManager.getProcessInfo();
 - `ScheduleTask.get` - 获取计划任务信息（无需权限）
 - `ScheduleTask.getAll` - 获取所有计划任务（无需权限）
 - `ScheduleTask.setEnabled` - 启用/禁用计划任务（需要 `SCHEDULE_TASK_MANAGE` 权限）
+- `Languages.loadPack` - 加载语言包（需要 `LANGUAGES_WRITE` 权限）
+- `Languages.setCurrent` - 设置当前语言（需要 `LANGUAGES_WRITE` 权限）
+- `Languages.getText` - 按常量名获取本地化文本（需要 `LANGUAGES_READ` 权限）
+- `Languages.listPacks` - 列出语言包文件（需要 `LANGUAGES_READ` 权限）
+- `Languages.getCurrentLocale` - 获取当前语言（需要 `LANGUAGES_READ` 权限）
+- `Languages.getLoadedLocales` - 获取已加载语言列表（需要 `LANGUAGES_READ` 权限）
 
 **示例**:
 ```javascript
@@ -566,6 +598,7 @@ try {
 - 普通权限会自动授予，特殊权限需要用户确认
 - 权限被拒绝时，API 调用会立即抛出错误
 - 详细权限列表请参考 [PermissionManager API 文档](./PermissionManager.md)
+- `FileSystem.*` 依赖各分区的 NodeTree；当某分区 NodeTree 未初始化时，ProcessManager 会尝试从 FSDirve 重建该分区树，详见 [NodeTree.md](./NodeTree.md)。语言包相关 API 见 [LanguagesExpansion.md](./LanguagesExpansion.md)。
 
 ### 其他方法
 
@@ -731,6 +764,7 @@ ProcessManager 会自动跟踪程序创建的 DOM 元素：
 4. **内存管理**: 程序退出时会自动释放所有内存，但建议在 `__exit__` 中手动释放内存引用
 5. **DOM 清理**: 程序退出时会自动清理所有标记的 DOM 元素
 6. **CLI 终端**: CLI 程序从 GUI 启动时会自动创建终端，无需手动处理
+7. **CVS-ZEROS-009 已修复**: ProcessManager 内核 API 调用已增加调用栈与 PID 一致性校验、Exploit PID 使用严格校验，并提供进程绑定 API（`initArgs.kernelAPI.call`）。禁止应用层传入伪造或他人 PID 提权；推荐敏感/多实例程序使用 `initArgs.kernelAPI.call(apiName, args)`。详见 [VULN/CVS_ZEROS_009.md](../../VULN/CVS_ZEROS_009.md)
 
 ## 相关文档
 

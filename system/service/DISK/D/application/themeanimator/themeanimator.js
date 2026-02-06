@@ -14,7 +14,41 @@
         themeChangeUnsubscribe: null,
         styleChangeUnsubscribe: null,
         animationPresetChangeUnsubscribe: null,
+        _languageChangeUnsubscribe: null,
         _loadingRandomAnimeBg: false,  // 防止重复请求标志
+        
+        /**
+         * 多语言文案：优先使用 LanguagesExpansion，否则返回 fallback
+         * @param {string} key 语言包常量名
+         * @param {string} fallback 无语言包时的回退文案
+         * @returns {string}
+         */
+        _getText: function(key, fallback) {
+            if (typeof LanguagesExpansion !== 'undefined' && typeof LanguagesExpansion.getText === 'function') {
+                const value = LanguagesExpansion.getText(key);
+                if (value && value !== key) return value;
+            }
+            return fallback != null ? fallback : (key || '');
+        },
+        
+        /** 语言切换时刷新所有带 data-i18n 的区块标题和标签页文案 */
+        _refreshUIStrings: function() {
+            const self = this;
+            if (!self.window) return;
+            self.window.querySelectorAll('.themeanimator-section-title[data-i18n]').forEach(function(el) {
+                const k = el.getAttribute('data-i18n');
+                if (k) el.textContent = self._getText(k, el.textContent);
+            });
+            const tabKeys = { theme: 'THEMEANIM_TAB_THEME', style: 'THEMEANIM_TAB_STYLE', background: 'THEMEANIM_TAB_BACKGROUND', animation: 'THEMEANIM_TAB_ANIMATION', lockscreen: 'THEMEANIM_TAB_LOCKSCREEN' };
+            self.window.querySelectorAll('.themeanimator-tab[data-tab]').forEach(function(btn) {
+                const tabId = btn.getAttribute('data-tab');
+                const key = tabKeys[tabId];
+                if (key) {
+                    const span = btn.querySelector('span:last-child');
+                    if (span) span.textContent = self._getText(key, span.textContent);
+                }
+            });
+        },
         
         __init__: async function(pid, initArgs) {
             if (typeof KernelLogger !== 'undefined') {
@@ -43,7 +77,7 @@
                 }
                 
                 const windowInfo = GUIManager.registerWindow(pid, this.window, {
-                    title: '主题与动画管理器',
+                    title: this._getText('THEMEANIM_TITLE', '主题与动画管理器'),
                     icon: icon,
                     onClose: () => {
                         // onClose 回调只做清理工作，不调用 _closeWindow 或 unregisterWindow
@@ -129,13 +163,20 @@
             
             // 注册锁屏背景卡片的右键菜单（删除功能）
             this._registerLockscreenBackgroundContextMenu();
+            
+            // 监听语言切换，刷新界面文案
+            if (typeof LanguagesExpansion !== 'undefined' && typeof LanguagesExpansion.onLanguageChange === 'function') {
+                this._languageChangeUnsubscribe = LanguagesExpansion.onLanguageChange(() => {
+                    this._refreshUIStrings();
+                });
+            }
         },
         
         __info__: function() {
             return {
-                name: '主题管理器',
+                name: this._getText('THEMEANIM_APP_NAME', '主题管理器'),
                 type: 'GUI',
-                description: '系统主题与动画的调控与管理',
+                description: this._getText('THEMEANIM_APP_DESC', '系统主题与动画的调控与管理'),
                 version: '1.0.0',
                 author: 'ZerOS Team',
                 copyright: '© 2025 ZerOS',
@@ -189,6 +230,12 @@
                 } catch (e) {
                     // 忽略错误
                 }
+            }
+            if (this._languageChangeUnsubscribe && typeof this._languageChangeUnsubscribe === 'function') {
+                try {
+                    this._languageChangeUnsubscribe();
+                } catch (e) {}
+                this._languageChangeUnsubscribe = null;
             }
             
             // 移除壁纸社区窗口
@@ -259,7 +306,7 @@
                 }
                 
                 const windowInfo = GUIManager.registerWindow(this.pid, communityWindow, {
-                    title: '壁纸社区',
+                    title: this._getText('THEMEANIM_WALLPAPER_COMMUNITY', '壁纸社区'),
                     icon: icon,
                     onClose: () => {
                         // 清理窗口引用
@@ -294,7 +341,7 @@
             
             const searchInput = document.createElement('input');
             searchInput.type = 'text';
-            searchInput.placeholder = '搜索壁纸（如：猫猫、风景、二次元...）';
+            searchInput.placeholder = this._getText('THEMEANIM_SEARCH_WALLPAPER', '搜索壁纸（如：猫猫、风景、二次元...）');
             searchInput.style.cssText = `
                 flex: 1;
                 padding: 10px 16px;
@@ -307,13 +354,13 @@
             `;
             searchInput.addEventListener('keypress', (e) => {
                 if (e.key === 'Enter') {
-                    this._searchWallpapers(searchInput.value.trim() || '壁纸', 1);
+                    this._searchWallpapers(searchInput.value.trim() || this._getText('THEMEANIM_WALLPAPER_KEYWORD', '壁纸'), 1);
                 }
             });
             searchContainer.appendChild(searchInput);
             
             const searchBtn = document.createElement('button');
-            searchBtn.textContent = '搜索';
+            searchBtn.textContent = this._getText('THEMEANIM_SEARCH', '搜索');
             searchBtn.style.cssText = `
                 padding: 10px 24px;
                 background: rgba(139, 92, 246, 0.3);
@@ -326,7 +373,7 @@
                 transition: all 0.2s ease;
             `;
             searchBtn.addEventListener('click', () => {
-                this._searchWallpapers(searchInput.value.trim() || '壁纸', 1);
+                this._searchWallpapers(searchInput.value.trim() || this._getText('THEMEANIM_WALLPAPER_KEYWORD', '壁纸'), 1);
             });
             searchBtn.addEventListener('mouseenter', () => {
                 searchBtn.style.background = 'rgba(139, 92, 246, 0.4)';
@@ -384,7 +431,7 @@
             this.wallpaperCommunityLimit = 12; // 每页12个壁纸
             
             // 默认加载一些壁纸
-            this._searchWallpapers('壁纸', 1);
+            this._searchWallpapers(this._getText('THEMEANIM_WALLPAPER_KEYWORD', '壁纸'), 1);
             
             // 聚焦窗口
             if (typeof GUIManager !== 'undefined' && this.wallpaperCommunityWindowId) {
@@ -401,7 +448,7 @@
             }
             
             // 显示加载状态
-            this.wallpaperCommunityContainer.innerHTML = '<div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: rgba(215, 224, 221, 0.7);">加载中...</div>';
+            this.wallpaperCommunityContainer.innerHTML = '<div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: rgba(215, 224, 221, 0.7);">' + this._getText('THEMEANIM_LOADING', '加载中...') + '</div>';
             
             try {
                 // 构建API URL
@@ -416,7 +463,7 @@
                 const data = await response.json();
                 
                 if (data.code !== 200 || !Array.isArray(data.data)) {
-                    throw new Error(data.msg || 'API返回数据格式错误');
+                    throw new Error(data.msg || this._getText('THEMEANIM_API_ERROR', 'API返回数据格式错误'));
                 }
                 
                 // 更新当前状态
@@ -428,7 +475,7 @@
                 
                 // 显示壁纸列表
                 if (data.data.length === 0) {
-                    this.wallpaperCommunityContainer.innerHTML = '<div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: rgba(215, 224, 221, 0.7);">未找到相关壁纸</div>';
+                    this.wallpaperCommunityContainer.innerHTML = '<div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: rgba(215, 224, 221, 0.7);">' + this._getText('THEMEANIM_NO_WALLPAPERS', '未找到相关壁纸') + '</div>';
                 } else {
                     data.data.forEach(wallpaper => {
                         const card = this._createWallpaperCard(wallpaper);
@@ -443,7 +490,7 @@
                 if (typeof KernelLogger !== 'undefined') {
                     KernelLogger.error('ThemeAnimator', `搜索壁纸失败: ${error.message}`, error);
                 }
-                this.wallpaperCommunityContainer.innerHTML = `<div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: rgba(255, 95, 87, 0.8);">加载失败: ${error.message}</div>`;
+                this.wallpaperCommunityContainer.innerHTML = '<div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: rgba(255, 95, 87, 0.8);">' + this._getText('THEMEANIM_LOAD_FAILED_MSG', '加载失败: {0}').replace('{0}', error.message) + '</div>';
             }
         },
         
@@ -524,7 +571,7 @@
             
             // 名称
             const name = document.createElement('div');
-            name.textContent = wallpaper.name || wallpaper.cname || '未命名';
+            name.textContent = wallpaper.name || wallpaper.cname || this._getText('THEMEANIM_UNNAMED', '未命名');
             name.style.cssText = `
                 font-size: 14px;
                 font-weight: 600;
@@ -533,7 +580,7 @@
                 text-overflow: ellipsis;
                 white-space: nowrap;
             `;
-            name.title = wallpaper.name || wallpaper.cname || '未命名';
+            name.title = wallpaper.name || wallpaper.cname || this._getText('THEMEANIM_UNNAMED', '未命名');
             info.appendChild(name);
             
             // 作者和热度
@@ -547,7 +594,7 @@
             `;
             
             const author = document.createElement('span');
-            author.textContent = `👤 ${wallpaper.author || '未知'}`;
+            author.textContent = '👤 ' + (wallpaper.author || this._getText('THEMEANIM_AUTHOR_UNKNOWN', '未知'));
             meta.appendChild(author);
             
             if (wallpaper.hot) {
@@ -603,7 +650,7 @@
             
             // 上一页按钮
             const prevBtn = document.createElement('button');
-            prevBtn.textContent = '上一页';
+            prevBtn.textContent = this._getText('THEMEANIM_PREV_PAGE', '上一页');
             prevBtn.disabled = currentPage <= 1;
             prevBtn.style.cssText = `
                 padding: 8px 16px;
@@ -630,7 +677,7 @@
             
             // 页码显示
             const pageInfo = document.createElement('span');
-            pageInfo.textContent = `第 ${currentPage} 页`;
+            pageInfo.textContent = this._getText('THEMEANIM_PAGE_N', '第 {0} 页').replace('{0}', currentPage);
             pageInfo.style.cssText = `
                 padding: 8px 16px;
                 color: rgba(215, 224, 221, 0.7);
@@ -640,7 +687,7 @@
             
             // 下一页按钮
             const nextBtn = document.createElement('button');
-            nextBtn.textContent = '下一页';
+            nextBtn.textContent = this._getText('THEMEANIM_NEXT_PAGE', '下一页');
             nextBtn.disabled = itemCount < this.wallpaperCommunityLimit;
             nextBtn.style.cssText = `
                 padding: 8px 16px;
@@ -680,7 +727,7 @@
                 const wallpaperUrl = isVideo ? wallpaper.video_url : wallpaper.phone_img_url;
                 
                 if (!wallpaperUrl) {
-                    throw new Error('壁纸URL不存在');
+                    throw new Error(this._getText('THEMEANIM_WALLPAPER_URL_MISSING', '壁纸URL不存在'));
                 }
                 
                 // 下载壁纸
@@ -734,12 +781,12 @@
                 });
                 
                 if (!saveResponse.ok) {
-                    throw new Error(`保存文件失败: HTTP ${saveResponse.status}`);
+                    throw new Error(this._getText('THEMEANIM_SAVE_FILE_FAILED_MSG', '保存文件失败: {0}').replace('{0}', 'HTTP ' + saveResponse.status));
                 }
                 
                 const saveResult = await saveResponse.json();
                 if (saveResult.status !== 'success') {
-                    throw new Error(`保存文件失败: ${saveResult.message || '未知错误'}`);
+                    throw new Error(this._getText('THEMEANIM_SAVE_FILE_FAILED_MSG', '保存文件失败: {0}').replace('{0}', saveResult.message || this._getText('THEMEANIM_UNKNOWN_ERROR', '未知错误')));
                 }
                 
                 // 使用 ThemeManager 设置壁纸
@@ -766,10 +813,10 @@
                         
                         // 成功时静默完成，不显示弹窗
                     } else {
-                        throw new Error('应用壁纸失败');
+                        throw new Error(this._getText('THEMEANIM_APPLY_WALLPAPER_FAILED', '应用壁纸失败'));
                     }
                 } else {
-                    throw new Error('ThemeManager 不可用');
+                    throw new Error(this._getText('THEMEANIM_TM_UNAVAILABLE', 'ThemeManager 不可用'));
                 }
                 
             } catch (error) {
@@ -777,13 +824,13 @@
                     KernelLogger.error('ThemeAnimator', `下载并应用壁纸失败: ${error.message}`, error);
                 }
                 if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                    await GUIManager.showAlert(`下载并应用壁纸失败: ${error.message}`, '错误', 'error');
+                    await GUIManager.showAlert(this._getText('THEMEANIM_DOWNLOAD_APPLY_FAILED_MSG', '下载并应用壁纸失败: {0}').replace('{0}', error.message), this._getText('THEMEANIM_ERROR', '错误'), 'error');
                 } else {
-                    alert(`下载并应用壁纸失败: ${error.message}`);
+                    alert(this._getText('THEMEANIM_DOWNLOAD_APPLY_FAILED_MSG', '下载并应用壁纸失败: {0}').replace('{0}', error.message));
                 }
             }
         },
-        
+
         /**
          * 创建标签页容器
          */
@@ -798,11 +845,11 @@
             `;
             
             const tabs = [
-                { id: 'theme', label: '主题', icon: '🎨' },
-                { id: 'style', label: '风格', icon: '💅' },
-                { id: 'background', label: '背景', icon: '🖼️' },
-                { id: 'animation', label: '动画', icon: '✨' },
-                { id: 'lockscreen', label: '锁屏', icon: '🔒' }
+                { id: 'theme', label: this._getText('THEMEANIM_TAB_THEME', '主题'), icon: '🎨' },
+                { id: 'style', label: this._getText('THEMEANIM_TAB_STYLE', '风格'), icon: '💅' },
+                { id: 'background', label: this._getText('THEMEANIM_TAB_BACKGROUND', '背景'), icon: '🖼️' },
+                { id: 'animation', label: this._getText('THEMEANIM_TAB_ANIMATION', '动画'), icon: '✨' },
+                { id: 'lockscreen', label: this._getText('THEMEANIM_TAB_LOCKSCREEN', '锁屏'), icon: '🔒' }
             ];
             
             tabs.forEach((tab, index) => {
@@ -918,15 +965,15 @@
             const currentSection = document.createElement('div');
             currentSection.className = 'themeanimator-section';
             currentSection.innerHTML = `
-                <h3 style="margin: 0 0 12px 0; color: rgba(215, 224, 221, 0.9); font-size: 16px; font-weight: 600;">当前主题</h3>
+                <h3 class="themeanimator-section-title" data-i18n="THEMEANIM_CURRENT_THEME" style="margin: 0 0 12px 0; color: rgba(215, 224, 221, 0.9); font-size: 16px; font-weight: 600;">` + this._getText('THEMEANIM_CURRENT_THEME', '当前主题') + `</h3>
                 <div class="current-theme-display" style="
                     padding: 16px;
                     background: rgba(139, 92, 246, 0.1);
                     border-radius: 8px;
                     border: 1px solid rgba(139, 92, 246, 0.3);
                 ">
-                    <div id="current-theme-name" style="font-size: 18px; font-weight: 600; color: rgba(139, 92, 246, 1); margin-bottom: 8px;">加载中...</div>
-                    <div id="current-theme-description" style="font-size: 13px; color: rgba(215, 224, 221, 0.7);">正在加载主题信息...</div>
+                    <div id="current-theme-name" style="font-size: 18px; font-weight: 600; color: rgba(139, 92, 246, 1); margin-bottom: 8px;">` + this._getText('THEMEANIM_LOADING', '加载中...') + `</div>
+                    <div id="current-theme-description" style="font-size: 13px; color: rgba(215, 224, 221, 0.7);">` + this._getText('THEMEANIM_LOADING_THEME_INFO', '正在加载主题信息...') + `</div>
                 </div>
             `;
             panel.appendChild(currentSection);
@@ -935,7 +982,7 @@
             const themesSection = document.createElement('div');
             themesSection.className = 'themeanimator-section';
             themesSection.innerHTML = `
-                <h3 style="margin: 0 0 12px 0; color: rgba(215, 224, 221, 0.9); font-size: 16px; font-weight: 600;">可用主题</h3>
+                <h3 class="themeanimator-section-title" data-i18n="THEMEANIM_AVAILABLE_THEMES" style="margin: 0 0 12px 0; color: rgba(215, 224, 221, 0.9); font-size: 16px; font-weight: 600;">` + this._getText('THEMEANIM_AVAILABLE_THEMES', '可用主题') + `</h3>
                 <div id="themes-list" class="themes-list" style="
                     display: grid;
                     grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
@@ -967,15 +1014,15 @@
             const currentSection = document.createElement('div');
             currentSection.className = 'themeanimator-section';
             currentSection.innerHTML = `
-                <h3 style="margin: 0 0 12px 0; color: rgba(215, 224, 221, 0.9); font-size: 16px; font-weight: 600;">当前风格</h3>
+                <h3 class="themeanimator-section-title" data-i18n="THEMEANIM_CURRENT_STYLE" style="margin: 0 0 12px 0; color: rgba(215, 224, 221, 0.9); font-size: 16px; font-weight: 600;">` + this._getText('THEMEANIM_CURRENT_STYLE', '当前风格') + `</h3>
                 <div class="current-style-display" style="
                     padding: 16px;
                     background: rgba(139, 92, 246, 0.1);
                     border-radius: 8px;
                     border: 1px solid rgba(139, 92, 246, 0.3);
                 ">
-                    <div id="current-style-name" style="font-size: 18px; font-weight: 600; color: rgba(139, 92, 246, 1); margin-bottom: 8px;">加载中...</div>
-                    <div id="current-style-description" style="font-size: 13px; color: rgba(215, 224, 221, 0.7);">正在加载风格信息...</div>
+                    <div id="current-style-name" style="font-size: 18px; font-weight: 600; color: rgba(139, 92, 246, 1); margin-bottom: 8px;">` + this._getText('THEMEANIM_LOADING', '加载中...') + `</div>
+                    <div id="current-style-description" style="font-size: 13px; color: rgba(215, 224, 221, 0.7);">` + this._getText('THEMEANIM_LOADING_STYLE_INFO', '正在加载风格信息...') + `</div>
                 </div>
             `;
             panel.appendChild(currentSection);
@@ -984,7 +1031,7 @@
             const stylesSection = document.createElement('div');
             stylesSection.className = 'themeanimator-section';
             stylesSection.innerHTML = `
-                <h3 style="margin: 0 0 12px 0; color: rgba(215, 224, 221, 0.9); font-size: 16px; font-weight: 600;">可用风格</h3>
+                <h3 class="themeanimator-section-title" data-i18n="THEMEANIM_AVAILABLE_STYLES" style="margin: 0 0 12px 0; color: rgba(215, 224, 221, 0.9); font-size: 16px; font-weight: 600;">` + this._getText('THEMEANIM_AVAILABLE_STYLES', '可用风格') + `</h3>
                 <div id="styles-list" class="styles-list" style="
                     display: grid;
                     grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
@@ -1027,7 +1074,7 @@
                 font-size: 16px;
                 font-weight: 600;
             `;
-            sectionTitle.textContent = '当前背景';
+            sectionTitle.textContent = this._getText('THEMEANIM_CURRENT_BG', '当前背景');
             currentSection.appendChild(sectionTitle);
             
             // 当前背景信息显示
@@ -1053,7 +1100,7 @@
                 white-space: nowrap;
                 word-break: break-all;
             `;
-            nameElement.textContent = '加载中...';
+            nameElement.textContent = this._getText('THEMEANIM_LOADING', '加载中...');
             currentBackgroundDisplay.appendChild(nameElement);
             
             // 创建描述元素
@@ -1068,12 +1115,12 @@
                 word-wrap: break-word;
                 line-height: 1.5;
             `;
-            descElement.textContent = '正在加载背景信息...';
+            descElement.textContent = this._getText('THEMEANIM_LOADING_BG_INFO', '正在加载背景信息...');
             currentBackgroundDisplay.appendChild(descElement);
             
             // 在当前背景显示框内也添加一个按钮（更明显）
             const selectLocalImageBtnInside = document.createElement('button');
-            selectLocalImageBtnInside.textContent = '📁 选择本地图片/视频作为背景';
+            selectLocalImageBtnInside.textContent = '📁 ' + this._getText('THEMEANIM_SELECT_LOCAL', '选择本地图片/视频作为背景');
             selectLocalImageBtnInside.id = 'select-local-image-btn-inside';
             selectLocalImageBtnInside.className = 'select-local-image-btn-inside';
             selectLocalImageBtnInside.style.cssText = `
@@ -1119,7 +1166,7 @@
             
             // 添加随机二次元背景按钮
             const randomAnimeBgBtn = document.createElement('button');
-            randomAnimeBgBtn.textContent = '🎨 随机二次元背景';
+            randomAnimeBgBtn.textContent = '🎨 ' + this._getText('THEMEANIM_RANDOM_ANIME', '随机二次元背景');
             randomAnimeBgBtn.id = 'random-anime-bg-btn';
             randomAnimeBgBtn.className = 'random-anime-bg-btn';
             randomAnimeBgBtn.style.cssText = `
@@ -1159,7 +1206,7 @@
             
             // 添加取消随机二次元背景按钮
             const cancelRandomAnimeBgBtn = document.createElement('button');
-            cancelRandomAnimeBgBtn.textContent = '❌ 取消随机二次元背景';
+            cancelRandomAnimeBgBtn.textContent = '❌ ' + this._getText('THEMEANIM_CANCEL_RANDOM', '取消随机二次元背景');
             cancelRandomAnimeBgBtn.id = 'cancel-random-anime-bg-btn';
             cancelRandomAnimeBgBtn.className = 'cancel-random-anime-bg-btn';
             cancelRandomAnimeBgBtn.style.cssText = `
@@ -1199,7 +1246,7 @@
             
             // 添加壁纸社区按钮
             const wallpaperCommunityBtn = document.createElement('button');
-            wallpaperCommunityBtn.textContent = '🖼️ 壁纸社区';
+            wallpaperCommunityBtn.textContent = '🖼️ ' + this._getText('THEMEANIM_WALLPAPER_COMMUNITY_BTN', '壁纸社区');
             wallpaperCommunityBtn.id = 'wallpaper-community-btn';
             wallpaperCommunityBtn.className = 'wallpaper-community-btn';
             wallpaperCommunityBtn.style.cssText = `
@@ -1266,7 +1313,7 @@
             const backgroundsSection = document.createElement('div');
             backgroundsSection.className = 'themeanimator-section';
             backgroundsSection.innerHTML = `
-                <h3 style="margin: 0 0 12px 0; color: rgba(215, 224, 221, 0.9); font-size: 16px; font-weight: 600;">可用背景</h3>
+                <h3 class="themeanimator-section-title" data-i18n="THEMEANIM_AVAILABLE_BACKGROUNDS" style="margin: 0 0 12px 0; color: rgba(215, 224, 221, 0.9); font-size: 16px; font-weight: 600;">` + this._getText('THEMEANIM_AVAILABLE_BACKGROUNDS', '可用背景') + `</h3>
                 <div id="backgrounds-list" class="backgrounds-list" style="
                     display: grid;
                     grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
@@ -1298,15 +1345,15 @@
             const currentSection = document.createElement('div');
             currentSection.className = 'themeanimator-section';
             currentSection.innerHTML = `
-                <h3 style="margin: 0 0 12px 0; color: rgba(215, 224, 221, 0.9); font-size: 16px; font-weight: 600;">当前动画预设</h3>
+                <h3 class="themeanimator-section-title" data-i18n="THEMEANIM_CURRENT_ANIM_PRESET" style="margin: 0 0 12px 0; color: rgba(215, 224, 221, 0.9); font-size: 16px; font-weight: 600;">` + this._getText('THEMEANIM_CURRENT_ANIM_PRESET', '当前动画预设') + `</h3>
                 <div class="current-animation-preset-display" style="
                     padding: 16px;
                     background: rgba(139, 92, 246, 0.1);
                     border-radius: 8px;
                     border: 1px solid rgba(139, 92, 246, 0.3);
                 ">
-                    <div id="current-animation-preset-name" style="font-size: 18px; font-weight: 600; color: rgba(139, 92, 246, 1); margin-bottom: 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; word-break: break-all;">加载中...</div>
-                    <div id="current-animation-preset-description" style="font-size: 13px; color: rgba(215, 224, 221, 0.7); overflow: hidden; word-break: break-all; word-wrap: break-word; line-height: 1.5;">正在加载动画预设信息...</div>
+                    <div id="current-animation-preset-name" style="font-size: 18px; font-weight: 600; color: rgba(139, 92, 246, 1); margin-bottom: 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; word-break: break-all;">` + this._getText('THEMEANIM_LOADING', '加载中...') + `</div>
+                    <div id="current-animation-preset-description" style="font-size: 13px; color: rgba(215, 224, 221, 0.7); overflow: hidden; word-break: break-all; word-wrap: break-word; line-height: 1.5;">` + this._getText('THEMEANIM_LOADING_PRESET_INFO', '正在加载动画预设信息...') + `</div>
                 </div>
             `;
             panel.appendChild(currentSection);
@@ -1315,7 +1362,7 @@
             const presetsSection = document.createElement('div');
             presetsSection.className = 'themeanimator-section';
             presetsSection.innerHTML = `
-                <h3 style="margin: 0 0 12px 0; color: rgba(215, 224, 221, 0.9); font-size: 16px; font-weight: 600;">可用动画预设</h3>
+                <h3 class="themeanimator-section-title" data-i18n="THEMEANIM_AVAILABLE_PRESETS" style="margin: 0 0 12px 0; color: rgba(215, 224, 221, 0.9); font-size: 16px; font-weight: 600;">` + this._getText('THEMEANIM_AVAILABLE_PRESETS', '可用动画预设') + `</h3>
                 <div id="animation-presets-list" class="animation-presets-list" style="
                     display: grid;
                     grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
@@ -1331,7 +1378,7 @@
             const infoSection = document.createElement('div');
             infoSection.className = 'themeanimator-section';
             infoSection.innerHTML = `
-                <h3 style="margin: 0 0 12px 0; color: rgba(215, 224, 221, 0.9); font-size: 16px; font-weight: 600;">动画信息</h3>
+                <h3 class="themeanimator-section-title" data-i18n="THEMEANIM_ANIM_INFO" style="margin: 0 0 12px 0; color: rgba(215, 224, 221, 0.9); font-size: 16px; font-weight: 600;">` + this._getText('THEMEANIM_ANIM_INFO', '动画信息') + `</h3>
                 <div id="animation-info" style="
                     padding: 16px;
                     background: rgba(139, 92, 246, 0.05);
@@ -1371,7 +1418,7 @@
                 font-size: 16px;
                 font-weight: 600;
             `;
-            randomBgTitle.textContent = '随机锁屏壁纸';
+            randomBgTitle.textContent = this._getText('THEMEANIM_RANDOM_LOCK_BG', '随机锁屏壁纸');
             randomBgSection.appendChild(randomBgTitle);
             
             const randomBgContainer = document.createElement('div');
@@ -1390,7 +1437,7 @@
                 color: rgba(215, 224, 221, 0.9);
                 font-size: 14px;
             `;
-            randomBgLabel.textContent = '启用随机锁屏壁纸';
+            randomBgLabel.textContent = this._getText('THEMEANIM_ENABLE_RANDOM', '启用随机锁屏壁纸');
             randomBgContainer.appendChild(randomBgLabel);
             
             const randomBgToggle = document.createElement('input');
@@ -1421,7 +1468,7 @@
             const backgroundsSection = document.createElement('div');
             backgroundsSection.className = 'themeanimator-section';
             backgroundsSection.innerHTML = `
-                <h3 style="margin: 0 0 12px 0; color: rgba(215, 224, 221, 0.9); font-size: 16px; font-weight: 600;">锁屏背景</h3>
+                <h3 class="themeanimator-section-title" data-i18n="THEMEANIM_LOCK_BG_SECTION" style="margin: 0 0 12px 0; color: rgba(215, 224, 221, 0.9); font-size: 16px; font-weight: 600;">` + this._getText('THEMEANIM_LOCK_BG_SECTION', '锁屏背景') + `</h3>
                 <div id="lockscreen-backgrounds-list" class="lockscreen-backgrounds-list" style="
                     display: grid;
                     grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
@@ -1444,7 +1491,7 @@
                         card.style.opacity = '0.5';
                         card.style.cursor = 'not-allowed';
                         card.style.pointerEvents = 'none';
-                        card.title = '请先关闭随机锁屏壁纸功能';
+                        card.title = this._getText('THEMEANIM_HINT_DISABLE_RANDOM_FIRST', '请先关闭随机锁屏壁纸功能');
                     } else {
                         // 随机壁纸禁用时，启用背景图选择
                         card.style.opacity = '1';
@@ -1470,7 +1517,7 @@
                             margin-bottom: 12px;
                             text-align: center;
                         `;
-                        hint.textContent = '💡 提示：关闭随机锁屏壁纸后，可以选择固定锁屏背景';
+                        hint.textContent = '💡 ' + this._getText('THEMEANIM_HINT_DISABLE_RANDOM', '提示：关闭随机锁屏壁纸后，可以选择固定锁屏背景');
                         backgroundsSection.insertBefore(hint, backgroundsListContainer);
                     }
                 } else {
@@ -1529,7 +1576,7 @@
                 font-size: 16px;
                 font-weight: 600;
             `;
-            componentsTitle.textContent = '锁屏组件';
+            componentsTitle.textContent = this._getText('THEMEANIM_LOCK_COMPONENTS', '锁屏组件');
             componentsSection.appendChild(componentsTitle);
             
             // 时间组件开关
@@ -1553,7 +1600,7 @@
                 align-items: center;
                 gap: 8px;
             `;
-            timeComponentLabel.innerHTML = '<span>🕐</span><span>时间组件</span>';
+            timeComponentLabel.innerHTML = '<span>🕐</span><span>' + this._getText('THEMEANIM_TIME_COMPONENT', '时间组件') + '</span>';
             timeComponentContainer.appendChild(timeComponentLabel);
             
             const timeComponentToggle = document.createElement('input');
@@ -1623,7 +1670,7 @@
                 align-items: center;
                 gap: 8px;
             `;
-            dailyQuoteLabel.innerHTML = '<span>💬</span><span>每日一言</span>';
+            dailyQuoteLabel.innerHTML = '<span>💬</span><span>' + this._getText('THEMEANIM_DAILY_QUOTE', '每日一言') + '</span>';
             dailyQuoteContainer.appendChild(dailyQuoteLabel);
             
             const dailyQuoteToggle = document.createElement('input');
@@ -1685,16 +1732,16 @@
          */
         _loadLockscreenBackgroundsList: async function(container) {
             if (typeof ProcessManager === 'undefined') {
-                container.innerHTML = '<p style="color: rgba(215, 224, 221, 0.7);">ProcessManager 不可用</p>';
+                container.innerHTML = '<p style="color: rgba(215, 224, 221, 0.7);">' + this._getText('THEMEANIM_PM_UNAVAILABLE', 'ProcessManager 不可用') + '</p>';
                 return;
             }
             
             try {
                 // 获取默认锁屏背景图（从 system/assets/start/ 目录）
                 const defaultBackgrounds = [
-                    { id: 'lockscreen_bg1', name: '锁屏背景 1', path: '/system/assets/start/bg1.jpg' },
-                    { id: 'lockscreen_bg2', name: '锁屏背景 2', path: '/system/assets/start/bg2.jpg' },
-                    { id: 'lockscreen_bg3', name: '锁屏背景 3', path: '/system/assets/start/bg3.jpg' }
+                    { id: 'lockscreen_bg1', name: this._getText('THEMEANIM_LOCK_BG_N', '锁屏背景 {0}').replace('{0}', '1'), path: '/system/assets/start/bg1.jpg' },
+                    { id: 'lockscreen_bg2', name: this._getText('THEMEANIM_LOCK_BG_N', '锁屏背景 {0}').replace('{0}', '2'), path: '/system/assets/start/bg2.jpg' },
+                    { id: 'lockscreen_bg3', name: this._getText('THEMEANIM_LOCK_BG_N', '锁屏背景 {0}').replace('{0}', '3'), path: '/system/assets/start/bg3.jpg' }
                 ];
                 
                 // 获取已发送的锁屏背景（从 LStorage）
@@ -1705,7 +1752,7 @@
                 
                 container.innerHTML = '';
                 if (allBackgrounds.length === 0) {
-                    container.innerHTML = '<p style="color: rgba(215, 224, 221, 0.7);">没有可用的锁屏背景</p>';
+                    container.innerHTML = '<p style="color: rgba(215, 224, 221, 0.7);">' + this._getText('THEMEANIM_NO_LOCK_BG', '没有可用的锁屏背景') + '</p>';
                     return;
                 }
                 
@@ -1715,7 +1762,7 @@
                     container.appendChild(card);
                 }
             } catch (e) {
-                container.innerHTML = `<p style="color: rgba(255, 95, 87, 0.8);">加载锁屏背景列表失败: ${e.message}</p>`;
+                container.innerHTML = '<p style="color: rgba(255, 95, 87, 0.8);">' + this._getText('THEMEANIM_LOAD_LOCK_BG_FAILED', '加载锁屏背景列表失败') + ': ' + e.message + '</p>';
             }
         },
         
@@ -1774,7 +1821,7 @@
                     z-index: 10;
                     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
                 `;
-                activeBadge.textContent = '✓ 已选择';
+                activeBadge.textContent = '✓ ' + this._getText('THEMEANIM_SELECTED', '已选择');
                 card.appendChild(activeBadge);
             }
             
@@ -1884,7 +1931,7 @@
         _setLockscreenBackground: async function(background) {
             try {
                 if (typeof LockScreen === 'undefined' || !LockScreen.container) {
-                    throw new Error('LockScreen 不可用');
+                    throw new Error(this._getText('THEMEANIM_LOCKSCREEN_UNAVAILABLE', 'LockScreen 不可用'));
                 }
                 
                 // 处理背景路径（支持本地路径和网络路径，支持所有分区 A-Z）
@@ -2091,14 +2138,14 @@
          */
         _loadThemesList: async function(container) {
             if (typeof ProcessManager === 'undefined') {
-                container.innerHTML = '<p style="color: rgba(215, 224, 221, 0.7);">ProcessManager 不可用</p>';
+                container.innerHTML = '<p style="color: rgba(215, 224, 221, 0.7);">' + this._getText('THEMEANIM_PM_UNAVAILABLE', 'ProcessManager 不可用') + '</p>';
                 return;
             }
             
             try {
                 const themes = await ProcessManager.getAllThemes(this.pid);
                 if (!themes || themes.length === 0) {
-                    container.innerHTML = '<p style="color: rgba(215, 224, 221, 0.7);">没有可用的主题</p>';
+                    container.innerHTML = '<p style="color: rgba(215, 224, 221, 0.7);">' + this._getText('THEMEANIM_NO_THEMES', '没有可用的主题') + '</p>';
                     return;
                 }
                 
@@ -2108,7 +2155,7 @@
                     container.appendChild(themeCard);
                 });
             } catch (e) {
-                container.innerHTML = `<p style="color: rgba(255, 95, 87, 0.8);">加载主题列表失败: ${e.message}</p>`;
+                container.innerHTML = '<p style="color: rgba(255, 95, 87, 0.8);">' + this._getText('THEMEANIM_LOAD_THEMES_FAILED', '加载主题列表失败') + ': ' + e.message + '</p>';
             }
         },
         
@@ -2192,7 +2239,7 @@
                     font-weight: 600;
                     display: inline-block;
                 `;
-                badge.textContent = '当前主题';
+                badge.textContent = this._getText('THEMEANIM_CURRENT_THEME', '当前主题');
                 card.appendChild(badge);
             }
             
@@ -2243,14 +2290,14 @@
          */
         _loadStylesList: async function(container) {
             if (typeof ProcessManager === 'undefined') {
-                container.innerHTML = '<p style="color: rgba(215, 224, 221, 0.7);">ProcessManager 不可用</p>';
+                container.innerHTML = '<p style="color: rgba(215, 224, 221, 0.7);">' + this._getText('THEMEANIM_PM_UNAVAILABLE', 'ProcessManager 不可用') + '</p>';
                 return;
             }
             
             try {
                 const styles = await ProcessManager.getAllStyles(this.pid);
                 if (!styles || styles.length === 0) {
-                    container.innerHTML = '<p style="color: rgba(215, 224, 221, 0.7);">没有可用的风格</p>';
+                    container.innerHTML = '<p style="color: rgba(215, 224, 221, 0.7);">' + this._getText('THEMEANIM_NO_STYLES', '没有可用的风格') + '</p>';
                     return;
                 }
                 
@@ -2260,7 +2307,7 @@
                     container.appendChild(styleCard);
                 });
             } catch (e) {
-                container.innerHTML = `<p style="color: rgba(255, 95, 87, 0.8);">加载风格列表失败: ${e.message}</p>`;
+                container.innerHTML = '<p style="color: rgba(255, 95, 87, 0.8);">' + this._getText('THEMEANIM_LOAD_STYLES_FAILED', '加载风格列表失败') + ': ' + e.message + '</p>';
             }
         },
         
@@ -2351,7 +2398,7 @@
                     font-weight: 600;
                     display: inline-block;
                 `;
-                badge.textContent = '当前风格';
+                badge.textContent = this._getText('THEMEANIM_CURRENT_STYLE', '当前风格');
                 card.appendChild(badge);
             }
             
@@ -2408,7 +2455,7 @@
                 nameEl.textContent = theme.name || theme.id;
             }
             if (descEl) {
-                descEl.textContent = theme.description || '无描述';
+                descEl.textContent = theme.description || this._getText('THEMEANIM_NO_DESC', '无描述');
             }
         },
         
@@ -2425,7 +2472,7 @@
                 nameEl.title = nameText; // 添加 title 属性，鼠标悬停时显示完整文本
             }
             if (descEl) {
-                const descText = style.description || '无描述';
+                const descText = style.description || this._getText('THEMEANIM_NO_DESC', '无描述');
                 descEl.textContent = descText;
                 descEl.title = descText; // 添加 title 属性
             }
@@ -2456,14 +2503,14 @@
          */
         _loadBackgroundsList: async function(container) {
             if (typeof ProcessManager === 'undefined') {
-                container.innerHTML = '<p style="color: rgba(215, 224, 221, 0.7);">ProcessManager 不可用</p>';
+                container.innerHTML = '<p style="color: rgba(215, 224, 221, 0.7);">' + this._getText('THEMEANIM_PM_UNAVAILABLE', 'ProcessManager 不可用') + '</p>';
                 return;
             }
             
             try {
                 const backgrounds = ProcessManager.getAllDesktopBackgrounds(this.pid);
                 if (!backgrounds || backgrounds.length === 0) {
-                    container.innerHTML = '<p style="color: rgba(215, 224, 221, 0.7);">没有可用的背景</p>';
+                    container.innerHTML = '<p style="color: rgba(215, 224, 221, 0.7);">' + this._getText('THEMEANIM_NO_BACKGROUNDS', '没有可用的背景') + '</p>';
                     return;
                 }
                 
@@ -2493,7 +2540,7 @@
                 }
                 
                 if (validBackgrounds.length === 0) {
-                    container.innerHTML = '<p style="color: rgba(215, 224, 221, 0.7);">没有可用的背景</p>';
+                    container.innerHTML = '<p style="color: rgba(215, 224, 221, 0.7);">' + this._getText('THEMEANIM_NO_BACKGROUNDS', '没有可用的背景') + '</p>';
                     return;
                 }
                 
@@ -2503,7 +2550,7 @@
                     container.appendChild(backgroundCard);
                 });
             } catch (e) {
-                container.innerHTML = `<p style="color: rgba(255, 95, 87, 0.8);">加载背景列表失败: ${e.message}</p>`;
+                container.innerHTML = '<p style="color: rgba(255, 95, 87, 0.8);">' + this._getText('THEMEANIM_LOAD_BG_FAILED', '加载背景列表失败') + ': ' + e.message + '</p>';
             }
         },
         
@@ -2701,8 +2748,8 @@
                     word-break: break-all;
                 `;
                 const isVideoFile = isVideo;
-                pathContainer.textContent = `${isVideoFile ? '本地视频' : '本地图片'}: ${background.path}`;
-                pathContainer.title = `${isVideoFile ? '本地视频' : '本地图片'}: ${background.path}`; // 添加 title 属性
+                pathContainer.textContent = (isVideoFile ? this._getText('THEMEANIM_LOCAL_VIDEO_LABEL', '本地视频') : this._getText('THEMEANIM_LOCAL_IMAGE_LABEL', '本地图片')) + ': ' + background.path;
+                pathContainer.title = (isVideoFile ? this._getText('THEMEANIM_LOCAL_VIDEO_LABEL', '本地视频') : this._getText('THEMEANIM_LOCAL_IMAGE_LABEL', '本地图片')) + ': ' + background.path;
                 card.appendChild(pathContainer);
             }
             
@@ -2738,7 +2785,7 @@
                     font-weight: 600;
                     display: inline-block;
                 `;
-                badge.textContent = '当前背景';
+                badge.textContent = this._getText('THEMEANIM_CURRENT_BG', '当前背景');
                 card.appendChild(badge);
             }
             
@@ -2820,7 +2867,7 @@
                 nameEl.title = nameText; // 添加 title 属性，鼠标悬停时显示完整文本
             }
             if (descEl) {
-                const descText = background.description || '无描述';
+                const descText = background.description || this._getText('THEMEANIM_NO_DESC', '无描述');
                 descEl.textContent = descText;
                 descEl.title = descText; // 添加 title 属性
             }
@@ -2855,7 +2902,7 @@
                     // 返回菜单项数组
                     return [
                         {
-                            label: '发送到锁屏背景',
+                            label: this._getText('THEMEANIM_SEND_TO_LOCK', '发送到锁屏背景'),
                             action: async () => {
                                 // 获取背景对象
                                 if (typeof ProcessManager === 'undefined') {
@@ -2875,7 +2922,7 @@
                             }
                         },
                         {
-                            label: '删除',
+                            label: this._getText('THEMEANIM_DELETE', '删除'),
                             action: async () => {
                                 // 获取背景对象
                                 if (typeof ProcessManager === 'undefined') {
@@ -2905,7 +2952,7 @@
         _sendToLockscreenBackground: async function(background) {
             try {
                 if (!background || !background.path) {
-                    throw new Error('背景信息不完整');
+                    throw new Error(this._getText('THEMEANIM_BG_INCOMPLETE', '背景信息不完整'));
                 }
                 
                 // 检查是否是本地文件路径（支持所有分区 A-Z）
@@ -2913,7 +2960,7 @@
                 const isLocalPath = partitionMatch !== null || background.path.includes('/system/service/DISK/');
                 
                 if (!isLocalPath) {
-                    throw new Error('只能发送本地背景到锁屏');
+                    throw new Error(this._getText('THEMEANIM_LOCAL_ONLY_SEND_TO_LOCK', '只能发送本地背景到锁屏'));
                 }
                 
                 // 获取文件扩展名
@@ -2924,7 +2971,7 @@
                 const isImage = supportedImageFormats.includes(fileExtension);
                 
                 if (!isImage && !isVideo) {
-                    throw new Error('不支持的文件格式');
+                    throw new Error(this._getText('THEMEANIM_UNSUPPORTED_FORMAT', '不支持的文件格式'));
                 }
                 
                 // 生成锁屏背景文件名（基于原文件名和背景ID，确保唯一性）
@@ -3002,14 +3049,14 @@
                             }
                         } else {
                             // 如果路径只有盘符，无法确定文件名
-                            throw new Error('无法从路径中提取文件名');
+                            throw new Error(this._getText('THEMEANIM_EXTRACT_FILENAME_FAILED', '无法从路径中提取文件名'));
                         }
                     } else {
-                        throw new Error('不支持的路径格式');
+                        throw new Error(this._getText('THEMEANIM_UNSUPPORTED_PATH_FORMAT', '不支持的路径格式'));
                     }
                 }
                 if (!dirPath || !fileName) {
-                    throw new Error('无法解析文件路径');
+                    throw new Error(this._getText('THEMEANIM_PARSE_PATH_FAILED', '无法解析文件路径'));
                 }
                 
                 // 读取文件
@@ -3024,12 +3071,12 @@
                 
                 const readResponse = await fetch(readUrl.toString());
                 if (!readResponse.ok) {
-                    throw new Error(`读取文件失败: HTTP ${readResponse.status}`);
+                    throw new Error(this._getText('THEMEANIM_READ_FILE_FAILED_MSG', '读取文件失败: {0}').replace('{0}', 'HTTP ' + readResponse.status));
                 }
                 
                 const readResult = await readResponse.json();
                 if (readResult.status !== 'success') {
-                    throw new Error(`读取文件失败: ${readResult.message || '未知错误'}`);
+                    throw new Error(this._getText('THEMEANIM_READ_FILE_FAILED_MSG', '读取文件失败: {0}').replace('{0}', readResult.message || this._getText('THEMEANIM_UNKNOWN_ERROR', '未知错误')));
                 }
                 
                 // 获取文件内容
@@ -3085,12 +3132,12 @@
                 });
                 
                 if (!saveResponse.ok) {
-                    throw new Error(`保存文件失败: HTTP ${saveResponse.status}`);
+                    throw new Error(this._getText('THEMEANIM_SAVE_FILE_FAILED_MSG', '保存文件失败: {0}').replace('{0}', 'HTTP ' + saveResponse.status));
                 }
                 
                 const saveResult = await saveResponse.json();
                 if (saveResult.status !== 'success') {
-                    throw new Error(`保存文件失败: ${saveResult.message || '未知错误'}`);
+                    throw new Error(this._getText('THEMEANIM_SAVE_FILE_FAILED_MSG', '保存文件失败: {0}').replace('{0}', saveResult.message || this._getText('THEMEANIM_UNKNOWN_ERROR', '未知错误')));
                 }
                 
                 // 添加到锁屏背景列表
@@ -3205,7 +3252,7 @@
                     // 返回菜单项数组
                     return [
                         {
-                            label: '删除',
+                            label: this._getText('THEMEANIM_DELETE', '删除'),
                             action: async () => {
                                 try {
                                     // 执行删除
@@ -3228,7 +3275,7 @@
         _deleteLockscreenBackground: async function(backgroundPath, backgroundId) {
             try {
                 if (typeof ProcessManager === 'undefined') {
-                    throw new Error('ProcessManager 不可用');
+                    throw new Error(this._getText('THEMEANIM_PM_UNAVAILABLE', 'ProcessManager 不可用'));
                 }
                 
                 // 检查是否是本地文件路径（只有本地文件才能删除，支持所有分区 A-Z）
@@ -3236,7 +3283,7 @@
                 const isLocalPath = partitionMatch !== null || backgroundPath.includes('/system/service/DISK/');
                 
                 if (!isLocalPath) {
-                    throw new Error('只能删除本地锁屏背景');
+                    throw new Error(this._getText('THEMEANIM_LOCAL_ONLY_DELETE_LOCK', '只能删除本地锁屏背景'));
                 }
                 
                 // 使用内核API删除文件
@@ -3247,7 +3294,7 @@
                 );
                 
                 if (!deleteResult || deleteResult.status !== 'success') {
-                    throw new Error(deleteResult?.message || '删除文件失败');
+                    throw new Error(deleteResult?.message || this._getText('THEMEANIM_DELETE_FILE_FAILED', '删除文件失败'));
                 }
                 
                 // 从锁屏背景列表中移除
@@ -3334,8 +3381,8 @@
                     try {
                         await NotificationManager.createNotification(this.pid, {
                             type: 'snapshot',
-                            title: '主题管理器',
-                            content: 'ProcessManager 不可用',
+                            title: this._getText('THEMEANIM_APP_NAME', '主题管理器'),
+                            content: this._getText('THEMEANIM_PM_UNAVAILABLE', 'ProcessManager 不可用'),
                             duration: 3000
                         });
                     } catch (e) {
@@ -3370,8 +3417,8 @@
                                 try {
                                     await NotificationManager.createNotification(this.pid, {
                                         type: 'snapshot',
-                                        title: '主题管理器',
-                                        content: '请选择图片文件（jpg, png, gif, bmp, svg, webp, ico）或视频文件（mp4, webm, ogg）',
+                                        title: this._getText('THEMEANIM_APP_NAME', '主题管理器'),
+                                        content: this._getText('THEMEANIM_SELECT_IMAGE_VIDEO_HINT', '请选择图片文件（jpg, png, gif, bmp, svg, webp, ico）或视频文件（mp4, webm, ogg）'),
                                         duration: 4000
                                     });
                                 } catch (e) {
@@ -3413,8 +3460,8 @@
                                         try {
                                             await NotificationManager.createNotification(this.pid, {
                                                 type: 'snapshot',
-                                                title: '设置成功',
-                                                content: `背景设置成功！${isVideo ? '（视频将静音循环播放）' : ''}`,
+                                                title: this._getText('THEMEANIM_SET_SUCCESS', '设置成功'),
+                                                content: isVideo ? this._getText('THEMEANIM_BG_SET_SUCCESS_VIDEO', '背景设置成功！（视频将静音循环播放）') : this._getText('THEMEANIM_BG_SET_SUCCESS', '背景设置成功！'),
                                                 duration: 3000
                                             });
                                         } catch (e) {
@@ -3429,8 +3476,8 @@
                                         try {
                                             await NotificationManager.createNotification(this.pid, {
                                                 type: 'snapshot',
-                                                title: '设置失败',
-                                                content: `设置背景失败：${isVideo ? '视频' : '图片'}不存在或无法访问`,
+                                                title: this._getText('THEMEANIM_SET_FAILED', '设置失败'),
+                                                content: this._getText('THEMEANIM_BG_SET_FAILED_ACCESS', '设置背景失败：{0}不存在或无法访问').replace('{0}', isVideo ? this._getText('THEMEANIM_LOCAL_VIDEO_LABEL', '视频') : this._getText('THEMEANIM_LOCAL_IMAGE_LABEL', '图片')),
                                                 duration: 4000
                                             });
                                         } catch (e) {
@@ -3449,7 +3496,7 @@
                                     try {
                                         await NotificationManager.createNotification(this.pid, {
                                             type: 'snapshot',
-                                            title: '设置失败',
+                                            title: this._getText('THEMEANIM_SET_FAILED', '设置失败'),
                                             content: `设置背景失败: ${e.message}`,
                                             duration: 4000
                                         });
@@ -3466,8 +3513,8 @@
                                 try {
                                     await NotificationManager.createNotification(this.pid, {
                                         type: 'snapshot',
-                                        title: '主题管理器',
-                                        content: 'ThemeManager 不可用',
+                                        title: this._getText('THEMEANIM_APP_NAME', '主题管理器'),
+                                        content: this._getText('THEMEANIM_TM_UNAVAILABLE', 'ThemeManager 不可用'),
                                         duration: 3000
                                     });
                                 } catch (e) {
@@ -3490,8 +3537,8 @@
                         try {
                             await NotificationManager.createNotification(this.pid, {
                                 type: 'snapshot',
-                                title: '主题管理器',
-                                content: '无法启动文件管理器',
+                                title: this._getText('THEMEANIM_APP_NAME', '主题管理器'),
+                                content: this._getText('THEMEANIM_CANNOT_START_FM', '无法启动文件管理器'),
                                 duration: 3000
                             });
                         } catch (e) {
@@ -3514,7 +3561,7 @@
                     try {
                         await NotificationManager.createNotification(this.pid, {
                             type: 'snapshot',
-                            title: '错误',
+                            title: this._getText('THEMEANIM_ERROR', '错误'),
                             content: `打开文件选择器失败: ${e.message}`,
                             duration: 4000
                         });
@@ -3532,14 +3579,14 @@
          */
         _loadAnimationPresetsList: async function(container) {
             if (typeof ThemeManager === 'undefined') {
-                container.innerHTML = '<p style="color: rgba(215, 224, 221, 0.7);">ThemeManager 不可用</p>';
+                container.innerHTML = '<p style="color: rgba(215, 224, 221, 0.7);">' + this._getText('THEMEANIM_TM_UNAVAILABLE', 'ThemeManager 不可用') + '</p>';
                 return;
             }
             
             try {
                 const presets = ThemeManager.getAllAnimationPresets();
                 if (!presets || presets.length === 0) {
-                    container.innerHTML = '<p style="color: rgba(215, 224, 221, 0.7);">没有可用的动画预设</p>';
+                    container.innerHTML = '<p style="color: rgba(215, 224, 221, 0.7);">' + this._getText('THEMEANIM_NO_PRESETS', '没有可用的动画预设') + '</p>';
                     return;
                 }
                 
@@ -3549,7 +3596,7 @@
                     container.appendChild(presetCard);
                 });
             } catch (e) {
-                container.innerHTML = `<p style="color: rgba(255, 95, 87, 0.8);">加载动画预设列表失败: ${e.message}</p>`;
+                container.innerHTML = '<p style="color: rgba(255, 95, 87, 0.8);">' + this._getText('THEMEANIM_LOAD_PRESETS_FAILED', '加载动画预设列表失败') + ': ' + e.message + '</p>';
             }
         },
         
@@ -3639,7 +3686,7 @@
                     font-weight: 600;
                     display: inline-block;
                 `;
-                badge.textContent = '当前预设';
+                badge.textContent = this._getText('THEMEANIM_CURRENT_PRESET', '当前预设');
                 card.appendChild(badge);
             }
             
@@ -3723,7 +3770,7 @@
          */
         _loadAnimationInfo: function(container) {
             if (typeof AnimateManager === 'undefined') {
-                container.innerHTML = '<p style="color: rgba(215, 224, 221, 0.7);">AnimateManager 不可用</p>';
+                container.innerHTML = '<p style="color: rgba(215, 224, 221, 0.7);">' + this._getText('THEMEANIM_ANIM_MGR_UNAVAILABLE', 'AnimateManager 不可用') + '</p>';
                 return;
             }
             
@@ -3750,7 +3797,7 @@
                 html += '</div>';
                 container.innerHTML = html;
             } catch (e) {
-                container.innerHTML = `<p style="color: rgba(255, 95, 87, 0.8);">加载动画信息失败: ${e.message}</p>`;
+                container.innerHTML = '<p style="color: rgba(255, 95, 87, 0.8);">' + this._getText('THEMEANIM_LOAD_ANIM_INFO_FAILED', '加载动画信息失败') + ': ' + e.message + '</p>';
             }
         },
         
@@ -3773,7 +3820,7 @@
             // 禁用按钮并显示加载状态
             const originalText = btn.textContent;
             btn.disabled = true;
-            btn.textContent = '⏳ 正在加载...';
+            btn.textContent = '⏳ ' + this._getText('THEMEANIM_LOADING_BTN', '正在加载...');
             btn.style.opacity = '0.6';
             btn.style.cursor = 'not-allowed';
             
@@ -3794,7 +3841,7 @@
                 // 检查响应类型
                 const contentType = response.headers.get('content-type');
                 if (!contentType || !contentType.includes('image/')) {
-                    throw new Error('响应不是图片类型');
+                    throw new Error(this._getText('THEMEANIM_RESPONSE_NOT_IMAGE', '响应不是图片类型'));
                 }
                 
                 // 获取图片 blob
@@ -3856,7 +3903,7 @@
                 
                 // 保存图片到本地（使用 FileSystem API）
                 if (typeof ProcessManager === 'undefined') {
-                    throw new Error('ProcessManager 不可用');
+                    throw new Error(this._getText('THEMEANIM_PM_UNAVAILABLE', 'ProcessManager 不可用'));
                 }
                 
                 // 提取 base64 数据部分（去掉 data:image/jpeg;base64, 前缀）
@@ -3885,12 +3932,12 @@
                 });
                 
                 if (!saveResponse.ok) {
-                    throw new Error(`保存文件失败: HTTP ${saveResponse.status}`);
+                    throw new Error(this._getText('THEMEANIM_SAVE_FILE_FAILED_MSG', '保存文件失败: {0}').replace('{0}', 'HTTP ' + saveResponse.status));
                 }
                 
                 const saveResult = await saveResponse.json();
                 if (saveResult.status !== 'success') {
-                    throw new Error(`保存文件失败: ${saveResult.message || '未知错误'}`);
+                    throw new Error(this._getText('THEMEANIM_SAVE_FILE_FAILED_MSG', '保存文件失败: {0}').replace('{0}', saveResult.message || this._getText('THEMEANIM_UNKNOWN_ERROR', '未知错误')));
                 }
                 
                 // 使用 CacheDrive 保存图片元数据（永不过期，除非功能被禁用）
@@ -3949,10 +3996,10 @@
                         
                         // 成功时不显示弹窗，静默完成
                     } else {
-                        throw new Error('设置背景失败');
+                        throw new Error(this._getText('THEMEANIM_SET_BG_FAILED', '设置背景失败'));
                     }
                 } else {
-                    throw new Error('ThemeManager 不可用');
+                    throw new Error(this._getText('THEMEANIM_TM_UNAVAILABLE', 'ThemeManager 不可用'));
                 }
             } catch (e) {
                 if (typeof KernelLogger !== 'undefined') {
@@ -3975,7 +4022,7 @@
                     try {
                         await NotificationManager.createNotification(this.pid, {
                             type: 'snapshot',
-                            title: '加载失败',
+                            title: this._getText('THEMEANIM_LOAD_FAILED_TITLE', '加载失败'),
                             content: `加载随机二次元背景失败: ${e.message}`,
                             duration: 4000
                         });
@@ -4030,8 +4077,8 @@
                 try {
                     await NotificationManager.createNotification(this.pid, {
                         type: 'snapshot',
-                        title: '主题管理器',
-                        content: '已取消随机二次元背景功能。刷新时将不再自动请求。背景图将在30分钟后自动清理。',
+                        title: this._getText('THEMEANIM_APP_NAME', '主题管理器'),
+                        content: this._getText('THEMEANIM_CANCEL_RANDOM_MSG', '已取消随机二次元背景功能。刷新时将不再自动请求。背景图将在30分钟后自动清理。'),
                         duration: 4000
                     });
                 } catch (e) {
@@ -4403,7 +4450,7 @@
                         
                         const result = await response.json();
                         if (result.status !== 'success') {
-                            throw new Error(result.message || '删除文件失败');
+                            throw new Error(result.message || this._getText('THEMEANIM_DELETE_FILE_FAILED', '删除文件失败'));
                         }
                         
                         if (typeof KernelLogger !== 'undefined') {

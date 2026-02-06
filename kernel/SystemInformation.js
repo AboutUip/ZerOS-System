@@ -5,10 +5,10 @@ KernelLogger.info("SystemInformation", "模块初始化");
 
 class SystemInformation {
     // 系统版本
-    static SYSTEM_VERSION = '0.6.2';
+    static SYSTEM_VERSION = '0.6.4';
     
     // 内核版本
-    static KERNEL_VERSION = '0.6.3';
+    static KERNEL_VERSION = '0.6.4';
     
     // 构建日期
     static BUILD_DATE = new Date('2025-11-28');
@@ -61,7 +61,7 @@ class SystemInformation {
     
     // 后端配置（可通过 LStorage 或环境变量配置）
     static _backendConfig = {
-        type: SystemInformation.BACKEND_TYPE.SPRINGBOOT,
+        type: SystemInformation.BACKEND_TYPE.PHP,
         phpPort: 8089,                              // PHP 默认端口
         springBootPort: 8080                        // SpringBoot 默认端口
     };

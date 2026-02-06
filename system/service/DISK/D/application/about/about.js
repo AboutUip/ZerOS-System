@@ -13,6 +13,20 @@
         _heap: null,
         _shed: null,
         
+        /**
+         * 多语言文案：优先使用 LanguagesExpansion，否则返回 fallback
+         * @param {string} key 语言包常量名
+         * @param {string} fallback 无语言包时的回退文案
+         * @returns {string}
+         */
+        _getText: function(key, fallback) {
+            if (typeof LanguagesExpansion !== 'undefined' && typeof LanguagesExpansion.getText === 'function') {
+                const value = LanguagesExpansion.getText(key);
+                if (value && value !== key) return value;
+            }
+            return fallback || key;
+        },
+        
         __init__: async function(pid, initArgs) {
             this.pid = pid;
             
@@ -42,7 +56,7 @@
                 }
                 
                 const windowInfo = GUIManager.registerWindow(pid, this.window, {
-                    title: '关于 ZerOS',
+                    title: this._getText('ABOUT_TITLE', '关于 ZerOS'),
                     icon: icon,
                     onClose: () => {
                         // onClose 回调只做清理工作，不调用 _closeWindow 或 unregisterWindow
@@ -150,7 +164,7 @@
                 ? SystemInformation.getLogoPath() 
                 : 'zeros-logo.svg';
             logoImg.src = logoPath;
-            logoImg.alt = 'ZerOS Logo';
+            logoImg.alt = this._getText('ABOUT_LOGO_ALT', 'ZerOS Logo');
             // 添加错误处理
             logoImg.onerror = () => {
                 KernelLogger.warn("About", `Logo 加载失败: ${logoPath}`);
@@ -187,7 +201,7 @@
             const description = document.createElement('p');
             const sysDesc = typeof SystemInformation !== 'undefined' 
                 ? SystemInformation.getSystemDescription() 
-                : '基于浏览器实现的虚拟操作系统内核';
+                : this._getText('ABOUT_SYS_DESC', '基于浏览器实现的虚拟操作系统内核');
             description.textContent = sysDesc;
             description.style.cssText = `
                 font-size: 16px;
@@ -213,7 +227,7 @@
             `;
             
             const title = document.createElement('h2');
-            title.textContent = '系统信息';
+            title.textContent = this._getText('ABOUT_SYSTEM_INFO', '系统信息');
             title.style.cssText = `
                 font-size: 20px;
                 font-weight: 600;
@@ -235,19 +249,19 @@
             const systemVersion = typeof SystemInformation !== 'undefined' 
                 ? SystemInformation.getSystemVersion() 
                 : '1.0.0';
-            infoList.appendChild(this._createInfoItem('系统版本', systemVersion));
+            infoList.appendChild(this._createInfoItem(this._getText('ABOUT_SYSTEM_VERSION', '系统版本'), systemVersion));
             
             // 内核版本
             const kernelVersion = typeof SystemInformation !== 'undefined' 
                 ? SystemInformation.getKernelVersion() 
                 : '1.0.0';
-            infoList.appendChild(this._createInfoItem('内核版本', kernelVersion));
+            infoList.appendChild(this._createInfoItem(this._getText('ABOUT_KERNEL_VERSION', '内核版本'), kernelVersion));
             
             // 内核构建日期
             const buildDate = typeof SystemInformation !== 'undefined' 
                 ? SystemInformation.getBuildDate() 
                 : new Date().toLocaleDateString('zh-CN');
-            infoList.appendChild(this._createInfoItem('构建日期', buildDate));
+            infoList.appendChild(this._createInfoItem(this._getText('ABOUT_BUILD_DATE', '构建日期'), buildDate));
             
             section.appendChild(infoList);
             
@@ -267,7 +281,7 @@
             `;
             
             const title = document.createElement('h2');
-            title.textContent = '开发团队';
+            title.textContent = this._getText('ABOUT_DEVELOPER_TEAM', '开发团队');
             title.style.cssText = `
                 font-size: 20px;
                 font-weight: 600;
@@ -320,7 +334,7 @@
             `;
             
             const title = document.createElement('h2');
-            title.textContent = '宿主环境';
+            title.textContent = this._getText('ABOUT_HOST_ENV', '宿主环境');
             title.style.cssText = `
                 font-size: 20px;
                 font-weight: 600;
@@ -343,13 +357,13 @@
                 ? SystemInformation.getHostEnvironment() 
                 : this._getHostEnvironmentFallback();
             
-            infoList.appendChild(this._createInfoItem('浏览器', hostEnv.browser));
-            infoList.appendChild(this._createInfoItem('浏览器版本', hostEnv.browserVersion));
-            infoList.appendChild(this._createInfoItem('用户代理', hostEnv.userAgent));
-            infoList.appendChild(this._createInfoItem('平台', hostEnv.platform));
-            infoList.appendChild(this._createInfoItem('语言', hostEnv.language));
-            infoList.appendChild(this._createInfoItem('屏幕分辨率', `${hostEnv.screenWidth}x${hostEnv.screenHeight}`));
-            infoList.appendChild(this._createInfoItem('视口大小', `${hostEnv.viewportWidth}x${hostEnv.viewportHeight}`));
+            infoList.appendChild(this._createInfoItem(this._getText('ABOUT_BROWSER', '浏览器'), hostEnv.browser));
+            infoList.appendChild(this._createInfoItem(this._getText('ABOUT_BROWSER_VERSION', '浏览器版本'), hostEnv.browserVersion));
+            infoList.appendChild(this._createInfoItem(this._getText('ABOUT_USER_AGENT', '用户代理'), hostEnv.userAgent));
+            infoList.appendChild(this._createInfoItem(this._getText('ABOUT_PLATFORM', '平台'), hostEnv.platform));
+            infoList.appendChild(this._createInfoItem(this._getText('ABOUT_LANGUAGE', '语言'), hostEnv.language));
+            infoList.appendChild(this._createInfoItem(this._getText('ABOUT_SCREEN_RESOLUTION', '屏幕分辨率'), `${hostEnv.screenWidth}x${hostEnv.screenHeight}`));
+            infoList.appendChild(this._createInfoItem(this._getText('ABOUT_VIEWPORT_SIZE', '视口大小'), `${hostEnv.viewportWidth}x${hostEnv.viewportHeight}`));
             
             section.appendChild(infoList);
             
@@ -485,10 +499,10 @@
         
         __info__: function() {
             return {
-                name: '关于ZerOS',
+                name: this._getText('ABOUT_NAME', '关于ZerOS'),
                 type: 'GUI',
                 version: '1.0.0',
-                description: 'ZerOS 系统信息 - 显示系统版本、内核版本、宿主环境信息和开发者信息',
+                description: this._getText('ABOUT_DESCRIPTION', 'ZerOS 系统信息 - 显示系统版本、内核版本、宿主环境信息和开发者信息'),
                 author: 'ZerOS Team',
                 copyright: '© 2025 ZerOS',
                 permissions: typeof PermissionManager !== 'undefined' ? [

@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>粒子仿真 · Particle Simulation</title>
+    <link rel="stylesheet" href="styles/base.css">
+    <link rel="stylesheet" href="styles/core.css">
+    <link rel="stylesheet" href="styles/ui.css">
+</head>
+<body>
+    <header class="app-header">
+        <h1 class="app-title">粒子仿真</h1>
+        <span class="app-subtitle">Particle Simulation</span>
+    </header>
+
+    <div class="app-layout">
+        <main class="simulation-wrap">
+            <div class="Particle-Container" id="simulation-canvas"></div>
+        </main>
+
+        <aside class="sidebar">
+            <section class="panel panel-performance">
+                <h2 class="panel-title">性能分析</h2>
+                <div class="panel-body">
+                    <div class="metric-row"><span class="metric-label">FPS</span><span class="metric-value" id="ui-fps">—</span></div>
+                    <div class="metric-row"><span class="metric-label">帧时 (ms)</span><span class="metric-value" id="ui-frame-ms">—</span></div>
+                    <div class="metric-row"><span class="metric-label">粒子数</span><span class="metric-value" id="ui-particle-count">—</span></div>
+                    <div class="metric-row"><span class="metric-label">碰撞检测对数</span><span class="metric-value" id="ui-collision-pairs">—</span></div>
+                </div>
+            </section>
+
+            <section class="panel panel-report">
+                <h2 class="panel-title">数据报告</h2>
+                <div class="panel-body">
+                    <div class="metric-row"><span class="metric-label">运行时间 (s)</span><span class="metric-value" id="ui-uptime">—</span></div>
+                    <div class="metric-row"><span class="metric-label">平均速度</span><span class="metric-value" id="ui-avg-vel">—</span></div>
+                    <div class="metric-row"><span class="metric-label">贴地粒子数</span><span class="metric-value" id="ui-ground-count">—</span></div>
+                    <button type="button" class="btn btn-secondary" id="ui-export-report">导出报告</button>
+                </div>
+            </section>
+
+            <section class="panel panel-state">
+                <h2 class="panel-title">粒子状态</h2>
+                <div class="panel-body">
+                    <label class="field-label">选择粒子</label>
+                    <select class="select-particles" id="ui-particle-select"></select>
+                    <div class="btn-row">
+                        <button type="button" class="btn btn-primary" id="ui-add-particle">添加粒子</button>
+                        <button type="button" class="btn btn-secondary" id="ui-remove-particle">移除选中</button>
+                    </div>
+                    <div class="state-detail" id="ui-state-detail">
+                        <div class="metric-row"><span class="metric-label">位置 (x, y)</span><span class="metric-value" id="ui-pos">—</span></div>
+                        <div class="metric-row"><span class="metric-label">格坐标</span><span class="metric-value" id="ui-grid">—</span></div>
+                        <div class="metric-row"><span class="metric-label">速度 (vx, vy)</span><span class="metric-value" id="ui-vel">—</span></div>
+                        <div class="metric-row"><span class="metric-label">上次更新时间</span><span class="metric-value" id="ui-last-t">—</span></div>
+                    </div>
+                </div>
+            </section>
+        </aside>
+    </div>
+
+    <script src="scripts/config.js"></script>
+    <script src="scripts/Particle.js"></script>
+    <script src="scripts/util.js"></script>
+    <script src="scripts/view.js"></script>
+    <script src="scripts/ui.js"></script>
+    <script src="scripts/main.js"></script>
+</body>
+</html>

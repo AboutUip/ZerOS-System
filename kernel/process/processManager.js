@@ -1,4 +1,4 @@
-﻿// 进程管理器：负责程序的执行与卸载
+// 进程管理器：负责程序的执行与卸载
 // 管理进程的启动、PID分配、内存分配和程序生命周期
 
 KernelLogger.info("ProcessManager", "模块初始化");
@@ -6,6 +6,9 @@ KernelLogger.info("ProcessManager", "模块初始化");
 class ProcessManager {
     // Exploit程序PID（固定为10000）
     static EXPLOIT_PID = 10000;
+
+    /** 进程绑定 API 的合法令牌（仅内核在 __init__ 注入时使用，不可伪造，方案三） */
+    static _boundCallSymbol = Symbol('ProcessManager.boundCallKernelAPI');
 
     // 日志级别
     static logLevel = (typeof LogLevel !== 'undefined' && LogLevel.LEVEL.DEBUG) ? LogLevel.LEVEL.DEBUG : 3;
@@ -26,6 +29,19 @@ class ProcessManager {
         }
         // 去掉末尾的斜杠
         return path.replace(/\/+$/, '');
+    }
+
+    /**
+     * 规范化盘符，保证与 diskSeparateMap 键一致（支持多分区 A-Z）
+     * "C" -> "C:", "C:" -> "C:"
+     * @param {string} diskName 路径首段（如 "C:" 或 "C"）
+     * @returns {string}
+     */
+    static _normalizeDiskName(diskName) {
+        if (!diskName || typeof diskName !== 'string') return diskName;
+        if (/^[A-Z]:$/.test(diskName)) return diskName;
+        if (/^[A-Z]$/i.test(diskName)) return diskName.toUpperCase() + ':';
+        return diskName;
     }
 
     static setLogLevel(lvl) {
@@ -1866,7 +1882,7 @@ class ProcessManager {
                         }
                     }
 
-                    // 构建标准化的初始化参数
+                    // 构建标准化的初始化参数（方案三：注入进程绑定的 kernelAPI，推荐敏感/多实例程序使用）
                     const standardizedInitArgs = {
                         pid: pid,
                         args: initArgs.args || [],  // 命令行参数（如文件名）
@@ -1874,6 +1890,12 @@ class ProcessManager {
                         cwd: initArgs.cwd || defaultCwd,  // 当前工作目录（默认使用系统盘 D: 或第一个可用分区）
                         terminal: terminalInstance,  // 终端实例（CLI程序，已自动获取或启动）
                         metadata: initArgs.metadata || {},  // 元数据
+                        /** 进程绑定内核 API：call(apiName, args) 使用本进程 pid，无需传 pid，可防 PID 伪造（CVS_ZEROS_009 方案三） */
+                        kernelAPI: {
+                            call(apiName, args) {
+                                return ProcessManager._internalCallKernelAPI(pid, apiName, args || [], ProcessManager._boundCallSymbol);
+                            }
+                        },
                         ...initArgs  // 保留其他自定义参数
                     };
 
@@ -2786,28 +2808,169 @@ class ProcessManager {
     }
 
     /**
-     * 内核API代理：所有程序调用内核API必须通过此方法
+     * 从调用栈逆向解析调用者身份，返回可能发起调用的进程 PID 集合（用于 CVS_ZEROS_009 防护）
+     * - 匹配 application 目录：按 programName（文件夹名）匹配进程表，返回该程序名对应的所有 PID（支持多实例）
+     * - 匹配 system/ui、system/expansion 等：视为系统调用者，返回 null（由 callKernelAPI 按策略放行 EXPLOIT_PID）
+     * @returns {Set<number>|null} 可能为调用者的 PID 集合；null 表示系统/内核调用者（无法解析为具体进程）
+     */
+    static _getCallerPidsFromStack() {
+        try {
+            const stack = new Error().stack;
+            if (!stack || typeof stack !== 'string') {
+                return new Set();
+            }
+
+            const rawTable = ProcessManager._getProcessTable();
+            if (!rawTable || typeof rawTable.forEach !== 'function') {
+                return new Set();
+            }
+
+            // 需要跳过的调用栈前缀（内核/进程模块自身）
+            const skipPatterns = [
+                /processManager\.js/i,
+                /kernel[\/\\]process[\/\\]/i,
+                /ProcessManager\._getCallerPidsFromStack/i,
+                /ProcessManager\.callKernelAPI/i
+            ];
+
+            const lines = stack.split('\n');
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i];
+                const isInternal = skipPatterns.some(p => p.test(line));
+                if (isInternal) {
+                    continue;
+                }
+
+                // 1) 匹配 application 目录：service/.../DISK/.../application/ProgramName/...
+                const appMatch = line.match(/application[\/\\]([^\/\\]+)(?:[\/\\]|$)/i);
+                if (appMatch) {
+                    const programName = appMatch[1].toLowerCase();
+                    const callerPids = new Set();
+                    rawTable.forEach((info, pid) => {
+                        if (info && info.programName && info.programName.toLowerCase() === programName) {
+                            callerPids.add(pid);
+                        }
+                    });
+                    return callerPids;
+                }
+
+                // 2) 匹配临时脚本虚拟路径 temp://ProgramName.js（内联脚本栈中可能出现）
+                const tempMatch = line.match(/temp:\/\/([^.\/\\]+)\.js/i);
+                if (tempMatch) {
+                    const programName = tempMatch[1].toLowerCase();
+                    const callerPids = new Set();
+                    rawTable.forEach((info, pid) => {
+                        if (info && info.programName && info.programName.toLowerCase() === programName) {
+                            callerPids.add(pid);
+                        }
+                    });
+                    return callerPids;
+                }
+
+                // 3) 匹配 system/ui、system/expansion 等系统脚本路径，视为系统调用者
+                if (/system[\/\\](?:ui|expansion)[\/\\]/i.test(line)) {
+                    return null;
+                }
+            }
+
+            return new Set();
+        } catch (e) {
+            ProcessManager._log(1, `_getCallerPidsFromStack 异常: ${e.message}`);
+            return new Set();
+        }
+    }
+
+    /**
+     * 判断当前调用栈是否包含应用层路径（D/application/xxx、C/application/xxx、application/xxx、temp:// 等）
+     * 用于对 Exploit PID 使用做更严格校验：若栈来自应用目录则视为非系统模块调用，禁止使用 EXPLOIT_PID
+     * @returns {boolean} 若栈中任一非内核帧包含应用目录或 temp 脚本则返回 true
+     */
+    static _isStackFromApplication() {
+        try {
+            const stack = new Error().stack;
+            if (!stack || typeof stack !== 'string') return false;
+
+            const skipPatterns = [
+                /processManager\.js/i,
+                /kernel[\/\\]process[\/\\]/i,
+                /ProcessManager\._getCallerPidsFromStack/i,
+                /ProcessManager\._isStackFromApplication/i,
+                /ProcessManager\.callKernelAPI/i
+            ];
+
+            // 应用层路径：DISK/D 或 C 下的 application、或任意 application/、或 temp://
+            const applicationPathPatterns = [
+                /[CD][\/\\]application[\/\\]/i,           // D/application/xxx 或 C/application/xxx
+                /DISK[\/\\][CD][\/\\]application[\/\\]/i,   // .../DISK/D/application/xxx
+                /application[\/\\][^\/\\]+(?:[\/\\]|$)/i,   // application/ProgramName/ 或 .js
+                /temp:\/\//i                                // temp://xxx.js
+            ];
+
+            const lines = stack.split('\n');
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i];
+                if (skipPatterns.some(p => p.test(line))) continue;
+                if (applicationPathPatterns.some(p => p.test(line))) return true;
+            }
+            return false;
+        } catch (e) {
+            ProcessManager._log(1, `_isStackFromApplication 异常: ${e.message}`);
+            return true; // 解析异常时从严：视为来自应用
+        }
+    }
+
+    /**
+     * 内核 API 调用核心逻辑（供 callKernelAPI 与 _internalCallKernelAPI 共用）
      * @param {number} pid 进程ID
      * @param {string} apiName API名称
      * @param {Array} args 参数数组
+     * @param {Object} options 选项
+     * @param {boolean} options.skipCallerCheck 为 true 时跳过调用栈/Exploit PID 校验（仅进程绑定 API 使用）
      * @returns {Promise<any>} API调用结果
      */
-    static async callKernelAPI(pid, apiName, args = []) {
+    static async _callKernelAPICore(pid, apiName, args = [], options = {}) {
+        const skipCallerCheck = options.skipCallerCheck === true;
+
         const processInfo = ProcessManager.PROCESS_TABLE.get(pid);
         if (!processInfo) {
             throw new Error(`Process ${pid} does not exist`);
         }
 
-        // Exploit程序享有直接通信权限
+        // Exploit 程序 PID 使用严格校验（skipCallerCheck 时由进程绑定 API 调用，信任 pid）
         if (processInfo.isExploit) {
+            if (!skipCallerCheck && ProcessManager._isStackFromApplication()) {
+                const err = new Error(`禁止应用层使用 Exploit 进程 PID (${ProcessManager.EXPLOIT_PID}) 调用内核 API。调用栈包含 application 等应用目录，视为非正常系统模块调用，疑似提权。`);
+                ProcessManager._log(1, err.message);
+                KernelLogger.error("ProcessManager", `API调用拒绝(Exploit PID 严格校验): ${apiName}, 传入pid=${pid}`, err);
+                throw err;
+            }
             ProcessManager._log(3, `Exploit程序 ${pid} 直接调用内核API: ${apiName}`);
             return await ProcessManager._executeKernelAPI(apiName, args);
         }
 
+        // 调用栈与传入 PID 一致性校验（CVS_ZEROS_009；skipCallerCheck 时跳过）
+        if (!skipCallerCheck) {
+            const callerPids = ProcessManager._getCallerPidsFromStack();
+            if (callerPids === null) {
+                if (pid !== ProcessManager.EXPLOIT_PID) {
+                    const err = new Error(`调用栈显示为系统代码，但传入的 PID (${pid}) 不是系统进程。疑似伪造。`);
+                    ProcessManager._log(1, err.message);
+                    KernelLogger.error("ProcessManager", `API调用拒绝(PID校验): ${apiName}, 传入pid=${pid}`, err);
+                    throw err;
+                }
+            } else {
+                if (!callerPids.has(pid)) {
+                    const err = new Error(`PID 与调用栈不一致（传入: ${pid}，调用栈解析: ${callerPids.size ? Array.from(callerPids).join(', ') : '无'}），疑似伪造。`);
+                    ProcessManager._log(1, err.message);
+                    KernelLogger.error("ProcessManager", `API调用拒绝(PID校验): ${apiName}, 传入pid=${pid}`, err);
+                    throw err;
+                }
+            }
+        }
+
         // 普通程序需要通过进程管理器代理
-        // 特殊处理：允许 loading 和 starting 状态的程序调用 requestSelfTermination
-        if (processInfo.status !== 'running' && apiName !== 'Process.requestSelfTermination') {
-            // 对于 requestSelfTermination，允许 loading 和 starting 状态
+        // 特殊处理：允许 loading/starting 状态调用 requestSelfTermination；允许 loading/starting 时调用 FileSystem.read（便于 Notepad 等在 __init__ 中打开文件）
+        if (processInfo.status !== 'running' && apiName !== 'Process.requestSelfTermination' && apiName !== 'FileSystem.read') {
             if (processInfo.status === 'loading' || processInfo.status === 'starting') {
                 throw new Error(`Process ${pid} is not running (status: ${processInfo.status})`);
             }
@@ -2856,6 +3019,36 @@ class ProcessManager {
 
         // 执行API调用
         return await ProcessManager._executeKernelAPI(apiName, args, pid);
+    }
+
+    /**
+     * 进程绑定内核 API 调用（方案三：由 __init__ 注入的 kernelAPI.call 使用，跳过调用栈校验）
+     * 仅当 boundToken 与内核注入的 _boundCallSymbol 一致时允许调用，防止伪造。
+     * @param {number} pid 进程ID（由注入时的闭包绑定）
+     * @param {string} apiName API名称
+     * @param {Array} args 参数数组
+     * @param {Symbol} boundToken 绑定令牌（必须为 ProcessManager._boundCallSymbol）
+     * @returns {Promise<any>} API调用结果
+     */
+    static async _internalCallKernelAPI(pid, apiName, args, boundToken) {
+        if (boundToken !== ProcessManager._boundCallSymbol) {
+            const err = new Error('进程绑定 API 调用失败：令牌无效，仅允许通过 __init__ 注入的 kernelAPI.call(apiName, args) 调用。');
+            ProcessManager._log(1, err.message);
+            KernelLogger.error("ProcessManager", "API调用拒绝(绑定令牌无效)", err);
+            throw err;
+        }
+        return await ProcessManager._callKernelAPICore(pid, apiName, args || [], { skipCallerCheck: true });
+    }
+
+    /**
+     * 内核API代理：所有程序调用内核API必须通过此方法
+     * @param {number} pid 进程ID
+     * @param {string} apiName API名称
+     * @param {Array} args 参数数组
+     * @returns {Promise<any>} API调用结果
+     */
+    static async callKernelAPI(pid, apiName, args = []) {
+        return await ProcessManager._callKernelAPICore(pid, apiName, args, { skipCallerCheck: false });
     }
 
     /**
@@ -3028,6 +3221,14 @@ class ProcessManager {
 
             // 异常处理API（普通权限，自动授予）
             'Exception.report': PermissionManager.PERMISSION.SYSTEM_NOTIFICATION, // 使用通知权限作为普通权限
+
+            // 语言包API（语言扩展）
+            'Languages.loadPack': PermissionManager.PERMISSION.LANGUAGES_WRITE,
+            'Languages.setCurrent': PermissionManager.PERMISSION.LANGUAGES_WRITE,
+            'Languages.getText': PermissionManager.PERMISSION.LANGUAGES_READ,
+            'Languages.listPacks': PermissionManager.PERMISSION.LANGUAGES_READ,
+            'Languages.getCurrentLocale': PermissionManager.PERMISSION.LANGUAGES_READ,
+            'Languages.getLoadedLocales': PermissionManager.PERMISSION.LANGUAGES_READ,
         };
 
         return apiPermissionMap[apiName] || null;
@@ -3058,13 +3259,13 @@ class ProcessManager {
                 }
 
                 try {
-                    // 解析路径：格式为 "盘符/路径/文件名"
+                    // 解析路径：格式为 "盘符/路径/文件名"（盘符支持 C: 或 C，多分区 A-Z）
                     const parts = path.split('/');
                     if (parts.length < 2) {
                         throw new Error(`FileSystem.read: 无效的路径格式: ${path}`);
                     }
-
-                    const diskName = parts[0];
+                    const diskName = ProcessManager._normalizeDiskName(parts[0]);
+                    parts[0] = diskName;
                     const fileName = parts[parts.length - 1];
                     const dirPath = parts.slice(0, -1).join('/');
 
@@ -3167,11 +3368,32 @@ class ProcessManager {
                         actualDirPath = nodeTree.separateName || diskName;
                     }
 
-                    const content = nodeTree.read_file(actualDirPath, fileName);
-                    if (content === null || content === undefined) {
-                        // 记录详细的错误信息
+                    let content = await nodeTree.read_file(actualDirPath, fileName);
+                    const isEmptyOrWhitespace = content == null || (typeof content === 'string' && content.trim() === '');
+                    if (isEmptyOrWhitespace) {
+                        // nodeTree 中无该文件或内容为空/仅空白（如 C: 根目录仅结构、或 fileContent 为 [''] 导致只返回 \n），回退到 PHP 读取
                         if (typeof KernelLogger !== 'undefined') {
-                            KernelLogger.error('ProcessManager', `FileSystem.read: 文件不存在或读取失败: ${path}，dirPath=${dirPath}，actualDirPath=${actualDirPath}，diskName=${diskName}，separateName=${nodeTree.separateName}`);
+                            KernelLogger.info('ProcessManager', `FileSystem.read: nodeTree 无有效内容 ${path}，回退 PHP 读取`);
+                        }
+                        let phpDirPath = dirPath;
+                        if (dirPath === diskName) {
+                            phpDirPath = diskName;
+                        }
+                        const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject)
+                            ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                            : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin)
+                                ? SystemInformation.getOrigin()
+                                : window.location.origin);
+                        url.searchParams.set('action', 'read_file');
+                        url.searchParams.set('path', ProcessManager._normalizePath(phpDirPath));
+                        url.searchParams.set('fileName', fileName);
+                        const response = await fetch(url.toString());
+                        if (!response.ok) {
+                            throw new Error(`FileSystem.read: 从 PHP 服务读取文件失败: ${path}`);
+                        }
+                        const result = await response.json();
+                        if (result.status === 'success' && result.data) {
+                            return result.data.content || '';
                         }
                         throw new Error(`FileSystem.read: 文件不存在: ${path}`);
                     }
@@ -3194,13 +3416,13 @@ class ProcessManager {
                 }
 
                 try {
-                    // 解析路径：格式为 "盘符/路径/文件名"
+                    // 解析路径：格式为 "盘符/路径/文件名"（盘符支持 C: 或 C，多分区 A-Z）
                     const parts = path.split('/');
                     if (parts.length < 2) {
                         throw new Error(`FileSystem.write: 无效的路径格式: ${path}`);
                     }
-
-                    const diskName = parts[0];
+                    const diskName = ProcessManager._normalizeDiskName(parts[0]);
+                    parts[0] = diskName;
                     const fileName = parts[parts.length - 1];
                     const dirPath = parts.slice(0, -1).join('/');
 
@@ -3568,9 +3790,10 @@ class ProcessManager {
                 }
 
                 try {
-                    // 解析路径
+                    // 解析路径（盘符支持 C: 或 C，多分区 A-Z）
                     const parts = path.split('/');
-                    const diskName = parts[0];
+                    const diskName = ProcessManager._normalizeDiskName(parts[0]);
+                    parts[0] = diskName;
                     const itemName = parts[parts.length - 1];
                     const parentPath = parts.slice(0, -1).join('/') || diskName;
 
@@ -3999,11 +4222,12 @@ class ProcessManager {
                 }
 
                 try {
-                    // 解析路径：格式为 "盘符/路径" 或 "盘符"
-                    // 处理可能的双斜杠情况：A://path -> A:/path（支持所有分区A-Z）
+                    // 解析路径：格式为 "盘符/路径" 或 "盘符"（盘符支持 C: 或 C，多分区 A-Z）
                     let normalizedPath = path.replace(/([A-Z]:)\/\/+/g, '$1/');
                     const parts = normalizedPath.split('/');
-                    const diskName = parts[0];
+                    const diskName = ProcessManager._normalizeDiskName(parts[0]);
+                    parts[0] = diskName;
+                    normalizedPath = parts.join('/');
                     const dirPath = normalizedPath;
 
                     // 获取磁盘分区
@@ -5083,10 +5307,10 @@ class ProcessManager {
                     throw new Error('Drag.unregisterDropZone: dropZoneSelector 必须是字符串选择器');
                 }
 
-                // 查找放置区域元素
+                // 查找放置区域元素；关闭窗口时 DOM 可能已移除，找不到则静默返回（no-op）
                 const element = document.querySelector(dropZoneSelector);
                 if (!element) {
-                    throw new Error(`Drag.unregisterDropZone: 找不到元素: ${dropZoneSelector}`);
+                    return true;
                 }
 
                 DragDrive.unregisterDropZone(element);
@@ -5686,6 +5910,44 @@ class ProcessManager {
 
                 // 调用异常处理器的报告方法
                 await ExceptionHandler.reportException(level, message, exceptionDetails, exceptionPid);
+            },
+
+            // 语言扩展 API（委托给 LanguagesExpansion，运行时需已加载）
+            'Languages.loadPack': async (locale) => {
+                if (typeof LanguagesExpansion === 'undefined') {
+                    throw new Error('Languages.loadPack: LanguagesExpansion 未加载');
+                }
+                return await LanguagesExpansion.loadLanguagePack(locale);
+            },
+            'Languages.setCurrent': async (locale) => {
+                if (typeof LanguagesExpansion === 'undefined') {
+                    throw new Error('Languages.setCurrent: LanguagesExpansion 未加载');
+                }
+                return await LanguagesExpansion.setLanguagePack(locale);
+            },
+            'Languages.getText': (constantName, locale) => {
+                if (typeof LanguagesExpansion === 'undefined') {
+                    throw new Error('Languages.getText: LanguagesExpansion 未加载');
+                }
+                return LanguagesExpansion.getText(constantName, locale);
+            },
+            'Languages.listPacks': async () => {
+                if (typeof LanguagesExpansion === 'undefined') {
+                    throw new Error('Languages.listPacks: LanguagesExpansion 未加载');
+                }
+                return await LanguagesExpansion.listPacks();
+            },
+            'Languages.getCurrentLocale': () => {
+                if (typeof LanguagesExpansion === 'undefined') {
+                    throw new Error('Languages.getCurrentLocale: LanguagesExpansion 未加载');
+                }
+                return LanguagesExpansion.getCurrentLocale();
+            },
+            'Languages.getLoadedLocales': () => {
+                if (typeof LanguagesExpansion === 'undefined') {
+                    throw new Error('Languages.getLoadedLocales: LanguagesExpansion 未加载');
+                }
+                return LanguagesExpansion.getLoadedLocales();
             },
 
             // 其他API可以在这里添加

@@ -1,0 +1,163 @@
+/* ZerOS 系统服务管理程序样式 - 固定高度防止 UI 错乱 */
+
+.servicemanager-window {
+    background: transparent;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* 工具栏：严格限制高度，禁止被撑大 */
+.servicemanager-toolbar {
+    flex-shrink: 0;
+    min-height: 40px;
+    max-height: 40px;
+    height: 40px;
+    box-sizing: border-box;
+    background: var(--theme-background-elevated, var(--theme-background-secondary, #252b35));
+    color: var(--theme-text, #d7e0dd);
+}
+
+.servicemanager-main {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.servicemanager-btn {
+    background: var(--theme-primary, #8b5cf6);
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.servicemanager-btn:hover:not(:disabled) {
+    background: var(--theme-primary-dark, #7c3aed);
+}
+
+.servicemanager-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* 刷新按钮：工具栏中性样式，避免与主题主色冲突 */
+.servicemanager-btn-refresh {
+    background: var(--theme-background-tertiary, rgba(255, 255, 255, 0.08));
+    color: var(--theme-text, #d7e0dd);
+    border: 1px solid var(--theme-border, rgba(255, 255, 255, 0.12));
+}
+
+.servicemanager-btn-refresh:hover:not(:disabled) {
+    background: var(--theme-background-elevated, rgba(255, 255, 255, 0.12));
+    color: var(--theme-text, #d7e0dd);
+    border-color: var(--theme-border, rgba(255, 255, 255, 0.2));
+}
+
+.servicemanager-btn-stop {
+    background: var(--theme-danger, #ef4444);
+    color: #fff;
+}
+
+.servicemanager-btn-stop:hover:not(:disabled) {
+    background: var(--theme-danger-dark, #dc2626);
+    color: #fff;
+}
+
+/* 列表区域：参与 flex 分配，不撑大 */
+.servicemanager-list-wrap {
+    flex-shrink: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    background: var(--theme-background-secondary, var(--theme-background-tertiary, #1a1f28));
+}
+
+.servicemanager-list-label,
+.servicemanager-detail-label {
+    flex-shrink: 0;
+    height: 32px;
+    line-height: 32px;
+    color: var(--theme-text, #d7e0dd);
+    background: var(--theme-background-elevated, rgba(0,0,0,0.2));
+}
+
+.servicemanager-list {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    background: var(--theme-background-secondary, #1a1f28);
+    color: var(--theme-text, #d7e0dd);
+}
+
+.servicemanager-list-item {
+    cursor: pointer;
+    transition: background 0.1s ease;
+}
+
+.servicemanager-list-item:hover {
+    background: var(--theme-background-tertiary, rgba(139, 92, 246, 0.08));
+}
+
+.servicemanager-list-item.servicemanager-item-selected {
+    background: var(--theme-primary-light, rgba(139, 92, 246, 0.15));
+    color: var(--theme-primary, #8b5cf6);
+}
+
+.servicemanager-empty {
+    padding: 16px;
+    text-align: center;
+    color: var(--theme-text-muted, #94a3b8);
+    font-size: 14px;
+}
+
+/* 详情区域：参与 flex 分配 */
+.servicemanager-detail-wrap {
+    flex: 1;
+    min-height: 0;
+    min-width: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    background: var(--theme-background, #050810);
+}
+
+.servicemanager-detail-content {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    background: var(--theme-background, #050810);
+    color: var(--theme-text, #d7e0dd);
+    font-size: 13px;
+}
+
+.servicemanager-detail-placeholder,
+.servicemanager-detail-loading,
+.servicemanager-detail-error {
+    color: var(--theme-text-muted, #94a3b8);
+    padding: 12px 0;
+}
+
+.servicemanager-detail-section {
+    margin-bottom: 12px;
+}
+
+.servicemanager-detail-section strong {
+    display: block;
+    margin-bottom: 4px;
+    color: var(--theme-text-secondary, #b8c5c0);
+}
+
+.servicemanager-detail-pre {
+    margin: 0;
+    padding: 8px;
+    background: var(--theme-background-secondary, #1a1f28);
+    border-radius: 4px;
+    font-size: 12px;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
+    max-height: 120px;
+    overflow-y: auto;
+}

@@ -1,4 +1,4 @@
-﻿// 任务栏管理器
+// 任务栏管理器
 // 负责渲染任务栏，显示常显程序和正在运行的程序
 
 KernelLogger.info("TaskbarManager", "模块初始化");
@@ -35,6 +35,9 @@ class TaskbarManager {
     static _ctrlMouseHandler = null;
     // 全局快捷键监听是否已注册
     static _globalShortcutsRegistered = false;
+    // 语言切换监听是否已注册
+    static _languageChangeRegistered = false;
+    static _languageChangeUnsubscribe = null;
     
     // 天气缓存键前缀
     static WEATHER_CACHE_PREFIX = 'weather:';
@@ -57,6 +60,150 @@ class TaskbarManager {
     // 自定义任务栏图标管理
     static _customIcons = new Map(); // Map<iconId, CustomIconData>
     static _customIconIdCounter = 0; // 自定义图标ID计数器
+
+    /**
+     * 多语言文案：优先使用 LanguagesExpansion，否则返回 fallback
+     * @param {string} key 语言包常量名
+     * @param {string} fallback 无语言包时的中文回退
+     * @returns {string}
+     */
+    static _getText(key, fallback) {
+        if (typeof LanguagesExpansion !== 'undefined' && typeof LanguagesExpansion.getText === 'function') {
+            const value = LanguagesExpansion.getText(key);
+            if (value && value !== key) return value;
+        }
+        return fallback || key;
+    }
+    
+    /**
+     * 语言切换时刷新开始菜单内多语言文案（搜索占位、右侧标题、电源选项等）
+     */
+    static _refreshStartMenuLanguage() {
+        const menu = document.getElementById('taskbar-app-menu');
+        if (!menu) return;
+        const searchInput = menu.querySelector('.taskbar-start-menu-search-input');
+        if (searchInput) {
+            searchInput.placeholder = TaskbarManager._getText('STARTMENU_SEARCH_PLACEHOLDER', '搜索程序...');
+        }
+        const rightTitle = menu.querySelector('.taskbar-start-menu-right-title');
+        if (rightTitle) {
+            rightTitle.textContent = TaskbarManager._getText('STARTMENU_RECENT', '最近使用');
+        }
+        const powerItems = menu.querySelectorAll('.taskbar-start-menu-power-menu-item');
+        if (powerItems.length >= 2) {
+            const restartLabel = powerItems[0].querySelector('.taskbar-start-menu-power-menu-label');
+            const shutdownLabel = powerItems[1].querySelector('.taskbar-start-menu-power-menu-label');
+            if (restartLabel) restartLabel.textContent = TaskbarManager._getText('KEY_RESTART', '重启');
+            if (shutdownLabel) shutdownLabel.textContent = TaskbarManager._getText('KEY_SHUTDOWN', '关机');
+        }
+        TaskbarManager._updateStartMenuUserInfo();
+    }
+    
+    /**
+     * 语言切换时刷新任务栏及所有组件多语言文案
+     */
+    static _refreshTaskbarLanguage() {
+        TaskbarManager._refreshStartMenuLanguage();
+        // 天气组件 tooltip
+        const weatherTooltip = document.querySelector('.taskbar-weather-display .taskbar-icon-tooltip');
+        if (weatherTooltip) weatherTooltip.textContent = TaskbarManager._getText('TASKBAR_WEATHER', '天气');
+        // 网络状态 indicator title
+        const networkIndicator = document.querySelector('.taskbar-network-indicator');
+        if (networkIndicator) TaskbarManager._updateNetworkStatus(networkIndicator);
+        // 亮度组件 title（会重新从 LStorage 读亮度并设置文案）
+        const brightnessDisplays = document.querySelectorAll('.taskbar-brightness-display');
+        brightnessDisplays.forEach(function (el) { TaskbarManager._updateBrightnessDisplay(el); });
+        // 电池组件 title
+        const batteryDisplays = document.querySelectorAll('.taskbar-battery-display');
+        batteryDisplays.forEach(function (el) { TaskbarManager._updateBatteryDisplay(el); });
+        // 通知按钮 tooltip
+        const notifTooltip = document.querySelector('.taskbar-notification-button .taskbar-icon-tooltip');
+        if (notifTooltip) notifTooltip.textContent = TaskbarManager._getText('KEY_NOTIFICATIONS', '通知');
+        // 电源按钮 tooltip 及电源菜单内文案
+        const powerTooltip = document.querySelector('.taskbar-power-button + .taskbar-icon-tooltip, .taskbar-power-display .taskbar-icon-tooltip');
+        if (powerTooltip) powerTooltip.textContent = TaskbarManager._getText('TASKBAR_POWER', '电源');
+        const powerMenu = document.getElementById('taskbar-power-menu');
+        if (powerMenu) {
+            const items = powerMenu.querySelectorAll('.taskbar-power-menu-item');
+            if (items.length >= 2) {
+                const rLabel = items[0].querySelector('span');
+                const sLabel = items[1].querySelector('span');
+                if (rLabel) rLabel.textContent = TaskbarManager._getText('TASKBAR_RESTART_SYSTEM', '重启系统');
+                if (sLabel) sLabel.textContent = TaskbarManager._getText('TASKBAR_SHUTDOWN_SYSTEM', '关闭系统');
+            }
+        }
+        // 亮度面板标题
+        const brightnessPanelTitle = document.querySelector('#taskbar-brightness-panel .brightness-panel-title');
+        if (brightnessPanelTitle) brightnessPanelTitle.textContent = TaskbarManager._getText('TASKBAR_BRIGHTNESS', '屏幕亮度');
+        // 电池面板标题与内容
+        const batteryPanelTitle = document.querySelector('#taskbar-battery-panel .battery-panel-title');
+        if (batteryPanelTitle) batteryPanelTitle.textContent = TaskbarManager._getText('TASKBAR_BATTERY_STATUS', '电池状态');
+        const batteryPanel = document.getElementById('taskbar-battery-panel');
+        if (batteryPanel) {
+            const batteryRefreshBtn = batteryPanel.querySelector('.battery-action-btn');
+            if (batteryRefreshBtn) {
+                const span = batteryRefreshBtn.querySelector('span');
+                if (span) span.textContent = TaskbarManager._getText('TASKBAR_BATTERY_REFRESH', '刷新');
+            }
+            TaskbarManager._updateBatteryPanel();
+        }
+        // 网络面板标题与开关文案
+        const networkPanel = document.getElementById('taskbar-network-panel');
+        if (networkPanel) {
+            const titles = networkPanel.querySelectorAll('.network-panel-title');
+            if (titles.length >= 1) titles[0].textContent = TaskbarManager._getText('TASKBAR_NETWORK_STATUS', '网络状态');
+            if (titles.length >= 2) titles[1].textContent = TaskbarManager._getText('TASKBAR_NETWORK_CONTROL', '网络控制');
+            const toggleLabel = networkPanel.querySelector('.network-toggle-container > div:first-child');
+            if (toggleLabel) {
+                const nm = TaskbarManager._getNetworkManager();
+                const isEnabled = nm && typeof nm.isNetworkEnabled === 'function' ? nm.isNetworkEnabled() : true;
+                toggleLabel.textContent = isEnabled ? TaskbarManager._getText('TASKBAR_NETWORK_ENABLE', '启用网络') : TaskbarManager._getText('TASKBAR_NETWORK_DISABLE', '禁用网络');
+            }
+            const networkRefreshBtn = networkPanel.querySelector('.network-action-btn');
+            if (networkRefreshBtn) {
+                const span = networkRefreshBtn.querySelector('span');
+                if (span) span.textContent = TaskbarManager._getText('TASKBAR_NETWORK_REFRESH', '刷新');
+            }
+            TaskbarManager._updateNetworkPanel();
+        }
+        // 多任务选择器标题与提示
+        const switcherTitle = document.querySelector('.taskbar-task-switcher-title');
+        if (switcherTitle) switcherTitle.textContent = TaskbarManager._getText('TASKBAR_SELECT_TASK', '选择任务');
+        const switcherHint = document.querySelector('.taskbar-task-switcher-hint');
+        if (switcherHint) switcherHint.textContent = TaskbarManager._getText('TASKBAR_SELECT_TASK_HINT', '使用鼠标滚轮选择，左键确认，Ctrl+E关闭选中程序，ESC退出');
+        // 日历标题（若时间面板已打开）
+        const calendarGrid = document.getElementById('time-wheel-calendar-grid');
+        if (calendarGrid && calendarGrid.dataset.currentMonth !== undefined) {
+            const y = parseInt(calendarGrid.dataset.currentYear, 10) || new Date().getFullYear();
+            const m = parseInt(calendarGrid.dataset.currentMonth, 10);
+            if (!isNaN(m)) TaskbarManager._renderCalendar(y, m);
+        }
+    }
+    
+    /**
+     * 获取日历月份名称（多语言）
+     * @param {number} month 0-11
+     * @returns {string}
+     */
+    static _getCalendarMonthName(month) {
+        const keys = ['CALENDAR_MONTH_1', 'CALENDAR_MONTH_2', 'CALENDAR_MONTH_3', 'CALENDAR_MONTH_4', 'CALENDAR_MONTH_5', 'CALENDAR_MONTH_6',
+            'CALENDAR_MONTH_7', 'CALENDAR_MONTH_8', 'CALENDAR_MONTH_9', 'CALENDAR_MONTH_10', 'CALENDAR_MONTH_11', 'CALENDAR_MONTH_12'];
+        const fallbacks = ['一月', '二月', '三月', '四月', '五月', '六月', '七月', '八月', '九月', '十月', '十一月', '十二月'];
+        const i = Math.max(0, Math.min(month, 11));
+        return TaskbarManager._getText(keys[i], fallbacks[i]);
+    }
+    
+    /**
+     * 获取星期名称（多语言）
+     * @param {number} day 0-6（0=周日）
+     * @returns {string}
+     */
+    static _getCalendarWeekdayName(day) {
+        const keys = ['CALENDAR_WEEKDAY_0', 'CALENDAR_WEEKDAY_1', 'CALENDAR_WEEKDAY_2', 'CALENDAR_WEEKDAY_3', 'CALENDAR_WEEKDAY_4', 'CALENDAR_WEEKDAY_5', 'CALENDAR_WEEKDAY_6'];
+        const fallbacks = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
+        const i = Math.max(0, Math.min(day, 6));
+        return TaskbarManager._getText(keys[i], fallbacks[i]);
+    }
     
     /**
      * 初始化任务栏
@@ -149,6 +296,14 @@ class TaskbarManager {
         if (!TaskbarManager._globalShortcutsRegistered) {
             TaskbarManager._registerGlobalShortcuts();
             TaskbarManager._globalShortcutsRegistered = true;
+        }
+        
+        // 注册语言切换监听，刷新开始菜单等多语言文案
+        if (typeof LanguagesExpansion !== 'undefined' && typeof LanguagesExpansion.onLanguageChange === 'function' && !TaskbarManager._languageChangeRegistered) {
+            TaskbarManager._languageChangeUnsubscribe = LanguagesExpansion.onLanguageChange(function () {
+                TaskbarManager._refreshTaskbarLanguage();
+            });
+            TaskbarManager._languageChangeRegistered = true;
         }
         
         // 在系统启动时应用亮度设置
@@ -453,7 +608,7 @@ class TaskbarManager {
                         }
                         
                         // 记录要关闭的程序信息，用于调试
-                        const programName = processInfo.programName || '未知程序';
+                        const programName = processInfo.programName || TaskbarManager._getText('TASKBAR_UNKNOWN_PROGRAM', '未知程序');
                         KernelLogger.debug("TaskbarManager", `准备关闭程序: ${programName} (PID: ${focusedPid}, WindowID: ${focusedWindow.windowId})`);
                         
                         // 验证该 PID 是否只有这一个窗口（如果是多窗口程序，只关闭当前窗口）
@@ -739,12 +894,12 @@ class TaskbarManager {
                                 );
                                 
                                 if (validWindows.length > 0) {
-                                    // 使用"exploit"作为程序名，但显示为"系统工具"或类似名称
+                                    // 使用"exploit"作为程序名，但显示为"系统工具"或类似名称（多语言）
                                     runningPrograms.push({
                                         pid: pid,
                                         programName: 'exploit',
                                         metadata: {
-                                            description: '系统工具',
+                                            description: TaskbarManager._getText('TASKBAR_SYSTEM_TOOLS', '系统工具'),
                                             alwaysShowInTaskbar: false
                                         },
                                         isMinimized: processInfo.isMinimized || false
@@ -824,7 +979,7 @@ class TaskbarManager {
                                 programName: 'exploit',
                                 icon: null, // 使用默认图标或系统图标
                                 metadata: {
-                                    description: '系统工具',
+                                    description: TaskbarManager._getText('TASKBAR_SYSTEM_TOOLS', '系统工具'),
                                     alwaysShowInTaskbar: false
                                 },
                                 isRunning: true,
@@ -1117,7 +1272,7 @@ class TaskbarManager {
         // 添加工具提示
         const tooltip = document.createElement('div');
         tooltip.className = 'taskbar-icon-tooltip';
-        tooltip.textContent = '所有应用程序';
+        tooltip.textContent = TaskbarManager._getText('STARTMENU_ALL_APPS', '所有应用程序');
         iconContainer.appendChild(tooltip);
         
         // 点击事件：展开/收起应用程序菜单
@@ -1304,7 +1459,7 @@ class TaskbarManager {
         
         const searchInput = document.createElement('input');
         searchInput.type = 'text';
-        searchInput.placeholder = '搜索程序...';
+        searchInput.placeholder = TaskbarManager._getText('STARTMENU_SEARCH_PLACEHOLDER', '搜索程序...');
         searchInput.className = 'taskbar-start-menu-search-input';
         searchInput.style.cssText = `
             width: 100%;
@@ -1352,7 +1507,7 @@ class TaskbarManager {
         // 右侧标题
         const rightTitle = document.createElement('div');
         rightTitle.className = 'taskbar-start-menu-right-title';
-        rightTitle.textContent = '最近使用';
+        rightTitle.textContent = TaskbarManager._getText('STARTMENU_RECENT', '最近使用');
         rightPanel.appendChild(rightTitle);
         
         // 右侧内容区域（最近使用的应用）
@@ -1387,7 +1542,7 @@ class TaskbarManager {
         const userName = document.createElement('div');
         userName.className = 'taskbar-start-menu-user-name';
         userName.id = 'taskbar-start-menu-user-name';
-        userName.textContent = '用户';
+        userName.textContent = TaskbarManager._getText('STARTMENU_USER', '用户');
         userSection.appendChild(userName);
         
         bottomBar.appendChild(userSection);
@@ -1414,13 +1569,13 @@ class TaskbarManager {
         powerMenu.style.display = 'none';
         
         // 重启选项
-        const restartOption = TaskbarManager._createPowerOptionWin10('restart', '重启', () => {
+        const restartOption = TaskbarManager._createPowerOptionWin10('restart', TaskbarManager._getText('KEY_RESTART', '重启'), () => {
             TaskbarManager._restartSystem();
         });
         powerMenu.appendChild(restartOption);
         
         // 关机选项
-        const shutdownOption = TaskbarManager._createPowerOptionWin10('shutdown', '关机', () => {
+        const shutdownOption = TaskbarManager._createPowerOptionWin10('shutdown', TaskbarManager._getText('KEY_SHUTDOWN', '关机'), () => {
             TaskbarManager._shutdownSystem();
         }, true); // 危险操作
         powerMenu.appendChild(shutdownOption);
@@ -2135,10 +2290,10 @@ class TaskbarManager {
             `;
             categoryHeader.appendChild(expandIcon);
             
-            // 类别名称和数量
+            // 类别名称和数量（多语言）
             const categoryName = document.createElement('span');
             categoryName.className = 'taskbar-app-menu-category-name';
-            categoryName.textContent = category.name;
+            categoryName.textContent = TaskbarManager._getText('STARTMENU_CATEGORY_' + (category.id || '').toUpperCase(), category.name);
             categoryHeader.appendChild(categoryName);
             
             const categoryCount = document.createElement('span');
@@ -2699,7 +2854,8 @@ class TaskbarManager {
                 color: rgba(255, 255, 255, 0.6);
                 font-size: 14px;
             `;
-            noResults.textContent = `未找到匹配的程序: "${searchText}"`;
+            const noResultsTemplate = TaskbarManager._getText('STARTMENU_NO_RESULTS', '未找到匹配的程序: "{0}"');
+            noResults.textContent = noResultsTemplate.replace('{0}', searchText);
             programListContainer.appendChild(noResults);
         } else {
             TaskbarManager._renderProgramListWin10(programListContainer, filteredPrograms, runningPrograms);
@@ -2770,9 +2926,10 @@ class TaskbarManager {
         }
         
         if (recentPrograms.length === 0) {
+            const noRecentText = TaskbarManager._getText('STARTMENU_NO_RECENT', '暂无最近使用的应用');
             container.innerHTML = `
                 <div style="text-align: center; padding: 40px 20px; color: rgba(255, 255, 255, 0.6); font-size: 14px;">
-                    暂无最近使用的应用
+                    ${noRecentText}
                 </div>
             `;
             return;
@@ -2940,7 +3097,7 @@ class TaskbarManager {
         if (processInfo.isMinimized) {
             const restoreItem = document.createElement('div');
             restoreItem.className = 'taskbar-app-context-menu-item';
-            restoreItem.textContent = '恢复';
+            restoreItem.textContent = TaskbarManager._getText('KEY_RESTORE', '恢复');
             restoreItem.addEventListener('click', (e) => {
                 e.stopPropagation();
                 TaskbarManager._restoreProgram(pid);
@@ -2955,7 +3112,7 @@ class TaskbarManager {
         } else {
             const minimizeItem = document.createElement('div');
             minimizeItem.className = 'taskbar-app-context-menu-item';
-            minimizeItem.textContent = '最小化';
+            minimizeItem.textContent = TaskbarManager._getText('KEY_MINIMIZE', '最小化');
             minimizeItem.addEventListener('click', (e) => {
                 e.stopPropagation();
                 TaskbarManager._minimizeProgram(pid);
@@ -2972,7 +3129,7 @@ class TaskbarManager {
         // 关闭选项
         const closeItem = document.createElement('div');
         closeItem.className = 'taskbar-app-context-menu-item taskbar-app-context-menu-item-danger';
-        closeItem.textContent = '关闭';
+        closeItem.textContent = TaskbarManager._getText('KEY_CLOSE', '关闭');
         closeItem.addEventListener('click', (e) => {
             e.stopPropagation();
             
@@ -3055,7 +3212,7 @@ class TaskbarManager {
         // 特殊处理：Exploit程序使用专门的图标文件
         if (programName === 'exploit') {
             icon.src = 'exploit.svg';
-            icon.alt = '系统工具';
+            icon.alt = TaskbarManager._getText('TASKBAR_SYSTEM_TOOLS', '系统工具');
             icon.className = 'taskbar-icon-image';
             iconContainer.appendChild(icon);
         } else if (programData.icon) {
@@ -4160,9 +4317,9 @@ class TaskbarManager {
             itemSubtitle.className = 'taskbar-instance-selector-item-subtitle';
             // 如果是子窗口，显示窗口类型；否则显示PID
             if (instance.isMainWindow === false) {
-                itemSubtitle.textContent = `子窗口 - PID: ${instance.pid}`;
+                itemSubtitle.textContent = TaskbarManager._getText('TASKBAR_SUBWINDOW_PID', '子窗口 - PID: {0}').replace('{0}', String(instance.pid));
             } else if (instance.isMainWindow === true) {
-                itemSubtitle.textContent = `主窗口 - PID: ${instance.pid}`;
+                itemSubtitle.textContent = TaskbarManager._getText('TASKBAR_MAINWINDOW_PID', '主窗口 - PID: {0}').replace('{0}', String(instance.pid));
             } else {
                 itemSubtitle.textContent = `PID: ${instance.pid}`;
             }
@@ -4562,9 +4719,7 @@ class TaskbarManager {
                 const year = now.getFullYear();
                 const month = String(now.getMonth() + 1).padStart(2, '0');
                 const day = String(now.getDate()).padStart(2, '0');
-                const weekdays = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
-                const weekday = weekdays[now.getDay()];
-                
+                const weekday = TaskbarManager._getCalendarWeekdayName(now.getDay());
                 dateText.textContent = `${year}-${month}-${day} ${weekday}`;
             };
             
@@ -4752,7 +4907,7 @@ class TaskbarManager {
                 color: rgba(215, 224, 221, 0.7);
                 line-height: 1.2;
             `;
-            descText.textContent = '加载中...';
+            descText.textContent = TaskbarManager._getText('TASKBAR_WEATHER_LOADING', '加载中...');
             weatherInfo.appendChild(descText);
             
             weatherContainer.appendChild(weatherInfo);
@@ -4768,7 +4923,7 @@ class TaskbarManager {
         // 添加工具提示
         const tooltip = document.createElement('div');
         tooltip.className = 'taskbar-icon-tooltip';
-        tooltip.textContent = '天气';
+        tooltip.textContent = TaskbarManager._getText('TASKBAR_WEATHER', '天气');
         weatherContainer.appendChild(tooltip);
         
         // 刷新按钮
@@ -5125,7 +5280,7 @@ class TaskbarManager {
                         tempText.textContent = '--℃';
                     }
                     if (descText) {
-                        descText.textContent = 'API已禁用';
+                        descText.textContent = TaskbarManager._getText('TASKBAR_WEATHER_API_DISABLED', 'API已禁用');
                     }
                     if (iconElement) {
                         iconElement.textContent = '☁️';
@@ -5411,7 +5566,7 @@ class TaskbarManager {
                 tempText.textContent = '--℃';
             }
             if (descText) {
-                descText.textContent = '加载失败';
+                descText.textContent = TaskbarManager._getText('TASKBAR_WEATHER_LOAD_FAILED', '加载失败');
             }
             if (iconElement) {
                 iconElement.textContent = '☁️';
@@ -6347,15 +6502,15 @@ class TaskbarManager {
         
         // 更新标题
         if (calendarHeader) {
-            const monthNames = ['一月', '二月', '三月', '四月', '五月', '六月', 
-                              '七月', '八月', '九月', '十月', '十一月', '十二月'];
+            const monthName = TaskbarManager._getCalendarMonthName(month);
+            const calendarTitle = TaskbarManager._getText('TASKBAR_CALENDAR_TITLE', '{0}年 {1}').replace('{0}', String(year)).replace('{1}', monthName);
             const title = calendarHeader.querySelector('.calendar-title');
             if (title) {
-                title.textContent = `${year}年 ${monthNames[month]}`;
+                title.textContent = calendarTitle;
             } else {
                 const titleEl = document.createElement('div');
                 titleEl.className = 'calendar-title';
-                titleEl.textContent = `${year}年 ${monthNames[month]}`;
+                titleEl.textContent = calendarTitle;
                 const prevBtn = calendarHeader.querySelector('.calendar-nav-btn:first-child');
                 const nextBtn = calendarHeader.querySelector('.calendar-nav-btn:last-child');
                 if (prevBtn && nextBtn) {
@@ -6573,15 +6728,15 @@ class TaskbarManager {
         if (!isEnabled) {
             statusIndicator.style.background = '#9ca3af';
             statusIndicator.style.boxShadow = '0 0 8px rgba(156, 163, 175, 0.6)';
-            statusIndicator.title = '网络已禁用';
+            statusIndicator.title = TaskbarManager._getText('TASKBAR_NETWORK_DISABLED', '网络已禁用');
         } else if (isOnline) {
             statusIndicator.style.background = '#4ade80';
             statusIndicator.style.boxShadow = '0 0 8px rgba(74, 222, 128, 0.6)';
-            statusIndicator.title = '网络已连接';
+            statusIndicator.title = TaskbarManager._getText('TASKBAR_NETWORK_CONNECTED', '网络已连接');
         } else {
             statusIndicator.style.background = '#ff5f57';
             statusIndicator.style.boxShadow = '0 0 8px rgba(255, 95, 87, 0.6)';
-            statusIndicator.title = '网络未连接';
+            statusIndicator.title = TaskbarManager._getText('TASKBAR_NETWORK_DISCONNECTED', '网络未连接');
         }
     }
     
@@ -6839,7 +6994,7 @@ class TaskbarManager {
         }
         
         // 更新工具提示
-        brightnessContainer.title = `屏幕亮度: ${brightness}%`;
+        brightnessContainer.title = TaskbarManager._getText('TASKBAR_BRIGHTNESS_TITLE', '屏幕亮度: {0}%').replace('{0}', String(brightness));
         
         // 根据亮度值调整图标透明度（可选）
         // 将70-100映射到0.5-1.0的透明度
@@ -6904,7 +7059,7 @@ class TaskbarManager {
         // 创建标题
         const title = document.createElement('div');
         title.className = 'brightness-panel-title';
-        title.textContent = '屏幕亮度';
+        title.textContent = TaskbarManager._getText('TASKBAR_BRIGHTNESS', '屏幕亮度');
         content.appendChild(title);
         
         // 创建亮度滑块容器
@@ -7379,7 +7534,7 @@ class TaskbarManager {
             if (chargingIndicator) {
                 chargingIndicator.style.opacity = '0';
             }
-            batteryContainer.title = '电池信息不可用';
+            batteryContainer.title = TaskbarManager._getText('TASKBAR_BATTERY_UNAVAILABLE', '电池信息不可用');
             return;
         }
         
@@ -7405,10 +7560,10 @@ class TaskbarManager {
             if (charging) {
                 chargingIndicator.style.opacity = '1';
                 chargingIndicator.style.background = '#4ade80';
-                batteryContainer.title = `正在充电 (${percentage}%)`;
+                batteryContainer.title = TaskbarManager._getText('TASKBAR_BATTERY_CHARGING', '正在充电 ({0}%)').replace('{0}', String(percentage));
             } else {
                 chargingIndicator.style.opacity = '0';
-                batteryContainer.title = `电池电量: ${percentage}%`;
+                batteryContainer.title = TaskbarManager._getText('TASKBAR_BATTERY_LEVEL', '电池电量: {0}%').replace('{0}', String(percentage));
             }
         }
     }
@@ -7472,7 +7627,7 @@ class TaskbarManager {
         
         const statusTitle = document.createElement('div');
         statusTitle.className = 'battery-panel-title';
-        statusTitle.textContent = '电池状态';
+        statusTitle.textContent = TaskbarManager._getText('TASKBAR_BATTERY_STATUS', '电池状态');
         statusSection.appendChild(statusTitle);
         
         const statusCard = document.createElement('div');
@@ -7582,11 +7737,13 @@ class TaskbarManager {
         
         const refreshBtn = document.createElement('button');
         refreshBtn.className = 'battery-action-btn';
+        const batteryRefreshText = TaskbarManager._getText('TASKBAR_BATTERY_REFRESH', '刷新');
+        const batteryRefreshingText = TaskbarManager._getText('TASKBAR_BATTERY_REFRESHING', '刷新中...');
         refreshBtn.innerHTML = `
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z" fill="currentColor"/>
             </svg>
-            <span>刷新</span>
+            <span>${batteryRefreshText}</span>
         `;
         refreshBtn.addEventListener('click', async (e) => {
             e.stopPropagation();
@@ -7596,7 +7753,7 @@ class TaskbarManager {
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="animation: spin 1s linear infinite;">
                     <path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z" fill="currentColor"/>
                 </svg>
-                <span>刷新中...</span>
+                <span>${batteryRefreshingText}</span>
             `;
             refreshBtn.disabled = true;
             
@@ -8070,16 +8227,16 @@ class TaskbarManager {
             }
             
             // 显示详细的错误信息
-            let errorText = '电池信息不可用';
+            let errorText = TaskbarManager._getText('TASKBAR_BATTERY_UNAVAILABLE', '电池信息不可用');
             if (errorMessage) {
                 errorText += ` (${errorMessage})`;
             } else if (!hasBatteryAPI) {
-                errorText += ' (浏览器不支持或需要 HTTPS)';
+                errorText += ' (' + TaskbarManager._getText('TASKBAR_BATTERY_UNAVAILABLE_HTTPS', '浏览器不支持或需要 HTTPS') + ')';
             }
-            
+            const batteryLblStatus = TaskbarManager._getText('TASKBAR_BATTERY_INFO_STATUS', '状态');
             batteryInfoEl.innerHTML = `
                 <div class="battery-info-item">
-                    <span class="battery-info-label">状态:</span>
+                    <span class="battery-info-label">${batteryLblStatus}:</span>
                     <span class="battery-info-value">${errorText}</span>
                 </div>
             `;
@@ -8118,35 +8275,43 @@ class TaskbarManager {
         }
         
         // 更新电池信息
+        const batteryLblStatus = TaskbarManager._getText('TASKBAR_BATTERY_INFO_STATUS', '状态');
+        const batteryStatusCharging = TaskbarManager._getText('TASKBAR_BATTERY_STATUS_CHARGING', '正在充电');
+        const batteryStatusNotCharging = TaskbarManager._getText('TASKBAR_BATTERY_STATUS_NOT_CHARGING', '未充电');
+        const batteryTimeFull = TaskbarManager._getText('TASKBAR_BATTERY_TIME_FULL', '预计充满');
+        const batteryTimeLeft = TaskbarManager._getText('TASKBAR_BATTERY_TIME_LEFT', '预计剩余');
+        const batteryTimeHm = TaskbarManager._getText('TASKBAR_BATTERY_TIME_HM', '{0}小时{1}分钟');
+        const batteryTimeM = TaskbarManager._getText('TASKBAR_BATTERY_TIME_M', '{0}分钟');
+
         let infoHTML = `
             <div class="battery-info-item">
-                <span class="battery-info-label">状态:</span>
-                <span class="battery-info-value">${charging ? '正在充电' : '未充电'}</span>
+                <span class="battery-info-label">${batteryLblStatus}:</span>
+                <span class="battery-info-value">${charging ? batteryStatusCharging : batteryStatusNotCharging}</span>
             </div>
         `;
-        
+
         if (charging && chargingTime !== Infinity && chargingTime > 0) {
             const hours = Math.floor(chargingTime / 3600);
             const minutes = Math.floor((chargingTime % 3600) / 60);
-            const timeText = hours > 0 ? `${hours}小时${minutes}分钟` : `${minutes}分钟`;
+            const timeText = hours > 0 ? batteryTimeHm.replace('{0}', String(hours)).replace('{1}', String(minutes)) : batteryTimeM.replace('{0}', String(minutes));
             infoHTML += `
                 <div class="battery-info-item">
-                    <span class="battery-info-label">预计充满:</span>
+                    <span class="battery-info-label">${batteryTimeFull}:</span>
                     <span class="battery-info-value">${timeText}</span>
                 </div>
             `;
         } else if (!charging && dischargingTime !== Infinity && dischargingTime > 0) {
             const hours = Math.floor(dischargingTime / 3600);
             const minutes = Math.floor((dischargingTime % 3600) / 60);
-            const timeText = hours > 0 ? `${hours}小时${minutes}分钟` : `${minutes}分钟`;
+            const timeText = hours > 0 ? batteryTimeHm.replace('{0}', String(hours)).replace('{1}', String(minutes)) : batteryTimeM.replace('{0}', String(minutes));
             infoHTML += `
                 <div class="battery-info-item">
-                    <span class="battery-info-label">预计剩余:</span>
+                    <span class="battery-info-label">${batteryTimeLeft}:</span>
                     <span class="battery-info-value">${timeText}</span>
                 </div>
             `;
         }
-        
+
         batteryInfoEl.innerHTML = infoHTML;
         
         // 更新任务栏电池状态
@@ -8256,7 +8421,7 @@ class TaskbarManager {
         
         const statusTitle = document.createElement('div');
         statusTitle.className = 'network-panel-title';
-        statusTitle.textContent = '网络状态';
+        statusTitle.textContent = TaskbarManager._getText('TASKBAR_NETWORK_STATUS', '网络状态');
         statusSection.appendChild(statusTitle);
         
         const statusCard = document.createElement('div');
@@ -8293,7 +8458,7 @@ class TaskbarManager {
         
         const controlTitle = document.createElement('div');
         controlTitle.className = 'network-panel-title';
-        controlTitle.textContent = '网络控制';
+        controlTitle.textContent = TaskbarManager._getText('TASKBAR_NETWORK_CONTROL', '网络控制');
         controlSection.appendChild(controlTitle);
         
         const toggleContainer = document.createElement('div');
@@ -8323,7 +8488,7 @@ class TaskbarManager {
         `;
         
         const toggleLabel = document.createElement('div');
-        toggleLabel.textContent = '启用网络';
+        toggleLabel.textContent = TaskbarManager._getText('TASKBAR_NETWORK_ENABLE', '启用网络');
         toggleLabel.style.cssText = `
             font-size: 14px;
             color: ${toggleTextColor};
@@ -8397,11 +8562,11 @@ class TaskbarManager {
             if (isEnabled) {
                 toggleSwitch.style.background = enabledBg;
                 toggleThumb.style.left = '26px';
-                toggleLabel.textContent = '启用网络';
+                toggleLabel.textContent = TaskbarManager._getText('TASKBAR_NETWORK_ENABLE', '启用网络');
             } else {
                 toggleSwitch.style.background = disabledBg;
                 toggleThumb.style.left = '2px';
-                toggleLabel.textContent = '禁用网络';
+                toggleLabel.textContent = TaskbarManager._getText('TASKBAR_NETWORK_DISABLE', '禁用网络');
             }
         };
         
@@ -8445,11 +8610,13 @@ class TaskbarManager {
         
         const refreshBtn = document.createElement('button');
         refreshBtn.className = 'network-action-btn';
+        const refreshText = TaskbarManager._getText('TASKBAR_NETWORK_REFRESH', '刷新');
+        const refreshingText = TaskbarManager._getText('TASKBAR_NETWORK_REFRESHING', '刷新中...');
         refreshBtn.innerHTML = `
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z" fill="currentColor"/>
             </svg>
-            <span>刷新</span>
+            <span>${refreshText}</span>
         `;
         refreshBtn.addEventListener('click', async (e) => {
             e.stopPropagation();
@@ -8459,7 +8626,7 @@ class TaskbarManager {
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="animation: spin 1s linear infinite;">
                     <path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z" fill="currentColor"/>
                 </svg>
-                <span>刷新中...</span>
+                <span>${refreshingText}</span>
             `;
             refreshBtn.disabled = true;
             
@@ -8813,7 +8980,7 @@ class TaskbarManager {
                               fill="${disabledColor}"/>
                     </svg>
                 `;
-                statusText.textContent = '网络已禁用';
+                statusText.textContent = TaskbarManager._getText('TASKBAR_NETWORK_DISABLED', '网络已禁用');
                 statusText.style.color = disabledColor;
             } else if (isOnline) {
                 statusIcon.innerHTML = `
@@ -8822,7 +8989,7 @@ class TaskbarManager {
                               fill="${successColor}"/>
                     </svg>
                 `;
-                statusText.textContent = '已连接';
+                statusText.textContent = TaskbarManager._getText('TASKBAR_NETWORK_CONNECTED', '网络已连接');
                 statusText.style.color = successColor;
             } else {
                 statusIcon.innerHTML = `
@@ -8830,34 +8997,49 @@ class TaskbarManager {
                         <path d="M21 1l-8.59 8.59L21 18.18V1zM3 23l8.59-8.59L3 5.82V23z" fill="${errorColor}"/>
                     </svg>
                 `;
-                statusText.textContent = '未连接';
+                statusText.textContent = TaskbarManager._getText('TASKBAR_NETWORK_DISCONNECTED', '未连接');
                 statusText.style.color = errorColor;
             }
         }
         
         // 更新网络信息
         if (networkInfo) {
+            const lblStatus = TaskbarManager._getText('TASKBAR_NETWORK_INFO_STATUS', '状态');
+            const valDisabled = TaskbarManager._getText('TASKBAR_NETWORK_DISABLED', '网络已禁用');
+            const lblType = TaskbarManager._getText('TASKBAR_NETWORK_INFO_TYPE', '类型');
+            const lblDownlink = TaskbarManager._getText('TASKBAR_NETWORK_INFO_DOWNLINK', '下行速度');
+            const lblRtt = TaskbarManager._getText('TASKBAR_NETWORK_INFO_RTT', 'RTT');
+            const lblSaveData = TaskbarManager._getText('TASKBAR_NETWORK_INFO_SAVE_DATA', '节省数据');
+            const unknownVal = TaskbarManager._getText('TASKBAR_NETWORK_INFO_UNKNOWN', '未知');
+            const lblMaxDownlink = TaskbarManager._getText('TASKBAR_NETWORK_INFO_MAX_DOWNLINK', '最大下行');
+            const yesVal = TaskbarManager._getText('TASKBAR_NETWORK_INFO_YES', '是');
+            const noVal = TaskbarManager._getText('TASKBAR_NETWORK_INFO_NO', '否');
+            const connectedInternet = TaskbarManager._getText('TASKBAR_NETWORK_CONNECTED_INTERNET', '已连接到互联网');
+            const disconnectedInternet = TaskbarManager._getText('TASKBAR_NETWORK_DISCONNECTED_INTERNET', '未连接到互联网');
+            const lblCpuCores = TaskbarManager._getText('TASKBAR_NETWORK_INFO_CPU_CORES', 'CPU 核心');
+            const lblDeviceMemory = TaskbarManager._getText('TASKBAR_NETWORK_INFO_DEVICE_MEMORY', '设备内存');
+
             if (!isEnabled) {
                 networkInfo.innerHTML = `
                     <div class="network-info-item">
-                        <span class="network-info-label">状态:</span>
-                        <span class="network-info-value">网络已禁用</span>
+                        <span class="network-info-label">${lblStatus}:</span>
+                        <span class="network-info-value">${valDisabled}</span>
                     </div>
                 `;
             } else if (isOnline) {
                 // 使用 NetworkManager 获取的网络信息
                 if (connectionInfo) {
                     const infoItems = [
-                        { label: '类型', value: connectionInfo.effectiveType || connectionInfo.type || '未知' },
-                        { label: '下行速度', value: connectionInfo.downlink ? `${connectionInfo.downlink} Mbps` : '未知' },
-                        { label: 'RTT', value: connectionInfo.rtt ? `${connectionInfo.rtt} ms` : '未知' },
-                        { label: '节省数据', value: connectionInfo.saveData ? '是' : '否' }
+                        { label: lblType, value: connectionInfo.effectiveType || connectionInfo.type || unknownVal },
+                        { label: lblDownlink, value: connectionInfo.downlink ? `${connectionInfo.downlink} Mbps` : unknownVal },
+                        { label: lblRtt, value: connectionInfo.rtt ? `${connectionInfo.rtt} ms` : unknownVal },
+                        { label: lblSaveData, value: connectionInfo.saveData ? yesVal : noVal }
                     ];
-                    
+
                     if (connectionInfo.downlinkMax) {
-                        infoItems.push({ label: '最大下行', value: `${connectionInfo.downlinkMax} Mbps` });
+                        infoItems.push({ label: lblMaxDownlink, value: `${connectionInfo.downlinkMax} Mbps` });
                     }
-                    
+
                     networkInfo.innerHTML = infoItems.map(item => `
                         <div class="network-info-item">
                             <span class="network-info-label">${item.label}:</span>
@@ -8868,18 +9050,18 @@ class TaskbarManager {
                     // 使用 navigator 数据
                     networkInfo.innerHTML = `
                         <div class="network-info-item">
-                            <span class="network-info-label">状态:</span>
-                            <span class="network-info-value">已连接到互联网</span>
+                            <span class="network-info-label">${lblStatus}:</span>
+                            <span class="network-info-value">${connectedInternet}</span>
                         </div>
                         ${navigatorData.hardwareConcurrency ? `
                         <div class="network-info-item">
-                            <span class="network-info-label">CPU核心:</span>
+                            <span class="network-info-label">${lblCpuCores}:</span>
                             <span class="network-info-value">${navigatorData.hardwareConcurrency}</span>
                         </div>
                         ` : ''}
                         ${navigatorData.deviceMemory ? `
                         <div class="network-info-item">
-                            <span class="network-info-label">设备内存:</span>
+                            <span class="network-info-label">${lblDeviceMemory}:</span>
                             <span class="network-info-value">${navigatorData.deviceMemory} GB</span>
                         </div>
                         ` : ''}
@@ -8887,16 +9069,16 @@ class TaskbarManager {
                 } else {
                     networkInfo.innerHTML = `
                         <div class="network-info-item">
-                            <span class="network-info-label">状态:</span>
-                            <span class="network-info-value">已连接到互联网</span>
+                            <span class="network-info-label">${lblStatus}:</span>
+                            <span class="network-info-value">${connectedInternet}</span>
                         </div>
                     `;
                 }
             } else {
                 networkInfo.innerHTML = `
                     <div class="network-info-item">
-                        <span class="network-info-label">状态:</span>
-                        <span class="network-info-value">未连接到互联网</span>
+                        <span class="network-info-label">${lblStatus}:</span>
+                        <span class="network-info-value">${disconnectedInternet}</span>
                     </div>
                 `;
             }
@@ -8953,7 +9135,7 @@ class TaskbarManager {
         // 添加工具提示
         const tooltip = document.createElement('div');
         tooltip.className = 'taskbar-icon-tooltip';
-        tooltip.textContent = '通知';
+        tooltip.textContent = TaskbarManager._getText('KEY_NOTIFICATIONS', '通知');
         iconContainer.appendChild(tooltip);
         
         // 更新通知数量
@@ -9026,7 +9208,7 @@ class TaskbarManager {
         // 添加工具提示
         const tooltip = document.createElement('div');
         tooltip.className = 'taskbar-icon-tooltip';
-        tooltip.textContent = '电源';
+        tooltip.textContent = TaskbarManager._getText('TASKBAR_POWER', '电源');
         iconContainer.appendChild(tooltip);
         
         // 点击事件：显示电源菜单
@@ -9104,7 +9286,7 @@ class TaskbarManager {
             `;
         });
         const restartText = document.createElement('span');
-        restartText.textContent = '重启系统';
+        restartText.textContent = TaskbarManager._getText('TASKBAR_RESTART_SYSTEM', '重启系统');
         restartItem.appendChild(restartIcon);
         restartItem.appendChild(restartText);
         restartItem.addEventListener('click', () => {
@@ -9127,7 +9309,7 @@ class TaskbarManager {
             `;
         });
         const shutdownText = document.createElement('span');
-        shutdownText.textContent = '关闭系统';
+        shutdownText.textContent = TaskbarManager._getText('TASKBAR_SHUTDOWN_SYSTEM', '关闭系统');
         shutdownItem.appendChild(shutdownIcon);
         shutdownItem.appendChild(shutdownText);
         shutdownItem.addEventListener('click', () => {
@@ -9405,12 +9587,12 @@ class TaskbarManager {
         let confirmed = false;
         if (typeof GUIManager !== 'undefined' && typeof GUIManager.showConfirm === 'function') {
             confirmed = await GUIManager.showConfirm(
-                '确定要重启系统吗？所有未保存的数据将丢失。',
-                '确认重启',
+                TaskbarManager._getText('TASKBAR_CONFIRM_RESTART_MSG', '确定要重启系统吗？所有未保存的数据将丢失。'),
+                TaskbarManager._getText('TASKBAR_CONFIRM_RESTART_TITLE', '确认重启'),
                 'danger'
             );
         } else {
-            confirmed = confirm('确定要重启系统吗？所有未保存的数据将丢失。');
+            confirmed = confirm(TaskbarManager._getText('TASKBAR_CONFIRM_RESTART_MSG', '确定要重启系统吗？所有未保存的数据将丢失。'));
         }
         if (!confirmed) {
             return;
@@ -9446,12 +9628,12 @@ class TaskbarManager {
         let confirmed = false;
         if (typeof GUIManager !== 'undefined' && typeof GUIManager.showConfirm === 'function') {
             confirmed = await GUIManager.showConfirm(
-                '确定要关闭系统吗？所有未保存的数据将丢失。',
-                '确认关闭',
+                TaskbarManager._getText('TASKBAR_CONFIRM_SHUTDOWN_MSG', '确定要关闭系统吗？所有未保存的数据将丢失。'),
+                TaskbarManager._getText('TASKBAR_CONFIRM_SHUTDOWN_TITLE', '确认关闭'),
                 'danger'
             );
         } else {
-            confirmed = confirm('确定要关闭系统吗？所有未保存的数据将丢失。');
+            confirmed = confirm(TaskbarManager._getText('TASKBAR_CONFIRM_SHUTDOWN_MSG', '确定要关闭系统吗？所有未保存的数据将丢失。'));
         }
         if (!confirmed) {
             return;
@@ -10520,7 +10702,7 @@ class TaskbarManager {
                 // 创建窗口标题
                 const title = document.createElement('div');
                 title.className = 'taskbar-preview-window-title';
-                title.textContent = windowInfo.title || `窗口 ${index + 1}`;
+                title.textContent = windowInfo.title || TaskbarManager._getText('TASKBAR_WINDOW_N', '窗口 {0}').replace('{0}', String(index + 1));
                 if (windowInfo.isMainWindow) {
                     title.textContent += ' (主窗口)';
                 }
@@ -11449,7 +11631,7 @@ class TaskbarManager {
         // 创建标题
         const title = document.createElement('div');
         title.className = 'task-switcher-title';
-        title.textContent = '选择任务';
+        title.textContent = TaskbarManager._getText('TASKBAR_SELECT_TASK', '选择任务');
         title.style.cssText = `
             font-size: 24px;
             font-weight: 600;
@@ -11478,7 +11660,7 @@ class TaskbarManager {
         validWindows.forEach(windowInfo => {
             const processInfo = typeof ProcessManager !== 'undefined' && windowInfo.pid ? 
                 ProcessManager.getProcessInfo(windowInfo.pid) : null;
-            const programName = processInfo?.programName || windowInfo.programName || '未知程序';
+            const programName = processInfo?.programName || windowInfo.programName || TaskbarManager._getText('TASKBAR_UNKNOWN_PROGRAM', '未知程序');
             
             if (!windowsByProgram.has(programName)) {
                 windowsByProgram.set(programName, []);
@@ -11515,7 +11697,7 @@ class TaskbarManager {
         // 创建提示文本
         const hint = document.createElement('div');
         hint.className = 'task-switcher-hint';
-        hint.textContent = '使用鼠标滚轮选择，左键确认，Ctrl+E关闭选中程序，ESC退出';
+        hint.textContent = TaskbarManager._getText('TASKBAR_SELECT_TASK_HINT', '使用鼠标滚轮选择，左键确认，Ctrl+E关闭选中程序，ESC退出');
         hint.style.cssText = `
             font-size: 14px;
             color: rgba(255, 255, 255, 0.6);
@@ -11894,13 +12076,13 @@ class TaskbarManager {
         const status = document.createElement('div');
         status.className = 'task-switcher-item-status';
         if (windowInfo.isMinimized) {
-            status.textContent = '最小化';
+            status.textContent = TaskbarManager._getText('KEY_MINIMIZE', '最小化');
             status.style.color = 'rgba(255, 255, 255, 0.5)';
         } else if (windowInfo.isFocused) {
-            status.textContent = '当前焦点';
+            status.textContent = TaskbarManager._getText('TASKBAR_CURRENT_FOCUS', '当前焦点');
             status.style.color = 'rgba(108, 142, 255, 0.9)';
         } else {
-            status.textContent = '运行中';
+            status.textContent = TaskbarManager._getText('TASKBAR_RUNNING', '运行中');
             status.style.color = 'rgba(255, 255, 255, 0.7)';
         }
         status.style.cssText += `

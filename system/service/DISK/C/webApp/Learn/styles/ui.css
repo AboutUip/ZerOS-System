@@ -1,0 +1,211 @@
+/* 产品级 UI：严谨布局与面板 */
+:root {
+    --bg-page: #0f1419;
+    --bg-panel: #1a2332;
+    --bg-header: #161e2a;
+    --border: #2d3a4d;
+    --text: #e6edf3;
+    --text-muted: #8b949e;
+    --accent: #58a6ff;
+    --accent-dim: #388bfd66;
+    --success: #3fb950;
+    --danger: #f85149;
+    --radius: 8px;
+    --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans SC", sans-serif;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: var(--font-sans);
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--text);
+    background: var(--bg-page);
+    min-height: 100vh;
+}
+
+/* 顶栏 */
+.app-header {
+    background: var(--bg-header);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 24px;
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+}
+.app-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text);
+}
+.app-subtitle {
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+/* 主布局 */
+.app-layout {
+    display: flex;
+    min-height: calc(100vh - 49px);
+}
+.simulation-wrap {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    min-width: 0;
+}
+.Particle-Container {
+    outline: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.3);
+}
+
+/* 侧栏 */
+.sidebar {
+    width: 320px;
+    min-width: 280px;
+    background: var(--bg-panel);
+    border-left: 1px solid var(--border);
+    padding: 16px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+/* 面板 */
+.panel {
+    background: var(--bg-page);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+}
+.panel-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--border);
+}
+.panel-body {
+    padding: 14px;
+}
+
+/* 指标行 */
+.metric-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--border);
+}
+.metric-row:last-child {
+    border-bottom: none;
+}
+.metric-label {
+    color: var(--text-muted);
+    font-size: 13px;
+}
+.metric-value {
+    font-variant-numeric: tabular-nums;
+    color: var(--accent);
+    font-weight: 500;
+}
+
+/* 按钮 */
+.btn {
+    display: inline-block;
+    padding: 8px 14px;
+    font-size: 13px;
+    font-weight: 500;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    cursor: pointer;
+    margin-top: 10px;
+    width: 100%;
+    font-family: inherit;
+    transition: background 0.15s, border-color 0.15s;
+}
+.btn-secondary {
+    background: var(--bg-panel);
+    color: var(--text);
+}
+.btn-secondary:hover {
+    background: var(--border);
+    border-color: var(--text-muted);
+}
+.btn-primary {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+}
+.btn-primary:hover {
+    filter: brightness(1.1);
+}
+.btn-row {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+}
+.btn-row .btn {
+    flex: 1;
+    margin-top: 0;
+}
+
+/* 粒子状态选择 */
+.field-label {
+    display: block;
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+}
+.select-particles {
+    width: 100%;
+    padding: 8px 10px;
+    font-size: 13px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg-panel);
+    color: var(--text);
+    margin-bottom: 12px;
+    font-family: inherit;
+    cursor: pointer;
+}
+.select-particles:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+.state-detail {
+    padding-top: 8px;
+    border-top: 1px solid var(--border);
+}
+
+/* 粒子格子样式（覆盖 base） */
+.Unit-Particle {
+    outline: 1px solid var(--border);
+    box-sizing: border-box;
+    position: relative;
+    float: left;
+    margin: 0;
+    padding: 0;
+}
+.Unit-Particle > div {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 6px var(--accent-dim);
+}

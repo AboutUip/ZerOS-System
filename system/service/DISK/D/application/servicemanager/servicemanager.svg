@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="svcGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#5b21b6"/>
+      <stop offset="100%" stop-color="#8b5cf6"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="12" fill="#1a0b2e" opacity="0.8"/>
+  <rect x="8" y="8" width="48" height="48" rx="6" fill="#2d1b3d" stroke="url(#svcGrad)" stroke-width="2"/>
+  <circle cx="32" cy="28" r="6" fill="none" stroke="url(#svcGrad)" stroke-width="2"/>
+  <rect x="29" y="18" width="6" height="6" rx="1" fill="url(#svcGrad)"/>
+  <rect x="29" y="38" width="6" height="6" rx="1" fill="url(#svcGrad)"/>
+  <rect x="18" y="29" width="6" height="6" rx="1" fill="url(#svcGrad)"/>
+  <rect x="40" y="29" width="6" height="6" rx="1" fill="url(#svcGrad)"/>
+  <rect x="22" y="22" width="4" height="4" rx="0.5" fill="url(#svcGrad)"/>
+  <rect x="38" y="22" width="4" height="4" rx="0.5" fill="url(#svcGrad)"/>
+  <rect x="22" y="38" width="4" height="4" rx="0.5" fill="url(#svcGrad)"/>
+  <rect x="38" y="38" width="4" height="4" rx="0.5" fill="url(#svcGrad)"/>
+  <rect x="12" y="48" width="40" height="4" rx="2" fill="#3d1f5d"/>
+  <rect x="12" y="53" width="32" height="3" rx="1" fill="#3d1f5d"/>
+</svg>

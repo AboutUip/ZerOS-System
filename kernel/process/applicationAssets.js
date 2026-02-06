@@ -1,4 +1,4 @@
-﻿// 该文件用于存放所有应用程序的启动文件和元数据
+// 该文件用于存放所有应用程序的启动文件和元数据
 // 注意：程序必须禁止自动初始化（包括立即调用函数）
 // 程序只能调用依赖管理器去注册自己的加载
 // 程序必须导出 [程序名(大写全拼)] 对象，并实现 __init__ , __info__ 和 __exit__ 方法
@@ -16,6 +16,41 @@
 // - metadata: 程序元数据（可选）
 //   - supportsPreview: boolean (可选) - 是否支持窗口预览快照，如果为true，当程序只有单例运行时，会使用html2canvas生成真实的窗口快照
 
+/**
+ * APPLICATION_ASSETS — 系统应用/程序资源清单
+ *
+ * 描述 (Description):
+ * 映射每个应用 ID 到其运行所需的资源路径与元数据。路径为磁盘上实际的 D: 盘绝对路径，
+ * 每个条目定义脚本、样式、图标、可选的额外资源以及应用的配置/行为元信息。
+ *
+ * @typedef {Object} AppMetadata
+ * @property {boolean} [autoStart=false] - 是否开机或系统启动时自动启动该应用。是否自动启动。
+ * @property {number} [priority] - 应用优先级（数值，可用于窗口/启动/任务栏排序或权限决策）。
+ * @property {string} description - 应用简要描述。
+ * @property {string} version - 应用版本号（例如 "1.0.0"）。
+ * @property {string} [type] - 应用类型/子类（例如 "GUI"、"game"、"utility" 等）。
+ * @property {boolean} [alwaysShowInTaskbar=false] - 即使未运行也是否在任务栏显示快捷方式。
+ * @property {boolean} [allowMultipleInstances=true] - 是否允许多开多个实例。
+ * @property {boolean} [supportsPreview=false] - 是否支持窗口缩略/预览快照。
+ * @property {string} [category] - 应用分类（例如 "system"、"utility"、"game"、"security" 等）。
+ * @property {boolean} [showOnDesktop] - 是否在桌面显示快捷方式（可选）。
+ *
+ * @typedef {Object} ApplicationAsset
+ * @property {string} script - 应用主脚本的绝对路径（D: 盘上的真实路径）。
+ * @property {string[]} [styles] - 一个或多个样式表文件的绝对路径数组。
+ * @property {string} [icon] - 图标文件的绝对路径。
+ * @property {string|string[]} [assets] - 可选的额外资源（单个路径或路径数组），例如图片、字体或数据文件。
+ * @property {AppMetadata} metadata - 应用的行为与展示元数据。
+ *
+ * @typedef {Object.<string, ApplicationAsset>} ApplicationAssetsMap
+ *
+ * 使用示例 (Usage):
+ * - 键（string）是应用标识符（如 "terminal", "browser"）。
+ * - 值为 ApplicationAsset，提供运行该应用所需的所有静态文件路径与配置。
+ *
+ * 这个字段代表什么（中文）:
+ * - 它是操作系统内核/桌面环境用于注册与管理内置或可用应用的中央清单，供启动器、任务栏、设置与权限系统查询与使用。
+ */
 const APPLICATION_ASSETS = {
     // 终端程序（ZerOS内置终端，永恒存在）
     // 注意：路径是 D: 盘下的真实路径
@@ -449,6 +484,23 @@ const APPLICATION_ASSETS = {
             category: "system"
         }
     },
+
+    "servicemanager": {
+        script: "D:/application/servicemanager/servicemanager.js",
+        styles: ["D:/application/servicemanager/servicemanager.css"],
+        icon: "D:/application/servicemanager/servicemanager.svg",
+        metadata: {
+            autoStart: false,
+            priority: 3,
+            description: "系统服务管理",
+            version: "1.0.0",
+            type: "GUI",
+            alwaysShowInTaskbar: false,
+            allowMultipleInstances: false,
+            supportsPreview: true,
+            category: "system"
+        }
+    },
     
     "scheduletask": {
         script: "D:/application/scheduletask/scheduletask.js",
@@ -502,6 +554,42 @@ const APPLICATION_ASSETS = {
             category: "utility"  // 工具类应用
         }
     },
+
+    // Notepad程序
+    // 该程序内置为系统的笔记本
+    "notepad": {
+        script: "D:/application/notepad/notepad.js",
+        styles: ["D:/application/notepad/notepad.css"],
+        icon: "D:/application/notepad/notepad.svg",
+        metadata: {
+            autoStart: false,
+            priority: 4,
+            description: "Notepad",
+            version: "1.0.0",
+            type: "GUI",
+            alwaysShowInTaskbar: false,
+            allowMultipleInstances: true,
+            supportsPreview: true,
+            category: "system"  // 系统应用
+        }
+    },
+
+    // Horror Mansion - 3D 恐怖游戏
+    "horrormansion": {
+        script: "D:/application/HorrorMansion/HorrorMansion.js",
+        icon: "D:/application/HorrorMansion/HorrorMansion.svg",
+        metadata: {
+            autoStart: false,
+            priority: 5,
+            description: "Horror Mansion 3D",
+            version: "1.0.0",
+            type: "GUI",
+            alwaysShowInTaskbar: false,
+            allowMultipleInstances: false,
+            supportsPreview: true,
+            category: "game"
+        }
+    }
 };
 
 // 不导出到全局作用域，交由POOL管理

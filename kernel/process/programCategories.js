@@ -1,4 +1,4 @@
-﻿// 程序类别配置表
+// 程序类别配置表
 // 用于管理所有程序的分类，支持通过元数据指定类别
 // 无法解析的类别将自动归类到"其他程序"
 
@@ -25,6 +25,7 @@ const PROGRAM_CATEGORY_MAP = {
     'terminal': 'system',      // 终端
     'taskmanager': 'system',   // 任务管理器
     'filemanager': 'system',   // 文件管理器
+    'servicemanager': 'system', // 系统服务管理
     
     // 轻松使用
     'vim': 'utility',          // Vim编辑器

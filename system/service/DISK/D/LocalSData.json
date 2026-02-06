@@ -4,13 +4,13 @@
     "system.style": "macos",
     "desktop.icons": [
       {
-        "id": 3,
+        "id": 8,
         "programName": "filemanager",
         "name": "文件管理器",
         "icon": "D:/application/filemanager/filemanager.svg",
         "description": "文件管理器",
         "position": null,
-        "createdAt": 1768574357268
+        "createdAt": 1770381245442
       }
     ],
     "musicplayer.settings": {
@@ -147,10 +147,16 @@
         "name": "wallpaper_community_409819.mp4",
         "description": "本地视频: D:/cache/wallpaper_community_409819.mp4（静音循环播放）",
         "path": "D:/cache/wallpaper_community_409819.mp4"
+      },
+      {
+        "id": "local_D__cache_wallpaper_community_354652_mp4",
+        "name": "wallpaper_community_354652.mp4",
+        "description": "Local video: D:/cache/wallpaper_community_354652.mp4 (muted loop)",
+        "path": "D:/cache/wallpaper_community_354652.mp4"
       }
     ],
     "taskbarPosition": "bottom",
-    "system.animationPreset": "smooth",
+    "system.animationPreset": "elegant",
     "desktop.autoArrange": true,
     "desktop.arrangement": "list",
     "system.theme": "default",
@@ -178,14 +184,14 @@
         "password": "61b249bf6d604d14120821f43625e84e",
         "avatar": "avatar_root_1766272534753.jpg",
         "createdAt": 1766271155991,
-        "lastLogin": 1768577772375
+        "lastLogin": 1770381254236
       },
       "TestUser": {
         "level": "USER",
         "password": null,
         "avatar": null,
         "createdAt": 1766271155991,
-        "lastLogin": 1768067914456
+        "lastLogin": 1770364258362
       }
     },
     "userControl.currentUser": "root",
@@ -241,7 +247,10 @@
       "test": true
     },
     "exceptionHandler.kernelExceptionTimestamp": 1768413452064,
-    "exceptionHandler.blockNormalBoot": false
+    "exceptionHandler.blockNormalBoot": false,
+    "languagesExpansion": {
+      "currentLocale": "zh-CN"
+    }
   },
   "programs": {}
 }

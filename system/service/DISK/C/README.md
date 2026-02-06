@@ -281,6 +281,11 @@ ZerOS Kernel 采用模块化架构，主要包含以下核心模块：
   - 文件系统 API
   - 驱动层 API
 
+### 扩展与插件
+- **[扩展与插件 (PLUGINS)](docs/PLUGINS/README.md)** - 语言包、服务模块等编写说明
+  - [语言包格式](docs/PLUGINS/LanguagePack.md)
+  - [服务模块编写](docs/PLUGINS/ServiceModule.md)
+
 ### 安全文档
 - **[安全漏洞报告中心](VULN/README.md)** - 系统安全漏洞报告和修复状态
   - 漏洞统计和列表

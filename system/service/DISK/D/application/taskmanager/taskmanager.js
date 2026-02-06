@@ -8,6 +8,20 @@
     const TASKMANAGER = {
         pid: null,
         
+        /**
+         * 多语言文案：优先使用 LanguagesExpansion，否则返回 fallback
+         * @param {string} key 语言包常量名
+         * @param {string} fallback 无语言包时的回退文案
+         * @returns {string}
+         */
+        _getText: function(key, fallback) {
+            if (typeof LanguagesExpansion !== 'undefined' && typeof LanguagesExpansion.getText === 'function') {
+                const value = LanguagesExpansion.getText(key);
+                if (value && value !== key) return value;
+            }
+            return fallback || key;
+        },
+        
         // 磁盘信息缓存
         _diskInfoCache: new Map(), // Map<diskName, { data, timestamp }>
         _diskInfoCacheTimeout: 30000, // 缓存30秒,
@@ -72,11 +86,11 @@
                 }
                 
                 // 根据模式设置不同的窗口标题
-                let windowTitle = '任务管理器';
+                let windowTitle = this._getText('TASKMANAGER_TITLE', '任务管理器');
                 if (this._isProcessSelectorMode) {
-                    windowTitle = '选择进程';
+                    windowTitle = this._getText('TASKMANAGER_SELECT_PROCESS', '选择进程');
                 } else if (this._isProgramSelectorMode) {
-                    windowTitle = '选择程序';
+                    windowTitle = this._getText('TASKMANAGER_SELECT_PROGRAM', '选择程序');
                 }
                 
                 const windowInfo = GUIManager.registerWindow(pid, this.window, {
@@ -205,7 +219,7 @@
             
             // 标题
             const title = document.createElement('div');
-            title.textContent = '任务管理器';
+            title.textContent = this._getText('TASKMANAGER_TITLE', '任务管理器');
             title.style.cssText = `
                 font-size: 16px;
                 font-weight: 600;
@@ -230,7 +244,7 @@
             const closeBtn = document.createElement('button');
             closeBtn.className = 'control-btn';
             closeBtn.innerHTML = '×';
-            closeBtn.title = '关闭';
+            closeBtn.title = this._getText('KEY_CLOSE', '关闭');
             closeBtn.style.cssText = `
                 width: 32px;
                 height: 32px;
@@ -283,16 +297,16 @@
             
             const hintText = document.createElement('span');
             if (this._isProcessSelectorMode) {
-                hintText.textContent = '⚙️ 请选择一个运行中的进程（单击选中后点击"选择"按钮）';
+                hintText.textContent = '⚙️ ' + this._getText('TASKMANAGER_HINT_PROCESS', '请选择一个运行中的进程（单击选中后点击「选择」按钮）');
             } else if (this._isProgramSelectorMode) {
-                hintText.textContent = '📦 请选择一个程序（单击选中后点击"选择"按钮）';
+                hintText.textContent = '📦 ' + this._getText('TASKMANAGER_HINT_PROGRAM', '请选择一个程序（单击选中后点击「选择」按钮）');
             }
             selectorHint.appendChild(hintText);
             
             // 选择按钮（单选模式）
             const selectButton = document.createElement('button');
             selectButton.className = 'taskmanager-select-button';
-            selectButton.textContent = '选择';
+            selectButton.textContent = this._getText('TASKMANAGER_SELECT_BTN', '选择');
             selectButton.style.cssText = `
                 padding: 6px 16px;
                 background: rgba(139, 92, 246, 0.3);
@@ -338,7 +352,7 @@
             `;
             
             const refreshBtn = document.createElement('button');
-            refreshBtn.textContent = '刷新';
+            refreshBtn.textContent = this._getText('KEY_REFRESH', '刷新');
             refreshBtn.style.cssText = `
                 padding: 6px 12px;
                 border: 1px solid rgba(108, 142, 255, 0.3);
@@ -366,7 +380,7 @@
             // 查看POOL按钮（选择模式下隐藏）
             if (!isSelectorMode) {
                 const viewPoolBtn = document.createElement('button');
-                viewPoolBtn.textContent = '查看POOL';
+                viewPoolBtn.textContent = this._getText('TASKMANAGER_VIEW_POOL', '查看POOL');
                 viewPoolBtn.style.cssText = `
                     padding: 6px 12px;
                     border: 1px solid rgba(108, 142, 255, 0.3);
@@ -390,7 +404,7 @@
                 
                 // 查看网络按钮（选择模式下隐藏）
                 const viewNetworkBtn = document.createElement('button');
-                viewNetworkBtn.textContent = '查看网络';
+                viewNetworkBtn.textContent = this._getText('TASKMANAGER_VIEW_NETWORK', '查看网络');
                 viewNetworkBtn.style.cssText = `
                     padding: 6px 12px;
                     border: 1px solid rgba(108, 142, 255, 0.3);
@@ -424,7 +438,7 @@
             
             const searchInput = document.createElement('input');
             searchInput.type = 'text';
-            searchInput.placeholder = this._isProgramSelectorMode ? '搜索程序...' : '搜索进程...';
+            searchInput.placeholder = this._isProgramSelectorMode ? this._getText('TASKMANAGER_SEARCH_PROGRAM', '搜索程序...') : this._getText('TASKMANAGER_SEARCH_PROCESS', '搜索进程...');
             searchInput.style.cssText = `
                 width: 100%;
                 padding: 6px 12px;
@@ -464,7 +478,7 @@
                 `;
                 
                 const sortLabel = document.createElement('span');
-                sortLabel.textContent = '排序:';
+                sortLabel.textContent = this._getText('TASKMANAGER_SORT', '排序:');
                 sortLabel.style.cssText = `
                     font-size: 12px;
                     color: #aab2c0;
@@ -482,11 +496,11 @@
                     outline: none;
                 `;
                 sortSelect.innerHTML = `
-                    <option value="status">按状态</option>
-                    <option value="name">按名称</option>
-                    <option value="pid">按PID</option>
-                    <option value="memory">按内存</option>
-                    <option value="time">按启动时间</option>
+                    <option value="status">${this._getText('TASKMANAGER_SORT_STATUS', '按状态')}</option>
+                    <option value="name">${this._getText('TASKMANAGER_SORT_NAME', '按名称')}</option>
+                    <option value="pid">${this._getText('TASKMANAGER_SORT_PID', '按PID')}</option>
+                    <option value="memory">${this._getText('TASKMANAGER_SORT_MEMORY', '按内存')}</option>
+                    <option value="time">${this._getText('TASKMANAGER_SORT_TIME', '按启动时间')}</option>
                 `;
                 sortSelect.value = this._sortBy || 'status';
                 sortSelect.addEventListener('change', (e) => {
@@ -525,7 +539,7 @@
                 });
                 
                 const filterLabel = document.createElement('span');
-                filterLabel.textContent = '隐藏已退出';
+                filterLabel.textContent = this._getText('TASKMANAGER_HIDE_EXITED', '隐藏已退出');
                 
                 filterCheckbox.appendChild(filterInput);
                 filterCheckbox.appendChild(filterLabel);
@@ -571,10 +585,10 @@
                 background: rgba(108, 142, 255, 0.05);
             `;
             
-            const tabProcess = this._createTab('进程详情', true);
-            const tabResources = this._createTab('资源监控', false);
-            const tabSystem = this._createTab('系统信息', false);
-            const tabLogs = this._createTab('程序日志', false);
+            const tabProcess = this._createTab(this._getText('TASKMANAGER_TAB_PROCESS', '进程详情'), true);
+            const tabResources = this._createTab(this._getText('TASKMANAGER_TAB_RESOURCES', '资源监控'), false);
+            const tabSystem = this._createTab(this._getText('TASKMANAGER_TAB_SYSTEM', '系统信息'), false);
+            const tabLogs = this._createTab(this._getText('TASKMANAGER_TAB_LOGS', '程序日志'), false);
             
             tabs.appendChild(tabProcess);
             tabs.appendChild(tabResources);
@@ -697,7 +711,7 @@
             
             const placeholder = document.createElement('div');
             placeholder.className = 'taskmanager-placeholder';
-            placeholder.textContent = '选择一个进程查看详情';
+            placeholder.textContent = this._getText('TASKMANAGER_SELECT_PROCESS_DETAIL', '选择一个进程查看详情');
             placeholder.style.cssText = `
                 text-align: center;
                 color: #aab2c0;
@@ -727,7 +741,7 @@
             `;
             
             const memoryTitle = document.createElement('h3');
-            memoryTitle.textContent = '内存使用';
+            memoryTitle.textContent = this._getText('TASKMANAGER_MEMORY_USAGE', '内存使用');
             memoryTitle.style.cssText = `
                 color: #e8ecf0;
                 font-size: 16px;
@@ -755,7 +769,7 @@
             `;
             
             const diskTitle = document.createElement('h3');
-            diskTitle.textContent = '磁盘分区';
+            diskTitle.textContent = this._getText('TASKMANAGER_DISK_PARTITIONS', '磁盘分区');
             diskTitle.style.cssText = `
                 color: #e8ecf0;
                 font-size: 16px;
@@ -810,7 +824,7 @@
             // 获取所有进程
             if (typeof ProcessManager === 'undefined') {
                 const error = document.createElement('div');
-                error.textContent = 'ProcessManager 不可用';
+                error.textContent = this._getText('TASKMANAGER_PM_UNAVAILABLE', 'ProcessManager 不可用');
                 error.style.cssText = `
                     padding: 20px;
                     text-align: center;
@@ -824,7 +838,7 @@
             
             if (processes.length === 0) {
                 const empty = document.createElement('div');
-                empty.textContent = '没有运行的进程';
+                empty.textContent = this._getText('TASKMANAGER_NO_PROCESSES', '没有运行的进程');
                 empty.style.cssText = `
                     padding: 20px;
                     text-align: center;
@@ -853,7 +867,7 @@
             
             if (filteredProcesses.length === 0) {
                 const empty = document.createElement('div');
-                empty.textContent = this._searchQuery ? '未找到匹配的进程' : (filterExited ? '没有运行中的进程' : '没有进程');
+                empty.textContent = this._searchQuery ? this._getText('TASKMANAGER_NO_MATCH_PROCESS', '未找到匹配的进程') : (filterExited ? this._getText('TASKMANAGER_NO_RUNNING', '没有运行中的进程') : this._getText('TASKMANAGER_NO_PROCESS', '没有进程'));
                 empty.style.cssText = `
                     padding: 20px;
                     text-align: center;
@@ -967,8 +981,8 @@
                 'loading': '#fbbf24',
                 'exited': '#aab2c0'
             };
-            status.textContent = process.status === 'running' ? '运行中' : 
-                                process.status === 'loading' ? '加载中' : '已退出';
+            status.textContent = process.status === 'running' ? this._getText('TASKMANAGER_STATUS_RUNNING', '运行中') : 
+                                process.status === 'loading' ? this._getText('KEY_LOADING', '加载中…') : this._getText('TASKMANAGER_STATUS_EXITED', '已退出');
             status.style.color = statusColors[process.status] || '#aab2c0';
             info.appendChild(status);
             
@@ -1022,7 +1036,7 @@
             if (!this._isProcessSelectorMode && !this._isProgramSelectorMode && !process.isExploit && process.status === 'running') {
                 const killBtn = document.createElement('button');
                 killBtn.textContent = '×';
-                killBtn.title = '强制退出';
+                killBtn.title = this._getText('TASKMANAGER_END_TASK', '强制退出');
                 killBtn.style.cssText = `
                     position: absolute;
                     top: 8px;
@@ -1077,8 +1091,8 @@
                     try {
                         await NotificationManager.createNotification(this.pid, {
                             type: 'snapshot',
-                            title: '任务管理器',
-                            content: '进程不存在',
+                            title: this._getText('TASKMANAGER_TITLE', '任务管理器'),
+                            content: this._getText('TASKMANAGER_PROCESS_NOT_FOUND', '进程不存在'),
                             duration: 3000
                         });
                     } catch (e) {
@@ -1097,8 +1111,8 @@
                     try {
                         await NotificationManager.createNotification(this.pid, {
                             type: 'snapshot',
-                            title: '任务管理器',
-                            content: '无法终止Exploit程序',
+                            title: this._getText('TASKMANAGER_TITLE', '任务管理器'),
+                            content: this._getText('TASKMANAGER_CANNOT_END_EXPLOIT', '无法终止Exploit程序'),
                             duration: 3000
                         });
                     } catch (e) {
@@ -1114,12 +1128,12 @@
             let confirmed = false;
             if (typeof GUIManager !== 'undefined' && typeof GUIManager.showConfirm === 'function') {
                 confirmed = await GUIManager.showConfirm(
-                    `确定要强制退出程序 "${programName || `PID ${pid}`}" 吗？\n\n此操作将立即终止该程序，未保存的数据可能会丢失。`,
-                    '确认强制退出',
+                    this._getText('TASKMANAGER_CONFIRM_END_MSG', '确定要强制退出程序 "{0}" 吗？\n\n此操作将立即终止该程序，未保存的数据可能会丢失。').replace('{0}', programName || ('PID ' + pid)),
+                    this._getText('TASKMANAGER_CONFIRM_END_TITLE', '确认强制退出'),
                     'danger'
                 );
             } else {
-                confirmed = confirm(`确定要强制退出程序 "${programName || `PID ${pid}`}" 吗？\n\n此操作将立即终止该程序，未保存的数据可能会丢失。`);
+                confirmed = confirm(this._getText('TASKMANAGER_CONFIRM_END_MSG', '确定要强制退出程序 "{0}" 吗？\n\n此操作将立即终止该程序，未保存的数据可能会丢失。').replace('{0}', programName || ('PID ' + pid)));
             }
             
             if (!confirmed) {
@@ -1137,7 +1151,7 @@
                         this._setSelectedPid(null);
                         this._updateProcessDetail(null);
                         if (this.logsContent) {
-                            this.logsContent.innerHTML = '<div style="text-align: center; color: #aab2c0; padding: 40px;">请选择一个进程查看日志</div>';
+                            this.logsContent.innerHTML = '<div style="text-align: center; color: #aab2c0; padding: 40px;">' + this._getText('TASKMANAGER_SELECT_PROCESS_LOG', '请选择一个进程查看日志') + '</div>';
                         }
                     }
                     
@@ -1151,8 +1165,8 @@
                         try {
                             await NotificationManager.createNotification(this.pid, {
                                 type: 'snapshot',
-                                title: '任务管理器',
-                                content: 'ProcessManager 不可用，无法终止进程',
+                                title: this._getText('TASKMANAGER_TITLE', '任务管理器'),
+                                content: this._getText('TASKMANAGER_PM_CANNOT_END', 'ProcessManager 不可用，无法终止进程'),
                                 duration: 3000
                             });
                         } catch (e) {
@@ -1168,8 +1182,8 @@
                     try {
                         await NotificationManager.createNotification(this.pid, {
                             type: 'snapshot',
-                            title: '任务管理器',
-                            content: `终止进程失败: ${e.message}`,
+                            title: this._getText('TASKMANAGER_TITLE', '任务管理器'),
+                            content: this._getText('TASKMANAGER_END_FAILED', '终止进程失败: {0}').replace('{0}', e.message),
                             duration: 4000
                         });
                     } catch (notifError) {
@@ -1290,7 +1304,7 @@
             // 获取所有程序
             if (typeof ApplicationAssetManager === 'undefined') {
                 const error = document.createElement('div');
-                error.textContent = 'ApplicationAssetManager 不可用';
+                error.textContent = this._getText('TASKMANAGER_AAM_UNAVAILABLE', 'ApplicationAssetManager 不可用');
                 error.style.cssText = `
                     padding: 20px;
                     text-align: center;
@@ -1304,7 +1318,7 @@
             
             if (programs.length === 0) {
                 const empty = document.createElement('div');
-                empty.textContent = '没有安装的程序';
+                empty.textContent = this._getText('TASKMANAGER_NO_APPS', '没有安装的程序');
                 empty.style.cssText = `
                     padding: 20px;
                     text-align: center;
@@ -1326,7 +1340,7 @@
             
             if (filteredPrograms.length === 0) {
                 const empty = document.createElement('div');
-                empty.textContent = this._searchQuery ? '未找到匹配的程序' : '没有程序';
+                empty.textContent = this._searchQuery ? this._getText('TASKMANAGER_NO_MATCH_PROGRAM', '未找到匹配的程序') : this._getText('TASKMANAGER_NO_PROGRAM', '没有程序');
                 empty.style.cssText = `
                     padding: 20px;
                     text-align: center;
@@ -1421,7 +1435,7 @@
                 text-overflow: ellipsis;
                 white-space: nowrap;
             `;
-            name.textContent = program.name || '未知程序';
+            name.textContent = program.name || this._getText('TASKMANAGER_UNKNOWN_PROGRAM', '未知程序');
             info.appendChild(name);
             
             const description = document.createElement('div');
@@ -1445,7 +1459,7 @@
             
             const process = ProcessManager.getProcessInfo(pid);
             if (!process) {
-                this.processDetailPlaceholder.textContent = '进程不存在';
+                this.processDetailPlaceholder.textContent = this._getText('TASKMANAGER_PROCESS_NOT_FOUND', '进程不存在');
                 this.processDetailPlaceholder.style.display = 'block';
                 return;
             }
@@ -1463,13 +1477,12 @@
             `;
             
             // 基本信息
-            const basicInfo = this._createInfoSection('基本信息', [
-                { label: '进程ID', value: process.pid },
-                { label: '程序名称', value: process.programName || '未知' },
-                { label: '状态', value: process.status === 'running' ? '运行中' : 
-                                    process.status === 'loading' ? '加载中' : '已退出' },
-                { label: '启动时间', value: new Date(process.startTime).toLocaleString() },
-                { label: '退出时间', value: process.exitTime ? new Date(process.exitTime).toLocaleString() : '未退出' },
+            const basicInfo = this._createInfoSection(this._getText('TASKMANAGER_SECTION_BASIC', '基本信息'), [
+                { label: this._getText('TASKMANAGER_LABEL_PID', '进程ID'), value: process.pid },
+                { label: this._getText('TASKMANAGER_LABEL_PROGRAM_NAME', '程序名称'), value: process.programName || this._getText('TASKMANAGER_UNKNOWN', '未知') },
+                { label: this._getText('TASKMANAGER_LABEL_STATUS', '状态'), value: process.status === 'running' ? this._getText('TASKMANAGER_STATUS_RUNNING', '运行中') : process.status === 'loading' ? this._getText('KEY_LOADING', '加载中…') : this._getText('TASKMANAGER_STATUS_EXITED', '已退出') },
+                { label: this._getText('TASKMANAGER_LABEL_START_TIME', '启动时间'), value: new Date(process.startTime).toLocaleString() },
+                { label: this._getText('TASKMANAGER_LABEL_EXIT_TIME', '退出时间'), value: process.exitTime ? new Date(process.exitTime).toLocaleString() : this._getText('TASKMANAGER_NOT_EXITED', '未退出') },
             ]);
             detail.appendChild(basicInfo);
             
@@ -1509,22 +1522,20 @@
             }
             
             if (memInfo) {
-                const memoryInfo = this._createInfoSection('内存信息', [
-                    { label: '堆数量', value: (memInfo.heaps ? memInfo.heaps.length : 0).toString() },
-                    { label: '堆总大小', value: this._formatBytes(memInfo.totalHeapSize || 0) },
-                    { label: '堆已用', value: this._formatBytes(memInfo.totalHeapUsed || 0) },
-                    { label: '堆空闲', value: this._formatBytes(memInfo.totalHeapFree || 0) },
-                    { label: '堆使用率', value: memInfo.totalHeapSize > 0 ? 
-                        ((memInfo.totalHeapUsed / memInfo.totalHeapSize * 100).toFixed(2) + '%') : '0%' },
-                    { label: '栈数量', value: (memInfo.sheds ? memInfo.sheds.length : 0).toString() },
-                    { label: '栈总大小', value: this._formatBytes(memInfo.totalShedSize || 0) },
+                const memoryInfo = this._createInfoSection(this._getText('TASKMANAGER_MEMORY_USAGE', '内存使用'), [
+                    { label: this._getText('TASKMANAGER_HEAP_COUNT', '堆数量'), value: (memInfo.heaps ? memInfo.heaps.length : 0).toString() },
+                    { label: this._getText('TASKMANAGER_HEAP_TOTAL', '堆总大小'), value: this._formatBytes(memInfo.totalHeapSize || 0) },
+                    { label: this._getText('TASKMANAGER_HEAP_USED', '堆已用'), value: this._formatBytes(memInfo.totalHeapUsed || 0) },
+                    { label: this._getText('TASKMANAGER_HEAP_FREE', '堆空闲'), value: this._formatBytes(memInfo.totalHeapFree || 0) },
+                    { label: this._getText('TASKMANAGER_HEAP_USAGE', '堆使用率'), value: memInfo.totalHeapSize > 0 ? ((memInfo.totalHeapUsed / memInfo.totalHeapSize * 100).toFixed(2) + '%') : '0%' },
+                    { label: this._getText('TASKMANAGER_SHEED_COUNT', '栈数量'), value: (memInfo.sheds ? memInfo.sheds.length : 0).toString() },
+                    { label: this._getText('TASKMANAGER_SHEED_TOTAL', '栈总大小'), value: this._formatBytes(memInfo.totalShedSize || 0) },
                 ]);
                 detail.appendChild(memoryInfo);
             } else {
-                // 显示内存信息不可用
-                const memoryInfo = this._createInfoSection('内存信息', [
-                    { label: '状态', value: '内存信息不可用' },
-                    { label: '说明', value: '该进程可能未分配内存或内存已被释放' },
+                const memoryInfo = this._createInfoSection(this._getText('TASKMANAGER_MEMORY_USAGE', '内存使用'), [
+                    { label: this._getText('TASKMANAGER_LABEL_STATUS', '状态'), value: this._getText('TASKMANAGER_MEM_UNAVAILABLE', '内存信息不可用') },
+                    { label: this._getText('TASKMANAGER_LABEL_DESC', '描述'), value: this._getText('TASKMANAGER_MEM_UNAVAILABLE_DESC', '该进程可能未分配内存或内存已被释放') },
                 ]);
                 detail.appendChild(memoryInfo);
             }
@@ -1543,13 +1554,13 @@
             }
             
             if (programMetadata) {
-                const metadataInfo = this._createInfoSection('程序信息', [
-                    { label: '版本', value: programMetadata.version || '未知' },
-                    { label: '作者', value: programMetadata.author || '未知' },
-                    { label: '描述', value: programMetadata.description || '无描述' },
-                    { label: '类型', value: programMetadata.type || '未知' },
-                    { label: '支持多实例', value: programMetadata.allowMultipleInstances ? '是' : '否' },
-                    { label: '常显任务栏', value: programMetadata.alwaysShowInTaskbar ? '是' : '否' },
+                const metadataInfo = this._createInfoSection(this._getText('TASKMANAGER_SECTION_PROGRAM', '程序信息'), [
+                    { label: this._getText('TASKMANAGER_LABEL_VERSION', '版本'), value: programMetadata.version || this._getText('TASKMANAGER_UNKNOWN', '未知') },
+                    { label: this._getText('TASKMANAGER_LABEL_AUTHOR', '作者'), value: programMetadata.author || this._getText('TASKMANAGER_UNKNOWN', '未知') },
+                    { label: this._getText('TASKMANAGER_LABEL_DESC', '描述'), value: programMetadata.description || this._getText('TASKMANAGER_NO_DESC', '无描述') },
+                    { label: this._getText('TASKMANAGER_LABEL_TYPE', '类型'), value: programMetadata.type || this._getText('TASKMANAGER_UNKNOWN', '未知') },
+                    { label: this._getText('TASKMANAGER_MULTI_INSTANCE', '支持多实例'), value: programMetadata.allowMultipleInstances ? this._getText('TASKMANAGER_YES', '是') : this._getText('TASKMANAGER_NO', '否') },
+                    { label: this._getText('TASKMANAGER_ALWAYS_TASKBAR', '常显任务栏'), value: programMetadata.alwaysShowInTaskbar ? this._getText('TASKMANAGER_YES', '是') : this._getText('TASKMANAGER_NO', '否') },
                 ]);
                 detail.appendChild(metadataInfo);
             }
@@ -1591,28 +1602,28 @@
                         };
                     });
                     
-                    const permissionSection = this._createPermissionSection('权限信息', permissionItems, pid);
+                    const permissionSection = this._createPermissionSection(this._getText('TASKMANAGER_SECTION_PERM', '权限信息'), permissionItems, pid);
                     detail.appendChild(permissionSection);
                 } else {
-                    const permissionInfo = this._createInfoSection('权限信息', [
-                        { label: '状态', value: '该程序未声明或未获得任何权限' },
+                    const permissionInfo = this._createInfoSection(this._getText('TASKMANAGER_SECTION_PERM', '权限信息'), [
+                        { label: this._getText('TASKMANAGER_LABEL_STATUS', '状态'), value: this._getText('TASKMANAGER_NO_PERMISSION', '该程序未声明或未获得任何权限') },
                     ]);
                     detail.appendChild(permissionInfo);
                 }
             }
             
             // 其他信息
-            const otherInfo = this._createInfoSection('其他信息', [
-                { label: '是否Exploit', value: process.isExploit ? '是' : '否' },
-                { label: '是否CLI', value: process.isCLI ? '是' : '否' },
-                { label: '是否最小化', value: process.isMinimized ? '是' : '否' },
-                { label: '脚本路径', value: process.scriptPath || '未知' },
+            const otherInfo = this._createInfoSection(this._getText('TASKMANAGER_SECTION_OTHER', '其他信息'), [
+                { label: this._getText('TASKMANAGER_IS_EXPLOIT', '是否Exploit'), value: process.isExploit ? this._getText('TASKMANAGER_YES', '是') : this._getText('TASKMANAGER_NO', '否') },
+                { label: this._getText('TASKMANAGER_IS_CLI', '是否CLI'), value: process.isCLI ? this._getText('TASKMANAGER_YES', '是') : this._getText('TASKMANAGER_NO', '否') },
+                { label: this._getText('TASKMANAGER_IS_MINIMIZED', '是否最小化'), value: process.isMinimized ? this._getText('TASKMANAGER_YES', '是') : this._getText('TASKMANAGER_NO', '否') },
+                { label: this._getText('TASKMANAGER_SCRIPT_PATH', '脚本路径'), value: process.scriptPath || this._getText('TASKMANAGER_UNKNOWN', '未知') },
             ]);
             detail.appendChild(otherInfo);
             
             // 程序行为记录详细显示
             if (process.actions && process.actions.length > 0) {
-                const actionsSection = this._createActionsSection('行为记录', process.actions);
+                const actionsSection = this._createActionsSection(this._getText('TASKMANAGER_SECTION_ACTIONS', '行为记录'), process.actions);
                 detail.appendChild(actionsSection);
             }
             
@@ -1625,7 +1636,7 @@
             `;
             
             const actionsTitle = document.createElement('h3');
-            actionsTitle.textContent = '操作';
+            actionsTitle.textContent = this._getText('TASKMANAGER_ACTIONS', '操作');
             actionsTitle.style.cssText = `
                 color: #e8ecf0;
                 font-size: 16px;
@@ -1643,7 +1654,7 @@
             // 强制退出按钮（仅对运行中的非Exploit程序显示）
             if (!process.isExploit && process.status === 'running') {
                 const killBtn = document.createElement('button');
-                killBtn.textContent = '强制退出';
+                killBtn.textContent = this._getText('TASKMANAGER_END_TASK', '强制退出');
                 killBtn.style.cssText = `
                     padding: 10px 20px;
                     border: 1px solid rgba(255, 68, 68, 0.5);
@@ -1671,7 +1682,7 @@
             
             // 查看内存按钮
             const viewMemoryBtn = document.createElement('button');
-            viewMemoryBtn.textContent = '查看内存';
+            viewMemoryBtn.textContent = this._getText('TASKMANAGER_VIEW_MEMORY', '查看内存');
             viewMemoryBtn.style.cssText = `
                 padding: 10px 20px;
                 border: 1px solid rgba(108, 142, 255, 0.3);
@@ -1696,7 +1707,7 @@
             
             // 刷新信息按钮
             const refreshBtn = document.createElement('button');
-            refreshBtn.textContent = '刷新信息';
+            refreshBtn.textContent = this._getText('TASKMANAGER_REFRESH_INFO', '刷新信息');
             refreshBtn.style.cssText = `
                 padding: 10px 20px;
                 border: 1px solid rgba(108, 142, 255, 0.3);
@@ -1862,8 +1873,8 @@
                 const process = ProcessManager.getProcessInfo(pid);
                 if (process && !process.isExploit) {
                     const revokeBtn = document.createElement('button');
-                    revokeBtn.textContent = '撤销';
-                    revokeBtn.title = '撤销此权限';
+                    revokeBtn.textContent = this._getText('TASKMANAGER_REVOKE', '撤销');
+                    revokeBtn.title = this._getText('TASKMANAGER_REVOKE_PERMISSION', '撤销此权限');
                     revokeBtn.style.cssText = `
                         padding: 4px 8px;
                         border: 1px solid rgba(255, 68, 68, 0.3);
@@ -1939,7 +1950,7 @@
                 `;
                 
                 const actionName = document.createElement('div');
-                actionName.textContent = action.action || '未知操作';
+                actionName.textContent = action.action || this._getText('TASKMANAGER_UNKNOWN_ACTION', '未知操作');
                 actionName.style.cssText = `
                     color: #e8ecf0;
                     font-size: 13px;
@@ -1948,7 +1959,7 @@
                 `;
                 
                 const actionTime = document.createElement('div');
-                actionTime.textContent = action.timestamp ? new Date(action.timestamp).toLocaleString() : '未知时间';
+                actionTime.textContent = action.timestamp ? new Date(action.timestamp).toLocaleString() : this._getText('TASKMANAGER_UNKNOWN_TIME', '未知时间');
                 actionTime.style.cssText = `
                     color: #aab2c0;
                     font-size: 11px;
@@ -1979,7 +1990,7 @@
             
             if (actions.length > 20) {
                 const moreInfo = document.createElement('div');
-                moreInfo.textContent = `（仅显示最近 20 条，共 ${actions.length} 条记录）`;
+                moreInfo.textContent = this._getText('TASKMANAGER_LOG_RECENT', '（仅显示最近 20 条，共 {0} 条记录）').replace('{0}', String(actions.length));
                 moreInfo.style.cssText = `
                     color: #aab2c0;
                     font-size: 11px;
@@ -2038,7 +2049,7 @@
             `;
             
             const title = document.createElement('h3');
-            title.textContent = `权限管理 - ${process.programName} (PID: ${pid})`;
+            title.textContent = this._getText('TASKMANAGER_PERM_MANAGE', '权限管理 - {0} (PID: {1})').replace('{0}', process.programName || '').replace('{1}', String(pid));
             title.style.cssText = `
                 color: #e8ecf0;
                 font-size: 16px;
@@ -2122,7 +2133,7 @@
                     content.appendChild(permissionSection);
                 } else {
                     const empty = document.createElement('div');
-                    empty.textContent = '该程序未获得任何权限';
+                    empty.textContent = this._getText('TASKMANAGER_NO_PERM_GRANTED', '该程序未获得任何权限');
                     empty.style.cssText = `
                         text-align: center;
                         color: #aab2c0;
@@ -2133,7 +2144,7 @@
                 }
             } else {
                 const error = document.createElement('div');
-                error.textContent = '权限管理器不可用';
+                error.textContent = this._getText('TASKMANAGER_PERM_MANAGER_UNAVAILABLE', '权限管理器不可用');
                 error.style.cssText = `
                     text-align: center;
                     color: #ff4444;
@@ -2330,7 +2341,7 @@
             // 进程数量
             const processes = ProcessManager.listProcesses();
             const runningCount = processes.filter(p => p.status === 'running').length;
-            resources.push({ label: '运行中进程', value: `${runningCount} / ${processes.length}` });
+            resources.push({ label: this._getText('TASKMANAGER_RUNNING_PROCESSES', '运行中进程'), value: `${runningCount} / ${processes.length}` });
             
             // 总内存使用
             let totalHeap = 0;
@@ -2375,8 +2386,8 @@
                     totalShed += memInfo.totalShedSize || 0;
                 }
             });
-            resources.push({ label: '总堆内存', value: this._formatBytes(totalHeap) });
-            resources.push({ label: '总栈内存', value: this._formatBytes(totalShed) });
+            resources.push({ label: this._getText('TASKMANAGER_TOTAL_HEAP', '总堆内存'), value: this._formatBytes(totalHeap) });
+            resources.push({ label: this._getText('TASKMANAGER_TOTAL_SHEED', '总栈内存'), value: this._formatBytes(totalShed) });
             
             return resources;
         },
@@ -2385,7 +2396,7 @@
             const info = [];
             
             if (typeof Disk !== 'undefined') {
-                info.push({ label: '磁盘状态', value: Disk.canUsed ? '✓ 可用' : '✗ 不可用' });
+                info.push({ label: this._getText('TASKMANAGER_DISK_STATUS', '磁盘状态'), value: Disk.canUsed ? ('✓ ' + this._getText('TASKMANAGER_DISK_AVAILABLE', '可用')) : ('✗ ' + this._getText('TASKMANAGER_DISK_UNAVAILABLE', '不可用')) });
                 
                 if (Disk.canUsed && Disk.diskSeparateMap) {
                     // 获取所有分区（不依赖 initialized 属性，因为分区可能已经存在但还未完全初始化）
@@ -2403,8 +2414,8 @@
                         });
                     }
                     
-                    info.push({ label: '分区数量', value: allPartitions.length.toString() });
-                    info.push({ label: '分区列表', value: allPartitions.length > 0 ? allPartitions.join(', ') : '无' });
+                    info.push({ label: this._getText('TASKMANAGER_PARTITION_COUNT', '分区数量'), value: allPartitions.length.toString() });
+                    info.push({ label: this._getText('TASKMANAGER_PARTITION_LIST', '分区列表'), value: allPartitions.length > 0 ? allPartitions.join(', ') : this._getText('TASKMANAGER_NONE', '无') });
                     
                     // 显示每个分区的详细信息（从 PHP 服务实时获取）
                     if (allPartitions.length > 0) {
@@ -2413,8 +2424,8 @@
                             const partitionLabel = partitionName === 'D:' ? `${partitionName} (系统盘)` : partitionName;
                             info.push({ 
                                 label: partitionLabel, 
-                                value: '加载中...',
-                                dataAttribute: 'data-disk-info' // 标记为磁盘信息，用于后续更新
+                                value: this._getText('TASKMANAGER_LOADING', '加载中...'),
+                                dataAttribute: 'data-disk-info'
                             });
                         });
                         
@@ -2440,8 +2451,8 @@
                                 if (this.systemInfoContent) {
                                     const diskInfoElements = this.systemInfoContent.querySelectorAll('[data-disk-info]');
                                     diskInfoElements.forEach(el => {
-                                        if (el.textContent === '加载中...') {
-                                            el.textContent = '获取失败';
+                                        if (el.textContent === this._getText('TASKMANAGER_LOADING', '加载中...')) {
+                                            el.textContent = this._getText('TASKMANAGER_LOAD_FAILED', '获取失败');
                                             el.style.color = '#ff4444';
                                         }
                                     });
@@ -2451,7 +2462,7 @@
                     }
                 }
             } else {
-                info.push({ label: '磁盘状态', value: '✗ Disk模块未加载' });
+                info.push({ label: this._getText('TASKMANAGER_DISK_STATUS', '磁盘状态'), value: '✗ ' + this._getText('TASKMANAGER_DISK_NOT_LOADED', 'Disk模块未加载') });
             }
             
             return info;
@@ -2802,7 +2813,7 @@
             
             // 日志过滤选择器
             const filterLabel = document.createElement('span');
-            filterLabel.textContent = '过滤:';
+            filterLabel.textContent = this._getText('TASKMANAGER_LOG_FILTER', '过滤:');
             filterLabel.style.cssText = `
                 font-size: 12px;
                 color: #aab2c0;
@@ -2820,10 +2831,10 @@
                 cursor: pointer;
             `;
             filterSelect.innerHTML = `
-                <option value="all">全部</option>
-                <option value="error">错误</option>
-                <option value="warning">警告</option>
-                <option value="info">信息</option>
+                <option value="all">${this._getText('TASKMANAGER_LOG_ALL', '全部')}</option>
+                <option value="error">${this._getText('TASKMANAGER_LOG_ERROR', '错误')}</option>
+                <option value="warning">${this._getText('TASKMANAGER_LOG_WARNING', '警告')}</option>
+                <option value="info">${this._getText('TASKMANAGER_LOG_INFO', '信息')}</option>
             `;
             filterSelect.value = this._getLogFilter();
             filterSelect.addEventListener('change', (e) => {
@@ -2835,7 +2846,7 @@
             });
             
             const clearBtn = document.createElement('button');
-            clearBtn.textContent = '清空';
+            clearBtn.textContent = this._getText('TASKMANAGER_LOG_CLEAR', '清空');
             clearBtn.style.cssText = `
                 padding: 4px 12px;
                 border: 1px solid rgba(108, 142, 255, 0.3);
@@ -2888,7 +2899,7 @@
         _updateProcessLogs: function(pid) {
             if (!this.logsContent || !pid) {
                 if (this.logsContent) {
-                    this.logsContent.innerHTML = '<div style="text-align: center; color: #aab2c0; padding: 40px;">请选择一个进程查看日志</div>';
+                    this.logsContent.innerHTML = '<div style="text-align: center; color: #aab2c0; padding: 40px;">' + this._getText('TASKMANAGER_SELECT_PROCESS_LOG', '请选择一个进程查看日志') + '</div>';
                 }
                 return;
             }
@@ -2919,7 +2930,7 @@
             }
             
             if (!process) {
-                this.logsContent.innerHTML = '<div style="text-align: center; color: #ff4444; padding: 40px;">进程不存在</div>';
+                this.logsContent.innerHTML = '<div style="text-align: center; color: #ff4444; padding: 40px;">' + this._getText('TASKMANAGER_PROCESS_NOT_FOUND', '进程不存在') + '</div>';
                 return;
             }
             
@@ -2934,7 +2945,7 @@
             }
             
             if (actions.length === 0) {
-                this.logsContent.innerHTML = '<div style="text-align: center; color: #aab2c0; padding: 40px;">该进程没有行为记录</div>';
+                this.logsContent.innerHTML = '<div style="text-align: center; color: #aab2c0; padding: 40px;">' + this._getText('TASKMANAGER_NO_ACTIONS', '该进程没有行为记录') + '</div>';
                 return;
             }
             
@@ -2956,7 +2967,7 @@
             }
             
             if (filteredActions.length === 0) {
-                this.logsContent.innerHTML = '<div style="text-align: center; color: #aab2c0; padding: 40px;">没有符合条件的日志记录</div>';
+                this.logsContent.innerHTML = '<div style="text-align: center; color: #aab2c0; padding: 40px;">' + this._getText('TASKMANAGER_NO_LOG_MATCH', '没有符合条件的日志记录') + '</div>';
                 return;
             }
             
@@ -3009,7 +3020,7 @@
                     time.textContent = new Date(action.timestamp).toLocaleString();
                     time.dataset.timestamp = action.timestamp.toString();
                 } else {
-                    time.textContent = '未知时间';
+                    time.textContent = this._getText('TASKMANAGER_UNKNOWN_TIME', '未知时间');
                 }
                 logEntry.appendChild(time);
                 
@@ -4362,10 +4373,10 @@
         
         __info__: function() {
             return {
-                name: '任务管理器',
+                name: this._getText('TASKMANAGER_TITLE', '任务管理器'),
                 type: 'GUI',
                 version: '1.0.0',
-                description: 'ZerOS 任务管理器 - 进程管理、资源监控和系统检测',
+                description: 'ZerOS ' + this._getText('TASKMANAGER_TITLE', '任务管理器') + ' - 进程管理、资源监控和系统检测',
                 author: 'ZerOS Team',
                 copyright: '© 2025 ZerOS',
                 permissions: typeof PermissionManager !== 'undefined' ? [

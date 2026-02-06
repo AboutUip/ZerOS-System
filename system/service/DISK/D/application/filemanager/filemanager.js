@@ -14,6 +14,83 @@
         _heap: null,
         _shed: null,
         
+        /**
+         * 多语言文案：优先使用 LanguagesExpansion，否则返回 fallback
+         * @param {string} key 语言包常量名
+         * @param {string} fallback 无语言包时的回退文案
+         * @returns {string}
+         */
+        _getText: function(key, fallback) {
+            if (typeof LanguagesExpansion !== 'undefined' && typeof LanguagesExpansion.getText === 'function') {
+                const value = LanguagesExpansion.getText(key);
+                if (value && value !== key) return value;
+            }
+            return fallback || key;
+        },
+        
+        /**
+         * 语言切换时刷新所有界面文案（工具栏、侧栏、地址栏、搜索框、状态栏、空列表提示、属性面板、窗口标题）
+         */
+        _refreshUIStrings: function() {
+            if (!this.window) return;
+            // 窗口标题
+            const titleEl = this.window.querySelector('.zos-window-title');
+            if (titleEl) {
+                let windowTitle = this._getText('FM_TITLE', '文件管理器');
+                if (this._isFolderSelectorMode) windowTitle = this._getText('FM_SELECT_FOLDER', '选择文件夹');
+                else if (this._isFileSelectorMode) windowTitle = this._getText('FM_SELECT_FILE', '选择文件');
+                titleEl.textContent = windowTitle;
+            }
+            // 工具栏按钮
+            if (this.backBtn) this.backBtn.title = this._getText('FM_BACK', '后退 (Alt+←)');
+            if (this.forwardBtn) this.forwardBtn.title = this._getText('FM_FORWARD', '前进 (Alt+→)');
+            if (this.upBtn) this.upBtn.title = this._getText('FM_UP', '返回上级目录');
+            if (this.refreshBtn) this.refreshBtn.title = this._getText('FM_REFRESH', '刷新');
+            if (this.newFileBtn) {
+                this.newFileBtn.textContent = this._getText('FM_BTN_NEW_FILE', '+ 文件');
+                this.newFileBtn.title = this._isReadOnlyMode ? this._getText('FM_READONLY_NEW_FILE', '新建文件（只读模式：普通用户无法创建文件）') : this._getText('FM_NEW_FILE', '新建文件');
+            }
+            if (this.newDirBtn) {
+                this.newDirBtn.textContent = this._getText('FM_BTN_NEW_DIR', '+ 目录');
+                this.newDirBtn.title = this._isReadOnlyMode ? this._getText('FM_READONLY_NEW_DIR', '新建目录（只读模式：普通用户无法创建目录）') : this._getText('FM_NEW_DIR', '新建目录');
+            }
+            if (this.copyBtn) {
+                this.copyBtn.textContent = this._getText('FM_BTN_COPY', '📋 复制');
+                this.copyBtn.title = this._isReadOnlyMode ? this._getText('FM_READONLY_COPY', '复制（只读模式：普通用户无法复制文件）') : this._getText('FM_COPY', '复制 (Ctrl+C)');
+            }
+            if (this.cutBtn) {
+                this.cutBtn.textContent = this._getText('FM_BTN_CUT', '✂️ 剪切');
+                this.cutBtn.title = this._isReadOnlyMode ? this._getText('FM_READONLY_CUT', '剪切（只读模式：普通用户无法剪切文件）') : this._getText('FM_CUT', '剪切 (Ctrl+X)');
+            }
+            if (this.pasteBtn) {
+                this.pasteBtn.textContent = this._getText('FM_BTN_PASTE', '📄 粘贴');
+                this.pasteBtn.title = this._getText('FM_PASTE', '粘贴 (Ctrl+V)');
+            }
+            if (this.viewModeButtons) {
+                const viewTitles = { 'details': 'FM_VIEW_DETAILS', 'large-icons': 'FM_VIEW_LARGE_ICONS', 'small-icons': 'FM_VIEW_SMALL_ICONS', 'list': 'FM_VIEW_LIST', 'tiles': 'FM_VIEW_TILES' };
+                const viewFallbacks = { 'details': '详细信息', 'large-icons': '大图标', 'small-icons': '小图标', 'list': '列表', 'tiles': '平铺' };
+                Object.keys(this.viewModeButtons).forEach(mode => {
+                    const btn = this.viewModeButtons[mode];
+                    if (btn) btn.title = this._getText(viewTitles[mode], viewFallbacks[mode]);
+                });
+            }
+            // 侧栏
+            if (this.sidebarTitle) this.sidebarTitle.textContent = this._getText('FM_PLACES', '位置');
+            if (this.sidebarRootItem) {
+                const labelSpan = this.sidebarRootItem.querySelector('span');
+                if (labelSpan) labelSpan.textContent = this._getText('FM_THIS_PC', '此电脑');
+            }
+            if (this.searchInput) this.searchInput.placeholder = this._getText('FM_SEARCH', '搜索...');
+            if (this.breadcrumbContainer) this._updateBreadcrumb();
+            if (typeof this._updateStatusBar === 'function') this._updateStatusBar();
+            if (this.fileListElement) this._renderFileList();
+            // 属性面板若已打开，重新加载当前选中项以刷新标签
+            if (this.propertiesPanel && this.propertiesPanel.style.display !== 'none' && typeof this._getSelectedItem === 'function') {
+                const item = this._getSelectedItem();
+                if (item && typeof this._loadPropertyPanel === 'function') this._loadPropertyPanel(item);
+            }
+        },
+        
         // 数据键名（存储在内存中）
         _currentPathKey: 'currentPath',
         _fileListKey: 'fileList',
@@ -141,11 +218,11 @@
                 }
                 
                 // 根据模式设置不同的窗口标题
-                let windowTitle = '文件管理器';
+                let windowTitle = this._getText('FM_TITLE', '文件管理器');
                 if (this._isFolderSelectorMode) {
-                    windowTitle = '选择文件夹';
+                    windowTitle = this._getText('FM_SELECT_FOLDER', '选择文件夹');
                 } else if (this._isFileSelectorMode) {
-                    windowTitle = '选择文件';
+                    windowTitle = this._getText('FM_SELECT_FILE', '选择文件');
                 }
                 
                 const windowInfo = GUIManager.registerWindow(pid, this.window, {
@@ -245,15 +322,15 @@
                 const hintText = document.createElement('span');
                 if (this._multiSelect) {
                     if (this._isFolderSelectorMode) {
-                        hintText.textContent = '📁 多选模式：勾选多个文件夹后点击"确认选择"';
+                        hintText.textContent = this._getText('FM_HINT_MULTI_FOLDER', '📁 多选模式：勾选多个文件夹后点击"确认选择"');
                     } else if (this._isFileSelectorMode) {
-                        hintText.textContent = '📄 多选模式：勾选多个文件/文件夹后点击"确认选择"';
+                        hintText.textContent = this._getText('FM_HINT_MULTI_FILE', '📄 多选模式：勾选多个文件/文件夹后点击"确认选择"');
                     }
                 } else {
                     if (this._isFolderSelectorMode) {
-                        hintText.textContent = '📁 双击文件夹进入，单击选中后点击"选择"按钮';
+                        hintText.textContent = this._getText('FM_HINT_FOLDER_SELECT', '📁 双击文件夹进入，单击选中后点击"选择"按钮');
                     } else if (this._isFileSelectorMode) {
-                        hintText.textContent = '📄 请选择一个文件（单击或双击文件进行选择）';
+                        hintText.textContent = this._getText('FM_HINT_FILE_SELECT', '📄 请选择一个文件（单击或双击文件进行选择）');
                     }
                 }
                 selectorHint.appendChild(hintText);
@@ -262,7 +339,7 @@
                 if (this._multiSelect) {
                     const confirmButton = document.createElement('button');
                     confirmButton.className = 'filemanager-select-button';
-                    confirmButton.textContent = `确认选择 (0)`;
+                    confirmButton.textContent = this._getText('FM_CONFIRM_SELECT_N', '确认选择 ({0})').replace('{0}', '0');
                     confirmButton.style.cssText = `
                         padding: 6px 16px;
                         background: rgba(139, 92, 246, 0.3);
@@ -284,7 +361,7 @@
                     // 文件夹选择器模式下添加选择按钮（单选）
                     const selectButton = document.createElement('button');
                     selectButton.className = 'filemanager-select-button';
-                    selectButton.textContent = '选择文件夹';
+                    selectButton.textContent = this._getText('FM_SELECT_FOLDER', '选择文件夹');
                     selectButton.style.cssText = `
                         padding: 6px 16px;
                         background: rgba(139, 92, 246, 0.3);
@@ -379,6 +456,13 @@
             if (typeof GUIManager !== 'undefined') {
                 GUIManager.focusWindow(pid);
             }
+            
+            // 语言切换时刷新界面文案
+            if (typeof LanguagesExpansion !== 'undefined' && typeof LanguagesExpansion.onLanguageChange === 'function') {
+                this._languageChangeUnsubscribe = LanguagesExpansion.onLanguageChange(() => {
+                    this._refreshUIStrings();
+                });
+            }
         },
         
         /**
@@ -404,14 +488,14 @@
             `;
             
             // 后退按钮
-            const backBtn = this._createToolbarButton('←', '后退 (Alt+←)', () => {
+            const backBtn = this._createToolbarButton('←', this._getText('FM_BACK', '后退 (Alt+←)'), () => {
                 this._goBack();
             });
             this.backBtn = backBtn;  // 保存引用以便更新状态
             toolbar.appendChild(backBtn);
             
             // 前进按钮
-            const forwardBtn = this._createToolbarButton('→', '前进 (Alt+→)', () => {
+            const forwardBtn = this._createToolbarButton('→', this._getText('FM_FORWARD', '前进 (Alt+→)'), () => {
                 this._goForward();
             });
             this.forwardBtn = forwardBtn;  // 保存引用以便更新状态
@@ -420,9 +504,10 @@
             toolbar.appendChild(forwardBtn);
             
             // 返回上级按钮
-            const upBtn = this._createToolbarButton('↑', '返回上级目录', () => {
+            const upBtn = this._createToolbarButton('↑', this._getText('FM_UP', '返回上级目录'), () => {
                 this._goUp();
             });
+            this.upBtn = upBtn;
             toolbar.appendChild(upBtn);
             
             // 分隔符
@@ -436,7 +521,7 @@
             toolbar.appendChild(separator1);
             
             // 刷新按钮
-            const refreshBtn = this._createToolbarButton('↻', '刷新', async () => {
+            const refreshBtn = this._createToolbarButton('↻', this._getText('FM_REFRESH', '刷新'), async () => {
                 const currentPath = this._getCurrentPath();
                 if (currentPath === null || currentPath === '') {
                     await this._loadRootDirectory();
@@ -444,6 +529,7 @@
                     await this._loadDirectory(currentPath);
                 }
             });
+            this.refreshBtn = refreshBtn;
             toolbar.appendChild(refreshBtn);
             
             // 分隔符
@@ -454,26 +540,28 @@
             // 在选择器模式下隐藏文件操作按钮
             if (!this._isFolderSelectorMode && !this._isFileSelectorMode) {
                 // 新建文件按钮（只读模式下禁用）
-                const newFileBtn = this._createToolbarButton('+ 文件', '新建文件', () => {
+                const newFileBtn = this._createToolbarButton(this._getText('FM_BTN_NEW_FILE', '+ 文件'), this._getText('FM_NEW_FILE', '新建文件'), () => {
                     this._createNewFile();
                 }, true);
+                this.newFileBtn = newFileBtn;
                 if (this._isReadOnlyMode) {
                     newFileBtn.style.opacity = '0.5';
                     newFileBtn.style.cursor = 'not-allowed';
                     newFileBtn.disabled = true;
-                    newFileBtn.title = '新建文件（只读模式：普通用户无法创建文件）';
+                    newFileBtn.title = this._getText('FM_READONLY_NEW_FILE', '新建文件（只读模式：普通用户无法创建文件）');
                 }
                 toolbar.appendChild(newFileBtn);
                 
                 // 新建目录按钮（只读模式下禁用）
-                const newDirBtn = this._createToolbarButton('+ 目录', '新建目录', () => {
+                const newDirBtn = this._createToolbarButton(this._getText('FM_BTN_NEW_DIR', '+ 目录'), this._getText('FM_NEW_DIR', '新建目录'), () => {
                     this._createNewDirectory();
                 }, true);
+                this.newDirBtn = newDirBtn;
                 if (this._isReadOnlyMode) {
                     newDirBtn.style.opacity = '0.5';
                     newDirBtn.style.cursor = 'not-allowed';
                     newDirBtn.disabled = true;
-                    newDirBtn.title = '新建目录（只读模式：普通用户无法创建目录）';
+                    newDirBtn.title = this._getText('FM_READONLY_NEW_DIR', '新建目录（只读模式：普通用户无法创建目录）');
                 }
                 toolbar.appendChild(newDirBtn);
                 
@@ -483,33 +571,33 @@
                 toolbar.appendChild(separator3);
                 
                 // 复制按钮（只读模式下禁用）
-                const copyBtn = this._createToolbarButton('📋 复制', '复制 (Ctrl+C)', () => {
+                const copyBtn = this._createToolbarButton(this._getText('FM_BTN_COPY', '📋 复制'), this._getText('FM_COPY', '复制 (Ctrl+C)'), () => {
                     this._copySelectedItems();
                 }, true);
                 copyBtn.style.opacity = '0.5';
                 copyBtn.style.cursor = 'not-allowed';
                 if (this._isReadOnlyMode) {
                     copyBtn.disabled = true;
-                    copyBtn.title = '复制（只读模式：普通用户无法复制文件）';
+                    copyBtn.title = this._getText('FM_READONLY_COPY', '复制（只读模式：普通用户无法复制文件）');
                 }
                 this.copyBtn = copyBtn;  // 保存引用以便更新状态
                 toolbar.appendChild(copyBtn);
                 
                 // 剪切按钮（只读模式下禁用）
-                const cutBtn = this._createToolbarButton('✂️ 剪切', '剪切 (Ctrl+X)', () => {
+                const cutBtn = this._createToolbarButton(this._getText('FM_BTN_CUT', '✂️ 剪切'), this._getText('FM_CUT', '剪切 (Ctrl+X)'), () => {
                     this._cutSelectedItems();
                 }, true);
                 cutBtn.style.opacity = '0.5';
                 cutBtn.style.cursor = 'not-allowed';
                 if (this._isReadOnlyMode) {
                     cutBtn.disabled = true;
-                    cutBtn.title = '剪切（只读模式：普通用户无法剪切文件）';
+                    cutBtn.title = this._getText('FM_READONLY_CUT', '剪切（只读模式：普通用户无法剪切文件）');
                 }
                 this.cutBtn = cutBtn;  // 保存引用以便更新状态
                 toolbar.appendChild(cutBtn);
                 
                 // 粘贴按钮
-                const pasteBtn = this._createToolbarButton('📄 粘贴', '粘贴 (Ctrl+V)', () => {
+                const pasteBtn = this._createToolbarButton(this._getText('FM_BTN_PASTE', '📄 粘贴'), this._getText('FM_PASTE', '粘贴 (Ctrl+V)'), () => {
                     this._pasteItems();
                 }, true);
                 pasteBtn.style.opacity = '0.5';
@@ -534,23 +622,23 @@
                 `;
                 
                 // 详细信息视图按钮
-                const detailsViewBtn = this._createViewModeButton('详细信息', 'details', '≡');
+                const detailsViewBtn = this._createViewModeButton(this._getText('FM_VIEW_DETAILS', '详细信息'), 'details', '≡');
                 viewModeGroup.appendChild(detailsViewBtn);
                 
                 // 大图标视图按钮
-                const largeIconsViewBtn = this._createViewModeButton('大图标', 'large-icons', '⊞');
+                const largeIconsViewBtn = this._createViewModeButton(this._getText('FM_VIEW_LARGE_ICONS', '大图标'), 'large-icons', '⊞');
                 viewModeGroup.appendChild(largeIconsViewBtn);
                 
                 // 小图标视图按钮
-                const smallIconsViewBtn = this._createViewModeButton('小图标', 'small-icons', '⊟');
+                const smallIconsViewBtn = this._createViewModeButton(this._getText('FM_VIEW_SMALL_ICONS', '小图标'), 'small-icons', '⊟');
                 viewModeGroup.appendChild(smallIconsViewBtn);
                 
                 // 列表视图按钮
-                const listViewBtn = this._createViewModeButton('列表', 'list', '☰');
+                const listViewBtn = this._createViewModeButton(this._getText('FM_VIEW_LIST', '列表'), 'list', '☰');
                 viewModeGroup.appendChild(listViewBtn);
                 
                 // 平铺视图按钮
-                const tilesViewBtn = this._createViewModeButton('平铺', 'tiles', '▦');
+                const tilesViewBtn = this._createViewModeButton(this._getText('FM_VIEW_TILES', '平铺'), 'tiles', '▦');
                 viewModeGroup.appendChild(tilesViewBtn);
                 
                 this.viewModeButtons = {
@@ -750,7 +838,8 @@
                 text-transform: uppercase;
                 letter-spacing: 0.5px;
             `;
-            sidebarTitle.textContent = '位置';
+            sidebarTitle.textContent = this._getText('FM_PLACES', '位置');
+            this.sidebarTitle = sidebarTitle;
             sidebar.appendChild(sidebarTitle);
             
             // 磁盘分区列表
@@ -761,9 +850,10 @@
             `;
             
             // 根目录项
-            const rootItem = this._createSidebarItem('\\', '计算机', () => {
+            const rootItem = this._createSidebarItem('\\', this._getText('FM_THIS_PC', '此电脑'), () => {
                 this._loadRootDirectory();
             }, true);
+            this.sidebarRootItem = rootItem;
             diskList.appendChild(rootItem);
             
             // 分隔线
@@ -958,7 +1048,7 @@
             // 返回上级按钮
             const upBtn = document.createElement('button');
             upBtn.textContent = '↑';
-            upBtn.title = '返回上级目录';
+            upBtn.title = this._getText('FM_UP', '返回上级目录');
             upBtn.style.cssText = `
                 width: 32px;
                 height: 32px;
@@ -986,7 +1076,7 @@
             // 刷新按钮
             const refreshBtn = document.createElement('button');
             refreshBtn.textContent = '↻';
-            refreshBtn.title = '刷新';
+            refreshBtn.title = this._getText('FM_REFRESH', '刷新');
             refreshBtn.style.cssText = upBtn.style.cssText;
             refreshBtn.addEventListener('mouseenter', () => {
                 refreshBtn.style.background = 'rgba(108, 142, 255, 0.2)';
@@ -1018,8 +1108,8 @@
             
             // 新建文件按钮
             const newFileBtn = document.createElement('button');
-            newFileBtn.textContent = '+ 文件';
-            newFileBtn.title = '新建文件';
+            newFileBtn.textContent = this._getText('FM_BTN_NEW_FILE', '+ 文件');
+            newFileBtn.title = this._getText('FM_NEW_FILE', '新建文件');
             newFileBtn.style.cssText = `
                 padding: 6px 12px;
                 height: 32px;
@@ -1046,8 +1136,8 @@
             
             // 新建目录按钮
             const newDirBtn = document.createElement('button');
-            newDirBtn.textContent = '+ 目录';
-            newDirBtn.title = '新建目录';
+            newDirBtn.textContent = this._getText('FM_BTN_NEW_DIR', '+ 目录');
+            newDirBtn.title = this._getText('FM_NEW_DIR', '新建目录');
             newDirBtn.style.cssText = newFileBtn.style.cssText;
             newDirBtn.addEventListener('mouseenter', () => {
                 newDirBtn.style.background = 'rgba(108, 142, 255, 0.2)';
@@ -1158,7 +1248,7 @@
             // 根目录
             const rootItem = document.createElement('span');
             rootItem.className = 'breadcrumb-item';
-            rootItem.textContent = '此电脑';
+            rootItem.textContent = this._getText('FM_THIS_PC', '此电脑');
             rootItem.style.cssText = `
                 padding: 4px 8px;
                 cursor: pointer;
@@ -1275,7 +1365,7 @@
             // 搜索输入框
             const searchInput = document.createElement('input');
             searchInput.type = 'text';
-            searchInput.placeholder = '搜索...';
+            searchInput.placeholder = this._getText('FM_SEARCH', '搜索...');
             searchInput.className = 'filemanager-search-input';
             searchInput.style.cssText = `
                 flex: 1;
@@ -1291,7 +1381,7 @@
             // 清除按钮（初始隐藏）
             const clearBtn = document.createElement('button');
             clearBtn.textContent = '×';
-            clearBtn.title = '清除搜索';
+            clearBtn.title = this._getText('FM_CLEAR_SEARCH', '清除搜索');
             clearBtn.style.cssText = `
                 width: 18px;
                 height: 18px;
@@ -1463,9 +1553,9 @@
             const folderCount = fileList.filter(item => item.type === 'directory').length;
             
             if (this._searchQuery) {
-                this.fileCountText.textContent = `找到 ${totalCount} 项 (${fileCount} 个文件, ${folderCount} 个文件夹)`;
-            } else {
-                this.fileCountText.textContent = `${totalCount} 项 (${fileCount} 个文件, ${folderCount} 个文件夹)`;
+this.fileCountText.textContent = this._getText('FM_ITEMS_COUNT_FOUND', '找到 {0} 项 ({1} 个文件, {2} 个文件夹)').replace('{0}', String(totalCount)).replace('{1}', String(fileCount)).replace('{2}', String(folderCount));
+                } else {
+                this.fileCountText.textContent = this._getText('FM_ITEMS_COUNT', '{0} 项 ({1} 个文件, {2} 个文件夹)').replace('{0}', String(totalCount)).replace('{1}', String(fileCount)).replace('{2}', String(folderCount));
             }
         },
         
@@ -1533,7 +1623,7 @@
                 font-weight: 600;
                 color: #e8ecf0;
             `;
-            editTitle.textContent = '编辑文件';
+            editTitle.textContent = this._getText('FM_EDIT_FILE', '编辑文件');
             editHeader.appendChild(editTitle);
             
             const editActions = document.createElement('div');
@@ -1544,7 +1634,7 @@
             
             // 保存按钮
             const saveBtn = document.createElement('button');
-            saveBtn.textContent = '保存';
+            saveBtn.textContent = this._getText('KEY_SAVE', '保存');
             saveBtn.style.cssText = `
                 padding: 4px 12px;
                 height: 28px;
@@ -1675,7 +1765,7 @@
             propTitle.appendChild(titleIcon);
             
             const titleText = document.createElement('span');
-            titleText.textContent = '属性';
+            titleText.textContent = this._getText('FM_PROPERTIES', '属性');
             propTitle.appendChild(titleText);
             propHeader.appendChild(propTitle);
             
@@ -1740,7 +1830,7 @@
             this.propertiesPanel.style.width = '300px';
             
             // 清空内容，显示加载中
-            this.propertiesContent.innerHTML = '<div style="color: #aab2c0; text-align: center; padding: 20px;">加载中...</div>';
+            this.propertiesContent.innerHTML = '<div style="color: #aab2c0; text-align: center; padding: 20px;">' + this._getText('FM_PROP_LOADING', '加载中...') + '</div>';
             
             try {
                 // 从文件系统获取详细信息（使用 FSDirve.php，与桌面图标属性功能一致）
@@ -1758,55 +1848,66 @@
                 // 构建属性HTML
                 let html = '';
                 
-                // 基本信息
+                // 基本信息（多语言）
+                const propBasic = this._getText('FM_PROP_BASIC_INFO', '基本信息');
+                const propName = this._getText('FM_PROP_NAME', '名称');
+                const propType = this._getText('FM_PROP_TYPE', '类型');
+                const propPath = this._getText('FM_PROP_PATH', '路径');
+                const propFolder = this._getText('KEY_FOLDER', '文件夹');
+                const propFile = this._getText('KEY_FILE', '文件');
+                const propSize = this._getText('FM_PROP_SIZE', '大小');
+                const propExt = this._getText('FM_PROP_EXTENSION', '扩展名');
+                const propCreated = this._getText('FM_PROP_CREATED', '创建时间');
+                const propModified = this._getText('FM_PROP_MODIFIED', '修改时间');
+                const propFileType = this._getText('FM_PROP_FILE_TYPE', '文件类型');
+                const propDirInfo = this._getText('FM_PROP_DIR_INFO', '目录信息');
+                const propSubdirs = this._getText('FM_PROP_SUBDIRS', '子目录');
+                const propFiles = this._getText('FM_PROP_FILES', '文件');
                 html += '<div style="margin-bottom: 20px;">';
-                html += '<div style="font-weight: 600; margin-bottom: 12px; color: #6c8eff; font-size: 14px;">基本信息</div>';
-                html += `<div style="margin-bottom: 8px;"><span style="color: #aab2c0;">名称:</span> <span style="margin-left: 8px;">${this._escapeHtml(item.name)}</span></div>`;
-                html += `<div style="margin-bottom: 8px;"><span style="color: #aab2c0;">类型:</span> <span style="margin-left: 8px;">${item.type === 'directory' ? '文件夹' : '文件'}</span></div>`;
-                html += `<div style="margin-bottom: 8px;"><span style="color: #aab2c0;">路径:</span> <div style="margin-left: 8px; margin-top: 4px; word-break: break-all; color: #d7e0dd;">${this._escapeHtml(item.path)}</div></div>`;
+                html += '<div style="font-weight: 600; margin-bottom: 12px; color: #6c8eff; font-size: 14px;">' + propBasic + '</div>';
+                html += '<div style="margin-bottom: 8px;"><span style="color: #aab2c0;">' + propName + ':</span> <span style="margin-left: 8px;">' + this._escapeHtml(item.name) + '</span></div>';
+                html += '<div style="margin-bottom: 8px;"><span style="color: #aab2c0;">' + propType + ':</span> <span style="margin-left: 8px;">' + (item.type === 'directory' ? propFolder : propFile) + '</span></div>';
+                html += '<div style="margin-bottom: 8px;"><span style="color: #aab2c0;">' + propPath + ':</span> <div style="margin-left: 8px; margin-top: 4px; word-break: break-all; color: #d7e0dd;">' + this._escapeHtml(item.path) + '</div></div>';
                 html += '</div>';
                 
                 if (item.type === 'file') {
-                    // 文件信息
+                    const propFileInfo = this._getText('FM_PROP_FILE_INFO', '文件信息');
                     html += '<div style="margin-bottom: 20px;">';
-                    html += '<div style="font-weight: 600; margin-bottom: 12px; color: #6c8eff; font-size: 14px;">文件信息</div>';
+                    html += '<div style="font-weight: 600; margin-bottom: 12px; color: #6c8eff; font-size: 14px;">' + propFileInfo + '</div>';
                     
                     if (fileInfo) {
                         if (fileInfo.size !== undefined) {
-                            html += `<div style="margin-bottom: 8px;"><span style="color: #aab2c0;">大小:</span> <span style="margin-left: 8px;">${formatFileSize(fileInfo.size)}</span></div>`;
+                            html += '<div style="margin-bottom: 8px;"><span style="color: #aab2c0;">' + propSize + ':</span> <span style="margin-left: 8px;">' + formatFileSize(fileInfo.size) + '</span></div>';
                         }
                         if (fileInfo.extension) {
-                            html += `<div style="margin-bottom: 8px;"><span style="color: #aab2c0;">扩展名:</span> <span style="margin-left: 8px;">${fileInfo.extension}</span></div>`;
+                            html += '<div style="margin-bottom: 8px;"><span style="color: #aab2c0;">' + propExt + ':</span> <span style="margin-left: 8px;">' + fileInfo.extension + '</span></div>';
                         }
                         if (fileInfo.created) {
-                            html += `<div style="margin-bottom: 8px;"><span style="color: #aab2c0;">创建时间:</span> <span style="margin-left: 8px;">${fileInfo.created}</span></div>`;
+                            html += '<div style="margin-bottom: 8px;"><span style="color: #aab2c0;">' + propCreated + ':</span> <span style="margin-left: 8px;">' + fileInfo.created + '</span></div>';
                         }
                         if (fileInfo.modified) {
-                            html += `<div style="margin-bottom: 8px;"><span style="color: #aab2c0;">修改时间:</span> <span style="margin-left: 8px;">${fileInfo.modified}</span></div>`;
+                            html += '<div style="margin-bottom: 8px;"><span style="color: #aab2c0;">' + propModified + ':</span> <span style="margin-left: 8px;">' + fileInfo.modified + '</span></div>';
                         }
                     } else {
-                        // 如果无法获取文件信息，使用项目数据
                         if (item.size !== undefined) {
-                            html += `<div style="margin-bottom: 8px;"><span style="color: #aab2c0;">大小:</span> <span style="margin-left: 8px;">${formatFileSize(item.size)}</span></div>`;
+                            html += '<div style="margin-bottom: 8px;"><span style="color: #aab2c0;">' + propSize + ':</span> <span style="margin-left: 8px;">' + formatFileSize(item.size) + '</span></div>';
                         }
                         if (item.fileType) {
-                            html += `<div style="margin-bottom: 8px;"><span style="color: #aab2c0;">文件类型:</span> <span style="margin-left: 8px;">${item.fileType}</span></div>`;
+                            html += '<div style="margin-bottom: 8px;"><span style="color: #aab2c0;">' + propFileType + ':</span> <span style="margin-left: 8px;">' + item.fileType + '</span></div>';
                         }
                     }
                     html += '</div>';
                 } else {
-                    // 目录信息
                     html += '<div style="margin-bottom: 20px;">';
-                    html += '<div style="font-weight: 600; margin-bottom: 12px; color: #6c8eff; font-size: 14px;">目录信息</div>';
+                    html += '<div style="font-weight: 600; margin-bottom: 12px; color: #6c8eff; font-size: 14px;">' + propDirInfo + '</div>';
                     
                     if (fileInfo && fileInfo.created) {
-                        html += `<div style="margin-bottom: 8px;"><span style="color: #aab2c0;">创建时间:</span> <span style="margin-left: 8px;">${fileInfo.created}</span></div>`;
+                        html += '<div style="margin-bottom: 8px;"><span style="color: #aab2c0;">' + propCreated + ':</span> <span style="margin-left: 8px;">' + fileInfo.created + '</span></div>';
                     }
                     if (fileInfo && fileInfo.modified) {
-                        html += `<div style="margin-bottom: 8px;"><span style="color: #aab2c0;">修改时间:</span> <span style="margin-left: 8px;">${fileInfo.modified}</span></div>`;
+                        html += '<div style="margin-bottom: 8px;"><span style="color: #aab2c0;">' + propModified + ':</span> <span style="margin-left: 8px;">' + fileInfo.modified + '</span></div>';
                     }
                     
-                    // 统计目录中的文件和子目录数量（从 PHP 服务获取）
                     let phpPath = item.path;
                     if (/^[A-Z]:$/.test(phpPath)) {
                         phpPath = phpPath + '/';
@@ -1828,19 +1929,19 @@
                                 const items = listResult.data.items;
                                 const dirsCount = items.filter(i => i.type === 'directory').length;
                                 const filesCount = items.filter(i => i.type === 'file').length;
-                                html += `<div style="margin-bottom: 8px;"><span style="color: #aab2c0;">子目录:</span> <span style="margin-left: 8px;">${dirsCount}</span></div>`;
-                                html += `<div style="margin-bottom: 8px;"><span style="color: #aab2c0;">文件:</span> <span style="margin-left: 8px;">${filesCount}</span></div>`;
+                                html += '<div style="margin-bottom: 8px;"><span style="color: #aab2c0;">' + propSubdirs + ':</span> <span style="margin-left: 8px;">' + dirsCount + '</span></div>';
+                                html += '<div style="margin-bottom: 8px;"><span style="color: #aab2c0;">' + propFiles + ':</span> <span style="margin-left: 8px;">' + filesCount + '</span></div>';
                             } else {
-                                html += `<div style="margin-bottom: 8px;"><span style="color: #aab2c0;">子目录:</span> <span style="margin-left: 8px;">-</span></div>`;
-                                html += `<div style="margin-bottom: 8px;"><span style="color: #aab2c0;">文件:</span> <span style="margin-left: 8px;">-</span></div>`;
+                                html += '<div style="margin-bottom: 8px;"><span style="color: #aab2c0;">' + propSubdirs + ':</span> <span style="margin-left: 8px;">-</span></div>';
+                                html += '<div style="margin-bottom: 8px;"><span style="color: #aab2c0;">' + propFiles + ':</span> <span style="margin-left: 8px;">-</span></div>';
                             }
                         } else {
-                            html += `<div style="margin-bottom: 8px;"><span style="color: #aab2c0;">子目录:</span> <span style="margin-left: 8px;">-</span></div>`;
-                            html += `<div style="margin-bottom: 8px;"><span style="color: #aab2c0;">文件:</span> <span style="margin-left: 8px;">-</span></div>`;
+                            html += '<div style="margin-bottom: 8px;"><span style="color: #aab2c0;">' + propSubdirs + ':</span> <span style="margin-left: 8px;">-</span></div>';
+                            html += '<div style="margin-bottom: 8px;"><span style="color: #aab2c0;">' + propFiles + ':</span> <span style="margin-left: 8px;">-</span></div>';
                         }
                     } catch (e) {
-                        html += `<div style="margin-bottom: 8px;"><span style="color: #aab2c0;">子目录:</span> <span style="margin-left: 8px;">-</span></div>`;
-                        html += `<div style="margin-bottom: 8px;"><span style="color: #aab2c0;">文件:</span> <span style="margin-left: 8px;">-</span></div>`;
+                        html += '<div style="margin-bottom: 8px;"><span style="color: #aab2c0;">' + propSubdirs + ':</span> <span style="margin-left: 8px;">-</span></div>';
+                        html += '<div style="margin-bottom: 8px;"><span style="color: #aab2c0;">' + propFiles + ':</span> <span style="margin-left: 8px;">-</span></div>';
                     }
                     html += '</div>';
                 }
@@ -1851,7 +1952,7 @@
                 if (typeof KernelLogger !== 'undefined') {
                     KernelLogger.error('FileManager', '加载属性失败', error);
                 }
-                this.propertiesContent.innerHTML = `<div style="color: #ff4444;">加载属性失败: ${error.message}</div>`;
+                this.propertiesContent.innerHTML = '<div style="color: #ff4444;">' + this._getText('FM_LOAD_PROP_FAILED', '加载属性失败: {0}').replace('{0}', error.message) + '</div>';
             }
         },
         
@@ -2105,8 +2206,8 @@
                     try {
                         await NotificationManager.createNotification(this.pid, {
                             type: 'snapshot',
-                            title: '文件管理器',
-                            content: `加载根目录失败: ${error.message}`,
+                            title: this._getText('FM_TITLE', '文件管理器'),
+                            content: this._getText('FM_LOAD_ROOT_FAILED', '加载根目录失败: {0}').replace('{0}', error.message),
                             duration: 4000
                         });
                     } catch (e) {
@@ -2199,8 +2300,8 @@
                         try {
                             await NotificationManager.createNotification(this.pid, {
                                 type: 'snapshot',
-                                title: '文件管理器',
-                                content: `无法访问路径: ${path}\n${errorMessage}`,
+                                title: this._getText('FM_TITLE', '文件管理器'),
+                                content: this._getText('FM_ACCESS_PATH_FAILED', '无法访问路径: {0}\n{1}').replace('{0}', path).replace('{1}', errorMessage),
                                 duration: 4000
                             });
                         } catch (e) {
@@ -2215,7 +2316,7 @@
                 const result = await response.json();
                 
                 if (result.status !== 'success' || !result.data || !result.data.items) {
-                    const errorMessage = result.message || '未知错误';
+                    const errorMessage = result.message || this._getText('KEY_UNKNOWN_ERROR', '未知错误');
                     if (typeof KernelLogger !== 'undefined') {
                         KernelLogger.error('FileManager', `加载目录失败: ${errorMessage}`);
                     }
@@ -2224,8 +2325,8 @@
                         try {
                             await NotificationManager.createNotification(this.pid, {
                                 type: 'snapshot',
-                                title: '文件管理器',
-                                content: `无法访问路径: ${path}\n${errorMessage}`,
+                                title: this._getText('FM_TITLE', '文件管理器'),
+                                content: this._getText('FM_ACCESS_PATH_FAILED', '无法访问路径: {0}\n{1}').replace('{0}', path).replace('{1}', errorMessage),
                                 duration: 4000
                             });
                         } catch (e) {
@@ -2319,8 +2420,8 @@
                     try {
                         await NotificationManager.createNotification(this.pid, {
                             type: 'snapshot',
-                            title: '文件管理器',
-                            content: `加载目录失败: ${error.message}`,
+                            title: this._getText('FM_TITLE', '文件管理器'),
+                            content: this._getText('FM_LOAD_DIR_FAILED', '加载目录失败: {0}').replace('{0}', error.message),
                             duration: 4000
                         });
                     } catch (e) {
@@ -2535,7 +2636,7 @@
             
             const iconImg = document.createElement('img');
             iconImg.src = iconUrl;
-            iconImg.alt = item.type === 'directory' ? '目录' : '文件';
+            iconImg.alt = item.type === 'directory' ? this._getText('KEY_FOLDER', '文件夹') : this._getText('KEY_FILE', '文件');
             iconImg.style.cssText = 'width: 24px; height: 24px;';
             icon.appendChild(iconImg);
             
@@ -2756,7 +2857,7 @@
             if (fileList.length === 0) {
                 const emptyMsg = document.createElement('div');
                 emptyMsg.className = 'filemanager-empty';
-                emptyMsg.textContent = this._searchQuery ? '未找到匹配的文件' : '此目录为空';
+                emptyMsg.textContent = this._searchQuery ? this._getText('FM_NO_MATCHING_FILES', '未找到匹配的文件') : this._getText('FM_EMPTY_DIR', '此目录为空');
                 emptyMsg.style.cssText = `
                     padding: 40px;
                     text-align: center;
@@ -2792,12 +2893,10 @@
                 const itemElement = this._createFileListItem(item);
                 this.fileListElement.appendChild(itemElement);
                 
-                // 在元素添加到 DOM 后启用拖拽（仅在非选择器模式下）
+                // 在元素添加到 DOM 后立即启用拖拽（仅在非选择器模式下）
+                // 同步调用避免被后续的 _renderFileList 清空列表后 setTimeout 才执行导致元素已脱离 DOM
                 if (!this._isFileSelectorMode && !this._isFolderSelectorMode) {
-                    // 使用 setTimeout 确保元素已完全添加到 DOM
-                    setTimeout(() => {
-                        this._enableItemDrag(itemElement, item);
-                    }, 0);
+                    this._enableItemDrag(itemElement, item);
                 }
             }
         },
@@ -2876,7 +2975,7 @@
         _updateMultiSelectButton: function() {
             if (this.multiSelectConfirmButton) {
                 const count = this._selectedItems.length;
-                this.multiSelectConfirmButton.textContent = `确认选择 (${count})`;
+                this.multiSelectConfirmButton.textContent = this._getText('FM_CONFIRM_SELECT_N', '确认选择 ({0})').replace('{0}', String(count));
                 
                 if (count > 0) {
                     this.multiSelectConfirmButton.style.opacity = '1';
@@ -2914,8 +3013,8 @@
                         try {
                             await NotificationManager.createNotification(this.pid, {
                                 type: 'snapshot',
-                                title: '文件管理器',
-                                content: `选择失败: ${err.message}`,
+                                title: this._getText('FM_TITLE', '文件管理器'),
+                                content: this._getText('FM_SELECT_FAILED', '选择失败: {0}').replace('{0}', err.message),
                                 duration: 4000
                             });
                         } catch (e) {
@@ -2952,8 +3051,8 @@
                         try {
                             await NotificationManager.createNotification(this.pid, {
                                 type: 'snapshot',
-                                title: '文件管理器',
-                                content: `选择失败: ${err.message}`,
+                                title: this._getText('FM_TITLE', '文件管理器'),
+                                content: this._getText('FM_SELECT_FAILED', '选择失败: {0}').replace('{0}', err.message),
                                 duration: 4000
                             });
                         } catch (e) {
@@ -3060,23 +3159,23 @@
                 else if (fileType === 'MARKDOWN' || extension === 'md' || extension === 'markdown') {
                     await this._openFileWithCat(item);
                 }
-                // 其他文本文件类型（TEXT、CODE）默认用 vim 打开
+                // 其他文本文件类型（TEXT、CODE）默认用 Notepad 打开
                 else if (fileType === 'TEXT' || fileType === 'CODE') {
-                    await this._openFileWithVim(item);
+                    await this._openFileWithNotepad(item);
                 } else {
-                    // 其他类型文件（如 BINARY），提示用vim打开
+                    // 其他类型文件（如 BINARY），提示用 Notepad 打开
                     if (typeof GUIManager !== 'undefined' && typeof GUIManager.showConfirm === 'function') {
                         const confirmed = await GUIManager.showConfirm(
-                            `文件 "${item.name}" 不是文本文件。是否用 Vim 打开？`,
-                            '打开文件',
+                            this._getText('FM_NOT_TEXT_OPEN_NOTEPAD', '文件 "{0}" 不是文本文件。是否用 Notepad 打开？').replace('{0}', item.name),
+                            this._getText('FM_OPEN_FILE', '打开文件'),
                             'info'
                         );
                         if (confirmed) {
-                            await this._openFileWithVim(item);
+                            await this._openFileWithNotepad(item);
                         }
                     } else {
-                        if (confirm(`文件 "${item.name}" 不是文本文件。是否用 Vim 打开？`)) {
-                            await this._openFileWithVim(item);
+                        if (confirm(this._getText('FM_NOT_TEXT_OPEN_NOTEPAD', '文件 "{0}" 不是文本文件。是否用 Notepad 打开？').replace('{0}', item.name))) {
+                            await this._openFileWithNotepad(item);
                         }
                     }
                 }
@@ -3094,8 +3193,8 @@
                         try {
                             await NotificationManager.createNotification(this.pid, {
                                 type: 'snapshot',
-                                title: '文件管理器',
-                                content: 'ProcessManager 不可用',
+                                title: this._getText('FM_TITLE', '文件管理器'),
+                                content: this._getText('FM_PM_UNAVAILABLE', 'ProcessManager 不可用'),
                                 duration: 3000
                             });
                         } catch (e) {
@@ -3118,8 +3217,8 @@
                         try {
                             await NotificationManager.createNotification(this.pid, {
                                 type: 'snapshot',
-                                title: '文件管理器',
-                                content: '文件路径无效',
+                                title: this._getText('FM_TITLE', '文件管理器'),
+                                content: this._getText('FM_PATH_INVALID', '文件路径无效'),
                                 duration: 3000
                             });
                         } catch (e) {
@@ -3151,8 +3250,8 @@
                     try {
                         await NotificationManager.createNotification(this.pid, {
                             type: 'snapshot',
-                            title: '文件管理器',
-                            content: `启动视频播放器失败: ${error.message}`,
+                            title: this._getText('FM_TITLE', '文件管理器'),
+                            content: this._getText('FM_VIDEO_LAUNCH_FAILED', '启动视频播放器失败: {0}').replace('{0}', error.message),
                             duration: 4000
                         });
                     } catch (e) {
@@ -3175,8 +3274,8 @@
                         try {
                             await NotificationManager.createNotification(this.pid, {
                                 type: 'snapshot',
-                                title: '文件管理器',
-                                content: 'ProcessManager 不可用',
+                                title: this._getText('FM_TITLE', '文件管理器'),
+                                content: this._getText('FM_PM_UNAVAILABLE', 'ProcessManager 不可用'),
                                 duration: 3000
                             });
                         } catch (e) {
@@ -3199,8 +3298,8 @@
                         try {
                             await NotificationManager.createNotification(this.pid, {
                                 type: 'snapshot',
-                                title: '文件管理器',
-                                content: '文件路径无效',
+                                title: this._getText('FM_TITLE', '文件管理器'),
+                                content: this._getText('FM_PATH_INVALID', '文件路径无效'),
                                 duration: 3000
                             });
                         } catch (e) {
@@ -3232,8 +3331,8 @@
                     try {
                         await NotificationManager.createNotification(this.pid, {
                             type: 'snapshot',
-                            title: '文件管理器',
-                            content: `启动音频播放器失败: ${error.message}`,
+                            title: this._getText('FM_TITLE', '文件管理器'),
+                            content: this._getText('FM_AUDIO_LAUNCH_FAILED', '启动音频播放器失败: {0}').replace('{0}', error.message),
                             duration: 4000
                         });
                     } catch (e) {
@@ -3256,8 +3355,8 @@
                         try {
                             await NotificationManager.createNotification(this.pid, {
                                 type: 'snapshot',
-                                title: '文件管理器',
-                                content: 'ProcessManager 不可用',
+                                title: this._getText('FM_TITLE', '文件管理器'),
+                                content: this._getText('FM_PM_UNAVAILABLE', 'ProcessManager 不可用'),
                                 duration: 3000
                             });
                         } catch (e) {
@@ -3280,8 +3379,8 @@
                         try {
                             await NotificationManager.createNotification(this.pid, {
                                 type: 'snapshot',
-                                title: '文件管理器',
-                                content: '文件路径无效',
+                                title: this._getText('FM_TITLE', '文件管理器'),
+                                content: this._getText('FM_PATH_INVALID', '文件路径无效'),
                                 duration: 3000
                             });
                         } catch (e) {
@@ -3313,8 +3412,8 @@
                     try {
                         await NotificationManager.createNotification(this.pid, {
                             type: 'snapshot',
-                            title: '文件管理器',
-                            content: `启动 WebViewer 失败: ${error.message}`,
+                            title: this._getText('FM_TITLE', '文件管理器'),
+                            content: this._getText('FM_WEBVIEWER_LAUNCH_FAILED', '启动 WebViewer 失败: {0}').replace('{0}', error.message),
                             duration: 4000
                         });
                     } catch (e) {
@@ -3337,8 +3436,8 @@
                         try {
                             await NotificationManager.createNotification(this.pid, {
                                 type: 'snapshot',
-                                title: '文件管理器',
-                                content: 'ProcessManager 不可用',
+                                title: this._getText('FM_TITLE', '文件管理器'),
+                                content: this._getText('FM_PM_UNAVAILABLE', 'ProcessManager 不可用'),
                                 duration: 3000
                             });
                         } catch (e) {
@@ -3361,8 +3460,8 @@
                         try {
                             await NotificationManager.createNotification(this.pid, {
                                 type: 'snapshot',
-                                title: '文件管理器',
-                                content: '文件路径无效',
+                                title: this._getText('FM_TITLE', '文件管理器'),
+                                content: this._getText('FM_PATH_INVALID', '文件路径无效'),
                                 duration: 3000
                             });
                         } catch (e) {
@@ -3394,8 +3493,8 @@
                     try {
                         await NotificationManager.createNotification(this.pid, {
                             type: 'snapshot',
-                            title: '文件管理器',
-                            content: `启动图片查看器失败: ${error.message}`,
+                            title: this._getText('FM_TITLE', '文件管理器'),
+                            content: this._getText('FM_IMAGE_LAUNCH_FAILED', '启动图片查看器失败: {0}').replace('{0}', error.message),
                             duration: 4000
                         });
                     } catch (e) {
@@ -3418,8 +3517,8 @@
                         try {
                             await NotificationManager.createNotification(this.pid, {
                                 type: 'snapshot',
-                                title: '文件管理器',
-                                content: 'ProcessManager 不可用',
+                                title: this._getText('FM_TITLE', '文件管理器'),
+                                content: this._getText('FM_PM_UNAVAILABLE', 'ProcessManager 不可用'),
                                 duration: 3000
                             });
                         } catch (e) {
@@ -3442,8 +3541,8 @@
                         try {
                             await NotificationManager.createNotification(this.pid, {
                                 type: 'snapshot',
-                                title: '文件管理器',
-                                content: '文件路径无效',
+                                title: this._getText('FM_TITLE', '文件管理器'),
+                                content: this._getText('FM_PATH_INVALID', '文件路径无效'),
                                 duration: 3000
                             });
                         } catch (e) {
@@ -3475,8 +3574,8 @@
                     try {
                         await NotificationManager.createNotification(this.pid, {
                             type: 'snapshot',
-                            title: '文件管理器',
-                            content: `启动 ziper 失败: ${error.message}`,
+                            title: this._getText('FM_TITLE', '文件管理器'),
+                            content: this._getText('FM_ZIPER_LAUNCH_FAILED', '启动 ziper 失败: {0}').replace('{0}', error.message),
                             duration: 4000
                         });
                     } catch (e) {
@@ -3504,7 +3603,7 @@
                                 try {
                                     await NotificationManager.createNotification(this.pid, {
                                         type: 'snapshot',
-                                        title: '文件管理器',
+                                        title: this._getText('FM_TITLE', '文件管理器'),
                                         content: '权限不足：安装程序需要管理员权限',
                                         duration: 4000
                                     });
@@ -3528,7 +3627,7 @@
                             try {
                                 await NotificationManager.createNotification(this.pid, {
                                     type: 'snapshot',
-                                    title: '文件管理器',
+                                    title: this._getText('FM_TITLE', '文件管理器'),
                                     content: '无法验证用户权限，拒绝安装',
                                     duration: 4000
                                 });
@@ -3549,7 +3648,7 @@
                         try {
                             await NotificationManager.createNotification(this.pid, {
                                 type: 'snapshot',
-                                title: '文件管理器',
+                                title: this._getText('FM_TITLE', '文件管理器'),
                                 content: '无法验证用户权限，拒绝安装',
                                 duration: 4000
                             });
@@ -3568,8 +3667,8 @@
                         try {
                             await NotificationManager.createNotification(this.pid, {
                                 type: 'snapshot',
-                                title: '文件管理器',
-                                content: 'ProcessManager 不可用',
+                                title: this._getText('FM_TITLE', '文件管理器'),
+                                content: this._getText('FM_PM_UNAVAILABLE', 'ProcessManager 不可用'),
                                 duration: 3000
                             });
                         } catch (e) {
@@ -3592,8 +3691,8 @@
                         try {
                             await NotificationManager.createNotification(this.pid, {
                                 type: 'snapshot',
-                                title: '文件管理器',
-                                content: '文件路径无效',
+                                title: this._getText('FM_TITLE', '文件管理器'),
+                                content: this._getText('FM_PATH_INVALID', '文件路径无效'),
                                 duration: 3000
                             });
                         } catch (e) {
@@ -3715,7 +3814,7 @@
                     try {
                         await NotificationManager.createNotification(this.pid, {
                             type: 'snapshot',
-                            title: '文件管理器',
+                            title: this._getText('FM_TITLE', '文件管理器'),
                             content: `启动 zominstall 失败: ${error.message || error}`,
                             duration: 4000
                         });
@@ -3799,8 +3898,8 @@
                     try {
                         await NotificationManager.createNotification(this.pid, {
                             type: 'snapshot',
-                            title: '文件管理器',
-                            content: `打开文件失败: ${error.message}`,
+                            title: this._getText('FM_TITLE', '文件管理器'),
+                            content: this._getText('FM_OPEN_FILE_FAILED_MSG', '打开文件失败: {0}').replace('{0}', error.message),
                             duration: 4000
                         });
                     } catch (e) {
@@ -3880,8 +3979,8 @@
                     try {
                         await NotificationManager.createNotification(this.pid, {
                             type: 'snapshot',
-                            title: '保存成功',
-                            content: '文件已保存',
+                            title: this._getText('FM_SAVE_SUCCESS', '保存成功'),
+                            content: this._getText('FM_SAVE_SUCCESS_MSG', '文件已保存'),
                             duration: 2000
                         });
                     } catch (e) {
@@ -3900,8 +3999,8 @@
                     try {
                         await NotificationManager.createNotification(this.pid, {
                             type: 'snapshot',
-                            title: '保存失败',
-                            content: `保存文件失败: ${error.message}`,
+                            title: this._getText('FM_SAVE_FAILED', '保存失败'),
+                            content: this._getText('FM_SAVE_FAILED_MSG', '保存文件失败: {0}').replace('{0}', error.message),
                             duration: 4000
                         });
                     } catch (e) {
@@ -3928,7 +4027,83 @@
         },
         
         /**
-         * 用 Vim 打开文件
+         * 用 Notepad 打开文件
+         */
+        _openFileWithNotepad: async function(item) {
+            try {
+                if (typeof ProcessManager === 'undefined') {
+                    if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                        try {
+                            await NotificationManager.createNotification(this.pid, {
+                                type: 'snapshot',
+                                title: this._getText('FM_TITLE', '文件管理器'),
+                                content: this._getText('FM_PM_UNAVAILABLE', 'ProcessManager 不可用'),
+                                duration: 3000
+                            });
+                        } catch (e) {
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.error('FileManager', `ProcessManager 不可用，且创建通知失败: ${e.message}`);
+                            }
+                        }
+                    } else {
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.error('FileManager', 'ProcessManager 不可用');
+                        }
+                    }
+                    return;
+                }
+                const currentPath = this._getCurrentPath() || 'D:';
+                // 传完整文件路径：若 item.path 已是“目录/文件名”形式则直接用，否则用目录+文件名拼接（避免 C:/README.md 被拼成 C:/README.md/README.md）
+                const normalizedItemPath = (item.path || '').replace(/\/+$/, '');
+                const pathToOpen = (item.name && normalizedItemPath && normalizedItemPath.endsWith(item.name))
+                    ? normalizedItemPath
+                    : (item.name ? ((normalizedItemPath || currentPath.replace(/\/+$/, '')) + '/' + item.name) : (item.path || null));
+                if (!pathToOpen) {
+                    if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                        try {
+                            await NotificationManager.createNotification(this.pid, {
+                                type: 'snapshot',
+                                title: this._getText('FM_TITLE', '文件管理器'),
+                                content: this._getText('FM_PATH_INVALID', '文件路径无效'),
+                                duration: 3000
+                            });
+                        } catch (e) {
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.warn('FileManager', `创建通知失败: ${e.message}`);
+                            }
+                        }
+                    }
+                    return;
+                }
+                const cwd = currentPath || 'D:';
+                await ProcessManager.startProgram('notepad', {
+                    args: [pathToOpen],
+                    filePath: pathToOpen,
+                    cwd: cwd
+                });
+            } catch (error) {
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('FileManager', '启动 Notepad 失败', error);
+                }
+                if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                    try {
+                        await NotificationManager.createNotification(this.pid, {
+                            type: 'snapshot',
+                            title: this._getText('FM_TITLE', '文件管理器'),
+                            content: this._getText('FM_NOTEPAD_LAUNCH_FAILED', '启动 Notepad 失败: {0}').replace('{0}', error.message),
+                            duration: 4000
+                        });
+                    } catch (e) {
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('FileManager', `创建通知失败: ${e.message}`);
+                        }
+                    }
+                }
+            }
+        },
+
+        /**
+         * 用 Vim 打开文件（需终端）
          */
         _openFileWithVim: async function(item) {
             try {
@@ -3938,8 +4113,8 @@
                         try {
                             await NotificationManager.createNotification(this.pid, {
                                 type: 'snapshot',
-                                title: '文件管理器',
-                                content: 'ProcessManager 不可用',
+                                title: this._getText('FM_TITLE', '文件管理器'),
+                                content: this._getText('FM_PM_UNAVAILABLE', 'ProcessManager 不可用'),
                                 duration: 3000
                             });
                         } catch (e) {
@@ -3962,8 +4137,8 @@
                         try {
                             await NotificationManager.createNotification(this.pid, {
                                 type: 'snapshot',
-                                title: '文件管理器',
-                                content: '文件路径无效',
+                                title: this._getText('FM_TITLE', '文件管理器'),
+                                content: this._getText('FM_PATH_INVALID', '文件路径无效'),
                                 duration: 3000
                             });
                         } catch (e) {
@@ -4016,8 +4191,8 @@
                         try {
                             await NotificationManager.createNotification(this.pid, {
                                 type: 'snapshot',
-                                title: '文件管理器',
-                                content: '无法获取终端实例，Vim 需要终端来运行',
+                                title: this._getText('FM_TITLE', '文件管理器'),
+                                content: this._getText('FM_TERMINAL_VIM', '无法获取终端实例，Vim 需要终端来运行'),
                                 duration: 4000
                             });
                         } catch (e) {
@@ -4050,8 +4225,8 @@
                     try {
                         await NotificationManager.createNotification(this.pid, {
                             type: 'snapshot',
-                            title: '文件管理器',
-                            content: `启动 Vim 失败: ${error.message}`,
+                            title: this._getText('FM_TITLE', '文件管理器'),
+                            content: this._getText('FM_VIM_LAUNCH_FAILED', '启动 Vim 失败: {0}').replace('{0}', error.message),
                             duration: 4000
                         });
                     } catch (e) {
@@ -4074,8 +4249,8 @@
                         try {
                             await NotificationManager.createNotification(this.pid, {
                                 type: 'snapshot',
-                                title: '文件管理器',
-                                content: 'ProcessManager 不可用',
+                                title: this._getText('FM_TITLE', '文件管理器'),
+                                content: this._getText('FM_PM_UNAVAILABLE', 'ProcessManager 不可用'),
                                 duration: 3000
                             });
                         } catch (e) {
@@ -4098,8 +4273,8 @@
                         try {
                             await NotificationManager.createNotification(this.pid, {
                                 type: 'snapshot',
-                                title: '文件管理器',
-                                content: '文件路径无效',
+                                title: this._getText('FM_TITLE', '文件管理器'),
+                                content: this._getText('FM_PATH_INVALID', '文件路径无效'),
                                 duration: 3000
                             });
                         } catch (e) {
@@ -4152,8 +4327,8 @@
                         try {
                             await NotificationManager.createNotification(this.pid, {
                                 type: 'snapshot',
-                                title: '文件管理器',
-                                content: '无法获取终端实例，cat 需要终端来运行',
+                                title: this._getText('FM_TITLE', '文件管理器'),
+                                content: this._getText('FM_TERMINAL_CAT', '无法获取终端实例，cat 需要终端来运行'),
                                 duration: 4000
                             });
                         } catch (e) {
@@ -4212,7 +4387,7 @@
                     try {
                         await NotificationManager.createNotification(this.pid, {
                             type: 'snapshot',
-                            title: '文件管理器',
+                            title: this._getText('FM_TITLE', '文件管理器'),
                             content: `启动 cat 失败: ${error.message}`,
                             duration: 4000
                         });
@@ -4308,8 +4483,8 @@
                         try {
                             await NotificationManager.createNotification(this.pid, {
                                 type: 'snapshot',
-                                title: '文件管理器',
-                                content: '请在磁盘分区内创建文件',
+                                title: this._getText('FM_TITLE', '文件管理器'),
+                                content: this._getText('FM_CREATE_IN_PARTITION', '请在磁盘分区内创建文件'),
                                 duration: 3000
                             });
                         } catch (e) {
@@ -4328,8 +4503,8 @@
                         try {
                             await NotificationManager.createNotification(this.pid, {
                                 type: 'snapshot',
-                                title: '文件管理器',
-                                content: '当前路径无效',
+                                title: this._getText('FM_TITLE', '文件管理器'),
+                                content: this._getText('FM_PATH_INVALID_CURRENT', '当前路径无效'),
                                 duration: 3000
                             });
                         } catch (e) {
@@ -4384,8 +4559,8 @@
                     try {
                         await NotificationManager.createNotification(this.pid, {
                             type: 'snapshot',
-                            title: '创建失败',
-                            content: `创建文件失败: ${error.message}`,
+                            title: this._getText('KEY_ERROR', '错误'),
+                            content: this._getText('FM_CREATE_FILE_FAILED', '创建文件失败: {0}').replace('{0}', error.message),
                             duration: 4000
                         });
                     } catch (e) {
@@ -4407,8 +4582,8 @@
                     try {
                         await NotificationManager.createNotification(this.pid, {
                             type: 'snapshot',
-                            title: '文件管理器',
-                            content: '普通用户无法创建目录（只读模式）',
+                            title: this._getText('FM_TITLE', '文件管理器'),
+                            content: this._getText('FM_READONLY_CANNOT_CREATE_DIR', '普通用户无法创建目录（只读模式）'),
                             duration: 3000
                         });
                     } catch (e) {
@@ -4446,8 +4621,8 @@
                         try {
                             await NotificationManager.createNotification(this.pid, {
                                 type: 'snapshot',
-                                title: '文件管理器',
-                                content: '请在磁盘分区内创建目录',
+                                title: this._getText('FM_TITLE', '文件管理器'),
+                                content: this._getText('FM_CREATE_DIR_IN_PARTITION', '请在磁盘分区内创建目录'),
                                 duration: 3000
                             });
                         } catch (e) {
@@ -4466,8 +4641,8 @@
                         try {
                             await NotificationManager.createNotification(this.pid, {
                                 type: 'snapshot',
-                                title: '文件管理器',
-                                content: '当前路径无效',
+                                title: this._getText('FM_TITLE', '文件管理器'),
+                                content: this._getText('FM_PATH_INVALID_CURRENT', '当前路径无效'),
                                 duration: 3000
                             });
                         } catch (e) {
@@ -4531,8 +4706,8 @@
                     try {
                         await NotificationManager.createNotification(this.pid, {
                             type: 'snapshot',
-                            title: '创建失败',
-                            content: `创建目录失败: ${error.message}`,
+                            title: this._getText('KEY_ERROR', '错误'),
+                            content: this._getText('FM_CREATE_DIR_FAILED', '创建目录失败: {0}').replace('{0}', error.message),
                             duration: 4000
                         });
                     } catch (e) {
@@ -4656,7 +4831,7 @@
                         try {
                             await NotificationManager.createNotification(this.pid, {
                                 type: 'snapshot',
-                                title: '文件管理器',
+                                title: this._getText('FM_TITLE', '文件管理器'),
                                 content: 'DesktopManager 不可用',
                                 duration: 3000
                             });
@@ -4684,7 +4859,7 @@
                         try {
                             await NotificationManager.createNotification(this.pid, {
                                 type: 'snapshot',
-                                title: '文件管理器',
+                                title: this._getText('FM_TITLE', '文件管理器'),
                                 content: '拖拽数据不完整，无法添加到桌面',
                                 duration: 3000
                             });
@@ -4848,9 +5023,9 @@
                         return null;
                     }
                     
-                    // 从 dataset 或保存的对象引用获取信息
+                    // 从 dataset 或保存的对象引用获取信息（path 优先 _fileManagerItem 确保右键打开程序时能拿到完整路径）
                     const itemType = itemElement.dataset.type;
-                    const itemPath = itemElement.dataset.path;
+                    const itemPath = itemElement.dataset.path || (itemElement._fileManagerItem && itemElement._fileManagerItem.path) || '';
                     // 优先使用 dataset 中的 itemName，如果没有则从保存的对象引用获取
                     let itemName = itemElement.dataset.itemName;
                     if (!itemName && itemElement._fileManagerItem) {
@@ -4875,7 +5050,7 @@
                         // 文件夹选择器模式下，文件夹可以打开
                         if (!self._isFileSelectorMode) {
                             items.push({
-                                label: '打开',
+                                label: this._getText('FM_OPEN', '打开'),
                                 icon: '📂',
                                 action: () => {
                                     self._openItem({ type: 'directory', path: itemPath, name: itemName });
@@ -4886,7 +5061,7 @@
                         // 文件夹选择器模式下，文件夹可以选择
                         if (self._isFolderSelectorMode) {
                             items.push({
-                                label: '选择',
+                                label: this._getText('FM_SELECT', '选择'),
                                 icon: '✓',
                                 action: () => {
                                     const itemElement = target.closest('.filemanager-item');
@@ -4909,7 +5084,7 @@
                         // 非选择器模式下显示其他选项
                         if (!isSelectorMode) {
                             items.push({
-                                label: '在新窗口打开',
+                                label: this._getText('FM_OPEN_IN_NEW_WINDOW', '在新窗口打开'),
                             icon: '🪟',
                             action: async () => {
                                 if (typeof ProcessManager !== 'undefined') {
@@ -4923,7 +5098,7 @@
                             if (!self._isReadOnlyMode) {
                                 items.push({ type: 'separator' });
                                 items.push({
-                                    label: '新建文件',
+                                    label: this._getText('FM_NEW_FILE', '新建文件'),
                                 icon: '📄',
                                 action: async () => {
                                     // 临时切换到该目录，创建文件，然后切换回来
@@ -4937,7 +5112,7 @@
                                 }
                                 });
                                 items.push({
-                                    label: '新建文件夹',
+                                    label: this._getText('FM_NEW_FOLDER', '新建文件夹'),
                                 icon: '📁',
                                 action: async () => {
                                     // 临时切换到该目录，创建文件夹，然后切换回来
@@ -4981,7 +5156,7 @@
                     // 文件选择器模式下，文件可以选择
                     if (self._isFileSelectorMode) {
                         items.push({
-                            label: '选择',
+                            label: this._getText('FM_SELECT', '选择'),
                             icon: '✓',
                             action: () => {
                                 if (self._onFileSelected && typeof self._onFileSelected === 'function') {
@@ -5011,14 +5186,14 @@
                     if (isVideo) {
                         if (!isSelectorMode) {
                             items.push({
-                                label: '打开',
+                                label: this._getText('FM_OPEN', '打开'),
                                 icon: '🎬',
                                 action: () => {
                                     self._openFileWithVideoPlayer({ type: 'file', path: itemPath, name: itemName, fileType: fileType });
                                 }
                             });
                             items.push({
-                                label: '用视频播放器打开',
+                                label: this._getText('FM_OPEN_WITH_VIDEO', '用视频播放器打开'),
                                 icon: '🎬',
                                 action: () => {
                                     self._openFileWithVideoPlayer({ type: 'file', path: itemPath, name: itemName, fileType: fileType });
@@ -5028,10 +5203,10 @@
                                 type: 'separator'
                             });
                             items.push({
-                                label: '用 Vim 打开',
+                                label: this._getText('FM_OPEN_WITH_NOTEPAD', '用 Notepad 打开'),
                                 icon: '✏️',
                                 action: () => {
-                                    self._openFileWithVim({ type: 'file', path: itemPath, name: itemName, fileType: fileType });
+                                    self._openFileWithNotepad({ type: 'file', path: itemPath, name: itemName, fileType: fileType });
                                 }
                             });
                         }
@@ -5040,14 +5215,14 @@
                     else if (isAudio) {
                         if (!isSelectorMode) {
                             items.push({
-                                label: '打开',
+                                label: this._getText('FM_OPEN', '打开'),
                                 icon: '🎵',
                                 action: () => {
                                     self._openFileWithAudioPlayer({ type: 'file', path: itemPath, name: itemName, fileType: fileType });
                                 }
                             });
                             items.push({
-                                label: '用音频播放器打开',
+                                label: this._getText('FM_OPEN_WITH_AUDIO', '用音频播放器打开'),
                                 icon: '🎵',
                                 action: () => {
                                     self._openFileWithAudioPlayer({ type: 'file', path: itemPath, name: itemName, fileType: fileType });
@@ -5057,10 +5232,10 @@
                                 type: 'separator'
                             });
                             items.push({
-                                label: '用 Vim 打开',
+                                label: this._getText('FM_OPEN_WITH_NOTEPAD', '用 Notepad 打开'),
                                 icon: '✏️',
                                 action: () => {
-                                    self._openFileWithVim({ type: 'file', path: itemPath, name: itemName, fileType: fileType });
+                                    self._openFileWithNotepad({ type: 'file', path: itemPath, name: itemName, fileType: fileType });
                                 }
                             });
                         }
@@ -5069,17 +5244,17 @@
                     else if (isSvg && isImage) {
                         if (!isSelectorMode) {
                             items.push({
-                                label: '用图片查看器打开',
+                                label: this._getText('FM_OPEN_WITH_IMAGE_VIEWER', '用图片查看器打开'),
                                 icon: '🖼️',
                                 action: () => {
                                     self._openFileWithImageViewer({ type: 'file', path: itemPath, name: itemName, fileType: fileType });
                                 }
                             });
                             items.push({
-                                label: '用 Vim 打开',
+                                label: this._getText('FM_OPEN_WITH_NOTEPAD', '用 Notepad 打开'),
                                 icon: '✏️',
                                 action: () => {
-                                    self._openFileWithVim({ type: 'file', path: itemPath, name: itemName, fileType: fileType });
+                                    self._openFileWithNotepad({ type: 'file', path: itemPath, name: itemName, fileType: fileType });
                                 }
                             });
                         }
@@ -5088,14 +5263,14 @@
                     else if (isImage && !isSvg) {
                         if (!isSelectorMode) {
                             items.push({
-                                label: '打开',
+                                label: this._getText('FM_OPEN', '打开'),
                                 icon: '🖼️',
                                 action: () => {
                                     self._openFileWithImageViewer({ type: 'file', path: itemPath, name: itemName, fileType: fileType });
                                 }
                             });
                             items.push({
-                                label: '用图片查看器打开',
+                                label: this._getText('FM_OPEN_WITH_IMAGE_VIEWER', '用图片查看器打开'),
                                 icon: '🖼️',
                                 action: () => {
                                     self._openFileWithImageViewer({ type: 'file', path: itemPath, name: itemName, fileType: fileType });
@@ -5107,14 +5282,14 @@
                     else if (extension === 'html' || extension === 'htm') {
                         if (!isSelectorMode) {
                             items.push({
-                                label: '打开',
+                                label: this._getText('FM_OPEN', '打开'),
                                 icon: '🌐',
                                 action: () => {
                                     self._openFileWithWebViewer({ type: 'file', path: itemPath, name: itemName, fileType: fileType });
                                 }
                             });
                             items.push({
-                                label: '用 WebViewer 打开',
+                                label: this._getText('FM_OPEN_WITH_WEBVIEWER', '用 WebViewer 打开'),
                                 icon: '🌐',
                                 action: () => {
                                     self._openFileWithWebViewer({ type: 'file', path: itemPath, name: itemName, fileType: fileType });
@@ -5124,10 +5299,10 @@
                                 type: 'separator'
                             });
                             items.push({
-                                label: '用 Vim 打开',
+                                label: this._getText('FM_OPEN_WITH_NOTEPAD', '用 Notepad 打开'),
                                 icon: '✏️',
                                 action: () => {
-                                    self._openFileWithVim({ type: 'file', path: itemPath, name: itemName, fileType: fileType });
+                                    self._openFileWithNotepad({ type: 'file', path: itemPath, name: itemName, fileType: fileType });
                                 }
                             });
                         }
@@ -5136,7 +5311,7 @@
                     else if (fileType === 'ZOM') {
                         if (!isSelectorMode) {
                             items.push({
-                                label: '安装',
+                                label: this._getText('FM_INSTALL', '安装'),
                                 icon: '📦',
                                 action: () => {
                                     self._openFileWithZominstall({ type: 'file', path: itemPath, name: itemName, fileType: fileType });
@@ -5148,14 +5323,14 @@
                     else if (fileType === 'ZIP') {
                         if (!isSelectorMode) {
                             items.push({
-                                label: '打开',
+                                label: this._getText('FM_OPEN', '打开'),
                                 icon: '📦',
                                 action: () => {
                                     self._openFileWithZiper({ type: 'file', path: itemPath, name: itemName, fileType: fileType });
                                 }
                             });
                             items.push({
-                                label: '用 ziper 打开',
+                                label: this._getText('FM_OPEN_WITH_ZIPER', '用 ziper 打开'),
                                 icon: '📦',
                                 action: () => {
                                     self._openFileWithZiper({ type: 'file', path: itemPath, name: itemName, fileType: fileType });
@@ -5167,29 +5342,29 @@
                     else if (extension === 'js') {
                         if (!isSelectorMode) {
                             items.push({
-                                label: '作为程序执行',
+                                label: this._getText('FM_RUN_AS_PROGRAM', '作为程序执行'),
                                 icon: '▶️',
                                 action: async () => {
                                     await self._executeAsProgram(itemPath, itemName);
                                 }
                             });
                             items.push({
-                                label: '用 Vim 打开',
+                                label: this._getText('FM_OPEN_WITH_NOTEPAD', '用 Notepad 打开'),
                                 icon: '✏️',
                                 action: () => {
-                                    self._openFileWithVim({ type: 'file', path: itemPath, name: itemName, fileType: fileType });
+                                    self._openFileWithNotepad({ type: 'file', path: itemPath, name: itemName, fileType: fileType });
                                 }
                             });
                         }
                     }
-                    // 文本文件："打开"就是"用 Vim 打开"
+                    // 文本文件："打开"即用 Notepad 打开
                     else if (isTextFile) {
                         if (!isSelectorMode) {
                             items.push({
-                                label: '用 Vim 打开',
+                                label: this._getText('FM_OPEN_WITH_NOTEPAD', '用 Notepad 打开'),
                                 icon: '✏️',
                                 action: () => {
-                                    self._openFileWithVim({ type: 'file', path: itemPath, name: itemName, fileType: fileType });
+                                    self._openFileWithNotepad({ type: 'file', path: itemPath, name: itemName, fileType: fileType });
                                 }
                             });
                         }
@@ -5198,24 +5373,24 @@
                     else {
                         if (!isSelectorMode) {
                             items.push({
-                                label: '打开',
+                                label: this._getText('FM_OPEN', '打开'),
                                 icon: '📄',
                                 action: () => {
                                     self._openItem({ type: 'file', path: itemPath, name: itemName, fileType: fileType });
                                 }
                             });
                             items.push({
-                                label: '用 WebViewer 打开',
+                                label: this._getText('FM_OPEN_WITH_WEBVIEWER', '用 WebViewer 打开'),
                                 icon: '🌐',
                                 action: () => {
                                     self._openFileWithWebViewer({ type: 'file', path: itemPath, name: itemName, fileType: fileType });
                                 }
                             });
                             items.push({
-                                label: '用 Vim 打开',
+                                label: this._getText('FM_OPEN_WITH_NOTEPAD', '用 Notepad 打开'),
                                 icon: '✏️',
                                 action: () => {
-                                    self._openFileWithVim({ type: 'file', path: itemPath, name: itemName, fileType: fileType });
+                                    self._openFileWithNotepad({ type: 'file', path: itemPath, name: itemName, fileType: fileType });
                                 }
                             });
                         }
@@ -5230,7 +5405,7 @@
                         if (!self._isReadOnlyMode) {
                             // 复制选项
                             items.push({
-                                label: '复制',
+                                label: this._getText('FM_MENU_COPY', '复制'),
                             icon: '📋',
                             action: () => {
                                 // 设置选中项（如果还没有选中）
@@ -5251,7 +5426,7 @@
                         
                         // 剪切选项
                         items.push({
-                            label: '剪切',
+                            label: this._getText('FM_MENU_CUT', '剪切'),
                             icon: '✂️',
                             action: () => {
                                 // 设置选中项（如果还没有选中）
@@ -5273,7 +5448,7 @@
                         // 粘贴选项（如果有剪贴板内容）
                         if (self._clipboard && self._clipboard.items && self._clipboard.items.length > 0) {
                             items.push({
-                                label: '粘贴',
+                                label: this._getText('FM_MENU_PASTE', '粘贴'),
                                 icon: '📄',
                                 action: async () => {
                                     await self._pasteItems();
@@ -5284,16 +5459,16 @@
                         items.push({ type: 'separator' });
                         
                         items.push({
-                            label: '重命名',
+                            label: this._getText('FM_RENAME', '重命名'),
                             icon: '✏️',
                             action: async () => {
                                 if (typeof GUIManager !== 'undefined' && typeof GUIManager.showPrompt === 'function') {
-                                    const newName = await GUIManager.showPrompt('请输入新名称:', '重命名', itemName);
+                                    const newName = await GUIManager.showPrompt(this._getText('FM_RENAME_PROMPT', '请输入新名称:'), this._getText('FM_RENAME', '重命名'), itemName);
                                     if (newName && newName !== itemName) {
                                         await self._renameItem(itemPath, newName);
                                     }
                                 } else {
-                                    const newName = prompt('请输入新名称:', itemName);
+                                    const newName = prompt(this._getText('FM_RENAME_PROMPT', '请输入新名称:'), itemName);
                                     if (newName && newName !== itemName) {
                                         await self._renameItem(itemPath, newName);
                                     }
@@ -5302,7 +5477,7 @@
                         });
                         
                             items.push({
-                                label: '删除',
+                                label: this._getText('FM_DELETE', '删除'),
                                 icon: '🗑️',
                                 danger: true,
                                 action: async () => {
@@ -5316,7 +5491,7 @@
                         
                         // 发送到桌面选项
                         items.push({
-                            label: '发送到桌面',
+                            label: this._getText('FM_SEND_TO_DESKTOP', '发送到桌面'),
                             icon: '🖥️',
                             action: async () => {
                                 try {
@@ -5351,7 +5526,7 @@
                                             try {
                                                 await NotificationManager.createNotification(this.pid, {
                                                     type: 'snapshot',
-                                                    title: '文件管理器',
+                                                    title: this._getText('FM_TITLE', '文件管理器'),
                                                     content: 'DesktopManager 不可用',
                                                     duration: 3000
                                                 });
@@ -5407,7 +5582,7 @@
                                     try {
                                         await NotificationManager.createNotification(this.pid, {
                                             type: 'snapshot',
-                                            title: '文件管理器',
+                                            title: this._getText('FM_TITLE', '文件管理器'),
                                             content: '该文件/文件夹已在桌面存在',
                                             duration: 3000
                                         });
@@ -5517,7 +5692,7 @@
                         
                         // 文件属性选项
                         items.push({
-                                label: '文件属性',
+                                label: this._getText('FM_PROPERTIES_FILE', '文件属性'),
                                 icon: '📋',
                                 action: () => {
                                     // 隐藏右键菜单（使用内核API）
@@ -5552,7 +5727,7 @@
                             
                             // 复制路径选项
                             items.push({
-                                label: '复制路径',
+                                label: this._getText('FM_COPY_PATH', '复制路径'),
                                 icon: '📋',
                                 action: async () => {
                                     try {
@@ -5564,8 +5739,8 @@
                                                 try {
                                                     await NotificationManager.createNotification(this.pid, {
                                                         type: 'snapshot',
-                                                        title: '复制成功',
-                                                        content: '路径已复制到剪贴板',
+                                                        title: this._getText('FM_COPY_SUCCESS', '复制成功'),
+                                                        content: this._getText('FM_PATH_COPIED', '路径已复制到剪贴板'),
                                                         duration: 2000
                                                     });
                                                 } catch (e) {
@@ -5589,8 +5764,8 @@
                                                 try {
                                                     await NotificationManager.createNotification(this.pid, {
                                                         type: 'snapshot',
-                                                        title: '复制成功',
-                                                        content: '路径已复制到剪贴板',
+                                                        title: this._getText('FM_COPY_SUCCESS', '复制成功'),
+                                                        content: this._getText('FM_PATH_COPIED', '路径已复制到剪贴板'),
                                                         duration: 2000
                                                     });
                                                 } catch (e) {
@@ -5609,8 +5784,8 @@
                                             try {
                                                 await NotificationManager.createNotification(this.pid, {
                                                     type: 'snapshot',
-                                                    title: '复制失败',
-                                                    content: '复制路径失败',
+                                                    title: this._getText('FM_COPY_FAILED', '复制失败'),
+                                                    content: this._getText('FM_COPY_PATH_FAILED', '复制路径失败'),
                                                     duration: 3000
                                                 });
                                             } catch (e) {
@@ -5653,7 +5828,7 @@
                     if (!self._isReadOnlyMode) {
                         // 新建文件
                         items.push({
-                            label: '新建文件',
+                            label: this._getText('FM_NEW_FILE', '新建文件'),
                             icon: '📄',
                             action: async () => {
                                 await self._createNewFile();
@@ -5662,7 +5837,7 @@
                         
                         // 新建文件夹
                         items.push({
-                            label: '新建文件夹',
+                            label: this._getText('FM_NEW_FOLDER', '新建文件夹'),
                             icon: '📁',
                             action: async () => {
                                 await self._createNewDirectory();
@@ -5673,7 +5848,7 @@
                         if (self._clipboard && self._clipboard.items && self._clipboard.items.length > 0) {
                             items.push({ type: 'separator' });
                             items.push({
-                                label: '粘贴',
+                                label: this._getText('FM_MENU_PASTE', '粘贴'),
                                 icon: '📄',
                                 action: async () => {
                                     await self._pasteItems();
@@ -5686,7 +5861,7 @@
                     
                     // 刷新
                     items.push({
-                        label: '刷新',
+                        label: this._getText('FM_REFRESH', '刷新'),
                         icon: '↻',
                         action: async () => {
                             const currentPath = self._getCurrentPath();
@@ -5713,8 +5888,8 @@
                     try {
                         await NotificationManager.createNotification(this.pid, {
                             type: 'snapshot',
-                            title: '文件管理器',
-                            content: '普通用户无法重命名文件/目录（只读模式）',
+                            title: this._getText('FM_TITLE', '文件管理器'),
+                            content: this._getText('FM_READONLY_CANNOT_RENAME', '普通用户无法重命名文件/目录（只读模式）'),
                             duration: 3000
                         });
                     } catch (e) {
@@ -5775,12 +5950,12 @@
                     const renameResponse = await fetch(renameUrl.toString());
                     if (!renameResponse.ok) {
                         const errorResult = await renameResponse.json().catch(() => ({ message: renameResponse.statusText }));
-                        throw new Error(errorResult.message || '重命名目录失败');
+                        throw new Error(errorResult.message || this._getText('FM_RENAME_DIR_FAILED', '重命名目录失败'));
                     }
                     
                     const renameResult = await renameResponse.json();
                     if (renameResult.status !== 'success') {
-                        throw new Error(renameResult.message || '重命名目录失败');
+                        throw new Error(renameResult.message || this._getText('FM_RENAME_DIR_FAILED', '重命名目录失败'));
                     }
                 } else {
                     // 文件：使用 rename_file
@@ -5797,12 +5972,12 @@
                     const renameResponse = await fetch(renameUrl.toString());
                     if (!renameResponse.ok) {
                         const errorResult = await renameResponse.json().catch(() => ({ message: renameResponse.statusText }));
-                        throw new Error(errorResult.message || '重命名文件失败');
+                        throw new Error(errorResult.message || this._getText('FM_RENAME_FILE_FAILED', '重命名文件失败'));
                     }
                     
                     const renameResult = await renameResponse.json();
                     if (renameResult.status !== 'success') {
-                        throw new Error(renameResult.message || '重命名文件失败');
+                        throw new Error(renameResult.message || this._getText('FM_RENAME_FILE_FAILED', '重命名文件失败'));
                     }
                 }
                 
@@ -5823,8 +5998,8 @@
                     try {
                         await NotificationManager.createNotification(this.pid, {
                             type: 'snapshot',
-                            title: '重命名失败',
-                            content: `重命名失败: ${error.message}`,
+                            title: this._getText('FM_RENAME_FAILED', '重命名失败'),
+                            content: this._getText('FM_RENAME_FAILED_MSG', '重命名失败: {0}').replace('{0}', error.message),
                             duration: 4000
                         });
                     } catch (e) {
@@ -5846,8 +6021,8 @@
                     try {
                         await NotificationManager.createNotification(this.pid, {
                             type: 'snapshot',
-                            title: '文件管理器',
-                            content: '普通用户无法删除文件/目录（只读模式）',
+                            title: this._getText('FM_TITLE', '文件管理器'),
+                            content: this._getText('FM_READONLY_CANNOT_DELETE', '普通用户无法删除文件/目录（只读模式）'),
                             duration: 3000
                         });
                     } catch (e) {
@@ -5899,7 +6074,7 @@
                 const result = await response.json();
                 
                 if (result.status !== 'success') {
-                    throw new Error(result.message || '删除失败');
+                    throw new Error(result.message || this._getText('FM_DELETE_FAILED', '删除失败'));
                 }
                 
                 // 刷新当前目录
@@ -5928,8 +6103,8 @@
                     try {
                         NotificationManager.createNotification(this.pid, {
                             type: 'snapshot',
-                            title: '文件管理器',
-                            content: '普通用户无法复制文件（只读模式）',
+                            title: this._getText('FM_TITLE', '文件管理器'),
+                            content: this._getText('FM_READONLY_CANNOT_COPY', '普通用户无法复制文件（只读模式）'),
                             duration: 3000
                         }).catch(() => {});
                     } catch (e) {
@@ -5948,7 +6123,7 @@
                     try {
                         NotificationManager.createNotification(this.pid, {
                             type: 'snapshot',
-                            title: '文件管理器',
+                            title: this._getText('FM_TITLE', '文件管理器'),
                             content: '请先选择一个文件或目录',
                             duration: 2000
                         }).catch(e => {
@@ -5993,8 +6168,8 @@
                     try {
                         NotificationManager.createNotification(this.pid, {
                             type: 'snapshot',
-                            title: '文件管理器',
-                            content: '普通用户无法剪切文件（只读模式）',
+                            title: this._getText('FM_TITLE', '文件管理器'),
+                            content: this._getText('FM_READONLY_CANNOT_CUT', '普通用户无法剪切文件（只读模式）'),
                             duration: 3000
                         }).catch(() => {});
                     } catch (e) {
@@ -6013,7 +6188,7 @@
                     try {
                         NotificationManager.createNotification(this.pid, {
                             type: 'snapshot',
-                            title: '文件管理器',
+                            title: this._getText('FM_TITLE', '文件管理器'),
                             content: '请先选择一个文件或目录',
                             duration: 2000
                         }).catch(e => {
@@ -6058,8 +6233,8 @@
                     try {
                         await NotificationManager.createNotification(this.pid, {
                             type: 'snapshot',
-                            title: '文件管理器',
-                            content: '普通用户无法粘贴文件（只读模式）',
+                            title: this._getText('FM_TITLE', '文件管理器'),
+                            content: this._getText('FM_READONLY_CANNOT_PASTE', '普通用户无法粘贴文件（只读模式）'),
                             duration: 3000
                         });
                     } catch (e) {
@@ -6077,7 +6252,7 @@
                     try {
                         await NotificationManager.createNotification(this.pid, {
                             type: 'snapshot',
-                            title: '文件管理器',
+                            title: this._getText('FM_TITLE', '文件管理器'),
                             content: '剪贴板为空',
                             duration: 2000
                         });
@@ -6097,8 +6272,8 @@
                     try {
                         await NotificationManager.createNotification(this.pid, {
                             type: 'snapshot',
-                            title: '文件管理器',
-                            content: '无法在根目录粘贴',
+                            title: this._getText('FM_TITLE', '文件管理器'),
+                            content: this._getText('FM_CANNOT_PASTE_AT_ROOT', '无法在根目录粘贴'),
                             duration: 3000
                         });
                     } catch (e) {
@@ -6248,8 +6423,8 @@
                     try {
                         await NotificationManager.createNotification(this.pid, {
                             type: 'snapshot',
-                            title: '粘贴失败',
-                            content: `粘贴失败: ${error.message}`,
+                            title: this._getText('FM_PASTE_FAILED', '粘贴失败'),
+                            content: this._getText('FM_PASTE_FAILED_MSG', '粘贴失败: {0}').replace('{0}', error.message),
                             duration: 4000
                         });
                     } catch (e) {
@@ -6512,6 +6687,12 @@
                             KernelLogger.warn('FileManager', '注销 GUIManager 窗口失败', e);
                         }
                     }
+                }
+                
+                // 取消语言切换订阅
+                if (this._languageChangeUnsubscribe) {
+                    try { this._languageChangeUnsubscribe(); } catch (e) {}
+                    this._languageChangeUnsubscribe = null;
                 }
                 
                 // 5. 清理所有子元素的引用（这些元素应该已经被 GUIManager 从 DOM 中移除）
@@ -6930,7 +7111,7 @@
                             }
                         } catch (tempError) {
                             // 临时程序启动失败，显示错误
-                            await this._showNotification('执行失败', `无法启动临时程序 "${fileName}": ${tempError.message}`, 'error');
+                            await this._showNotification(this._getText('FM_RUN_FAILED', '执行失败'), this._getText('FM_RUN_FAILED_TEMP_MSG', '无法启动临时程序 "{0}": {1}').replace('{0}', fileName).replace('{1}', tempError.message), 'error');
                             if (typeof KernelLogger !== 'undefined') {
                                 KernelLogger.error('FileManager', `临时程序启动失败: ${filePath}`, tempError);
                             }
@@ -6942,7 +7123,7 @@
                 }
             } catch (error) {
                 const errorMessage = error.message || String(error);
-                await this._showNotification('执行失败', `无法执行文件 "${fileName}": ${errorMessage}`, 'error');
+                await this._showNotification(this._getText('FM_RUN_FAILED', '执行失败'), this._getText('FM_RUN_FAILED_MSG', '无法执行文件 "{0}": {1}').replace('{0}', fileName).replace('{1}', errorMessage), 'error');
                 
                 if (typeof KernelLogger !== 'undefined') {
                     KernelLogger.error('FileManager', `执行程序失败: ${filePath}`, error);
@@ -7031,7 +7212,7 @@
                 }
             } catch (error) {
                 const errorMessage = error.message || String(error);
-                await this._showNotification('执行失败', `动态执行文件 "${fileName}" 失败: ${errorMessage}`, 'error');
+                await this._showNotification(this._getText('FM_RUN_FAILED', '执行失败'), this._getText('FM_RUN_FAILED_DYNAMIC_MSG', '动态执行文件 "{0}" 失败: {1}').replace('{0}', fileName).replace('{1}', errorMessage), 'error');
                 
                 if (typeof KernelLogger !== 'undefined') {
                     KernelLogger.error('FileManager', `动态执行程序失败: ${filePath}`, error);
@@ -7071,10 +7252,10 @@
          */
         __info__: function() {
             return {
-                name: '文件管理器',
+                name: this._getText('FM_TITLE', '文件管理器'),
                 type: 'GUI',
                 version: '1.0.0',
-                description: 'ZerOS 文件管理器 - 图形化文件浏览、编辑和管理',
+                description: this._getText('FM_DESCRIPTION', 'ZerOS 文件管理器 - 图形化文件浏览、编辑和管理'),
                 author: 'ZerOS Team',
                 copyright: '© 2025 ZerOS',
                 permissions: typeof PermissionManager !== 'undefined' ? [

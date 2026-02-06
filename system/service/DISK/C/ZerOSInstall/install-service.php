@@ -471,11 +471,13 @@ function syncDiskData($partitions) {
 /**
  * 创建管理员用户
  * 重要：只修改用户相关的数据，保留其他所有数据不变
- * 
+ * 系统资源释放后（用户创建时）将用户选择的语言写入注册表（system.registry.language 与 system.languagesExpansion.currentLocale）
+ *
  * @param string $username 用户名
  * @param string $password 已加密的MD5密码值（在JS端使用与CryptDrive._md5Hash完全一致的逻辑加密）
+ * @param string|null $language 用户语言，如 'zh-CN' 或 'en'，为空时默认 'zh-CN'
  */
-function createAdminUser($username, $password) {
+function createAdminUser($username, $password, $language = null) {
     // 规范化路径（处理Windows路径分隔符问题）
     $localSDataFile = str_replace(['/', '\\'], DIRECTORY_SEPARATOR, LOCAL_SDATA_FILE);
     
@@ -589,6 +591,20 @@ function createAdminUser($username, $password) {
     // 设置当前用户（保留其他 system 数据）
     $localData['system']['userControl.currentUser'] = $username;
     
+    // 系统资源释放后，将用户语言写入注册表（支持 LanguagesExpansion 与 registry）
+    $locale = ($language !== null && $language !== '') ? $language : 'zh-CN';
+    if (!in_array($locale, ['zh-CN', 'en'], true)) {
+        $locale = 'zh-CN';
+    }
+    if (!isset($localData['system']['registry']) || !is_array($localData['system']['registry'])) {
+        $localData['system']['registry'] = [];
+    }
+    $localData['system']['registry']['language'] = $locale;
+    if (!isset($localData['system']['languagesExpansion']) || !is_array($localData['system']['languagesExpansion'])) {
+        $localData['system']['languagesExpansion'] = [];
+    }
+    $localData['system']['languagesExpansion']['currentLocale'] = $locale;
+    
     // 写入文件（保留所有其他数据）
     if (!writeJsonFile($localSDataFile, $localData)) {
         // 检查目录是否存在
@@ -647,9 +663,10 @@ if ($method === 'POST') {
             break;
             
         case 'create-admin':
-            // 创建管理员用户
+            // 创建管理员用户（系统资源释放后，将用户语言写入注册表）
             $username = $input['username'] ?? '';
             $password = $input['password'] ?? '';
+            $language = isset($input['language']) ? trim((string) $input['language']) : null;
             
             // 验证用户名（只能英文）
             if (!preg_match('/^[a-zA-Z][a-zA-Z0-9_]*$/', $username)) {
@@ -663,7 +680,7 @@ if ($method === 'POST') {
                 break;
             }
             
-            $result = createAdminUser($username, $password);
+            $result = createAdminUser($username, $password, $language);
             if ($result === true) {
                 sendResponse(true, '管理员用户创建成功');
             } else {

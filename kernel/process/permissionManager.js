@@ -1,4 +1,4 @@
-﻿// 权限管理器
+// 权限管理器
 // 负责管理所有程序的内核操作权限
 // 支持权限声明、权限检查、动态权限申请
 
@@ -105,7 +105,11 @@ class PermissionManager {
         APPLICATION_UNINSTALL: 'APPLICATION_UNINSTALL',     // 卸载应用程序
         
         // 日志权限
-        SYSTEM_LOG_READ: 'SYSTEM_LOG_READ'                  // 读取系统日志（特殊权限，需要用户确认）
+        SYSTEM_LOG_READ: 'SYSTEM_LOG_READ',                 // 读取系统日志（特殊权限，需要用户确认）
+
+        // 语言包权限
+        LANGUAGES_READ: 'LANGUAGES_READ',                    // 读取语言包、按常量名获取文本、列出语言包
+        LANGUAGES_WRITE: 'LANGUAGES_WRITE'                  // 加载语言包、设置当前语言
     };
     
     /**
@@ -204,6 +208,10 @@ class PermissionManager {
         [PermissionManager.PERMISSION.SYSTEM_STORAGE_WRITE_USER_CONTROL]: PermissionManager.PERMISSION_LEVEL.DANGEROUS,
         [PermissionManager.PERMISSION.SYSTEM_STORAGE_WRITE_PERMISSION_CONTROL]: PermissionManager.PERMISSION_LEVEL.DANGEROUS,
         [PermissionManager.PERMISSION.SYSTEM_STORAGE_WRITE_DESKTOP]: PermissionManager.PERMISSION_LEVEL.SPECIAL,
+
+        // 语言包权限（普通权限，自动授予）
+        [PermissionManager.PERMISSION.LANGUAGES_READ]: PermissionManager.PERMISSION_LEVEL.NORMAL,
+        [PermissionManager.PERMISSION.LANGUAGES_WRITE]: PermissionManager.PERMISSION_LEVEL.NORMAL,
     };
     
     // ==================== 内部状态 ====================
@@ -1518,6 +1526,14 @@ class PermissionManager {
             [PermissionManager.PERMISSION.SYSTEM_LOG_READ]: {
                 name: '读取系统日志',
                 description: '允许程序读取系统日志信息（可能包含敏感信息，需要用户确认）'
+            },
+            [PermissionManager.PERMISSION.LANGUAGES_READ]: {
+                name: '读取语言包',
+                description: '允许程序读取语言包、按常量名获取本地化文本、列出可用语言包'
+            },
+            [PermissionManager.PERMISSION.LANGUAGES_WRITE]: {
+                name: '设置语言包',
+                description: '允许程序加载语言包、设置当前使用的语言'
             }
         };
         

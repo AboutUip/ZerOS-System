@@ -36,12 +36,36 @@
         // 主题变更监听器取消函数
         themeChangeUnsubscribe: null,
         
+        // 语言变更监听器取消函数
+        _languageChangeUnsubscribe: null,
+        
         // 加载蒙版相关
         _loadingOverlay: null,
         _isLoading: false,
         
         // 内联确认提示相关
         _inlineConfirmElement: null,
+        
+        /**
+         * 获取当前语言下的本地化文本（使用 LanguagesExpansion.getText）
+         * 若语言包未加载或不存在该 key，getText 会返回 key 本身，此时使用 fallback
+         * @param {string} key 常量名，如 SETTINGS_APP_TITLE
+         * @param {string} [fallback] 未找到时的回退文案
+         * @returns {string}
+         */
+        _getText: function(key, fallback) {
+            if (!key) return (fallback != null ? fallback : '');
+            try {
+                const LanguagesExpansion = (typeof POOL !== 'undefined' && POOL && typeof POOL.__GET__ === 'function')
+                    ? POOL.__GET__('KERNEL_GLOBAL_POOL', 'LanguagesExpansion')
+                    : (typeof window !== 'undefined' ? window.LanguagesExpansion : null);
+                if (LanguagesExpansion && typeof LanguagesExpansion.getText === 'function') {
+                    const value = LanguagesExpansion.getText(key);
+                    if (value && value !== key) return value;
+                }
+            } catch (e) {}
+            return (fallback != null ? fallback : '');
+        },
         
         /**
          * 初始化程序
@@ -66,7 +90,7 @@
                 overflow: hidden;
             `;
             
-            // 使用 GUIManager 注册窗口
+            // 使用 GUIManager 注册窗口（标题使用多语言）
             if (typeof GUIManager !== 'undefined') {
                 let icon = null;
                 if (typeof ApplicationAssetManager !== 'undefined') {
@@ -74,7 +98,7 @@
                 }
                 
                 const windowInfo = GUIManager.registerWindow(pid, this.window, {
-                    title: '设置',
+                    title: this._getText('SETTINGS_APP_TITLE', '设置'),
                     icon: icon,
                     onClose: () => {
                         // onClose 回调只做清理工作，不调用 _closeWindow 或 unregisterWindow
@@ -92,8 +116,8 @@
             // 创建窗口内容
             this._createWindowContent();
             
-            // 注册默认设置分类和设置项
-            this._registerDefaultSettings();
+            // 注册默认设置分类和设置项（等待语言等异步项完成，以便首次进入系统分类即显示完整列表）
+            await this._registerDefaultSettings();
             
             // 添加到容器
             guiContainer.appendChild(this.window);
@@ -106,6 +130,16 @@
             
             // 监听主题变更
             this._setupThemeListener();
+            
+            // 监听语言变更并刷新界面文案
+            const LanguagesExpansion = (typeof POOL !== 'undefined' && POOL && typeof POOL.__GET__ === 'function')
+                ? POOL.__GET__('KERNEL_GLOBAL_POOL', 'LanguagesExpansion')
+                : (typeof window !== 'undefined' ? window.LanguagesExpansion : null);
+            if (LanguagesExpansion && typeof LanguagesExpansion.onLanguageChange === 'function') {
+                this._languageChangeUnsubscribe = LanguagesExpansion.onLanguageChange(() => {
+                    this._refreshAllUITexts();
+                });
+            }
             
             // 初始化用户管理页面状态
             this.userManagementPage = 'list';
@@ -134,6 +168,11 @@
             if (this.themeChangeUnsubscribe && typeof this.themeChangeUnsubscribe === 'function') {
                 this.themeChangeUnsubscribe();
                 this.themeChangeUnsubscribe = null;
+            }
+            // 取消语言监听
+            if (this._languageChangeUnsubscribe && typeof this._languageChangeUnsubscribe === 'function') {
+                this._languageChangeUnsubscribe();
+                this._languageChangeUnsubscribe = null;
             }
             
             // 清理事件处理器
@@ -178,14 +217,21 @@
                 permissions: typeof PermissionManager !== 'undefined' ? [
                     PermissionManager.PERMISSION.GUI_WINDOW_CREATE,
                     PermissionManager.PERMISSION.EVENT_LISTENER,
+                    // 系统存储相关
                     PermissionManager.PERMISSION.SYSTEM_STORAGE_READ,
                     PermissionManager.PERMISSION.SYSTEM_STORAGE_WRITE,
                     PermissionManager.PERMISSION.SYSTEM_STORAGE_READ_USER_CONTROL,
                     PermissionManager.PERMISSION.SYSTEM_STORAGE_WRITE_USER_CONTROL,
+                    // 环境变量
                     PermissionManager.PERMISSION.ENVIRONMENT_READ,
                     PermissionManager.PERMISSION.ENVIRONMENT_WRITE,
+                    // 主题
                     PermissionManager.PERMISSION.THEME_READ,
                     PermissionManager.PERMISSION.THEME_WRITE,
+                    // 语言（语言扩展）
+                    PermissionManager.PERMISSION.LANGUAGES_READ,
+                    PermissionManager.PERMISSION.LANGUAGES_WRITE,
+                    // 文件系统与应用管理
                     PermissionManager.PERMISSION.KERNEL_DISK_READ,
                     PermissionManager.PERMISSION.KERNEL_DISK_WRITE,
                     PermissionManager.PERMISSION.APPLICATION_UNINSTALL
@@ -266,7 +312,7 @@
             const searchInput = document.createElement('input');
             searchInput.type = 'text';
             searchInput.className = 'settings-search-input';
-            searchInput.placeholder = '搜索设置';
+            searchInput.placeholder = this._getText('SETTINGS_SEARCH_PLACEHOLDER', '搜索设置');
             searchInput.style.cssText = `
                 flex: 1;
                 height: 40px;
@@ -383,7 +429,7 @@
             if (typeof NotificationManager === 'undefined' || typeof NotificationManager.createNotification === 'undefined') {
                 // 降级方案：使用 GUIManager.showAlert
                 if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                    await GUIManager.showAlert(message, type === 'error' ? '错误' : type === 'success' ? '成功' : '提示', type);
+                    await GUIManager.showAlert(message, type === 'error' ? this._getText('KEY_ERROR', '错误') : type === 'success' ? this._getText('KEY_SUCCESS', '成功') : this._getText('KEY_INFO', '提示'), type);
                 }
                 return;
             }
@@ -391,7 +437,7 @@
             try {
                 await NotificationManager.createNotification(this.pid, {
                     type: 'snapshot',
-                    title: type === 'error' ? '错误' : type === 'success' ? '成功' : type === 'warning' ? '警告' : '提示',
+                    title: type === 'error' ? this._getText('KEY_ERROR', '错误') : type === 'success' ? this._getText('KEY_SUCCESS', '成功') : type === 'warning' ? this._getText('KEY_WARNING', '警告') : this._getText('KEY_INFO', '提示'),
                     content: message,
                     autoClose: type === 'success' ? 3000 : type === 'error' ? 5000 : 4000
                 });
@@ -401,7 +447,7 @@
                 }
                 // 降级方案
                 if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                    await GUIManager.showAlert(message, type === 'error' ? '错误' : type === 'success' ? '成功' : '提示', type);
+                    await GUIManager.showAlert(message, type === 'error' ? this._getText('KEY_ERROR', '错误') : type === 'success' ? this._getText('KEY_SUCCESS', '成功') : this._getText('KEY_INFO', '提示'), type);
                 }
             }
         },
@@ -453,7 +499,7 @@
             `;
             
             const cancelBtn = document.createElement('button');
-            cancelBtn.textContent = '取消';
+            cancelBtn.textContent = this._getText('KEY_CANCEL', '取消');
             cancelBtn.style.cssText = `
                 padding: 8px 16px;
                 border: 1px solid var(--theme-border, rgba(139, 92, 246, 0.25));
@@ -475,7 +521,7 @@
             buttonGroup.appendChild(cancelBtn);
             
             const confirmBtn = document.createElement('button');
-            confirmBtn.textContent = '确认';
+            confirmBtn.textContent = this._getText('KEY_CONFIRM', '确认');
             const primaryColor = typeof ThemeManager !== 'undefined' && ThemeManager.getCurrentTheme() 
                 ? ThemeManager.getCurrentTheme().colors.primary || '#8b5cf6'
                 : '#8b5cf6';
@@ -521,7 +567,7 @@
             if (typeof NotificationManager === 'undefined' || typeof NotificationManager.createNotification === 'undefined') {
                 // 降级方案：使用 GUIManager.showAlert
                 if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                    await GUIManager.showAlert(message, type === 'error' ? '错误' : type === 'success' ? '成功' : '提示', type);
+                    await GUIManager.showAlert(message, type === 'error' ? this._getText('KEY_ERROR', '错误') : type === 'success' ? this._getText('KEY_SUCCESS', '成功') : this._getText('KEY_INFO', '提示'), type);
                 }
                 return;
             }
@@ -529,7 +575,7 @@
             try {
                 await NotificationManager.createNotification(this.pid, {
                     type: 'snapshot',
-                    title: type === 'error' ? '错误' : type === 'success' ? '成功' : type === 'warning' ? '警告' : '提示',
+                    title: type === 'error' ? this._getText('KEY_ERROR', '错误') : type === 'success' ? this._getText('KEY_SUCCESS', '成功') : type === 'warning' ? this._getText('KEY_WARNING', '警告') : this._getText('KEY_INFO', '提示'),
                     content: message,
                     autoClose: type === 'success' ? 3000 : type === 'error' ? 5000 : 4000
                 });
@@ -539,7 +585,7 @@
                 }
                 // 降级方案
                 if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                    await GUIManager.showAlert(message, type === 'error' ? '错误' : type === 'success' ? '成功' : '提示', type);
+                    await GUIManager.showAlert(message, type === 'error' ? this._getText('KEY_ERROR', '错误') : type === 'success' ? this._getText('KEY_SUCCESS', '成功') : this._getText('KEY_INFO', '提示'), type);
                 }
             }
         },
@@ -591,7 +637,7 @@
             `;
             
             const cancelBtn = document.createElement('button');
-            cancelBtn.textContent = '取消';
+            cancelBtn.textContent = this._getText('KEY_CANCEL', '取消');
             cancelBtn.style.cssText = `
                 padding: 8px 16px;
                 border: 1px solid var(--theme-border, rgba(139, 92, 246, 0.25));
@@ -613,7 +659,7 @@
             buttonGroup.appendChild(cancelBtn);
             
             const confirmBtn = document.createElement('button');
-            confirmBtn.textContent = '确认';
+            confirmBtn.textContent = this._getText('KEY_CONFIRM', '确认');
             const primaryColor = typeof ThemeManager !== 'undefined' && ThemeManager.getCurrentTheme() 
                 ? ThemeManager.getCurrentTheme().colors.primary || '#8b5cf6'
                 : '#8b5cf6';
@@ -656,18 +702,22 @@
          * @param {Object} categoryInfo 分类信息 { name, icon, description? }
          */
         registerCategory: function(categoryId, categoryInfo) {
-            if (!categoryId || !categoryInfo || !categoryInfo.name) {
+            const name = categoryInfo.nameKey ? this._getText(categoryInfo.nameKey, categoryInfo.name) : categoryInfo.name;
+            if (!categoryId || !categoryInfo || !name) {
                 if (typeof KernelLogger !== 'undefined') {
                     KernelLogger.warn('SETTINGS', `注册分类失败: 无效的分类信息`);
                 }
                 return false;
             }
             
+            const description = categoryInfo.descriptionKey ? this._getText(categoryInfo.descriptionKey, categoryInfo.description) : (categoryInfo.description || null);
             this.categories.set(categoryId, {
                 id: categoryId,
-                name: categoryInfo.name,
-                icon: categoryInfo.icon || null,
-                description: categoryInfo.description || null
+                nameKey: categoryInfo.nameKey || null,
+                name: name,
+                descriptionKey: categoryInfo.descriptionKey || null,
+                description: description,
+                icon: categoryInfo.icon || null
             });
             
             // 初始化该分类的设置项列表
@@ -692,7 +742,8 @@
          * @param {Object} settingInfo 设置项信息 { name, description?, type, component?, onRender?, onChange? }
          */
         registerSetting: function(categoryId, settingId, settingInfo) {
-            if (!categoryId || !settingId || !settingInfo || !settingInfo.name) {
+            const name = settingInfo.nameKey ? this._getText(settingInfo.nameKey, settingInfo.name) : settingInfo.name;
+            if (!categoryId || !settingId || !settingInfo || !name) {
                 if (typeof KernelLogger !== 'undefined') {
                     KernelLogger.warn('SETTINGS', `注册设置项失败: 无效的设置项信息`);
                 }
@@ -707,6 +758,8 @@
                 return false;
             }
             
+            const description = settingInfo.descriptionKey ? this._getText(settingInfo.descriptionKey, settingInfo.description) : (settingInfo.description || null);
+            
             // 获取该分类的设置项列表
             if (!this.settings.has(categoryId)) {
                 this.settings.set(categoryId, []);
@@ -716,34 +769,24 @@
             
             // 检查是否已存在
             const existingIndex = categorySettings.findIndex(s => s.id === settingId);
+            const item = {
+                id: settingId,
+                categoryId: categoryId,
+                nameKey: settingInfo.nameKey || null,
+                name: name,
+                descriptionKey: settingInfo.descriptionKey || null,
+                description: description,
+                type: settingInfo.type || 'text',
+                component: settingInfo.component || null,
+                onRender: settingInfo.onRender || null,
+                onChange: settingInfo.onChange || null,
+                value: settingInfo.value !== undefined ? settingInfo.value : null,
+                metadata: settingInfo.metadata || {}
+            };
             if (existingIndex >= 0) {
-                // 更新现有设置项
-                categorySettings[existingIndex] = {
-                    id: settingId,
-                    categoryId: categoryId,
-                    name: settingInfo.name,
-                    description: settingInfo.description || null,
-                    type: settingInfo.type || 'text',
-                    component: settingInfo.component || null,
-                    onRender: settingInfo.onRender || null,
-                    onChange: settingInfo.onChange || null,
-                    value: settingInfo.value !== undefined ? settingInfo.value : null,
-                    metadata: settingInfo.metadata || {}
-                };
+                categorySettings[existingIndex] = item;
             } else {
-                // 添加新设置项
-                categorySettings.push({
-                    id: settingId,
-                    categoryId: categoryId,
-                    name: settingInfo.name,
-                    description: settingInfo.description || null,
-                    type: settingInfo.type || 'text',
-                    component: settingInfo.component || null,
-                    onRender: settingInfo.onRender || null,
-                    onChange: settingInfo.onChange || null,
-                    value: settingInfo.value !== undefined ? settingInfo.value : null,
-                    metadata: settingInfo.metadata || {}
-                });
+                categorySettings.push(item);
             }
             
             // 如果当前显示的是该分类，更新内容
@@ -955,7 +998,7 @@
                 // 没有设置项，显示提示
                 const emptyMessage = document.createElement('div');
                 emptyMessage.className = 'settings-empty-message';
-                emptyMessage.textContent = '此分类暂无设置项';
+                emptyMessage.textContent = this._getText('SETTINGS_EMPTY_CATEGORY', '此分类暂无设置项');
                 emptyMessage.style.cssText = `
                     padding: 48px;
                     text-align: center;
@@ -1526,7 +1569,7 @@
                 // 没有结果
                 const emptyMessage = document.createElement('div');
                 emptyMessage.className = 'settings-empty-message';
-                emptyMessage.textContent = '未找到匹配的设置项';
+                emptyMessage.textContent = this._getText('SETTINGS_EMPTY_SEARCH', '未找到匹配的设置项');
                 emptyMessage.style.cssText = `
                     padding: 48px;
                     text-align: center;
@@ -1694,34 +1737,98 @@
         },
         
         /**
+         * 语言变更后刷新所有界面文案（窗口标题、搜索占位、分类/设置项名称、空状态提示）
+         */
+        _refreshAllUITexts: function() {
+            // 窗口标题
+            const titleEl = this.window ? this.window.querySelector('.zos-window-title') : null;
+            if (titleEl) {
+                titleEl.textContent = this._getText('SETTINGS_APP_TITLE', '设置');
+            }
+            // 搜索占位
+            if (this.searchInput) {
+                this.searchInput.placeholder = this._getText('SETTINGS_SEARCH_PLACEHOLDER', '搜索设置');
+            }
+            // 分类名称与描述（从 nameKey/descriptionKey 重新解析）
+            this.categories.forEach((cat, id) => {
+                if (cat.nameKey) {
+                    cat.name = this._getText(cat.nameKey, cat.name);
+                }
+                if (cat.descriptionKey) {
+                    cat.description = this._getText(cat.descriptionKey, cat.description);
+                }
+            });
+            // 设置项名称与描述
+            this.settings.forEach((list, categoryId) => {
+                if (!Array.isArray(list)) return;
+                list.forEach(s => {
+                    if (s.nameKey) {
+                        s.name = this._getText(s.nameKey, s.name);
+                    }
+                    if (s.descriptionKey) {
+                        s.description = this._getText(s.descriptionKey, s.description);
+                    }
+                });
+            });
+            this._updateNavigationPanel();
+            if (this.searchQuery) {
+                this._renderSearchResults();
+            } else if (this.currentCategory) {
+                this._renderCategoryContent(this.currentCategory);
+            }
+        },
+        
+        /**
          * 注册默认设置分类和设置项
          */
-        _registerDefaultSettings: function() {
+        _registerDefaultSettings: async function() {
             // 注册系统分类
             this.registerCategory('system', {
+                nameKey: 'SETTINGS_CATEGORY_SYSTEM',
                 name: '系统',
                 icon: `<svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path d="M10 2L2 7V9C2 13.55 5.16 17.74 10 18C14.84 17.74 18 13.55 18 9V7L10 2ZM10 4.21L16 8.14V9C16 12.52 13.33 15.86 10 16.18C6.67 15.86 4 12.52 4 9V8.14L10 4.21Z" fill="currentColor"/>
                 </svg>`,
+                descriptionKey: 'SETTINGS_CATEGORY_SYSTEM_DESC',
                 description: '系统相关设置'
             });
             
             // 注册天气组件开关设置项
-            this._registerWeatherComponentSetting();
+            await this._registerWeatherComponentSetting();
+            
+            // 先同步注册「界面语言」占位（默认 zh-CN），保证系统分类下立即可见
+            this._registerLanguageSettingPlaceholder();
+            // 延后拉取语言包列表并更新选项（此时进程已为 running，callKernelAPI 方可成功）
+            const self = this;
+            setTimeout(function() {
+                self._registerLanguageSetting().then(function() {
+                    if (self.currentCategory === 'system') {
+                        self._renderCategoryContent('system');
+                    }
+                }).catch(function(e) {
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.warn('SETTINGS', '更新界面语言选项失败: ' + (e && e.message));
+                    }
+                });
+            }, 100);
             
             // 注册用户管理分类
             this.registerCategory('users', {
+                nameKey: 'SETTINGS_CATEGORY_USERS',
                 name: '用户',
                 icon: `<svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path d="M10 10C12.7614 10 15 7.76142 15 5C15 2.23858 12.7614 0 10 0C7.23858 0 5 2.23858 5 5C5 7.76142 7.23858 10 10 10Z" fill="currentColor"/>
                     <path d="M10 12C6.68629 12 0 13.6863 0 17V20H20V17C20 13.6863 13.3137 12 10 12Z" fill="currentColor"/>
                 </svg>`,
+                descriptionKey: 'SETTINGS_CATEGORY_USERS_DESC',
                 description: '用户账户管理'
             });
             
             // 注册用户管理设置项（使用自定义渲染）
             this.registerSetting('users', 'user_management', {
+                nameKey: 'SETTINGS_USER_MANAGEMENT',
                 name: '用户管理',
+                descriptionKey: 'SETTINGS_USER_MANAGEMENT_DESC',
                 description: '管理用户账户、头像、密码等',
                 type: 'custom',
                 onRender: (setting, control) => {
@@ -1731,16 +1838,20 @@
             
             // 注册环境变量分类
             this.registerCategory('environment', {
+                nameKey: 'SETTINGS_CATEGORY_ENVIRONMENT',
                 name: '环境变量',
                 icon: `<svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path d="M10 2C5.58 2 2 5.58 2 10C2 14.42 5.58 18 10 18C14.42 18 18 14.42 18 10C18 5.58 14.42 2 10 2ZM10 16C6.69 16 4 13.31 4 10C4 6.69 6.69 4 10 4C13.31 4 16 6.69 16 10C16 13.31 13.31 16 10 16ZM9 5H11V7H9V5ZM9 8H11V15H9V8Z" fill="currentColor"/>
                 </svg>`,
+                descriptionKey: 'SETTINGS_CATEGORY_ENVIRONMENT_DESC',
                 description: '管理系统环境变量'
             });
             
             // 注册环境变量管理设置项（使用自定义渲染）
             this.registerSetting('environment', 'environment_management', {
+                nameKey: 'SETTINGS_ENVIRONMENT_MANAGEMENT',
                 name: '环境变量管理',
+                descriptionKey: 'SETTINGS_ENVIRONMENT_MANAGEMENT_DESC',
                 description: '管理系统环境变量，支持设置、修改、删除操作',
                 type: 'custom',
                 onRender: (setting, control) => {
@@ -1750,16 +1861,20 @@
             
             // 注册程序管理分类
             this.registerCategory('applications', {
+                nameKey: 'SETTINGS_CATEGORY_APPLICATIONS',
                 name: '应用',
                 icon: `<svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path d="M10 2L2 7V9C2 13.55 5.16 17.74 10 18C14.84 17.74 18 13.55 18 9V7L10 2ZM10 4.21L16 8.14V9C16 12.52 13.33 15.86 10 16.18C6.67 15.86 4 12.52 4 9V8.14L10 4.21Z" fill="currentColor"/>
                 </svg>`,
+                descriptionKey: 'SETTINGS_CATEGORY_APPLICATIONS_DESC',
                 description: '管理已安装的应用程序'
             });
             
             // 注册程序管理设置项（使用自定义渲染）
             this.registerSetting('applications', 'application_management', {
+                nameKey: 'SETTINGS_APPLICATION_MANAGEMENT',
                 name: '程序管理',
+                descriptionKey: 'SETTINGS_APPLICATION_MANAGEMENT_DESC',
                 description: '查看和管理已安装的应用程序，可以卸载动态安装的程序',
                 type: 'custom',
                 onRender: (setting, control) => {
@@ -1789,7 +1904,9 @@
             
             // 注册设置项
             this.registerSetting('system', 'taskbar_weather_enabled', {
+                nameKey: 'SETTINGS_WEATHER_COMPONENT',
                 name: '任务栏天气组件',
+                descriptionKey: 'SETTINGS_WEATHER_COMPONENT_DESC',
                 description: '启用或禁用任务栏右侧的天气显示组件',
                 type: 'toggle',
                 value: currentValue,
@@ -1825,6 +1942,186 @@
         },
         
         /**
+         * 同步注册「界面语言」占位项（默认 zh-CN），保证系统分类下立即可见；
+         * 进程为 loading 时无法 callKernelAPI，故先占位，再由 _registerLanguageSetting 在进程 running 后更新选项。
+         */
+        _registerLanguageSettingPlaceholder: function() {
+            this.registerSetting('system', 'ui_language', {
+                nameKey: 'SETTINGS_UI_LANGUAGE',
+                name: '界面语言',
+                descriptionKey: 'SETTINGS_UI_LANGUAGE_DESC',
+                description: '选择系统界面显示语言（需要对应语言包）',
+                type: 'select',
+                value: 'zh-CN',
+                metadata: {
+                    options: [{ value: 'zh-CN', label: '简体中文 (zh-CN)' }]
+                },
+                onChange: async (newValue, setting) => {
+                    if (!newValue || typeof ProcessManager === 'undefined' || typeof ProcessManager.callKernelAPI !== 'function') return;
+                    try {
+                        await ProcessManager.callKernelAPI(this.pid, 'Languages.loadPack', [newValue]);
+                        await ProcessManager.callKernelAPI(this.pid, 'Languages.setCurrent', [newValue]);
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.info('SETTINGS', '界面语言已切换为: ' + newValue);
+                        }
+                    } catch (e) {
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.error('SETTINGS', '切换界面语言失败: ' + (e && e.message), e);
+                        }
+                    }
+                }
+            });
+        },
+
+        /**
+         * 注册/更新界面语言设置项（拉取语言包列表、当前语言并更新下拉选项）
+         * - 默认语言为中文（zh-CN），如果存在对应语言包则自动加载并设置
+         * - 若进程尚未 running 会失败，由占位项保证 UI 已显示，此处仅更新选项
+         */
+        _registerLanguageSetting: async function() {
+            // 检查 ProcessManager 是否可用
+            if (typeof ProcessManager === 'undefined' || typeof ProcessManager.callKernelAPI !== 'function') {
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.warn('SETTINGS', '无法注册界面语言设置项: ProcessManager.callKernelAPI 不可用');
+                }
+                return;
+            }
+            
+            let availableLocales = [];
+            let currentLocale = '';
+            
+            // 获取可用语言包列表
+            try {
+                const files = await ProcessManager.callKernelAPI(this.pid, 'Languages.listPacks', []) || [];
+                availableLocales = files
+                    .map(file => {
+                        if (!file || typeof file !== 'string') return null;
+                        return file.replace(/\.json$/i, '');
+                    })
+                    .filter(Boolean);
+            } catch (e) {
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.warn('SETTINGS', `获取语言包列表失败: ${e.message}`);
+                }
+            }
+            
+            // 获取当前语言
+            try {
+                const locale = await ProcessManager.callKernelAPI(this.pid, 'Languages.getCurrentLocale', []);
+                if (locale && typeof locale === 'string') {
+                    currentLocale = locale;
+                }
+            } catch (e) {
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.debug('SETTINGS', `获取当前语言失败: ${e.message}`);
+                }
+            }
+            
+            // 如果尚未设置语言，默认使用 zh-CN（如果存在），否则使用第一个可用语言
+            if (!currentLocale) {
+                let defaultLocale = '';
+                if (availableLocales.includes('zh-CN')) {
+                    defaultLocale = 'zh-CN';
+                } else if (availableLocales.length > 0) {
+                    defaultLocale = availableLocales[0];
+                }
+                
+                if (defaultLocale) {
+                    try {
+                        await ProcessManager.callKernelAPI(this.pid, 'Languages.loadPack', [defaultLocale]);
+                        await ProcessManager.callKernelAPI(this.pid, 'Languages.setCurrent', [defaultLocale]);
+                        currentLocale = defaultLocale;
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.info('SETTINGS', `界面语言已初始化为: ${defaultLocale}`);
+                        }
+                    } catch (e) {
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('SETTINGS', `初始化界面语言失败: ${e.message}`);
+                        }
+                    }
+                }
+            } else {
+                // 确保当前语言包已加载
+                try {
+                    await ProcessManager.callKernelAPI(this.pid, 'Languages.loadPack', [currentLocale]);
+                } catch (e) {
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.debug('SETTINGS', `加载当前语言包失败: ${e.message}`);
+                    }
+                }
+            }
+            
+            // 若磁盘上暂无语言包列表，仍显示语言设置 UI，默认提供「简体中文」选项
+            if (!availableLocales || availableLocales.length === 0) {
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.debug('SETTINGS', '未从 D/plugins 获取到语言包列表，使用默认选项 zh-CN');
+                }
+                availableLocales = ['zh-CN'];
+            }
+            
+            // 构造下拉选项
+            const options = availableLocales.map(locale => {
+                return {
+                    value: locale,
+                    label: this._getLocaleDisplayName(locale)
+                };
+            });
+            
+            // 注册设置项（使用 select 控件）
+            this.registerSetting('system', 'ui_language', {
+                nameKey: 'SETTINGS_UI_LANGUAGE',
+                name: '界面语言',
+                descriptionKey: 'SETTINGS_UI_LANGUAGE_DESC',
+                description: '选择系统界面显示语言（需要对应语言包）',
+                type: 'select',
+                value: currentLocale || (availableLocales.includes('zh-CN') ? 'zh-CN' : availableLocales[0]),
+                metadata: {
+                    options: options
+                },
+                onChange: async (newValue, setting) => {
+                    if (!newValue) return;
+                    try {
+                        await ProcessManager.callKernelAPI(this.pid, 'Languages.loadPack', [newValue]);
+                        await ProcessManager.callKernelAPI(this.pid, 'Languages.setCurrent', [newValue]);
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.info('SETTINGS', `界面语言已切换为: ${newValue}`);
+                        }
+                    } catch (e) {
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.error('SETTINGS', `切换界面语言失败: ${e.message}`, e);
+                        }
+                    }
+                }
+            });
+        },
+        
+        /**
+         * 根据 locale 返回友好的显示名称
+         * @param {string} locale 语言标识，如 zh-CN、en
+         * @returns {string}
+         */
+        _getLocaleDisplayName: function(locale) {
+            if (!locale || typeof locale !== 'string') return '';
+            const key = 'SETTINGS_LOCALE_' + locale.replace(/-/g, '_').toUpperCase();
+            const t = this._getText(key, '');
+            if (t) return t;
+            switch (locale) {
+                case 'zh-CN':
+                    return this._getText('SETTINGS_LOCALE_ZH_CN', '简体中文 (zh-CN)');
+                case 'zh-TW':
+                    return '繁體中文 (zh-TW)';
+                case 'en':
+                case 'en-US':
+                    return this._getText('SETTINGS_LOCALE_EN', 'English (' + locale + ')');
+                case 'ja':
+                case 'ja-JP':
+                    return '日本語 (' + locale + ')';
+                default:
+                    return locale;
+            }
+        },
+        
+        /**
          * 渲染用户管理界面
          */
         _renderUserManagement: function(setting, control) {
@@ -1839,7 +2136,7 @@
             // 检查UserControl是否可用
             if (typeof UserControl === 'undefined') {
                 const errorMsg = document.createElement('div');
-                errorMsg.textContent = '用户控制系统未加载';
+                errorMsg.textContent = this._getText('SETTINGS_USER_CONTROL_NOT_LOADED', '用户控制系统未加载');
                 errorMsg.style.cssText = `
                     padding: 24px;
                     text-align: center;
@@ -1873,7 +2170,7 @@
             // 检查UserControl是否可用
             if (typeof UserControl === 'undefined') {
                 const errorMsg = document.createElement('div');
-                errorMsg.textContent = '用户控制系统未加载';
+                errorMsg.textContent = this._getText('SETTINGS_USER_CONTROL_NOT_LOADED', '用户控制系统未加载');
                 errorMsg.style.cssText = `
                     padding: 24px;
                     text-align: center;
@@ -1904,7 +2201,7 @@
             toolbarLeft.style.cssText = `display: flex; gap: 12px; align-items: center;`;
             
             const title = document.createElement('h2');
-            title.textContent = '用户账户';
+            title.textContent = this._getText('SETTINGS_USER_ACCOUNTS', '用户账户');
             title.style.cssText = `
                 font-size: 20px;
                 font-weight: 400;
@@ -1922,7 +2219,7 @@
             // 管理组按钮（管理员）
             if (isAdmin) {
                 const groupsBtn = document.createElement('button');
-                groupsBtn.textContent = '管理组';
+                groupsBtn.textContent = this._getText('SETTINGS_MANAGE_GROUPS', '管理组');
                 groupsBtn.style.cssText = `
                     padding: 8px 16px;
                     border: 1px solid var(--theme-border, rgba(139, 92, 246, 0.25));
@@ -1949,7 +2246,7 @@
             // 创建用户按钮（管理员）
             if (isAdmin) {
                 const createBtn = document.createElement('button');
-                createBtn.textContent = '+ 创建用户';
+                createBtn.textContent = this._getText('SETTINGS_CREATE_USER', '+ 创建用户');
                 const primaryColor = typeof ThemeManager !== 'undefined' && ThemeManager.getCurrentTheme() 
                     ? ThemeManager.getCurrentTheme().colors.primary || '#8b5cf6'
                     : '#8b5cf6';
@@ -2187,9 +2484,9 @@
             const levelTag = document.createElement('span');
             levelTag.className = 'settings-user-level';
             const levelNames = {
-                'USER': '用户',
-                'ADMIN': '管理员',
-                'DEFAULT_ADMIN': '默认管理员'
+                'USER': this._getText('SETTINGS_ROLE_USER', '用户'),
+                'ADMIN': this._getText('SETTINGS_ROLE_ADMIN', '管理员'),
+                'DEFAULT_ADMIN': this._getText('SETTINGS_ROLE_DEFAULT_ADMIN', '默认管理员')
             };
             levelTag.textContent = levelNames[user.level] || user.level;
             levelTag.style.cssText = `
@@ -2215,7 +2512,7 @@
             // 改名按钮（仅管理员）
             if (isAdmin && user.username !== 'root') {
                 const renameBtn = document.createElement('button');
-                renameBtn.textContent = '改名';
+                renameBtn.textContent = this._getText('SETTINGS_RENAME', '改名');
                 renameBtn.className = 'settings-user-action-btn';
                 renameBtn.style.cssText = `
                     padding: 6px 12px;
@@ -2235,7 +2532,7 @@
             // 设置密码按钮（管理员或用户自己）
             if (isAdmin || user.username === currentUser) {
                 const passwordBtn = document.createElement('button');
-                passwordBtn.textContent = user.hasPassword ? '修改密码' : '设置密码';
+                passwordBtn.textContent = user.hasPassword ? this._getText('SETTINGS_CHANGE_PASSWORD', '修改密码') : this._getText('SETTINGS_SET_PASSWORD', '设置密码');
                 passwordBtn.className = 'settings-user-action-btn';
                 passwordBtn.style.cssText = `
                     padding: 6px 12px;
@@ -2255,7 +2552,7 @@
             // 管理组按钮（管理员）
             if (isAdmin && typeof UserGroup !== 'undefined') {
                 const manageGroupsBtn = document.createElement('button');
-                manageGroupsBtn.textContent = '管理组';
+                manageGroupsBtn.textContent = this._getText('SETTINGS_MANAGE_GROUPS', '管理组');
                 manageGroupsBtn.className = 'settings-user-action-btn';
                 manageGroupsBtn.style.cssText = `
                     padding: 6px 12px;
@@ -2277,7 +2574,7 @@
             // 删除用户按钮（仅管理员，不能删除 root）
             if (isAdmin && user.username !== 'root' && user.username !== currentUser) {
                 const deleteBtn = document.createElement('button');
-                deleteBtn.textContent = '删除';
+                deleteBtn.textContent = this._getText('KEY_DELETE', '删除');
                 deleteBtn.className = 'settings-user-action-btn';
                 deleteBtn.style.cssText = `
                     padding: 6px 12px;
@@ -2615,7 +2912,7 @@
             // 检查UserControl是否可用
             if (typeof UserControl === 'undefined') {
                 const errorMsg = document.createElement('div');
-                errorMsg.textContent = '用户控制系统未加载';
+                errorMsg.textContent = this._getText('SETTINGS_USER_CONTROL_NOT_LOADED', '用户控制系统未加载');
                 errorMsg.style.cssText = `
                     padding: 24px;
                     text-align: center;
@@ -2629,7 +2926,7 @@
             const isAdmin = UserControl.isAdmin();
             if (!isAdmin) {
                 const errorMsg = document.createElement('div');
-                errorMsg.textContent = '只有管理员可以创建用户';
+                errorMsg.textContent = this._getText('SETTINGS_ADMIN_ONLY_CREATE_USER', '只有管理员可以创建用户');
                 errorMsg.style.cssText = `
                     padding: 24px;
                     text-align: center;
@@ -2641,7 +2938,7 @@
             
             // 创建返回按钮
             const backBtn = document.createElement('button');
-            backBtn.textContent = '← 返回';
+            backBtn.textContent = this._getText('SETTINGS_BACK', '← 返回');
             backBtn.style.cssText = `
                 padding: 8px 16px;
                 border: 1px solid var(--theme-border, rgba(139, 92, 246, 0.25));
@@ -2660,7 +2957,7 @@
             
             // 创建标题
             const title = document.createElement('h2');
-            title.textContent = '创建新用户';
+            title.textContent = this._getText('SETTINGS_CREATE_NEW_USER', '创建新用户');
             title.style.cssText = `
                 font-size: 24px;
                 font-weight: 300;
@@ -2683,7 +2980,7 @@
             usernameGroup.style.cssText = `display: flex; flex-direction: column; gap: 8px;`;
             
             const usernameLabel = document.createElement('label');
-            usernameLabel.textContent = '用户名';
+            usernameLabel.textContent = this._getText('SETTINGS_USERNAME', '用户名');
             usernameLabel.style.cssText = `
                 font-size: 14px;
                 font-weight: 500;
@@ -2693,7 +2990,7 @@
             
             const usernameInput = document.createElement('input');
             usernameInput.type = 'text';
-            usernameInput.placeholder = '请输入用户名';
+            usernameInput.placeholder = this._getText('SETTINGS_USERNAME_PLACEHOLDER', '请输入用户名');
             usernameInput.style.cssText = `
                 padding: 10px 12px;
                 border: 1px solid var(--theme-border, rgba(139, 92, 246, 0.25));
@@ -2712,7 +3009,7 @@
             levelGroup.style.cssText = `display: flex; flex-direction: column; gap: 8px;`;
             
             const levelLabel = document.createElement('label');
-            levelLabel.textContent = '用户级别';
+            levelLabel.textContent = this._getText('SETTINGS_USER_LEVEL', '用户级别');
             levelLabel.style.cssText = `
                 font-size: 14px;
                 font-weight: 500;
@@ -2723,7 +3020,7 @@
             const levelSelect = document.createElement('select');
             const isDefaultAdmin = UserControl.isDefaultAdmin();
             levelSelect.innerHTML = `
-                <option value="${UserControl.USER_LEVEL.USER}">普通用户</option>
+                <option value="${UserControl.USER_LEVEL.USER}">${this._getText('SETTINGS_USER_LEVEL_NORMAL', '普通用户')}</option>
                 ${isDefaultAdmin ? `<option value="${UserControl.USER_LEVEL.ADMIN}">管理员</option>` : ''}
             `;
             levelSelect.style.cssText = `
@@ -2745,7 +3042,7 @@
             passwordGroup.style.cssText = `display: flex; flex-direction: column; gap: 8px;`;
             
             const passwordLabel = document.createElement('label');
-            passwordLabel.textContent = '密码（可选，留空表示无密码）';
+            passwordLabel.textContent = this._getText('SETTINGS_PASSWORD_OPTIONAL', '密码（可选，留空表示无密码）');
             passwordLabel.style.cssText = `
                 font-size: 14px;
                 font-weight: 500;
@@ -2755,7 +3052,7 @@
             
             const passwordInput = document.createElement('input');
             passwordInput.type = 'password';
-            passwordInput.placeholder = '请输入密码（可选）';
+            passwordInput.placeholder = this._getText('SETTINGS_PASSWORD_PLACEHOLDER', '请输入密码（可选）');
             passwordInput.style.cssText = `
                 padding: 10px 12px;
                 border: 1px solid var(--theme-border, rgba(139, 92, 246, 0.25));
@@ -2778,7 +3075,7 @@
             `;
             
             const cancelBtn = document.createElement('button');
-            cancelBtn.textContent = '取消';
+            cancelBtn.textContent = this._getText('KEY_CANCEL', '取消');
             cancelBtn.style.cssText = `
                 padding: 10px 20px;
                 border: 1px solid var(--theme-border, rgba(139, 92, 246, 0.25));
@@ -2795,7 +3092,7 @@
             buttonGroup.appendChild(cancelBtn);
             
             const createBtn = document.createElement('button');
-            createBtn.textContent = '创建';
+            createBtn.textContent = this._getText('SETTINGS_CREATE', '创建');
             const primaryColor = typeof ThemeManager !== 'undefined' && ThemeManager.getCurrentTheme() 
                 ? ThemeManager.getCurrentTheme().colors.primary || '#8b5cf6'
                 : '#8b5cf6';
@@ -2901,7 +3198,7 @@
             // 检查UserGroup是否可用
             if (typeof UserGroup === 'undefined') {
                 const errorMsg = document.createElement('div');
-                errorMsg.textContent = '用户组管理系统未加载';
+                errorMsg.textContent = this._getText('SETTINGS_USER_GROUP_NOT_LOADED', '用户组管理系统未加载');
                 errorMsg.style.cssText = `
                     padding: 24px;
                     text-align: center;
@@ -2914,7 +3211,7 @@
             const username = this.userManagementPageData.username;
             if (!username) {
                 const errorMsg = document.createElement('div');
-                errorMsg.textContent = '无效的用户名';
+                errorMsg.textContent = this._getText('SETTINGS_INVALID_USERNAME', '无效的用户名');
                 errorMsg.style.cssText = `
                     padding: 24px;
                     text-align: center;
@@ -2926,7 +3223,7 @@
             
             // 创建返回按钮
             const backBtn = document.createElement('button');
-            backBtn.textContent = '← 返回';
+            backBtn.textContent = this._getText('SETTINGS_BACK', '← 返回');
             backBtn.style.cssText = `
                 padding: 8px 16px;
                 border: 1px solid var(--theme-border, rgba(139, 92, 246, 0.25));
@@ -2945,7 +3242,7 @@
             
             // 创建标题
             const title = document.createElement('h2');
-            title.textContent = `管理用户 "${username}" 的组成员`;
+            title.textContent = this._getText('SETTINGS_MANAGE_USER_GROUPS', '管理用户 "{0}" 的组成员').replace('{0}', username);
             title.style.cssText = `
                 font-size: 24px;
                 font-weight: 300;
@@ -3091,7 +3388,7 @@
             
             // 组类型标签
             const typeTag = document.createElement('span');
-            typeTag.textContent = group.type === 'ADMIN_GROUP' ? '管理员组' : '用户组';
+            typeTag.textContent = group.type === 'ADMIN_GROUP' ? this._getText('SETTINGS_GROUP_TYPE_ADMIN', '管理员组') : this._getText('SETTINGS_GROUP_TYPE_USER', '用户组');
             typeTag.style.cssText = `
                 font-size: 12px;
                 padding: 2px 8px;
@@ -3108,7 +3405,7 @@
             // 如果是默认组，显示提示
             if (checkbox.disabled) {
                 const hint = document.createElement('span');
-                hint.textContent = '（默认组）';
+                hint.textContent = this._getText('SETTINGS_DEFAULT_GROUP_HINT', '（默认组）');
                 hint.style.cssText = `
                     font-size: 12px;
                     color: var(--theme-text-secondary, #b8c5c0);
@@ -3126,7 +3423,7 @@
             // 检查UserGroup是否可用
             if (typeof UserGroup === 'undefined') {
                 const errorMsg = document.createElement('div');
-                errorMsg.textContent = '用户组管理系统未加载';
+                errorMsg.textContent = this._getText('SETTINGS_USER_GROUP_NOT_LOADED', '用户组管理系统未加载');
                 errorMsg.style.cssText = `
                     padding: 24px;
                     text-align: center;
@@ -3140,7 +3437,7 @@
             const isAdmin = typeof UserControl !== 'undefined' ? UserControl.isAdmin() : false;
             if (!isAdmin) {
                 const errorMsg = document.createElement('div');
-                errorMsg.textContent = '只有管理员可以管理组';
+                errorMsg.textContent = this._getText('SETTINGS_ADMIN_ONLY_MANAGE_GROUPS', '只有管理员可以管理组');
                 errorMsg.style.cssText = `
                     padding: 24px;
                     text-align: center;
@@ -3152,7 +3449,7 @@
             
             // 创建返回按钮
             const backBtn = document.createElement('button');
-            backBtn.textContent = '← 返回';
+            backBtn.textContent = this._getText('SETTINGS_BACK', '← 返回');
             backBtn.style.cssText = `
                 padding: 8px 16px;
                 border: 1px solid var(--theme-border, rgba(139, 92, 246, 0.25));
@@ -3179,7 +3476,7 @@
             `;
             
             const title = document.createElement('h2');
-            title.textContent = '用户组管理';
+            title.textContent = this._getText('SETTINGS_GROUP_MANAGEMENT', '用户组管理');
             title.style.cssText = `
                 font-size: 24px;
                 font-weight: 300;
@@ -3190,7 +3487,7 @@
             
             // 创建组按钮
             const createBtn = document.createElement('button');
-            createBtn.textContent = '+ 创建组';
+            createBtn.textContent = this._getText('SETTINGS_CREATE_GROUP', '+ 创建组');
             const primaryColor = typeof ThemeManager !== 'undefined' && ThemeManager.getCurrentTheme() 
                 ? ThemeManager.getCurrentTheme().colors.primary || '#8b5cf6'
                 : '#8b5cf6';
@@ -3220,7 +3517,7 @@
                     
                     if (groups.length === 0) {
                         const emptyMsg = document.createElement('div');
-                        emptyMsg.textContent = '暂无用户组';
+                        emptyMsg.textContent = this._getText('SETTINGS_NO_GROUPS', '暂无用户组');
                         emptyMsg.style.cssText = `
                             padding: 48px;
                             text-align: center;
@@ -3313,7 +3610,7 @@
             metaInfo.style.cssText = `display: flex; gap: 12px; align-items: center;`;
             
             const typeTag = document.createElement('span');
-            typeTag.textContent = group.type === 'ADMIN_GROUP' ? '管理员组' : '用户组';
+            typeTag.textContent = group.type === 'ADMIN_GROUP' ? this._getText('SETTINGS_GROUP_TYPE_ADMIN', '管理员组') : this._getText('SETTINGS_GROUP_TYPE_USER', '用户组');
             typeTag.style.cssText = `
                 font-size: 12px;
                 padding: 4px 8px;
@@ -3333,7 +3630,7 @@
             
             if (group.name === 'admins' || group.name === 'users') {
                 const defaultTag = document.createElement('span');
-                defaultTag.textContent = '默认组';
+                defaultTag.textContent = this._getText('SETTINGS_DEFAULT_GROUP', '默认组');
                 defaultTag.style.cssText = `
                     font-size: 12px;
                     padding: 4px 8px;
@@ -3353,7 +3650,7 @@
             
             // 查看成员按钮
             const viewBtn = document.createElement('button');
-            viewBtn.textContent = '查看成员';
+            viewBtn.textContent = this._getText('SETTINGS_VIEW_MEMBERS', '查看成员');
             viewBtn.style.cssText = `
                 padding: 6px 12px;
                 border: 1px solid var(--theme-border, rgba(139, 92, 246, 0.25));
@@ -3373,7 +3670,7 @@
             // 删除按钮（非默认组）
             if (group.name !== 'admins' && group.name !== 'users') {
                 const deleteBtn = document.createElement('button');
-                deleteBtn.textContent = '删除';
+                deleteBtn.textContent = this._getText('KEY_DELETE', '删除');
                 deleteBtn.style.cssText = `
                     padding: 6px 12px;
                     border: 1px solid var(--theme-border, rgba(255, 0, 0, 0.3));
@@ -3444,7 +3741,7 @@
             // 检查UserGroup是否可用
             if (typeof UserGroup === 'undefined') {
                 const errorMsg = document.createElement('div');
-                errorMsg.textContent = '用户组管理系统未加载';
+                errorMsg.textContent = this._getText('SETTINGS_USER_GROUP_NOT_LOADED', '用户组管理系统未加载');
                 errorMsg.style.cssText = `
                     padding: 24px;
                     text-align: center;
@@ -3457,7 +3754,7 @@
             const groupName = this.userManagementPageData.groupName;
             if (!groupName) {
                 const errorMsg = document.createElement('div');
-                errorMsg.textContent = '无效的组名';
+                errorMsg.textContent = this._getText('SETTINGS_INVALID_GROUP_NAME', '无效的组名');
                 errorMsg.style.cssText = `
                     padding: 24px;
                     text-align: center;
@@ -3469,7 +3766,7 @@
             
             // 创建返回按钮
             const backBtn = document.createElement('button');
-            backBtn.textContent = '← 返回';
+            backBtn.textContent = this._getText('SETTINGS_BACK', '← 返回');
             backBtn.style.cssText = `
                 padding: 8px 16px;
                 border: 1px solid var(--theme-border, rgba(139, 92, 246, 0.25));
@@ -3494,7 +3791,7 @@
                     const group = await UserGroup.getGroup(groupName);
                     if (!group) {
                         const errorMsg = document.createElement('div');
-                        errorMsg.textContent = '组不存在';
+                        errorMsg.textContent = this._getText('SETTINGS_GROUP_NOT_FOUND', '组不存在');
                         errorMsg.style.cssText = `
                             padding: 24px;
                             text-align: center;
@@ -3528,7 +3825,7 @@
                     
                     if (group.members.length === 0) {
                         const emptyMsg = document.createElement('div');
-                        emptyMsg.textContent = '此组暂无成员';
+                        emptyMsg.textContent = this._getText('SETTINGS_GROUP_NO_MEMBERS', '此组暂无成员');
                         emptyMsg.style.cssText = `
                             padding: 48px;
                             text-align: center;
@@ -3579,7 +3876,7 @@
                         const isDefaultGroup = groupName === 'admins' || groupName === 'users';
                         if (!isDefaultGroup) {
                             const removeBtn = document.createElement('button');
-                            removeBtn.textContent = '移除';
+                            removeBtn.textContent = this._getText('SETTINGS_REMOVE', '移除');
                             removeBtn.style.cssText = `
                                 padding: 4px 12px;
                                 border: 1px solid var(--theme-border, rgba(255, 0, 0, 0.3));
@@ -3634,7 +3931,7 @@
             // 检查UserGroup是否可用
             if (typeof UserGroup === 'undefined') {
                 const errorMsg = document.createElement('div');
-                errorMsg.textContent = '用户组管理系统未加载';
+                errorMsg.textContent = this._getText('SETTINGS_USER_GROUP_NOT_LOADED', '用户组管理系统未加载');
                 errorMsg.style.cssText = `
                     padding: 24px;
                     text-align: center;
@@ -3648,7 +3945,7 @@
             const isAdmin = typeof UserControl !== 'undefined' ? UserControl.isAdmin() : false;
             if (!isAdmin) {
                 const errorMsg = document.createElement('div');
-                errorMsg.textContent = '只有管理员可以创建组';
+                errorMsg.textContent = this._getText('SETTINGS_ADMIN_ONLY_CREATE_GROUP', '只有管理员可以创建组');
                 errorMsg.style.cssText = `
                     padding: 24px;
                     text-align: center;
@@ -3660,7 +3957,7 @@
             
             // 创建返回按钮
             const backBtn = document.createElement('button');
-            backBtn.textContent = '← 返回';
+            backBtn.textContent = this._getText('SETTINGS_BACK', '← 返回');
             backBtn.style.cssText = `
                 padding: 8px 16px;
                 border: 1px solid var(--theme-border, rgba(139, 92, 246, 0.25));
@@ -3679,7 +3976,7 @@
             
             // 创建标题
             const title = document.createElement('h2');
-            title.textContent = '创建新组';
+            title.textContent = this._getText('SETTINGS_CREATE_NEW_GROUP', '创建新组');
             title.style.cssText = `
                 font-size: 24px;
                 font-weight: 300;
@@ -3702,7 +3999,7 @@
             nameGroup.style.cssText = `display: flex; flex-direction: column; gap: 8px;`;
             
             const nameLabel = document.createElement('label');
-            nameLabel.textContent = '组名';
+            nameLabel.textContent = this._getText('SETTINGS_GROUP_NAME', '组名');
             nameLabel.style.cssText = `
                 font-size: 14px;
                 font-weight: 500;
@@ -3712,7 +4009,7 @@
             
             const nameInput = document.createElement('input');
             nameInput.type = 'text';
-            nameInput.placeholder = '请输入组名';
+            nameInput.placeholder = this._getText('SETTINGS_GROUP_NAME_PLACEHOLDER', '请输入组名');
             nameInput.style.cssText = `
                 padding: 10px 12px;
                 border: 1px solid var(--theme-border, rgba(139, 92, 246, 0.25));
@@ -3731,7 +4028,7 @@
             typeGroup.style.cssText = `display: flex; flex-direction: column; gap: 8px;`;
             
             const typeLabel = document.createElement('label');
-            typeLabel.textContent = '组类型';
+            typeLabel.textContent = this._getText('SETTINGS_GROUP_TYPE', '组类型');
             typeLabel.style.cssText = `
                 font-size: 14px;
                 font-weight: 500;
@@ -3745,7 +4042,7 @@
             const userGroupType = typeof UserGroup !== 'undefined' ? UserGroup.GROUP_TYPE.USER_GROUP : 'USER_GROUP';
             const adminGroupType = typeof UserGroup !== 'undefined' ? UserGroup.GROUP_TYPE.ADMIN_GROUP : 'ADMIN_GROUP';
             typeSelect.innerHTML = `
-                <option value="${userGroupType}">普通用户组</option>
+                <option value="${userGroupType}">${this._getText('SETTINGS_GROUP_TYPE_NORMAL', '普通用户组')}</option>
                 ${isDefaultAdmin ? `<option value="${adminGroupType}">管理员组</option>` : ''}
             `;
             typeSelect.style.cssText = `
@@ -3767,7 +4064,7 @@
             descGroup.style.cssText = `display: flex; flex-direction: column; gap: 8px;`;
             
             const descLabel = document.createElement('label');
-            descLabel.textContent = '组描述（可选）';
+            descLabel.textContent = this._getText('SETTINGS_GROUP_DESC', '组描述（可选）');
             descLabel.style.cssText = `
                 font-size: 14px;
                 font-weight: 500;
@@ -3777,7 +4074,7 @@
             
             const descInput = document.createElement('input');
             descInput.type = 'text';
-            descInput.placeholder = '请输入组描述';
+            descInput.placeholder = this._getText('SETTINGS_GROUP_DESC_PLACEHOLDER', '请输入组描述');
             descInput.style.cssText = `
                 padding: 10px 12px;
                 border: 1px solid var(--theme-border, rgba(139, 92, 246, 0.25));
@@ -3801,7 +4098,7 @@
             
             const cancelBtn = document.createElement('button');
             cancelBtn.type = 'button'; // 明确指定按钮类型，防止表单提交
-            cancelBtn.textContent = '取消';
+            cancelBtn.textContent = this._getText('KEY_CANCEL', '取消');
             cancelBtn.style.cssText = `
                 padding: 10px 20px;
                 border: 1px solid var(--theme-border, rgba(139, 92, 246, 0.25));
@@ -3822,7 +4119,7 @@
             
             const createBtn = document.createElement('button');
             createBtn.type = 'button'; // 明确指定按钮类型，防止表单提交
-            createBtn.textContent = '创建';
+            createBtn.textContent = this._getText('SETTINGS_CREATE', '创建');
             const primaryColor = typeof ThemeManager !== 'undefined' && ThemeManager.getCurrentTheme() 
                 ? ThemeManager.getCurrentTheme().colors.primary || '#8b5cf6'
                 : '#8b5cf6';
@@ -4028,7 +4325,7 @@
             // 检查 LStorage 是否可用
             if (typeof LStorage === 'undefined') {
                 const errorMsg = document.createElement('div');
-                errorMsg.textContent = 'LStorage 模块未加载';
+                errorMsg.textContent = this._getText('SETTINGS_LSTORAGE_NOT_LOADED', 'LStorage 模块未加载');
                 errorMsg.style.cssText = `
                     padding: 24px;
                     text-align: center;
@@ -4065,7 +4362,7 @@
             `;
             
             const title = document.createElement('h2');
-            title.textContent = '环境变量列表';
+            title.textContent = this._getText('SETTINGS_ENV_LIST', '环境变量列表');
             title.style.cssText = `
                 font-size: 20px;
                 font-weight: 400;
@@ -4075,7 +4372,7 @@
             toolbar.appendChild(title);
             
             const addBtn = document.createElement('button');
-            addBtn.textContent = '+ 添加环境变量';
+            addBtn.textContent = this._getText('SETTINGS_ADD_ENV', '+ 添加环境变量');
             const primaryColor = typeof ThemeManager !== 'undefined' && ThemeManager.getCurrentTheme() 
                 ? ThemeManager.getCurrentTheme().colors.primary || '#8b5cf6'
                 : '#8b5cf6';
@@ -4166,7 +4463,7 @@
                 
                 if (!envVars || Object.keys(envVars).length === 0) {
                     const emptyMsg = document.createElement('div');
-                    emptyMsg.textContent = '暂无环境变量';
+                    emptyMsg.textContent = this._getText('SETTINGS_NO_ENV', '暂无环境变量');
                     emptyMsg.style.cssText = `
                         padding: 48px;
                         text-align: center;
@@ -4240,7 +4537,7 @@
             actions.style.cssText = `display: flex; gap: 8px;`;
             
             const editBtn = document.createElement('button');
-            editBtn.textContent = '编辑';
+            editBtn.textContent = this._getText('KEY_EDIT', '编辑');
             editBtn.style.cssText = `
                 padding: 6px 12px;
                 border: 1px solid var(--theme-border, rgba(139, 92, 246, 0.25));
@@ -4284,7 +4581,7 @@
         _renderAddEnvironmentVariablePage: function(container) {
             // 创建返回按钮
             const backBtn = document.createElement('button');
-            backBtn.textContent = '← 返回';
+            backBtn.textContent = this._getText('SETTINGS_BACK', '← 返回');
             backBtn.style.cssText = `
                 padding: 8px 16px;
                 border: 1px solid var(--theme-border, rgba(139, 92, 246, 0.25));
@@ -4303,7 +4600,7 @@
             
             // 创建标题
             const title = document.createElement('h2');
-            title.textContent = '添加环境变量';
+            title.textContent = this._getText('SETTINGS_ADD_ENV_TITLE', '添加环境变量');
             title.style.cssText = `
                 font-size: 24px;
                 font-weight: 300;
@@ -4326,7 +4623,7 @@
             nameGroup.style.cssText = `display: flex; flex-direction: column; gap: 8px;`;
             
             const nameLabel = document.createElement('label');
-            nameLabel.textContent = '变量名';
+            nameLabel.textContent = this._getText('SETTINGS_VAR_NAME', '变量名');
             nameLabel.style.cssText = `
                 font-size: 14px;
                 font-weight: 500;
@@ -4336,7 +4633,7 @@
             
             const nameInput = document.createElement('input');
             nameInput.type = 'text';
-            nameInput.placeholder = '请输入环境变量名';
+            nameInput.placeholder = this._getText('SETTINGS_VAR_NAME_PLACEHOLDER', '请输入环境变量名');
             nameInput.style.cssText = `
                 padding: 10px 12px;
                 border: 1px solid var(--theme-border, rgba(139, 92, 246, 0.25));
@@ -4355,7 +4652,7 @@
             valueGroup.style.cssText = `display: flex; flex-direction: column; gap: 8px;`;
             
             const valueLabel = document.createElement('label');
-            valueLabel.textContent = '变量值';
+            valueLabel.textContent = this._getText('SETTINGS_VAR_VALUE', '变量值');
             valueLabel.style.cssText = `
                 font-size: 14px;
                 font-weight: 500;
@@ -4364,7 +4661,7 @@
             valueGroup.appendChild(valueLabel);
             
             const valueInput = document.createElement('textarea');
-            valueInput.placeholder = '请输入环境变量值';
+            valueInput.placeholder = this._getText('SETTINGS_VAR_VALUE_PLACEHOLDER', '请输入环境变量值');
             valueInput.style.cssText = `
                 padding: 10px 12px;
                 border: 1px solid var(--theme-border, rgba(139, 92, 246, 0.25));
@@ -4390,7 +4687,7 @@
             `;
             
             const cancelBtn = document.createElement('button');
-            cancelBtn.textContent = '取消';
+            cancelBtn.textContent = this._getText('KEY_CANCEL', '取消');
             cancelBtn.style.cssText = `
                 padding: 10px 20px;
                 border: 1px solid var(--theme-border, rgba(139, 92, 246, 0.25));
@@ -4407,7 +4704,7 @@
             buttonGroup.appendChild(cancelBtn);
             
             const addBtn = document.createElement('button');
-            addBtn.textContent = '添加';
+            addBtn.textContent = this._getText('SETTINGS_ADD', '添加');
             const primaryColor = typeof ThemeManager !== 'undefined' && ThemeManager.getCurrentTheme() 
                 ? ThemeManager.getCurrentTheme().colors.primary || '#8b5cf6'
                 : '#8b5cf6';
@@ -4483,7 +4780,7 @@
             
             // 创建返回按钮
             const backBtn = document.createElement('button');
-            backBtn.textContent = '← 返回';
+            backBtn.textContent = this._getText('SETTINGS_BACK', '← 返回');
             backBtn.style.cssText = `
                 padding: 8px 16px;
                 border: 1px solid var(--theme-border, rgba(139, 92, 246, 0.25));
@@ -4502,7 +4799,7 @@
             
             // 创建标题
             const title = document.createElement('h2');
-            title.textContent = `编辑环境变量: ${existingName}`;
+            title.textContent = this._getText('SETTINGS_EDIT_ENV_TITLE', '编辑环境变量: {0}').replace('{0}', existingName);
             title.style.cssText = `
                 font-size: 24px;
                 font-weight: 300;
@@ -4525,7 +4822,7 @@
             nameGroup.style.cssText = `display: flex; flex-direction: column; gap: 8px;`;
             
             const nameLabel = document.createElement('label');
-            nameLabel.textContent = '变量名';
+            nameLabel.textContent = this._getText('SETTINGS_VAR_NAME', '变量名');
             nameLabel.style.cssText = `
                 font-size: 14px;
                 font-weight: 500;
@@ -4556,7 +4853,7 @@
             valueGroup.style.cssText = `display: flex; flex-direction: column; gap: 8px;`;
             
             const valueLabel = document.createElement('label');
-            valueLabel.textContent = '变量值';
+            valueLabel.textContent = this._getText('SETTINGS_VAR_VALUE', '变量值');
             valueLabel.style.cssText = `
                 font-size: 14px;
                 font-weight: 500;
@@ -4565,7 +4862,7 @@
             valueGroup.appendChild(valueLabel);
             
             const valueInput = document.createElement('textarea');
-            valueInput.placeholder = '请输入环境变量值';
+            valueInput.placeholder = this._getText('SETTINGS_VAR_VALUE_PLACEHOLDER', '请输入环境变量值');
             valueInput.value = existingValue || '';
             valueInput.style.cssText = `
                 padding: 10px 12px;
@@ -4592,7 +4889,7 @@
             `;
             
             const cancelBtn = document.createElement('button');
-            cancelBtn.textContent = '取消';
+            cancelBtn.textContent = this._getText('KEY_CANCEL', '取消');
             cancelBtn.style.cssText = `
                 padding: 10px 20px;
                 border: 1px solid var(--theme-border, rgba(139, 92, 246, 0.25));
@@ -4609,7 +4906,7 @@
             buttonGroup.appendChild(cancelBtn);
             
             const saveBtn = document.createElement('button');
-            saveBtn.textContent = '保存';
+            saveBtn.textContent = this._getText('KEY_SAVE', '保存');
             const primaryColor = typeof ThemeManager !== 'undefined' && ThemeManager.getCurrentTheme() 
                 ? ThemeManager.getCurrentTheme().colors.primary || '#8b5cf6'
                 : '#8b5cf6';
@@ -4741,7 +5038,7 @@
             `;
             
             const title = document.createElement('h2');
-            title.textContent = '已安装的程序';
+            title.textContent = this._getText('SETTINGS_INSTALLED_APPS', '已安装的程序');
             title.style.cssText = `
                 font-size: 20px;
                 font-weight: 400;
@@ -4823,7 +5120,7 @@
                 
                 if (!allPrograms || allPrograms.length === 0) {
                     const emptyMsg = document.createElement('div');
-                    emptyMsg.textContent = '暂无已安装的程序';
+                    emptyMsg.textContent = this._getText('SETTINGS_NO_APPS', '暂无已安装的程序');
                     emptyMsg.style.cssText = `
                         padding: 48px;
                         text-align: center;
@@ -4936,12 +5233,12 @@
             
             if (isInstalled) {
                 const installedEl = document.createElement('span');
-                installedEl.textContent = '动态安装';
+                installedEl.textContent = this._getText('SETTINGS_DYNAMIC_INSTALL', '动态安装');
                 installedEl.style.cssText = 'color: #8b5cf6;';
                 metaInfo.appendChild(installedEl);
             } else {
                 const staticEl = document.createElement('span');
-                staticEl.textContent = '系统内置';
+                staticEl.textContent = this._getText('SETTINGS_BUILTIN', '系统内置');
                 staticEl.style.cssText = 'color: var(--theme-text-secondary, #b8c5c0);';
                 metaInfo.appendChild(staticEl);
             }
@@ -4953,7 +5250,7 @@
             // 删除按钮（仅动态安装的程序）
             if (isInstalled) {
                 const deleteBtn = document.createElement('button');
-                deleteBtn.textContent = '卸载';
+                deleteBtn.textContent = this._getText('SETTINGS_UNINSTALL', '卸载');
                 deleteBtn.style.cssText = `
                     padding: 8px 16px;
                     border: 1px solid #ff6b6b;
@@ -4996,7 +5293,7 @@
                     await UserControl.ensureInitialized();
                     const isAdmin = UserControl.isAdmin();
                     if (!isAdmin) {
-                        await GUIManager.showAlert('权限不足：卸载程序需要管理员权限', '错误', 'error');
+                        await GUIManager.showAlert(this._getText('SETTINGS_UNINSTALL_NO_PERMISSION', '权限不足：卸载程序需要管理员权限'), this._getText('KEY_ERROR', '错误'), 'error');
                         if (typeof KernelLogger !== 'undefined') {
                             KernelLogger.warn('SETTINGS', '非管理员用户尝试卸载程序，已拒绝');
                         }

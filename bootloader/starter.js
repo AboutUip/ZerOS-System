@@ -1,4 +1,4 @@
-﻿// BootLoader: 内核引导程序
+// BootLoader: 内核引导程序
 // 负责管理模块依赖关系，按正确顺序异步加载所有内核模块
 (function() {
     'use strict';
@@ -96,6 +96,18 @@
         "../kernel/core/usercontrol/userGroup.js": [
             "../kernel/drive/LStorage.js",
             "../kernel/core/usercontrol/userControl.js"
+        ],
+
+        // 第十二层：语言扩展（语言包管理器，依赖文件系统与本地存储）
+        "../system/expansion/languagesExpansion.js": [
+            "../kernel/filesystem/init.js",
+            "../kernel/drive/LStorage.js"
+        ],
+
+        // 第十二层：服务扩展（D/server 服务模块管理，依赖文件系统与进程管理器）
+        "../system/expansion/serverExpansion.js": [
+            "../kernel/filesystem/init.js",
+            "../kernel/process/processManager.js"
         ],
         
         // 第十一层：锁屏界面（依赖用户控制系统和本地存储管理器，高优先级）
@@ -1117,6 +1129,11 @@
             
             // 异步加载所有其他模块
             await loadModules(MODULE_DEPENDENCIES);
+            
+            // 等待语言扩展完成从 LStorage 恢复当前语言并加载语言包（重启后语言保持一致）
+            if (typeof LanguagesExpansion !== 'undefined' && LanguagesExpansion._ready) {
+                await LanguagesExpansion._ready;
+            }
             
             // 检查内核异常标志（在加载模块后立即检查）
             // 如果检测到内核异常，强制进入安全模式并阻止正常启动
