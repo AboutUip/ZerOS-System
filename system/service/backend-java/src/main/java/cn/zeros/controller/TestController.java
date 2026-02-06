@@ -1,11 +1,24 @@
 package cn.zeros.controller;
 
+import cn.zeros.model.Announcement;
 import cn.zeros.model.ApiResponse;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.io.File;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
@@ -20,7 +33,10 @@ import java.util.Map;
 @RequestMapping("/test")
 @Slf4j
 public class TestController {
-    
+
+
+    private static final String ANNOUNCEMENT_FILE_PATH = "../DISK/D/announcement/post.json";
+
     @RequestMapping(method = {RequestMethod.OPTIONS, RequestMethod.GET, RequestMethod.POST})
     public ResponseEntity<ApiResponse<Map<String, Object>>> handleRequest(
             @RequestBody(required = false) Map<String, Object> requestBody) {
@@ -76,9 +92,64 @@ public class TestController {
         }
     }
     
-    @RequestMapping(method = RequestMethod.OPTIONS)
+    @PostMapping("/handle")
     public ResponseEntity<Void> handleOptions() {
         return ResponseEntity.ok().build();
     }
+
+    @GetMapping("/announcement")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> getAnnouncement() {
+        try {
+            // 1. 读取文件
+            File file = new File(ANNOUNCEMENT_FILE_PATH);
+
+            if (!file.exists()) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(ApiResponse.error("公告文件未找到"));
+            }
+
+            // 2. 读取并解析JSON
+            String jsonContent = Files.readString(file.toPath(), StandardCharsets.UTF_8);
+            ObjectMapper mapper = new ObjectMapper();
+            mapper.setDateFormat(new SimpleDateFormat("yyyy-MM-dd HH:mm:ss"));
+
+            Announcement announcement = mapper.readValue(jsonContent, Announcement.class);
+
+            // 3. 直接构建您需要的data结构
+            Map<String, Object> data = getStringObjectMap(announcement, file);
+
+            // 5. 返回响应
+            return ResponseEntity.ok()
+                    .body(ApiResponse.success("公告读取成功", data));
+
+        } catch (JsonProcessingException e) {
+            log.error("JSON解析失败", e);
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(ApiResponse.error("公告格式错误"));
+        } catch (IOException e) {
+            log.error("文件读取失败", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ApiResponse.error("读取公告文件失败"));
+        }
+    }
+
+    private static Map<String, Object> getStringObjectMap(Announcement announcement, File file) {
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("title", announcement.getTitle());
+        data.put("content", announcement.getContent());
+        data.put("level", announcement.getLevel());
+
+        // 4. 处理updateTime转换为时间戳
+        if (announcement.getUpdateTime() != null) {
+            // 使用updateTime字段，但在data中命名为subTime
+            data.put("subTime", announcement.getUpdateTime().getTime());
+        } else {
+            // 如果没有updateTime，使用文件创建的时间
+            data.put("subTime", file.lastModified());
+        }
+        return data;
+    }
+
+
 }
 
