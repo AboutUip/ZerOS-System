@@ -1,0 +1,16 @@
+# 服务文档（SERVER）
+
+本目录存放 **D/server** 服务相关文档，包括服务模块编写约定与各内置服务的说明。
+
+## 文档索引
+
+| 文档 | 描述 |
+|------|------|
+| [服务模块编写 (ServiceModule.md)](./ServiceModule.md) | D/server 服务模块命名、接口约定与生命周期 |
+| [公告服务 (ServerAnnouncement.md)](./ServerAnnouncement.md) | 内置公告服务说明、API 约定与 ZerOS API 使用 |
+
+## 相关链接
+
+- [ServerExpansion API](../API/ServerExpansion.md) - 服务扩展加载与启停
+- [扩展与插件（PLUGINS）](../PLUGINS/README.md) - 语言包等扩展文档
+- [文档中心](../README.md)

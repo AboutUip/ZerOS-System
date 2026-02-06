@@ -93,13 +93,28 @@ if (typeof window !== 'undefined' && typeof window.__ZerOS_ServerExpansion_Regis
 
 详见 [ServerExpansion API](../API/ServerExpansion.md)。
 
+## 调用内核 API 时的 PID 约定
+
+D/server 下服务运行在主窗口，无独立进程；调用需要 PID 的内核 API（如 `NotificationManager.createNotification(pid, options)`）时，应使用 **PID 10000**（`ProcessManager.SERVER_SERVICE_PID`）。内核权限对该 PID 放行（hasPermission 通过、黑名单不拦截）。服务脚本中可写：
+
+```javascript
+const pid = (typeof ProcessManager !== 'undefined' && ProcessManager.SERVER_SERVICE_PID !== undefined)
+    ? ProcessManager.SERVER_SERVICE_PID
+    : 10000;
+```
+
 ## 目录与引导
 
 - **D/server 目录**：若不存在，扩展会得到空列表，不会报错；可在 D 盘下创建 `server` 目录并放入 `server-xxx.js`。
 - **BootLoader**：ServerExpansion 已在 `bootloader/starter.js` 的依赖表中注册，系统启动时会自动加载扩展并扫描 D/server，无需额外配置。
 
+## 内置服务示例
+
+- **announcement**：`D/server/server-announcement.js`，系统公告通知获取（轮询 API、按等级弹通知）。详见 [公告服务（ServerAnnouncement）](./ServerAnnouncement.md)。
+
 ## 相关文档
 
 - [ServerExpansion API](../API/ServerExpansion.md) - 服务扩展 API 说明
-- [扩展与插件索引](./README.md) - 本目录文档列表
+- [公告服务（ServerAnnouncement）](./ServerAnnouncement.md) - 内置公告服务说明与 ZerOS API 使用
+- [扩展与插件索引](../PLUGINS/README.md) - 语言包、服务模块等扩展文档
 - [文档中心](../README.md)

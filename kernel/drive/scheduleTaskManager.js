@@ -30,9 +30,11 @@ class ScheduleTaskManager {
      * Map<taskId, taskInfo>
      * taskInfo: {
      *     id: string,                    // 任务ID
-     *     taskType: string,               // 任务类型：'program' 或 'command'
+     *     taskType: string,               // 任务类型：'program' | 'command' | 'service'
      *     programName: string,            // 程序名称（taskType === 'program' 时必需）
      *     command: string,                // 命令（taskType === 'command' 时必需）
+     *     serviceId: string,              // 服务 ID（taskType === 'service' 时必需）
+     *     serviceAction: string,          // 服务操作：'start' | 'stop'（taskType === 'service' 时，默认 'start'）
      *     triggerType: string,            // 触发类型
      *     triggerConfig: Object,          // 触发配置
      *     enabled: boolean,               // 是否启用
@@ -51,7 +53,16 @@ class ScheduleTaskManager {
      */
     static TASK_TYPE = {
         PROGRAM: 'program',    // 执行程序
-        COMMAND: 'command'      // 执行命令
+        COMMAND: 'command',    // 执行命令
+        SERVICE: 'service'     // 服务（ServerExpansion 服务：启动/停止及暴露的 API）
+    };
+
+    /**
+     * 服务任务操作类型
+     */
+    static SERVICE_ACTION = {
+        START: 'start',
+        STOP: 'stop'
     };
     
     /**
@@ -366,6 +377,14 @@ class ScheduleTaskManager {
             if (!taskConfig.command || typeof taskConfig.command !== 'string') {
                 throw new Error("命令必须是字符串");
             }
+        } else if (taskType === ScheduleTaskManager.TASK_TYPE.SERVICE) {
+            if (!taskConfig.serviceId || typeof taskConfig.serviceId !== 'string') {
+                throw new Error("服务 ID 必须是字符串");
+            }
+            const action = taskConfig.serviceAction || ScheduleTaskManager.SERVICE_ACTION.START;
+            if (action !== ScheduleTaskManager.SERVICE_ACTION.START && action !== ScheduleTaskManager.SERVICE_ACTION.STOP) {
+                throw new Error("服务操作必须是 'start' 或 'stop'");
+            }
         }
         
         if (!taskConfig.triggerType || !Object.values(ScheduleTaskManager.TRIGGER_TYPE).includes(taskConfig.triggerType)) {
@@ -398,6 +417,9 @@ class ScheduleTaskManager {
             task.programName = taskConfig.programName;
         } else if (taskType === ScheduleTaskManager.TASK_TYPE.COMMAND) {
             task.command = taskConfig.command;
+        } else if (taskType === ScheduleTaskManager.TASK_TYPE.SERVICE) {
+            task.serviceId = taskConfig.serviceId;
+            task.serviceAction = taskConfig.serviceAction || ScheduleTaskManager.SERVICE_ACTION.START;
         }
         
         // 添加到任务列表
@@ -525,12 +547,27 @@ class ScheduleTaskManager {
         if (updates.enabled !== undefined) {
             task.enabled = Boolean(updates.enabled);
         }
-        
+
         if (updates.triggerConfig !== undefined) {
             ScheduleTaskManager._validateTriggerConfig(task.triggerType, updates.triggerConfig);
             task.triggerConfig = updates.triggerConfig;
         }
-        
+
+        if (task.taskType === ScheduleTaskManager.TASK_TYPE.SERVICE) {
+            if (updates.serviceId !== undefined) {
+                if (typeof updates.serviceId !== 'string') {
+                    throw new Error("服务 ID 必须是字符串");
+                }
+                task.serviceId = updates.serviceId;
+            }
+            if (updates.serviceAction !== undefined) {
+                if (updates.serviceAction !== ScheduleTaskManager.SERVICE_ACTION.START && updates.serviceAction !== ScheduleTaskManager.SERVICE_ACTION.STOP) {
+                    throw new Error("服务操作必须是 'start' 或 'stop'");
+                }
+                task.serviceAction = updates.serviceAction;
+            }
+        }
+
         task.updatedAt = Date.now();
         
         // 重新启动时间任务
@@ -678,12 +715,12 @@ class ScheduleTaskManager {
                 if (!command) {
                     throw new Error("命令未定义");
                 }
-                
+
                 // 获取 TerminalAPI
                 if (typeof POOL === 'undefined' || typeof POOL.__GET__ !== 'function') {
                     throw new Error("POOL 不可用");
                 }
-                
+
                 const TerminalAPI = POOL.__GET__("APPLICATION_SHARED_POOL", "TerminalAPI");
                 if (!TerminalAPI || typeof TerminalAPI.executeCommand !== 'function') {
                     // 如果 TerminalAPI 不可用，尝试启动终端程序并执行命令
@@ -694,10 +731,10 @@ class ScheduleTaskManager {
                             taskId: taskId,
                             autoStart: true
                         });
-                        
+
                         // 等待终端初始化完成
                         await new Promise(resolve => setTimeout(resolve, 1000));
-                        
+
                         // 再次尝试获取 TerminalAPI
                         const terminalAPI = POOL.__GET__("APPLICATION_SHARED_POOL", "TerminalAPI");
                         if (terminalAPI && typeof terminalAPI.executeCommand === 'function') {
@@ -711,6 +748,28 @@ class ScheduleTaskManager {
                 } else {
                     // 直接执行命令
                     TerminalAPI.executeCommand(command);
+                }
+            } else if (taskType === ScheduleTaskManager.TASK_TYPE.SERVICE) {
+                // 执行服务（启动或停止 ServerExpansion 服务）
+                const serviceId = task.serviceId;
+                const action = task.serviceAction || ScheduleTaskManager.SERVICE_ACTION.START;
+                if (!serviceId) {
+                    throw new Error("服务 ID 未定义");
+                }
+
+                if (typeof POOL === 'undefined' || typeof POOL.__GET__ !== 'function') {
+                    throw new Error("POOL 不可用");
+                }
+
+                const ServerExpansion = POOL.__GET__("KERNEL_GLOBAL_POOL", "ServerExpansion");
+                if (!ServerExpansion || typeof ServerExpansion.start !== 'function' || typeof ServerExpansion.stop !== 'function') {
+                    throw new Error("ServerExpansion 未加载或不可用");
+                }
+
+                if (action === ScheduleTaskManager.SERVICE_ACTION.START) {
+                    await ServerExpansion.start(serviceId);
+                } else {
+                    await ServerExpansion.stop(serviceId);
                 }
             } else {
                 throw new Error(`未知的任务类型: ${taskType}`);

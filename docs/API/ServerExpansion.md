@@ -15,7 +15,7 @@
 - **命名**：文件名须为 `server-<id>.js`，如 `server-myservice.js`，id 为 `myservice`
 - **合规**：模块加载后须调用 `window.__ZerOS_ServerExpansion_Register__(api)` 上报导出对象，且 `api` 必须包含上述五个方法且均为函数
 
-详见 [服务模块编写指南](../PLUGINS/ServiceModule.md)。
+详见 [服务模块编写指南](../SERVER/ServiceModule.md)。
 
 ## 初始化
 
@@ -136,8 +136,14 @@ await ServerExpansion.start('myservice');
 | `stop(id)` | 调用 `__stop__()` |
 | `status(id)` / `info(id)` | 调用 `__status__()` / `__info__()`，无副作用 |
 
+## 内置服务示例
+
+- **announcement**（`server-announcement.js`）：系统公告通知获取，每 3 分钟拉取公告 API，按等级弹通知或打日志。详见 [公告服务（ServerAnnouncement）](../SERVER/ServerAnnouncement.md)。
+
 ## 相关文档
 
-- [服务模块编写指南](../PLUGINS/ServiceModule.md) - D/server 服务模块的编写约定与示例
-- [扩展与插件索引](../PLUGINS/README.md) - 语言包、服务模块等扩展文档
+- [服务文档（SERVER）](../SERVER/README.md) - D/server 服务模块编写与各服务说明
+- [服务模块编写指南](../SERVER/ServiceModule.md) - D/server 服务模块的编写约定与示例
+- [公告服务（ServerAnnouncement）](../SERVER/ServerAnnouncement.md) - 内置公告服务说明与 ZerOS API 使用
+- [扩展与插件索引](../PLUGINS/README.md) - 语言包等扩展文档
 - [Starter](./Starter.md) - BootLoader 与模块加载顺序

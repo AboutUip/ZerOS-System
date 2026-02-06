@@ -503,13 +503,16 @@ class LStorage {
             const fileExists = await LStorage._fileExistsInPHP(filePath, fileName);
 
             if (!fileExists) {
+                if (LStorage._storageData && LStorage._storageData.system && Object.keys(LStorage._storageData.system).length > 0) {
+                    KernelLogger.warn("LStorage", "存储文件不存在，但内存中已有数据，保留内存数据避免丢失（如 desktop.icons）");
+                    return;
+                }
                 KernelLogger.info("LStorage", "存储文件不存在，创建新文件");
                 LStorage._storageData = {
                     system: {},
                     programs: {}
                 };
                 if (allowSave) {
-                    // 临时标记为已初始化，允许保存
                     const wasInitialized = LStorage._initialized;
                     LStorage._initialized = true;
                     await LStorage._saveStorageData();
@@ -522,6 +525,10 @@ class LStorage {
             const fileContent = await LStorage._readFileFromPHP(filePath, fileName);
 
             if (!fileContent) {
+                if (LStorage._storageData && LStorage._storageData.system && Object.keys(LStorage._storageData.system).length > 0) {
+                    KernelLogger.warn("LStorage", "存储文件读取为空，保留内存数据避免丢失（可能与 NodeTree/FS 临时不可用有关）");
+                    return;
+                }
                 KernelLogger.warn("LStorage", "存储文件为空，使用空数据结构");
                 LStorage._storageData = {
                     system: {},
@@ -628,7 +635,12 @@ class LStorage {
                     KernelLogger.debug("LStorage", `无法读取备份文件: ${backupError.message}`);
                 }
 
-                // 如果备份恢复失败，创建损坏文件的备份并初始化空数据
+                // 若内存中已有有效数据，不替换为空，避免桌面图标等被清空（如 NodeTree/FS 导致主文件损坏时）
+                if (LStorage._storageData && LStorage._storageData.system && Object.keys(LStorage._storageData.system).length > 0) {
+                    KernelLogger.warn("LStorage", "主文件解析失败且备份恢复失败，保留内存数据避免丢失（desktop.icons 等）");
+                    return;
+                }
+
                 try {
                     KernelLogger.warn("LStorage", "创建损坏文件的备份...");
                     const corruptedContent = await LStorage._readFileFromPHP(filePath, fileName);
@@ -641,7 +653,6 @@ class LStorage {
                     KernelLogger.warn("LStorage", `创建损坏文件备份失败: ${backupError.message}`);
                 }
 
-                // 使用空数据结构
                 LStorage._storageData = {
                     system: {},
                     programs: {}
@@ -649,6 +660,10 @@ class LStorage {
             }
         } catch (error) {
             KernelLogger.error("LStorage", `加载存储数据失败: ${error.message}`, error);
+            if (LStorage._storageData && LStorage._storageData.system && Object.keys(LStorage._storageData.system).length > 0) {
+                KernelLogger.warn("LStorage", "加载异常，保留内存数据避免丢失");
+                return;
+            }
             LStorage._storageData = {
                 system: {},
                 programs: {}

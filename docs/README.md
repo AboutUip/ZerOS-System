@@ -63,9 +63,9 @@
 
 | 文档 | 描述 |
 |------|------|
-| [扩展与插件索引 (PLUGINS)](./PLUGINS/README.md) | 语言包、服务模块等扩展的编写与使用说明 |
+| [扩展与插件索引 (PLUGINS)](./PLUGINS/README.md) | 语言包等扩展的编写与使用说明 |
 | [语言包格式](./PLUGINS/LanguagePack.md) | D/plugins 语言包存放位置与 JSON 格式 |
-| [服务模块编写](./PLUGINS/ServiceModule.md) | D/server 服务模块命名、接口约定与生命周期 |
+| [服务文档 (SERVER)](./SERVER/README.md) | D/server 服务模块编写与各内置服务说明 |
 
 ### 🔧 API 参考文档
 

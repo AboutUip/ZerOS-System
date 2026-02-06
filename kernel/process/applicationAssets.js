@@ -572,23 +572,6 @@ const APPLICATION_ASSETS = {
             supportsPreview: true,
             category: "system"  // 系统应用
         }
-    },
-
-    // Horror Mansion - 3D 恐怖游戏
-    "horrormansion": {
-        script: "D:/application/HorrorMansion/HorrorMansion.js",
-        icon: "D:/application/HorrorMansion/HorrorMansion.svg",
-        metadata: {
-            autoStart: false,
-            priority: 5,
-            description: "Horror Mansion 3D",
-            version: "1.0.0",
-            type: "GUI",
-            alwaysShowInTaskbar: false,
-            allowMultipleInstances: false,
-            supportsPreview: true,
-            category: "game"
-        }
     }
 };
 

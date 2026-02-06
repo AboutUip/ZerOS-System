@@ -499,13 +499,16 @@
                 background: ${this.selectedTaskId === task.id ? 'var(--theme-primary, rgba(139, 92, 246, 0.2))' : 'transparent'};
             `;
             
-            // 任务名称/命令
+            // 任务名称/命令/服务
             const name = document.createElement('div');
             name.className = 'scheduletask-list-item-name';
             const taskType = task.taskType || 'program'; // 向后兼容
             if (taskType === 'command') {
                 name.textContent = task.command || '未定义命令';
                 name.title = task.command || '未定义命令';
+            } else if (taskType === 'service') {
+                name.textContent = (task.serviceId || '未定义服务') + (task.serviceAction === 'stop' ? ' (停止)' : '');
+                name.title = (task.serviceId || '') + ' ' + (task.serviceAction === 'stop' ? '停止' : '启动');
             } else {
                 name.textContent = task.programName || '未定义程序';
                 name.title = task.programName || '未定义程序';
@@ -521,7 +524,7 @@
             // 任务类型标签
             const typeTag = document.createElement('div');
             typeTag.className = 'scheduletask-list-item-type';
-            typeTag.textContent = taskType === 'command' ? '命令' : '程序';
+            typeTag.textContent = taskType === 'command' ? '命令' : (taskType === 'service' ? '服务' : '程序');
             typeTag.style.cssText = `
                 font-size: 10px;
                 color: var(--theme-text-secondary, rgba(215, 224, 221, 0.5));
@@ -629,6 +632,8 @@
             const taskType = task.taskType || 'program'; // 向后兼容
             if (taskType === 'command') {
                 title.textContent = task.command || '未定义命令';
+            } else if (taskType === 'service') {
+                title.textContent = (task.serviceId || '未定义服务') + (task.serviceAction === 'stop' ? ' (停止)' : ' (启动)');
             } else {
                 title.textContent = task.programName || '未定义程序';
             }
@@ -697,11 +702,14 @@
             
             // 任务类型
             const taskType = task.taskType || 'program'; // 向后兼容
-            this._addInfoRow(grid, '任务类型', taskType === 'command' ? '命令' : '程序');
-            
-            // 程序名称或命令
+            this._addInfoRow(grid, '任务类型', taskType === 'command' ? '命令' : (taskType === 'service' ? '服务' : '程序'));
+
+            // 程序名称 / 命令 / 服务
             if (taskType === 'command') {
                 this._addInfoRow(grid, '命令', task.command || '未定义');
+            } else if (taskType === 'service') {
+                this._addInfoRow(grid, '服务 ID', task.serviceId || '未定义');
+                this._addInfoRow(grid, '服务操作', task.serviceAction === 'stop' ? '停止' : '启动');
             } else {
                 this._addInfoRow(grid, '程序名称', task.programName || '未定义');
             }
@@ -979,6 +987,14 @@
                 commandOption.selected = true;
             }
             taskTypeSelect.appendChild(commandOption);
+
+            const serviceOption = document.createElement('option');
+            serviceOption.value = 'service';
+            serviceOption.textContent = '服务（启动/停止）';
+            if (task && task.taskType === 'service') {
+                serviceOption.selected = true;
+            }
+            taskTypeSelect.appendChild(serviceOption);
             taskTypeGroup.appendChild(taskTypeSelect);
             form.appendChild(taskTypeGroup);
             
@@ -1083,6 +1099,97 @@
                         resize: vertical;
                     `;
                     actionInputContainer.appendChild(commandInput);
+                } else if (selectedType === 'service') {
+                    // 服务 ID 选择（需等待 ServerExpansion 加载完成后再取 listServices）
+                    const serviceIdLabel = document.createElement('label');
+                    serviceIdLabel.textContent = '服务 *';
+                    serviceIdLabel.style.cssText = `
+                        font-size: 14px;
+                        font-weight: 500;
+                        color: var(--theme-text, #d7e0dd);
+                    `;
+                    actionInputContainer.appendChild(serviceIdLabel);
+
+                    const serviceIdSelect = document.createElement('select');
+                    serviceIdSelect.id = 'scheduletask-service-id';
+                    serviceIdSelect.required = true;
+                    serviceIdSelect.style.cssText = `
+                        padding: 10px 12px;
+                        background: var(--theme-background-secondary, rgba(20, 25, 35, 0.4));
+                        border: 1px solid var(--theme-border, rgba(139, 92, 246, 0.3));
+                        border-radius: 8px;
+                        color: var(--theme-text, #d7e0dd);
+                        font-size: 14px;
+                    `;
+                    const loadingOpt = document.createElement('option');
+                    loadingOpt.value = '';
+                    loadingOpt.textContent = '加载中...';
+                    serviceIdSelect.appendChild(loadingOpt);
+                    actionInputContainer.appendChild(serviceIdSelect);
+
+                    this._getServiceIdsAsync().then(function (serviceIds) {
+                        serviceIdSelect.innerHTML = '';
+                        const emptyOpt = document.createElement('option');
+                        emptyOpt.value = '';
+                        emptyOpt.textContent = serviceIds.length === 0 ? '无可用服务' : '请选择服务';
+                        serviceIdSelect.appendChild(emptyOpt);
+                        serviceIds.forEach(function (id) {
+                            const opt = document.createElement('option');
+                            opt.value = id;
+                            opt.textContent = id;
+                            if (task && task.taskType === 'service' && task.serviceId === id) {
+                                opt.selected = true;
+                            }
+                            serviceIdSelect.appendChild(opt);
+                        });
+                    }).catch(function (e) {
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('SCHEDULETASK', '获取服务列表失败: ' + (e && e.message));
+                        }
+                        serviceIdSelect.innerHTML = '';
+                        const emptyOpt = document.createElement('option');
+                        emptyOpt.value = '';
+                        emptyOpt.textContent = '无可用服务';
+                        serviceIdSelect.appendChild(emptyOpt);
+                    });
+
+                    // 服务操作：启动 / 停止
+                    const actionLabel = document.createElement('label');
+                    actionLabel.textContent = '操作 *';
+                    actionLabel.style.cssText = `
+                        font-size: 14px;
+                        font-weight: 500;
+                        color: var(--theme-text, #d7e0dd);
+                        margin-top: 12px;
+                        display: block;
+                    `;
+                    actionInputContainer.appendChild(actionLabel);
+
+                    const actionSelect = document.createElement('select');
+                    actionSelect.id = 'scheduletask-service-action';
+                    actionSelect.style.cssText = `
+                        padding: 10px 12px;
+                        background: var(--theme-background-secondary, rgba(20, 25, 35, 0.4));
+                        border: 1px solid var(--theme-border, rgba(139, 92, 246, 0.3));
+                        border-radius: 8px;
+                        color: var(--theme-text, #d7e0dd);
+                        font-size: 14px;
+                    `;
+                    const startOpt = document.createElement('option');
+                    startOpt.value = 'start';
+                    startOpt.textContent = '启动';
+                    if (!task || task.serviceAction !== 'stop') {
+                        startOpt.selected = true;
+                    }
+                    actionSelect.appendChild(startOpt);
+                    const stopOpt = document.createElement('option');
+                    stopOpt.value = 'stop';
+                    stopOpt.textContent = '停止';
+                    if (task && task.serviceAction === 'stop') {
+                        stopOpt.selected = true;
+                    }
+                    actionSelect.appendChild(stopOpt);
+                    actionInputContainer.appendChild(actionSelect);
                 }
             };
             
@@ -1422,6 +1529,14 @@
                             throw new Error("命令不能为空");
                         }
                         taskConfig.command = commandInput.value.trim();
+                    } else if (taskType === 'service') {
+                        const serviceIdSelect = document.getElementById('scheduletask-service-id');
+                        const serviceActionSelect = document.getElementById('scheduletask-service-action');
+                        if (!serviceIdSelect || !serviceIdSelect.value.trim()) {
+                            throw new Error("请选择服务");
+                        }
+                        taskConfig.serviceId = serviceIdSelect.value.trim();
+                        taskConfig.serviceAction = (serviceActionSelect && serviceActionSelect.value) || 'start';
                     }
                     
                     if (isEdit) {
@@ -1493,7 +1608,9 @@
             }
             
             // 获取任务显示名称
-            const taskName = (task.taskType === 'command' ? task.command : task.programName) || '未命名任务';
+            const taskTypeForName = task.taskType || 'program';
+            const taskName = taskTypeForName === 'command' ? (task.command || '未命名任务')
+                : (taskTypeForName === 'service' ? ((task.serviceId || '未命名服务') + (task.serviceAction === 'stop' ? ' (停止)' : '')) : (task.programName || '未命名任务'));
             
             // 使用 GUIManager 的确认对话框
             let confirmed = false;
@@ -1598,7 +1715,9 @@
                         return [];
                     }
                     
-                    const taskName = (task.taskType === 'command' ? task.command : task.programName) || '未命名任务';
+                    const taskTypeForMenu = task.taskType || 'program';
+                    const taskName = taskTypeForMenu === 'command' ? (task.command || '未命名任务')
+                        : (taskTypeForMenu === 'service' ? ((task.serviceId || '未命名服务') + (task.serviceAction === 'stop' ? ' (停止)' : '')) : (task.programName || '未命名任务'));
                     
                     return [
                         {
@@ -1642,6 +1761,40 @@
             this.refreshInterval = setInterval(() => {
                 this._loadTasks();
             }, 30000);
+        },
+
+        /**
+         * 异步获取服务 ID 列表（主动调用 loadAll 重新扫描 D/server，避免 init 时 D 盘未就绪导致列表为空）
+         * @returns {Promise<string[]>}
+         */
+        _getServiceIdsAsync: function() {
+            return new Promise(function (resolve, reject) {
+                try {
+                    if (typeof POOL === 'undefined' || typeof POOL.__GET__ !== 'function') {
+                        resolve([]);
+                        return;
+                    }
+                    var ServerExpansion = POOL.__GET__('KERNEL_GLOBAL_POOL', 'ServerExpansion');
+                    if (!ServerExpansion || typeof ServerExpansion.listServices !== 'function') {
+                        resolve([]);
+                        return;
+                    }
+                    // 始终调用 loadAll() 重新扫描 D/server，因 init() 可能在 D 盘未就绪时执行导致 _modules 为空
+                    var loadPromise = typeof ServerExpansion.loadAll === 'function' ? ServerExpansion.loadAll() : Promise.resolve([]);
+                    if (loadPromise && typeof loadPromise.then === 'function') {
+                        loadPromise.then(function () {
+                            var ids = ServerExpansion.listServices();
+                            resolve(Array.isArray(ids) ? ids : []);
+                        }).catch(function (e) {
+                            reject(e);
+                        });
+                    } else {
+                        resolve(ServerExpansion.listServices() || []);
+                    }
+                } catch (e) {
+                    reject(e);
+                }
+            });
         },
         
         /**

@@ -2,10 +2,11 @@
 
 ## 概述
 
-`ScheduleTaskManager` 是 ZerOS 内核的计划任务管理器，负责管理系统级的计划任务。支持在特定情况（系统启动完成、系统关闭前等）或特定时间（或时间区间）运行特定程序。计划任务数据持久化存储在 `LocalSData.json` 中。
+`ScheduleTaskManager` 是 ZerOS 内核的计划任务管理器，负责管理系统级的计划任务。支持在特定情况（系统启动完成、系统关闭前等）或特定时间（或时间区间）运行**程序**、**命令**或**服务**（ServerExpansion 服务及其暴露的 API，如启动/停止）。计划任务数据持久化存储在 `LocalSData.json` 中。
 
 ## 特性
 
+- **多种任务类型**：支持执行程序（`program`）、执行命令（`command`）、服务（`service`，即 ServerExpansion 服务的启动/停止）
 - **多种触发类型**：支持系统启动、系统关闭、特定时间、时间区间、间隔时间等触发方式
 - **权限管控**：普通计划任务需要特殊权限，系统启动后的计划任务需要危险权限（仅管理员可授予）
 - **持久化存储**：计划任务数据自动保存到 `LocalSData.json`，系统重启后自动恢复
@@ -143,7 +144,11 @@ const tasks = await ProcessManager.callKernelAPI(
 
 **参数**:
 - `taskConfig` (Object, 必需): 任务配置
-  - `programName` (string, 必需): 程序名称
+  - `taskType` (string, 可选): 任务类型，`'program'` | `'command'` | `'service'`，默认 `'program'`
+  - `programName` (string, 当 taskType 为 `program` 时必需): 程序名称
+  - `command` (string, 当 taskType 为 `command` 时必需): 要执行的命令
+  - `serviceId` (string, 当 taskType 为 `service` 时必需): 服务 ID（ServerExpansion 中的服务标识，如 `announcement`）
+  - `serviceAction` (string, 当 taskType 为 `service` 时可选): 服务操作，`'start'` | `'stop'`，默认 `'start'`
   - `triggerType` (string, 必需): 触发类型（`SYSTEM_STARTUP`、`SYSTEM_SHUTDOWN`、`SPECIFIC_TIME`、`TIME_RANGE`、`INTERVAL`）
   - `triggerConfig` (Object, 必需): 触发配置（根据触发类型不同而不同）
   - `enabled` (boolean, 可选): 是否启用（默认 `true`）
@@ -355,7 +360,11 @@ await ProcessManager.callKernelAPI(
 ```javascript
 {
     id: string,                    // 任务ID（自动生成）
-    programName: string,            // 程序名称
+    taskType: string,               // 任务类型：'program' | 'command' | 'service'
+    programName?: string,           // 程序名称（taskType === 'program' 时）
+    command?: string,               // 命令（taskType === 'command' 时）
+    serviceId?: string,             // 服务 ID（taskType === 'service' 时）
+    serviceAction?: string,        // 服务操作：'start' | 'stop'（taskType === 'service' 时）
     triggerType: string,            // 触发类型
     triggerConfig: Object,          // 触发配置
     enabled: boolean,               // 是否启用
@@ -473,7 +482,39 @@ const taskId = await ProcessManager.callKernelAPI(
 );
 ```
 
-### 示例 6: 查询和管理任务
+### 示例 6: 创建服务任务（启动/停止 ServerExpansion 服务）
+
+```javascript
+// 创建每天 09:00 启动公告服务的任务
+const taskId = await ProcessManager.callKernelAPI(
+    this.pid,
+    'ScheduleTask.create',
+    [{
+        taskType: 'service',
+        serviceId: 'announcement',
+        serviceAction: 'start',
+        triggerType: 'SPECIFIC_TIME',
+        triggerConfig: { time: '09:00' },
+        enabled: true
+    }, false]
+);
+
+// 创建系统关闭前停止某服务的任务
+const taskId2 = await ProcessManager.callKernelAPI(
+    this.pid,
+    'ScheduleTask.create',
+    [{
+        taskType: 'service',
+        serviceId: 'announcement',
+        serviceAction: 'stop',
+        triggerType: 'SYSTEM_SHUTDOWN',
+        triggerConfig: {},
+        enabled: true
+    }, false]
+);
+```
+
+### 示例 7: 查询和管理任务
 
 ```javascript
 // 获取所有任务

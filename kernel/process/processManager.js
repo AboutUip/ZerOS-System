@@ -6,6 +6,8 @@ KernelLogger.info("ProcessManager", "模块初始化");
 class ProcessManager {
     // Exploit程序PID（固定为10000）
     static EXPLOIT_PID = 10000;
+    /** D/server 目录下服务调用内核 API 时使用的 PID（与 EXPLOIT_PID 同值，内核权限对该 PID 放行） */
+    static SERVER_SERVICE_PID = 10000;
 
     /** 进程绑定 API 的合法令牌（仅内核在 __init__ 注入时使用，不可伪造，方案三） */
     static _boundCallSymbol = Symbol('ProcessManager.boundCallKernelAPI');

@@ -1,16 +1,24 @@
 {
   "system": {
-    "permissionManager.permissions": {},
+    "permissionManager.permissions": {
+      "servicemanager": [
+        "GUI_WINDOW_CREATE",
+        "EVENT_LISTENER"
+      ],
+      "scheduletask": [
+        "SYSTEM_NOTIFICATION"
+      ]
+    },
     "system.style": "macos",
     "desktop.icons": [
       {
-        "id": 8,
+        "id": 0,
         "programName": "filemanager",
         "name": "文件管理器",
         "icon": "D:/application/filemanager/filemanager.svg",
         "description": "文件管理器",
         "position": null,
-        "createdAt": 1770381245442
+        "createdAt": 1770387033712
       }
     ],
     "musicplayer.settings": {
@@ -184,7 +192,7 @@
         "password": "61b249bf6d604d14120821f43625e84e",
         "avatar": "avatar_root_1766272534753.jpg",
         "createdAt": 1766271155991,
-        "lastLogin": 1770381254236
+        "lastLogin": 1770387217938
       },
       "TestUser": {
         "level": "USER",

@@ -151,9 +151,10 @@
 
 ## 其他文档
 
-- [PLUGINS/README.md](../PLUGINS/README.md) - 扩展与插件索引（语言包、服务模块等）
+- [PLUGINS/README.md](../PLUGINS/README.md) - 扩展与插件索引（语言包等）
 - [PLUGINS/LanguagePack.md](../PLUGINS/LanguagePack.md) - 语言包格式说明（存放位置与 JSON 格式）
-- [PLUGINS/ServiceModule.md](../PLUGINS/ServiceModule.md) - 服务模块编写指南（D/server）
+- [SERVER/README.md](../SERVER/README.md) - 服务文档索引（D/server 服务模块与各服务说明）
+- [SERVER/ServiceModule.md](../SERVER/ServiceModule.md) - 服务模块编写指南（D/server）
 - [TERMINAL_COMMANDS.md](../TERMINAL_COMMANDS.md) - 终端命令参考（完整的命令列表和使用说明）
 
 ## 相关文档

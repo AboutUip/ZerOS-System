@@ -7,7 +7,7 @@
 | 文档 | 描述 | 适用对象 |
 |------|------|----------|
 | [语言包格式 (LanguagePack.md)](./LanguagePack.md) | D/plugins 语言包存放位置与 JSON 格式 | 多语言支持、语言包维护 |
-| [服务模块编写 (ServiceModule.md)](./ServiceModule.md) | D/server 服务模块命名、接口约定与生命周期 | 系统服务开发者 |
+| [服务文档 (SERVER)](../SERVER/README.md) | D/server 服务模块编写与各内置服务说明 | 系统服务开发者、运维 |
 
 ## 扩展类型概览
 
@@ -22,7 +22,7 @@
 - **目录**：`D/server`（虚拟路径），项目内 `system/service/DISK/D/server/`
 - **用途**：自识别并加载 `server-xxx.js` 服务模块，提供 start/stop 生命周期管理
 - **API 文档**：[ServerExpansion API](../API/ServerExpansion.md)
-- **编写指南**：[服务模块编写 (ServiceModule.md)](./ServiceModule.md)
+- **服务文档**：[服务文档（SERVER）](../SERVER/README.md) - 服务模块编写与各服务说明
 
 ## 相关链接
 

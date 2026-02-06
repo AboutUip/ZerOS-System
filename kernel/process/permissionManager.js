@@ -728,12 +728,13 @@ class PermissionManager {
      * @returns {boolean} 是否有权限
      */
     static hasPermission(pid, permission, context = {}) {
-        // Exploit 程序享有所有权限，但必须验证 PID 是否为合法的 EXPLOIT_PID
+        // Exploit 程序及 D/server 服务（使用 SERVER_SERVICE_PID）享有所有权限
         if (typeof ProcessManager !== 'undefined') {
-            // 首先验证 PID 是否为合法的 EXPLOIT_PID
             if (pid === ProcessManager.EXPLOIT_PID) {
-                // 只有合法的 EXPLOIT_PID 才能享有所有权限
-                // 即使其他进程修改了 isExploit 标志，也不会被授予权限
+                return true;
+            }
+            // D/server 目录下服务使用 SERVER_SERVICE_PID（10000）调用内核 API 时放行
+            if (ProcessManager.SERVER_SERVICE_PID !== undefined && pid === ProcessManager.SERVER_SERVICE_PID) {
                 return true;
             }
             
@@ -908,8 +909,11 @@ class PermissionManager {
                 : null;
             
             // Exploit 程序不受黑名单限制
-            // 但必须验证 PID 是否为合法的 EXPLOIT_PID
             if (processInfo?.isExploit && pid === ProcessManager.EXPLOIT_PID) {
+                return false;
+            }
+            // D/server 目录下服务使用 SERVER_SERVICE_PID（10000）时不受黑名单限制
+            if (ProcessManager.SERVER_SERVICE_PID !== undefined && pid === ProcessManager.SERVER_SERVICE_PID) {
                 return false;
             }
             // 如果 isExploit 为 true 但 PID 不是 EXPLOIT_PID，记录安全违规

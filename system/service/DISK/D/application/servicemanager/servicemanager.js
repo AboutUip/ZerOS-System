@@ -16,6 +16,9 @@
         /** 当前选中的服务 id */
         _selectedId: null,
 
+        /** 自启计划任务映射：serviceId -> taskId（仅 SYSTEM_STARTUP + service 类型且 enabled） */
+        _autoStartMap: {},
+
         /** 语言变更监听器取消函数 */
         _languageChangeUnsubscribe: null,
 
@@ -126,7 +129,10 @@
                 copyright: '© 2025 ZerOS',
                 permissions: typeof PermissionManager !== 'undefined' ? [
                     PermissionManager.PERMISSION.GUI_WINDOW_CREATE,
-                    PermissionManager.PERMISSION.EVENT_LISTENER
+                    PermissionManager.PERMISSION.EVENT_LISTENER,
+                    PermissionManager.PERMISSION.SCHEDULE_TASK_CREATE,
+                    PermissionManager.PERMISSION.SCHEDULE_TASK_MANAGE,
+                    PermissionManager.PERMISSION.SCHEDULE_TASK_STARTUP
                 ] : [],
                 metadata: {
                     allowMultipleInstances: false
@@ -212,23 +218,107 @@
                 var delegateId = EventManager.registerElementEvent(this.pid, listEl, 'click', function (e) {
                     var row = e.target.closest('[data-service-id]');
                     if (!row) return;
-                    var sid = row.dataset.serviceId;
-                    var btn = e.target.closest('[data-action]');
-                    if (btn && btn.dataset.action === 'start') {
-                        self._startService(sid);
-                        return;
-                    }
-                    if (btn && btn.dataset.action === 'stop') {
-                        self._stopService(sid);
-                        return;
-                    }
-                    self._selectService(sid);
+                    self._selectService(row.dataset.serviceId);
                 });
                 this.eventHandlers.push(delegateId);
+
+                var detailWrap = this.window.querySelector('.servicemanager-detail-wrap');
+                if (detailWrap) {
+                    var detailClickId = EventManager.registerElementEvent(this.pid, detailWrap, 'click', function (e) {
+                        var btn = e.target.closest('[data-action]');
+                        if (!btn || !self._selectedId) return;
+                        e.preventDefault();
+                        if (btn.dataset.action === 'toggle-autostart') {
+                            self._toggleAutoStart(self._selectedId);
+                        } else if (btn.dataset.action === 'start') {
+                            self._startService(self._selectedId);
+                        } else if (btn.dataset.action === 'stop') {
+                            self._stopService(self._selectedId);
+                        }
+                    });
+                    this.eventHandlers.push(detailClickId);
+                }
             }
         },
 
-        _refreshServiceList: function () {
+        /** 切换服务自启（与计划任务联动：创建/删除 SYSTEM_STARTUP 类型的 service 任务） */
+        _toggleAutoStart: async function (serviceId) {
+            var taskId = this._autoStartMap[serviceId];
+            var self = this;
+            try {
+                if (typeof POOL === 'undefined' || typeof POOL.__GET__ !== 'function') {
+                    self._showMessage(self._getText('SERVICEMANAGER_NO_POOL', '系统不可用'));
+                    return;
+                }
+                var pm = POOL.__GET__('KERNEL_GLOBAL_POOL', 'ProcessManager');
+                if (!pm || typeof pm.callKernelAPI !== 'function') {
+                    self._showMessage(self._getText('SERVICEMANAGER_NO_PM', '进程管理器不可用'));
+                    return;
+                }
+                if (taskId) {
+                    await pm.callKernelAPI(self.pid, 'ScheduleTask.delete', [taskId]);
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.info('SERVICEMANAGER', '已关闭服务自启: ' + serviceId);
+                    }
+                } else {
+                    await pm.callKernelAPI(self.pid, 'ScheduleTask.create', [{
+                        taskType: 'service',
+                        serviceId: serviceId,
+                        serviceAction: 'start',
+                        triggerType: 'SYSTEM_STARTUP',
+                        triggerConfig: {},
+                        enabled: true
+                    }, true]);
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.info('SERVICEMANAGER', '已开启服务自启: ' + serviceId);
+                    }
+                }
+                await self._refreshServiceList();
+            } catch (e) {
+                var msg = e && (e.message || String(e)) || self._getText('SERVICEMANAGER_OPERATION_FAIL', '操作失败');
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.warn('SERVICEMANAGER', '自启切换失败: ' + msg);
+                }
+                self._showMessage(msg);
+                await self._refreshServiceList();
+            }
+        },
+
+        _showMessage: function (text) {
+            if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                try {
+                    NotificationManager.createNotification(this.pid, { title: '服务管理', content: text, type: 'snapshot', duration: 4000 });
+                } catch (err) {}
+            } else if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
+                try {
+                    GUIManager.showAlert(text, '服务管理', 'info');
+                } catch (err) {}
+            }
+        },
+
+        /** 获取计划任务列表并更新自启映射（SYSTEM_STARTUP + service 且 enabled） */
+        _updateAutoStartMap: async function () {
+            this._autoStartMap = {};
+            try {
+                if (typeof POOL === 'undefined' || typeof POOL.__GET__ !== 'function') return;
+                var pm = POOL.__GET__('KERNEL_GLOBAL_POOL', 'ProcessManager');
+                if (!pm || typeof pm.callKernelAPI !== 'function') return;
+                var tasks = await pm.callKernelAPI(this.pid, 'ScheduleTask.getAll', []);
+                if (!Array.isArray(tasks)) return;
+                for (var t = 0; t < tasks.length; t++) {
+                    var task = tasks[t];
+                    if (task.taskType === 'service' && task.triggerType === 'SYSTEM_STARTUP' && task.enabled && task.serviceId) {
+                        this._autoStartMap[task.serviceId] = task.id;
+                    }
+                }
+            } catch (e) {
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.warn('SERVICEMANAGER', '获取计划任务失败: ' + (e && e.message));
+                }
+            }
+        },
+
+        _refreshServiceList: async function () {
             var listEl = this.window.querySelector('[data-role="list"]');
             var detailEl = this.window.querySelector('[data-role="detail"]');
             if (!listEl) return;
@@ -240,6 +330,18 @@
                 return;
             }
 
+            // 先触发 loadAll 重新扫描 D/server，避免 init 时 D 盘未就绪导致 _modules 为空
+            if (typeof se.loadAll === 'function') {
+                try {
+                    await se.loadAll();
+                } catch (e) {
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.warn('SERVICEMANAGER', 'ServerExpansion.loadAll 失败: ' + (e && e.message));
+                    }
+                }
+            }
+
+            await this._updateAutoStartMap();
             var ids = se.listServices();
             listEl.innerHTML = '';
             if (ids.length === 0) {
@@ -253,33 +355,12 @@
                 var row = document.createElement('div');
                 row.className = 'servicemanager-list-item';
                 row.dataset.serviceId = id;
-                row.style.cssText = 'display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; border-bottom: 1px solid var(--theme-border, rgba(139,92,246,0.15)); min-height: 44px; box-sizing: border-box;';
-                var started = se.isStarted(id);
+                row.style.cssText = 'display: flex; align-items: center; padding: 10px 12px; border-bottom: 1px solid var(--theme-border, rgba(139,92,246,0.15)); min-height: 40px; box-sizing: border-box; cursor: pointer;';
                 var label = document.createElement('span');
                 label.className = 'servicemanager-item-label';
-                label.style.cssText = 'flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;';
+                label.style.cssText = 'flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px;';
                 label.textContent = id;
                 row.appendChild(label);
-                var statusSpan = document.createElement('span');
-                statusSpan.className = 'servicemanager-item-status';
-                statusSpan.style.cssText = 'font-size: 12px; margin-right: 8px; flex-shrink: 0;';
-                statusSpan.textContent = started ? (this._getText('SERVICEMANAGER_RUNNING', '运行中')) : (this._getText('SERVICEMANAGER_STOPPED', '已停止'));
-                statusSpan.style.color = started ? 'var(--theme-success, #22c55e)' : 'var(--theme-text-muted, #94a3b8)';
-                row.appendChild(statusSpan);
-                var btnStart = document.createElement('button');
-                btnStart.className = 'servicemanager-btn servicemanager-btn-start';
-                btnStart.dataset.action = 'start';
-                btnStart.textContent = this._getText('SERVICEMANAGER_START', '启动');
-                btnStart.style.cssText = 'padding: 4px 10px; font-size: 12px; flex-shrink: 0;';
-                if (started) btnStart.disabled = true;
-                row.appendChild(btnStart);
-                var btnStop = document.createElement('button');
-                btnStop.className = 'servicemanager-btn servicemanager-btn-stop';
-                btnStop.dataset.action = 'stop';
-                btnStop.textContent = this._getText('SERVICEMANAGER_STOP', '停止');
-                btnStop.style.cssText = 'padding: 4px 10px; font-size: 12px; margin-left: 4px; flex-shrink: 0;';
-                if (!started) btnStop.disabled = true;
-                row.appendChild(btnStop);
                 listEl.appendChild(row);
             }
 
@@ -316,13 +397,108 @@
             Promise.all([infoPromise, statusPromise]).then(function (results) {
                 var info = results[0];
                 var status = results[1];
-                var html = '<div class="servicemanager-detail-section"><strong>' + (id) + '</strong></div>';
-                html += '<div class="servicemanager-detail-section"><strong>' + (this._getText('SERVICEMANAGER_INFO', '信息')) + '</strong><pre class="servicemanager-detail-pre">' + (typeof info !== 'undefined' && info !== null ? JSON.stringify(info, null, 2) : '—') + '</pre></div>';
-                html += '<div class="servicemanager-detail-section"><strong>' + (this._getText('SERVICEMANAGER_STATUS', '状态')) + '</strong><pre class="servicemanager-detail-pre">' + (typeof status !== 'undefined' && status !== null ? JSON.stringify(status, null, 2) : '—') + '</pre></div>';
+                var autoStart = !!this._autoStartMap[id];
+                var started = se.isStarted(id);
+                var runningText = started ? (this._getText('SERVICEMANAGER_RUNNING', '运行中')) : (this._getText('SERVICEMANAGER_STOPPED', '已停止'));
+                var badgeClass = started ? 'servicemanager-badge-running' : 'servicemanager-badge-stopped';
+                var html = '<div class="servicemanager-detail-inner">';
+                html += '<header class="servicemanager-detail-header">';
+                html += '<h2 class="servicemanager-detail-title">' + (this._escapeHtml(id)) + '</h2>';
+                html += '<span class="servicemanager-detail-badge ' + badgeClass + '">' + (this._escapeHtml(runningText)) + '</span>';
+                html += '</header>';
+                html += '<div class="servicemanager-detail-card">';
+                html += '<div class="servicemanager-detail-card-title">' + (this._getText('SERVICEMANAGER_OPERATIONS', '操作')) + '</div>';
+                html += '<div class="servicemanager-detail-card-body"><div class="servicemanager-detail-actions">';
+                html += '<button type="button" class="servicemanager-btn servicemanager-btn-start" data-action="start"' + (started ? ' disabled' : '') + '>' + (this._getText('SERVICEMANAGER_START', '启动')) + '</button>';
+                html += '<button type="button" class="servicemanager-btn servicemanager-btn-stop" data-action="stop"' + (!started ? ' disabled' : '') + '>' + (this._getText('SERVICEMANAGER_STOP', '停止')) + '</button>';
+                html += '</div></div></div>';
+                html += '<div class="servicemanager-detail-card">';
+                html += '<div class="servicemanager-detail-card-title">' + (this._getText('SERVICEMANAGER_AUTOSTART', '自启')) + '</div>';
+                html += '<div class="servicemanager-detail-card-body">';
+                html += '<div class="servicemanager-autostart-row"><input type="checkbox" id="servicemanager-autostart-' + (this._escapeHtml(id)) + '" data-action="toggle-autostart"' + (autoStart ? ' checked' : '') + '><label for="servicemanager-autostart-' + (this._escapeHtml(id)) + '">' + (this._getText('SERVICEMANAGER_AUTOSTART_LABEL', '系统启动时自动启动此服务')) + '</label></div>';
+                html += '<div class="servicemanager-detail-hint">' + (this._getText('SERVICEMANAGER_AUTOSTART_HINT', '与计划任务联动')) + '</div></div></div>';
+                html += '<div class="servicemanager-detail-card">';
+                html += '<div class="servicemanager-detail-card-title">' + (this._getText('SERVICEMANAGER_INFO', '信息')) + '</div>';
+                html += '<div class="servicemanager-detail-card-body">' + this._renderInfoFriendly(info) + '</div></div>';
+                html += '<div class="servicemanager-detail-card">';
+                html += '<div class="servicemanager-detail-card-title">' + (this._getText('SERVICEMANAGER_STATUS', '状态')) + '</div>';
+                html += '<div class="servicemanager-detail-card-body">' + this._renderStatusFriendly(status) + '</div></div>';
+                html += '</div>';
                 detailEl.innerHTML = html;
             }.bind(this)).catch(function () {
                 detailEl.innerHTML = '<div class="servicemanager-detail-error">' + (this._getText('SERVICEMANAGER_LOAD_FAIL', '加载失败')) + '</div>';
             }.bind(this));
+        },
+
+        _escapeHtml: function (text) {
+            if (text == null || text === '') return '';
+            var div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        },
+
+        _renderInfoFriendly: function (info) {
+            if (info == null || typeof info !== 'object') return '<p class="servicemanager-detail-value" style="margin:0">—</p>';
+            var labels = { name: '名称', version: '版本', description: '描述', author: '作者', copyright: '版权' };
+            var keys = ['name', 'version', 'description', 'author', 'copyright'];
+            var html = '<div class="servicemanager-detail-grid">';
+            for (var i = 0; i < keys.length; i++) {
+                var k = keys[i];
+                if (!info.hasOwnProperty(k)) continue;
+                var v = info[k];
+                if (v === undefined || v === null) v = '—';
+                else if (typeof v === 'object') v = JSON.stringify(v);
+                else v = String(v);
+                var label = labels[k] || k;
+                html += '<span class="servicemanager-detail-label">' + (this._escapeHtml(label)) + '</span>';
+                html += '<span class="servicemanager-detail-value">' + (this._escapeHtml(v)) + '</span>';
+            }
+            var rest = Object.keys(info).filter(function (k) { return keys.indexOf(k) === -1; });
+            for (var j = 0; j < rest.length; j++) {
+                var key = rest[j];
+                var val = info[key];
+                if (val === undefined || val === null) val = '—';
+                else if (typeof val === 'object') val = JSON.stringify(val);
+                else val = String(val);
+                html += '<span class="servicemanager-detail-label">' + (this._escapeHtml(key)) + '</span>';
+                html += '<span class="servicemanager-detail-value">' + (this._escapeHtml(val)) + '</span>';
+            }
+            html += '</div>';
+            return html;
+        },
+
+        _renderStatusFriendly: function (status) {
+            if (status == null || typeof status !== 'object') return '<p class="servicemanager-detail-value" style="margin:0">—</p>';
+            var labels = { running: '运行状态', lastFetchTime: '最后拉取时间', lastSubTime: '最后公告时间', lastError: '错误信息', apiUrl: 'API 配置' };
+            var keys = ['running', 'lastFetchTime', 'lastSubTime', 'lastError', 'apiUrl'];
+            var html = '<div class="servicemanager-detail-grid">';
+            for (var i = 0; i < keys.length; i++) {
+                var k = keys[i];
+                if (!status.hasOwnProperty(k)) continue;
+                var v = status[k];
+                if (k === 'running') v = v ? (this._getText('SERVICEMANAGER_RUNNING', '运行中')) : (this._getText('SERVICEMANAGER_STOPPED', '已停止'));
+                else if (k === 'lastFetchTime' || k === 'lastSubTime') v = (v != null && v > 0) ? new Date(v).toLocaleString('zh-CN') : '—';
+                else if (k === 'lastError') v = (v != null && v !== '') ? String(v) : '—';
+                else if (k === 'apiUrl') v = (v != null && String(v).length > 0 && String(v).indexOf('未配置') === -1) ? '已配置' : '未配置';
+                else if (v === undefined || v === null) v = '—';
+                else if (typeof v === 'object') v = JSON.stringify(v);
+                else v = String(v);
+                var label = labels[k] || k;
+                html += '<span class="servicemanager-detail-label">' + (this._escapeHtml(label)) + '</span>';
+                html += '<span class="servicemanager-detail-value">' + (this._escapeHtml(v)) + '</span>';
+            }
+            var rest = Object.keys(status).filter(function (k) { return keys.indexOf(k) === -1; });
+            for (var j = 0; j < rest.length; j++) {
+                var key = rest[j];
+                var val = status[key];
+                if (val === undefined || val === null) val = '—';
+                else if (typeof val === 'object') val = JSON.stringify(val);
+                else val = String(val);
+                html += '<span class="servicemanager-detail-label">' + (this._escapeHtml(key)) + '</span>';
+                html += '<span class="servicemanager-detail-value">' + (this._escapeHtml(val)) + '</span>';
+            }
+            html += '</div>';
+            return html;
         },
 
         _startService: function (id) {
