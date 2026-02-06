@@ -1,8 +1,9 @@
 {
   "system": {
     "permissionManager.permissions": {
-      "settings": [
-        "SYSTEM_STORAGE_READ"
+      "notepad": [
+        "DRAG_ELEMENT",
+        "SYSTEM_NOTIFICATION"
       ]
     },
     "system.style": "macos",
@@ -191,17 +192,17 @@
         "password": "61b249bf6d604d14120821f43625e84e",
         "avatar": "avatar_root_1766272534753.jpg",
         "createdAt": 1766271155991,
-        "lastLogin": 1770359628714
+        "lastLogin": 1770368078110
       },
       "TestUser": {
         "level": "USER",
         "password": null,
         "avatar": null,
         "createdAt": 1766271155991,
-        "lastLogin": 1770360829029
+        "lastLogin": 1770364258362
       }
     },
-    "userControl.currentUser": "TestUser",
+    "userControl.currentUser": "root",
     "system.lockscreenTimeComponent": true,
     "system.lockscreenBackground": "/system/assets/start/bg3.jpg",
     "system.lockscreenRandomBg": true,

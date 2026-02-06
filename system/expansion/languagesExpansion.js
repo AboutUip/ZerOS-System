@@ -33,9 +33,9 @@
      * 从 D/plugins 读取文件内容（内核内直接使用 NodeTree，不经过 ProcessManager）
      * 若 D/plugins 节点不存在则直接返回 null，由上层走 PHP 回落，避免触发 NodeTree 错误日志
      * @param {string} fileName 文件名，如 "zh-CN.json"
-     * @returns {string|null} 文件内容，失败返回 null
+     * @returns {Promise<string|null>} 文件内容，失败返回 null
      */
-    function readLangPackFile(fileName) {
+    async function readLangPackFile(fileName) {
         let ref = getNodeTreeForLangPacks();
         if (!ref || !ref.nodeTree.initialized) {
             if (typeof KernelLogger !== 'undefined') {
@@ -47,7 +47,7 @@
             return null;
         }
         try {
-            let content = ref.nodeTree.read_file(ref.packsPath, fileName);
+            let content = await ref.nodeTree.read_file(ref.packsPath, fileName);
             return content != null ? String(content) : null;
         } catch (e) {
             if (typeof KernelLogger !== 'undefined') {
@@ -158,6 +158,7 @@
      * @returns {Object.<string, string>} 常量名到文本的映射
      */
     function parseLangPackJson(raw, locale) {
+        if (raw == null || (typeof raw === 'string' && raw.trim() === '')) return {};
         let data;
         try {
             data = JSON.parse(raw);
@@ -240,16 +241,16 @@
          * @param {string} locale 语言标识，如 "zh-CN"，对应文件 zh-CN.json
          * @returns {Promise<boolean>} 是否加载成功
          */
-        loadLanguagePack: function (locale) {
+        loadLanguagePack: async function (locale) {
             if (!locale || typeof locale !== 'string') {
                 if (typeof KernelLogger !== 'undefined') {
                     KernelLogger.warn("LanguagesExpansion", "loadLanguagePack: locale 必须是非空字符串");
                 }
-                return Promise.resolve(false);
+                return false;
             }
             var fileName = locale + '.json';
-            var raw = readLangPackFile(fileName);
-            if (raw == null) {
+            var raw = await readLangPackFile(fileName);
+            if (raw == null || (typeof raw === 'string' && raw.trim() === '')) {
                 return readLangPackFileViaPHP(fileName).then(function (content) {
                     if (content == null) return false;
                     var strings = parseLangPackJson(content, locale);
@@ -265,7 +266,7 @@
             if (typeof KernelLogger !== 'undefined') {
                 KernelLogger.info("LanguagesExpansion", "已加载语言包: " + locale);
             }
-            return Promise.resolve(true);
+            return true;
         },
 
         /**

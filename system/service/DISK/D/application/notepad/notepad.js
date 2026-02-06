@@ -22,12 +22,14 @@
         lastSavedText: '',
         dropZoneSelector: null,
         eventListeners: [],
+        _languageChangeUnsubscribe: null,
 
         // 初始化方法
         __init__ : async function(pid,initArgs) {
             
             // 更新pid
             this.pid = pid;
+            this._kernelAPI = (initArgs && initArgs.kernelAPI) || null;
 
             // 获取窗口容器(必须这样获取)
             const guiContainer = initArgs.guiContainer || document.getElementById('gui-container');
@@ -37,16 +39,16 @@
             this.window.className = 'notepad-window zos-gui-window';
             this.window.dataset.pid = pid.toString();
 
-            // 窗口内容
+            // 窗口内容（按钮文案由 _refreshUIStrings 多语言刷新）
             this.window.innerHTML = `
                 <div class="notepad-toolbar">
                     <div class="notepad-toolbar-left">
-                        <button class="notepad-btn" data-action="new">新建</button>
-                        <button class="notepad-btn" data-action="open">打开</button>
-                        <button class="notepad-btn" data-action="save">保存</button>
-                        <button class="notepad-btn" data-action="saveas">另存为</button>
-                        <button class="notepad-btn" data-action="clear">清空</button>
-                        <button class="notepad-btn" data-action="exit">退出</button>
+                        <button class="notepad-btn" data-action="new"></button>
+                        <button class="notepad-btn" data-action="open"></button>
+                        <button class="notepad-btn" data-action="save"></button>
+                        <button class="notepad-btn" data-action="saveas"></button>
+                        <button class="notepad-btn" data-action="clear"></button>
+                        <button class="notepad-btn" data-action="exit"></button>
                     </div>
                     <div class="notepad-toolbar-right">
                         <span class="notepad-path"></span>
@@ -72,7 +74,7 @@
 
                 // 该API详细用法参考 GUIManager 文档
                 this.applicationInfo = GUIManager.registerWindow(pid, this.window, {
-                    title: 'Notepad',
+                    title: this._getText('NOTEPAD_TITLE', 'Notepad'),
                     icon: ApplicationAssetManager.getIcon('notepad'),
                     // 兼容保留
                     // 窗口关闭回调
@@ -101,10 +103,23 @@
             guiContainer.appendChild(this.window);
 
             this._bindUI();
+            this._refreshUIStrings();
+            this._languageChangeUnsubscribe = null;
+            if (typeof LanguagesExpansion !== 'undefined' && typeof LanguagesExpansion.onLanguageChange === 'function') {
+                this._languageChangeUnsubscribe = LanguagesExpansion.onLanguageChange(() => {
+                    this._refreshUIStrings();
+                });
+            }
 
             const args = (initArgs && Array.isArray(initArgs.args)) ? initArgs.args : [];
-            const initialPath = (initArgs && typeof initArgs.filePath === 'string') ? initArgs.filePath : (args[0] || null);
+            const filePathArg = (initArgs && initArgs.filePath != null) ? initArgs.filePath : null;
+            const argsFirst = (args && args.length > 0) ? args[0] : null;
+            const initialPathRaw = (typeof filePathArg === 'string' ? filePathArg : null) || (typeof argsFirst === 'string' ? argsFirst : null) || null;
+            const pathStr = (initialPathRaw && String(initialPathRaw).trim() !== '' && String(initialPathRaw) !== 'undefined') ? String(initialPathRaw).trim() : '';
+            const initialPath = pathStr ? this._normalizePath(pathStr) : null;
             if (initialPath) {
+                // 延后一帧再打开文件，确保进程已完全注册、权限与 kernel API 可用
+                await new Promise(r => setTimeout(r, 0));
                 await this._openFile(initialPath);
             } else {
                 this._setText('');
@@ -115,6 +130,10 @@
 
         // 退出方法
         __exit__ : async function(){
+            if (this._languageChangeUnsubscribe && typeof this._languageChangeUnsubscribe === 'function') {
+                this._languageChangeUnsubscribe();
+                this._languageChangeUnsubscribe = null;
+            }
             this._unbindUI();
 
             // 注销窗口(固定写法)
@@ -135,15 +154,14 @@
 
         // 信息方法
         __info__ : function(){
-            // 固定返回注册信息就好
-            // 如果是动态安装的程序,需要与application.json保持一致
-            // 如果是系统内置的程序,需要与applicationAssets.js保持一致
+            // 固定返回注册信息就好；description 使用多语言（与语言包 NOTEPAD_DESCRIPTION 一致）
+            const desc = (typeof LanguagesExpansion !== 'undefined' && typeof LanguagesExpansion.getText === 'function')
+                ? LanguagesExpansion.getText('NOTEPAD_DESCRIPTION') : 'Notepad记事本';
             return {
-                // 具体配置项参见相关文档
                 name: 'Notepad',
                 type: 'GUI',
                 version: '1.0.0',
-                description: 'Notepad记事本',
+                description: desc || 'Notepad记事本',
                 author: 'ZerOS Team',
                 copyright: 'Copyright (c) 2026 ZerOS Team',
                 metadata: {
@@ -185,7 +203,7 @@
 
             if (this.textEl) {
                 const onInput = () => {
-                    const currentText = this._getText();
+                    const currentText = this._getEditorText();
                     const isDirty = this.filePath ? (currentText !== this.lastSavedText) : (currentText.length > 0);
                     this._setDirty(isDirty);
                     this._updateStatus();
@@ -266,8 +284,29 @@
             this.eventListeners.push({ el: dropZoneEl, type: 'zeros-drop', handler: onDrop });
         },
 
-        _getText: function() {
+        /** 多语言：优先 LanguagesExpansion.getText，否则返回 fallback */
+        _getText: function (key, fallback) {
+            if (typeof LanguagesExpansion !== 'undefined' && typeof LanguagesExpansion.getText === 'function') {
+                return LanguagesExpansion.getText(key) || fallback;
+            }
+            return fallback;
+        },
+        _getEditorText: function() {
             return this.textEl ? (this.textEl.value || '') : '';
+        },
+        /** 语言切换时刷新工具栏、标题、状态栏等多语言文案 */
+        _refreshUIStrings: function() {
+            const w = this.window;
+            if (!w) return;
+            const btnKeys = { new: 'NOTEPAD_BTN_NEW', open: 'NOTEPAD_BTN_OPEN', save: 'NOTEPAD_BTN_SAVE', saveas: 'NOTEPAD_BTN_SAVEAS', clear: 'NOTEPAD_BTN_CLEAR', exit: 'NOTEPAD_BTN_EXIT' };
+            const fallbacks = { new: '新建', open: '打开', save: '保存', saveas: '另存为', clear: '清空', exit: '退出' };
+            Object.keys(btnKeys).forEach(action => {
+                const btn = w.querySelector('.notepad-btn[data-action="' + action + '"]');
+                if (btn) btn.textContent = this._getText(btnKeys[action], fallbacks[action]);
+            });
+            if (this.pathEl) this.pathEl.textContent = this.filePath || this._getText('NOTEPAD_UNNAMED', '未命名');
+            this._updateTitle();
+            this._updateStatus();
         },
 
         _setText: function(text) {
@@ -279,7 +318,7 @@
         _setFilePath: function(path) {
             this.filePath = path ? this._normalizePath(path) : null;
             if (this.pathEl) {
-                this.pathEl.textContent = this.filePath || '未命名';
+                this.pathEl.textContent = this.filePath || this._getText('NOTEPAD_UNNAMED', '未命名');
             }
             this._updateTitle();
         },
@@ -291,26 +330,27 @@
         },
 
         _updateTitle: function() {
-            const name = this.filePath ? this.filePath.split('/').pop() : '未命名';
+            const name = this.filePath ? this.filePath.split('/').pop() : this._getText('NOTEPAD_UNNAMED', '未命名');
             const prefix = this.dirty ? '* ' : '';
             const titleEl = this.window ? this.window.querySelector('.zos-window-titlebar .zos-window-title') : null;
             if (titleEl) {
-                titleEl.textContent = `${prefix}${name} - Notepad`;
+                titleEl.textContent = `${prefix}${name} - ${this._getText('NOTEPAD_TITLE', 'Notepad')}`;
             }
         },
 
         _updateStatus: function() {
             if (!this.statusLeftEl || !this.statusRightEl) return;
-            const name = this.filePath ? this.filePath.split('/').pop() : '未命名';
-            const dirtyText = this.dirty ? '已修改' : (this.filePath ? '已保存' : '未保存');
+            const name = this.filePath ? this.filePath.split('/').pop() : this._getText('NOTEPAD_UNNAMED', '未命名');
+            const dirtyText = this.dirty ? this._getText('NOTEPAD_STATUS_MODIFIED', '已修改') : (this.filePath ? this._getText('NOTEPAD_STATUS_SAVED', '已保存') : this._getText('NOTEPAD_STATUS_UNSAVED', '未保存'));
             this.statusLeftEl.textContent = `${name} · ${dirtyText}`;
 
             const { line, col, length } = this._getCursorInfo();
-            this.statusRightEl.textContent = `行 ${line}, 列 ${col} · ${length} 字符`;
+            const fmt = this._getText('NOTEPAD_STATUS_LINE_COL', '行 {0}, 列 {1} · {2} 字符');
+            this.statusRightEl.textContent = fmt.replace('{0}', String(line)).replace('{1}', String(col)).replace('{2}', String(length));
         },
 
         _getCursorInfo: function() {
-            const text = this._getText();
+            const text = this._getEditorText();
             const length = text.length;
             if (!this.textEl) return { line: 1, col: 1, length };
             const pos = typeof this.textEl.selectionStart === 'number' ? this.textEl.selectionStart : 0;
@@ -330,6 +370,10 @@
             if (!p || typeof p !== 'string') return '';
             let s = p.replace(/\\/g, '/');
             s = s.replace(/\/+/g, '/');
+            // 确保盘符后紧跟 '/'，否则 FileSystem.read 无法解析（如 "D:path/file" -> "D:/path/file"）
+            if (/^[A-Za-z]:[^/]/.test(s)) {
+                s = s.charAt(0) + s.charAt(1) + '/' + s.slice(2);
+            }
             return s;
         },
 
@@ -352,7 +396,8 @@
             }
         },
 
-        _confirm: async function(message, title = '确认', type = 'warning') {
+        _confirm: async function(message, title, type = 'warning') {
+            if (title === undefined) title = this._getText('NOTEPAD_CONFIRM', '确认');
             if (typeof GUIManager !== 'undefined' && typeof GUIManager.showConfirm === 'function') {
                 try {
                     return await GUIManager.showConfirm(message, title, type);
@@ -363,7 +408,8 @@
             return confirm(message);
         },
 
-        _prompt: async function(message, title = '输入', defaultValue = '') {
+        _prompt: async function(message, title, defaultValue = '') {
+            if (title === undefined) title = this._getText('NOTEPAD_PROMPT', '输入');
             if (typeof GUIManager !== 'undefined' && typeof GUIManager.showPrompt === 'function') {
                 try {
                     return await GUIManager.showPrompt(message, title, defaultValue);
@@ -376,9 +422,9 @@
 
         _maybeSaveChanges: async function() {
             if (!this.dirty) return true;
-            const ok = await this._confirm('当前内容尚未保存，是否先保存？', 'Notepad', 'warning');
+            const ok = await this._confirm(this._getText('NOTEPAD_SAVE_BEFORE_LEAVE', '当前内容尚未保存，是否先保存？'), this._getText('NOTEPAD_TITLE', 'Notepad'), 'warning');
             if (!ok) {
-                const discard = await this._confirm('不保存并继续操作？', 'Notepad', 'danger');
+                const discard = await this._confirm(this._getText('NOTEPAD_DISCARD_CHANGES', '不保存并继续操作？'), this._getText('NOTEPAD_TITLE', 'Notepad'), 'danger');
                 return discard;
             }
             const saved = await this._saveFile();
@@ -387,7 +433,7 @@
 
         _openFileDialog: async function() {
             if (typeof ProcessManager === 'undefined') {
-                await this._notify('Notepad', 'ProcessManager 不可用');
+                await this._notify(this._getText('NOTEPAD_TITLE', 'Notepad'), this._getText('NOTEPAD_PM_UNAVAILABLE', 'ProcessManager 不可用'));
                 return;
             }
             const ok = await this._maybeSaveChanges();
@@ -404,31 +450,34 @@
                     }
                 });
             } catch (e) {
-                await this._notify('Notepad', `打开文件失败: ${e.message || String(e)}`);
+                await this._notify(this._getText('NOTEPAD_TITLE', 'Notepad'), (this._getText('NOTEPAD_OPEN_FAILED', '打开文件失败: {0}')).replace('{0}', e.message || String(e)));
             }
         },
 
         _openFile: async function(path) {
             if (!path) return;
             if (typeof ProcessManager === 'undefined') {
-                await this._notify('Notepad', 'ProcessManager 不可用');
+                await this._notify(this._getText('NOTEPAD_TITLE', 'Notepad'), this._getText('NOTEPAD_PM_UNAVAILABLE', 'ProcessManager 不可用'));
                 return;
             }
 
             try {
                 const filePath = this._normalizePath(path);
+                if (!filePath) return;
                 if (this.dirty && this.filePath !== filePath) {
                     const ok = await this._maybeSaveChanges();
                     if (!ok) return;
                 }
-                const content = await ProcessManager.callKernelAPI(this.pid, 'FileSystem.read', [filePath]);
-                this._setText(content || '');
-                this.lastSavedText = this._getText();
+                // 统一使用 ProcessManager.callKernelAPI，避免 __init__ 阶段注入的 kernelAPI 尚未生效
+                const raw = await ProcessManager.callKernelAPI(this.pid, 'FileSystem.read', [filePath]);
+                const content = raw == null ? '' : (Array.isArray(raw) ? raw.join('\n') : String(raw));
+                this._setText(content);
+                this.lastSavedText = this._getEditorText();
                 this._setFilePath(filePath);
                 this._setDirty(false);
-                await this._notify('Notepad', '文件已打开');
+                await this._notify(this._getText('NOTEPAD_TITLE', 'Notepad'), this._getText('NOTEPAD_FILE_OPENED', '文件已打开'));
             } catch (e) {
-                await this._notify('Notepad', `打开失败: ${e.message || String(e)}`);
+                await this._notify(this._getText('NOTEPAD_TITLE', 'Notepad'), (this._getText('NOTEPAD_OPEN_FAILED_MSG', '打开失败: {0}')).replace('{0}', e.message || String(e)));
             }
         },
 
@@ -437,28 +486,28 @@
                 return await this._saveAs();
             }
             if (typeof ProcessManager === 'undefined') {
-                await this._notify('Notepad', 'ProcessManager 不可用');
+                await this._notify(this._getText('NOTEPAD_TITLE', 'Notepad'), this._getText('NOTEPAD_PM_UNAVAILABLE', 'ProcessManager 不可用'));
                 return false;
             }
             try {
-                const ok = await ProcessManager.callKernelAPI(this.pid, 'FileSystem.write', [this.filePath, this._getText(), 'OVERWRITE']);
+                const ok = await ProcessManager.callKernelAPI(this.pid, 'FileSystem.write', [this.filePath, this._getEditorText(), 'OVERWRITE']);
                 if (ok) {
-                    this.lastSavedText = this._getText();
+                    this.lastSavedText = this._getEditorText();
                     this._setDirty(false);
-                    await this._notify('Notepad', '已保存');
+                    await this._notify(this._getText('NOTEPAD_TITLE', 'Notepad'), this._getText('NOTEPAD_SAVED', '已保存'));
                     return true;
                 }
-                await this._notify('Notepad', '保存失败');
+                await this._notify(this._getText('NOTEPAD_TITLE', 'Notepad'), this._getText('NOTEPAD_SAVE_FAILED', '保存失败'));
                 return false;
             } catch (e) {
-                await this._notify('Notepad', `保存失败: ${e.message || String(e)}`);
+                await this._notify(this._getText('NOTEPAD_TITLE', 'Notepad'), (this._getText('NOTEPAD_SAVE_FAILED_MSG', '保存失败: {0}')).replace('{0}', e.message || String(e)));
                 return false;
             }
         },
 
         _saveAs: async function() {
             if (typeof ProcessManager === 'undefined') {
-                await this._notify('Notepad', 'ProcessManager 不可用');
+                await this._notify(this._getText('NOTEPAD_TITLE', 'Notepad'), this._getText('NOTEPAD_PM_UNAVAILABLE', 'ProcessManager 不可用'));
                 return false;
             }
 
@@ -490,24 +539,24 @@
                 if (!folderItem || !folderItem.path) return false;
 
                 const defaultName = this.filePath ? this.filePath.split('/').pop() : 'untitled.txt';
-                const fileName = await this._prompt('请输入文件名:', '另存为', defaultName);
+                const fileName = await this._prompt(this._getText('NOTEPAD_SAVEAS_PROMPT', '请输入文件名:'), this._getText('NOTEPAD_SAVEAS_TITLE', '另存为'), defaultName);
                 if (!fileName) return false;
 
                 const folder = this._normalizePath(folderItem.path).replace(/\/$/, '');
                 const targetPath = `${folder}/${fileName}`.replace(/\/+/g, '/');
 
-                const ok = await ProcessManager.callKernelAPI(this.pid, 'FileSystem.write', [targetPath, this._getText(), 'OVERWRITE']);
+                const ok = await ProcessManager.callKernelAPI(this.pid, 'FileSystem.write', [targetPath, this._getEditorText(), 'OVERWRITE']);
                 if (ok) {
-                    this.lastSavedText = this._getText();
+                    this.lastSavedText = this._getEditorText();
                     this._setFilePath(targetPath);
                     this._setDirty(false);
-                    await this._notify('Notepad', '已另存为');
+                    await this._notify(this._getText('NOTEPAD_TITLE', 'Notepad'), this._getText('NOTEPAD_SAVEAS_DONE', '已另存为'));
                     return true;
                 }
-                await this._notify('Notepad', '另存为失败');
+                await this._notify(this._getText('NOTEPAD_TITLE', 'Notepad'), this._getText('NOTEPAD_SAVEAS_FAILED', '另存为失败'));
                 return false;
             } catch (e) {
-                await this._notify('Notepad', `另存为失败: ${e.message || String(e)}`);
+                await this._notify(this._getText('NOTEPAD_TITLE', 'Notepad'), (this._getText('NOTEPAD_SAVEAS_FAILED_MSG', '另存为失败: {0}')).replace('{0}', e.message || String(e)));
                 return false;
             }
         },
@@ -522,10 +571,10 @@
         },
 
         _clear: async function() {
-            const ok = await this._confirm('清空编辑区？', 'Notepad', 'warning');
+            const ok = await this._confirm(this._getText('NOTEPAD_CLEAR_CONFIRM', '清空编辑区？'), this._getText('NOTEPAD_TITLE', 'Notepad'), 'warning');
             if (!ok) return;
             this._setText('');
-            const currentText = this._getText();
+            const currentText = this._getEditorText();
             const isDirty = this.filePath ? (currentText !== this.lastSavedText) : (currentText.length > 0);
             this._setDirty(isDirty);
         },

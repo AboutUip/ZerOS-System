@@ -2420,34 +2420,10 @@ class ContextMenuManager {
                 }
             }
             
-            // 权限名称映射
-            const permNameMap = {
-                'SYSTEM_NOTIFICATION': '系统通知',
-                'KERNEL_DISK_READ': '读取文件',
-                'KERNEL_DISK_WRITE': '写入文件',
-                'KERNEL_DISK_DELETE': '删除文件',
-                'KERNEL_DISK_CREATE': '创建文件/目录',
-                'KERNEL_DISK_LIST': '列出目录',
-                'KERNEL_MEMORY_READ': '读取内存',
-                'KERNEL_MEMORY_WRITE': '写入内存',
-                'NETWORK_ACCESS': '网络访问',
-                'GUI_WINDOW_CREATE': '创建窗口',
-                'GUI_WINDOW_MANAGE': '管理窗口',
-                'SYSTEM_STORAGE_READ': '读取系统存储',
-                'SYSTEM_STORAGE_WRITE': '写入系统存储',
-                'PROCESS_MANAGE': '管理进程',
-                'THEME_READ': '读取主题',
-                'THEME_WRITE': '修改主题',
-                'DESKTOP_MANAGE': '管理桌面',
-                'MULTITHREADING_CREATE': '创建线程',
-                'MULTITHREADING_EXECUTE': '执行多线程任务',
-                'EVENT_LISTENER': '事件监听',
-                'CRYPT_GENERATE_KEY': '生成密钥',
-                'CRYPT_ENCRYPT': '加密数据',
-                'CRYPT_DECRYPT': '解密数据',
-                'CRYPT_DELETE_KEY': '删除密钥',
-                'CRYPT_MD5': 'MD5 哈希',
-                'CRYPT_RANDOM': '生成随机数'
+            // 权限名称映射（多语言：使用语言包 PERM_* 键）
+            const getPermDisplayName = function (perm) {
+                const key = 'PERM_' + perm;
+                return ContextMenuManager._getText(key, perm);
             };
             
             if (declaredPermissions.length > 0 || grantedPermissions.length > 0) {
@@ -2470,7 +2446,7 @@ class ContextMenuManager {
                                         level === PermissionManager.PERMISSION_LEVEL.SPECIAL ? ContextMenuManager._getText('PROGDETAILS_LEVEL_SPECIAL', '特殊') : ContextMenuManager._getText('PROGDETAILS_LEVEL_DANGEROUS', '危险');
                         const levelColor = level === PermissionManager.PERMISSION_LEVEL.NORMAL ? '#4caf50' :
                                          level === PermissionManager.PERMISSION_LEVEL.SPECIAL ? '#ff9800' : '#f44336';
-                        const permName = permNameMap[perm] || perm;
+                        const permName = getPermDisplayName(perm);
                         const isGranted = grantedPermissions.includes(perm);
                         
                         const permItem = document.createElement('div');
@@ -2570,7 +2546,7 @@ class ContextMenuManager {
                                         level === PermissionManager.PERMISSION_LEVEL.SPECIAL ? ContextMenuManager._getText('PROGDETAILS_LEVEL_SPECIAL', '特殊') : ContextMenuManager._getText('PROGDETAILS_LEVEL_DANGEROUS', '危险');
                         const levelColor = level === PermissionManager.PERMISSION_LEVEL.NORMAL ? '#4caf50' :
                                          level === PermissionManager.PERMISSION_LEVEL.SPECIAL ? '#ff9800' : '#f44336';
-                        const permName = permNameMap[perm] || perm;
+                        const permName = getPermDisplayName(perm);
                         
                         const permItem = document.createElement('div');
                         permItem.style.cssText = `

@@ -1,4 +1,4 @@
-﻿// 通知管理器
+// 通知管理器
 // 负责系统通知的显示、管理和交互
 // 依赖：TaskbarManager, ProcessManager, GUIManager
 
@@ -69,6 +69,7 @@ class NotificationManager {
     // 事件监听器
     static _hoverListeners = [];
     static _taskbarPositionListener = null;
+    static _languageChangeUnsubscribe = null;
     
     // 鼠标跟踪
     static _triggerThreshold = 15;
@@ -92,6 +93,36 @@ class NotificationManager {
         return 'bottom';
     }
     
+    /**
+     * 多语言文案：优先 LanguagesExpansion.getText，否则返回 fallback
+     * @param {string} key 语言包常量名
+     * @param {string} fallback 无语言包时的回退文案
+     * @returns {string}
+     */
+    static _getText(key, fallback) {
+        if (typeof LanguagesExpansion !== 'undefined' && typeof LanguagesExpansion.getText === 'function') {
+            const value = LanguagesExpansion.getText(key);
+            if (value && value !== key) return value;
+        }
+        return fallback != null ? fallback : (key || '');
+    }
+
+    /**
+     * 刷新通知栏空状态等多语言文案（语言切换时调用）
+     */
+    static _refreshUIStrings() {
+        if (NotificationManager._emptyStateElement) {
+            const textEl = NotificationManager._emptyStateElement.querySelector('.notification-empty-state-text');
+            if (textEl) {
+                textEl.textContent = NotificationManager._getText('NOTIFICATION_EMPTY_STATE', '暂时没有通知');
+            }
+        }
+        const closeBtn = document.getElementById('notification-container-close');
+        if (closeBtn) {
+            closeBtn.setAttribute('aria-label', NotificationManager._getText('NOTIFICATION_CLOSE_ARIA', '关闭通知栏'));
+        }
+    }
+
     /**
      * 检查鼠标是否在元素内
      * @param {number} x - 鼠标X坐标
@@ -120,6 +151,7 @@ class NotificationManager {
         const button = document.createElement('button');
         button.innerHTML = '✕';
         button.className = className || 'notification-close-button';
+        button.setAttribute('aria-label', NotificationManager._getText('NOTIFICATION_CLOSE_ARIA', '关闭通知栏'));
         
         const isAbsolute = position === 'absolute';
         button.style.cssText = `
@@ -198,6 +230,12 @@ class NotificationManager {
             NotificationManager._createNotificationContainer();
             NotificationManager._setupTaskbarPositionListener();
             NotificationManager._registerToPOOL();
+            
+            if (typeof LanguagesExpansion !== 'undefined' && typeof LanguagesExpansion.onLanguageChange === 'function') {
+                NotificationManager._languageChangeUnsubscribe = LanguagesExpansion.onLanguageChange(() => {
+                    NotificationManager._refreshUIStrings();
+                });
+            }
             
             NotificationManager._initialized = true;
             KernelLogger.info("NotificationManager", "通知管理器初始化完成");
@@ -464,6 +502,7 @@ class NotificationManager {
             position: 'absolute'
         });
         closeButton.id = 'notification-container-close';
+        closeButton.setAttribute('aria-label', NotificationManager._getText('NOTIFICATION_CLOSE_ARIA', '关闭通知栏'));
         // 调整位置，避免与通知的关闭按钮重叠
         // 通知的关闭按钮在 top: 8px, right: 8px（相对于通知元素）
         // 容器关闭按钮放在更靠上的位置，避免重叠
@@ -562,12 +601,13 @@ class NotificationManager {
         emptyState.appendChild(icon);
         
         const text = document.createElement('div');
+        text.className = 'notification-empty-state-text';
         text.style.cssText = `
             font-size: 14px;
             color: #b3b3b3;
             text-align: center;
         `;
-        text.textContent = '暂时没有通知';
+        text.textContent = NotificationManager._getText('NOTIFICATION_EMPTY_STATE', '暂时没有通知');
         emptyState.appendChild(text);
         
         NotificationManager._emptyStateElement = emptyState;

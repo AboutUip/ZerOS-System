@@ -4,6 +4,10 @@
 
 `NodeTree` 是 ZerOS 内核的文件树结构，用于管理虚拟文件系统的目录和文件。提供目录和文件的创建、删除、读取、写入、重命名等操作。
 
+**数据策略**：每次系统启动会从后端（FSDirve）重建整棵树；快照（`filesystem_*.json`）仅保存结构+元数据，**不保存文件内容**；`read_file` 时若树中无内容会从后端实时拉取并回填。
+
+**多磁盘分区**：每个分区（C:、D:、A–Z）对应一个 `NodeTreeCollection` 实例，由 `Disk.diskSeparateMap` 管理；盘符支持 `"C:"` 或 `"C"` 形式，请求 PHP 时统一为 `A:`/`A:/` 格式；NodeTree 内部仅使用本实例的 `separateName`，无单分区假设。
+
 注意：`NodeTreeCollection` 更偏向内核内部/系统模块使用。普通应用程序进行文件读写，优先使用 `ProcessManager.callKernelAPI` 暴露的 `FileSystem.*` 接口（会自动做权限检查与兼容处理）。
 
 ## 依赖
@@ -146,11 +150,11 @@ dPartition.delete_file("D:/Documents", "test.txt");
 - `path` (string): 目录路径
 - `fileName` (string): 文件名称
 
-**返回值**: `string|Array|null` - 文件内容
+**返回值**: `Promise<string|null>` - 文件内容，不存在或未初始化返回 null（若树中仅有结构无内容会从 PHP 拉取并回填）
 
 **示例**:
 ```javascript
-const content = dPartition.read_file("D:/Documents", "test.txt");
+const content = await dPartition.read_file("D:/Documents", "test.txt");
 console.log('文件内容:', content);
 ```
 
@@ -202,7 +206,7 @@ await dPartition.create_file("D:/Documents/Projects", file);
 const dPartition = Disk.diskSeparateMap.get("D:");
 
 // 读取文件
-const content = dPartition.read_file("D:/Documents/Projects", "readme.txt");
+const content = await dPartition.read_file("D:/Documents/Projects", "readme.txt");
 console.log('文件内容:', content);
 
 // 写入文件（覆盖）
@@ -263,36 +267,39 @@ if (dPartition.hasNode("D:/Documents")) {
 
 NodeTreeCollection 在创建时会等待 FileType 等依赖加载完成，然后按以下顺序加载数据：
 
-1. **从本地快照加载**：调用 `_loadFromLocalStorage()`，从后端（FSDirve）读取 `${separateName}/filesystem_${safeName}.json`。若文件存在且有效，则反序列化得到完整节点树。
-2. **无有效快照时从 PHP 重建**：加载完成后若当前仅有根节点（`nodes.size <= 1`），会调用 `_ensureTreeFromPHP()`，内部再调用 `_rebuildFromPHP()`，通过 FSDirve 的 `list_dir` 递归拉取真实目录结构并写回 `nodes`。这样可保证如 `D:/plugins` 等目录在无本地快照时也能被正确创建，避免 `list_file` 报「节点不存在」。
+1. **从本地快照加载**：调用 `_loadFromLocalStorage()`，从后端（FSDirve）读取 `${separateName}/filesystem_${safeName}.json`。若文件存在且有效，则反序列化得到节点树（仅结构+元数据，不含文件内容）。
+2. **每次启动从 PHP 重建**：加载完成后会调用 `_ensureTreeFromPHP()`，内部调用 `_rebuildFromPHP()`，通过 FSDirve 的 `list_dir` 递归拉取真实目录结构并写回 `nodes`，保证树与磁盘一致。重建完成后会将新结构（不含文件内容）写回 `filesystem_*.json`。
+
+**文件内容**：快照中不保存文件内容；`read_file` 时若树中该文件无内容，会从后端（FSDirve `read_file`）实时拉取并回填内存，应用层无需关心来源。
 
 **内部方法说明**（内核/系统模块使用，应用层无需直接调用）：
 
-- **`_ensureTreeFromPHP()`**：在 `_loadFromLocalStorage` 完成后调用；若 `nodes.size <= 1` 则从 PHP 服务重建整棵树。
-- **`_rebuildFromPHP(rootPath?)`**：清空除根节点外的所有节点，从 `rootPath` 或 `separateName` 起递归调用 FSDirve `list_dir`，按返回的目录/文件重建节点并标记 `initialized = true`。ProcessManager 在 `FileSystem.read/write/create/list` 等发现分区未初始化时也会调用此方法。
+- **`_ensureTreeFromPHP()`**：在 `_loadFromLocalStorage` 完成后调用；每次启动都会从 PHP 服务重建整棵树。
+- **`_rebuildFromPHP(rootPath?)`**：清空除根节点外的所有节点，从 `rootPath` 或 `separateName` 起递归调用 FSDirve `list_dir`，按返回的目录/文件重建节点并标记 `initialized = true`；完成后调用 `_saveToLocalStorage()` 将结构写回 `filesystem_*.json`。ProcessManager 在 `FileSystem.read/write/create/list` 等发现分区未初始化时也会调用此方法。
+- **`_readFileContentFromPHP(path, fileName)`**：从 FSDirve `read_file` 拉取单个文件内容，供 `read_file` 在树中无内容时补全。
 
 **请求 PHP 时的路径格式**：FSDirve 要求根路径为 `A:` 或 `A:/` 形式。`_rebuildDirectoryFromPHP` 会将 `D:` 转为 `D:/`、单字母 `D` 转为 `D:/` 再请求，以保证 PHP 校验通过。
 
 ## 持久化
 
-NodeTreeCollection 会将文件系统结构保存到后端文件系统（通过 FSDirve），并在下次启动时优先从本地快照恢复。无论分区名是 `"D"` 还是 `"D:"`，对 FSDirve 的实际请求都会将根路径规范为 `"D:/"` 等形式，与 FSDirve 的路径校验保持一致。
+NodeTreeCollection 将**仅结构+元数据**（不包含文件内容）保存到后端文件系统（通过 FSDirve）。文件内容由后端服务实时提供，不写入快照。
 
-**存储位置**: 逻辑上为 `${separateName}/filesystem_${safeName}.json`（其中 `safeName = separateName.replace(':', '_')`，对 FSDirve 请求时会按上文所述规范根路径格式）
+**存储位置**：逻辑上为 `${separateName}/filesystem_${safeName}.json`（其中 `safeName = separateName.replace(':', '_')`），例如：
 
-例如：
 - `C:/filesystem_C_.json`
 - `D:/filesystem_D_.json`
 
-若无该文件或反序列化后仅有根节点，会通过 `_ensureTreeFromPHP` 从 PHP 服务按真实目录结构重建，再正常使用。
+**写入时机**：每次从 PHP 重建完成后会调用 `_saveToLocalStorage()` 更新对应分区的 `filesystem_*.json`；此外在创建/删除/写入文件等操作后也会异步保存结构。快照中文件的 `fileContent` 始终为空数组，读取文件内容时通过 FSDirve `read_file` 实时获取。
 
 ## 注意事项
 
-1. **初始化**: NodeTreeCollection 在创建时会自动初始化，等待 FileType 加载完成后先加载本地快照，无有效快照时自动从 PHP 重建。
-2. **路径格式**: 路径使用 `/` 分隔，根路径为盘符（如 `"D:"`）；请求 PHP 时根路径会规范为 `D:/` 形式。
-3. **文件对象**: 创建文件时必须使用 `FileFormwork` 创建文件对象。
-4. **写入模式**: 写入文件时需指定写入模式（覆盖或追加）。
-5. **属性检查**: 删除、重命名等操作会检查文件/目录属性，如果设置了相应标志会拒绝操作。
-6. **持久化**: 文件系统会通过 FSDirve 保存/加载快照，无需应用层手动保存。
+1. **初始化**: NodeTreeCollection 在创建时会自动初始化，等待 FileType 加载完成后先加载本地快照（仅结构），然后**每次启动都会从 PHP 重建**整棵树并写回快照。
+2. **文件内容**: 快照不保存文件内容；`read_file` 时若树中无内容会从后端（FSDirve）实时拉取并回填，应用层直接使用 `read_file` 即可获得完整内容。
+3. **路径格式**: 路径使用 `/` 分隔，根路径为盘符（如 `"D:"`）；请求 PHP 时根路径会规范为 `D:/` 形式。
+4. **文件对象**: 创建文件时必须使用 `FileFormwork` 创建文件对象。
+5. **写入模式**: 写入文件时需指定写入模式（覆盖或追加）。
+6. **属性检查**: 删除、重命名等操作会检查文件/目录属性，如果设置了相应标志会拒绝操作。
+7. **持久化**: 仅结构通过 FSDirve 保存到 `filesystem_*.json`，文件内容由后端实时提供，无需应用层手动保存内容。
 
 ## 相关文档
 

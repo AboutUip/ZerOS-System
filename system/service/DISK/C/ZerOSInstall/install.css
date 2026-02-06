@@ -237,6 +237,13 @@ body {
     font-size: 14px;
 }
 
+.agreement-checkbox .agreement-en {
+    display: block;
+    margin-top: 6px;
+    color: #605e5c;
+    font-size: 13px;
+}
+
 /* 环境选择 */
 .env-selection {
     margin-bottom: 32px;
@@ -275,6 +282,50 @@ body {
 }
 
 .env-option label {
+    font-size: 15px;
+    font-weight: 500;
+    color: #323130;
+    cursor: pointer;
+}
+
+/* 语言选择（与环境选择样式一致） */
+.language-selection {
+    margin-bottom: 32px;
+}
+
+.language-options {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.language-option {
+    flex: 1;
+    padding: 20px;
+    background: #faf9f8;
+    border: 2px solid #edebe9;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.language-option:hover {
+    border-color: #0078d4;
+    background: #f3f2f1;
+}
+
+.language-option.selected {
+    border-color: #0078d4;
+    background: #e8f4f8;
+    box-shadow: 0 2px 8px rgba(0, 120, 212, 0.15);
+}
+
+.language-option input[type="radio"] {
+    margin-right: 10px;
+    accent-color: #0078d4;
+}
+
+.language-option label {
     font-size: 15px;
     font-weight: 500;
     color: #323130;
@@ -835,7 +886,8 @@ body {
         padding: 24px;
     }
     
-    .env-options {
+    .env-options,
+    .language-options {
         flex-direction: column;
     }
     

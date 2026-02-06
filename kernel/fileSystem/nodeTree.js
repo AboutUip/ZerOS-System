@@ -612,20 +612,56 @@ class NodeTreeCollection {
     }
 
     /**
-     * 若当前仅有根节点（无本地快照或快照为空），则从 PHP 服务重建整棵树，确保 D:/plugins 等目录存在
+     * 每次启动系统时从 PHP 服务自动重建 NodeTree，保证树结构与磁盘一致（不依赖本地快照）
      * 在 _loadFromLocalStorage 完成后调用
      * @returns {Promise<void>}
      */
     _ensureTreeFromPHP() {
-        if (this.nodes.size <= 1 && typeof this._rebuildFromPHP === 'function') {
-            KernelLogger.debug("NodeTree", `无有效快照（仅根节点），从 PHP 重建: ${this.separateName}`);
-            return this._rebuildFromPHP().catch(e => {
-                if (typeof KernelLogger !== 'undefined') {
-                    KernelLogger.warn("NodeTree", "无快照时从 PHP 重建失败: " + (e && e.message));
-                }
-            });
+        if (typeof this._rebuildFromPHP !== 'function') {
+            return Promise.resolve();
         }
-        return Promise.resolve();
+        KernelLogger.debug("NodeTree", `启动时从 PHP 重建: ${this.separateName}`);
+        return this._rebuildFromPHP().catch(e => {
+            if (typeof KernelLogger !== 'undefined') {
+                KernelLogger.warn("NodeTree", "启动时从 PHP 重建失败: " + (e && e.message));
+            }
+        });
+    }
+    
+    /**
+     * 从 PHP 服务读取单个文件内容（用于树中仅有结构、无内容时补全）
+     * @param {string} path 目录路径（如 D: 或 D:/foo）
+     * @param {string} fileName 文件名
+     * @returns {Promise<string|null>} 文件内容，失败或不存在返回 null
+     */
+    async _readFileContentFromPHP(path, fileName) {
+        try {
+            const phpServiceUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.getFSDirvePath)
+                ? SystemInformation.getFSDirvePath()
+                : "/system/service/FSDirve.php";
+            const readUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject)
+                ? SystemInformation.buildServiceUrlObject(phpServiceUrl)
+                : new URL(phpServiceUrl, (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin)
+                    ? SystemInformation.getOrigin()
+                    : window.location.origin);
+            readUrl.searchParams.set('action', 'read_file');
+            readUrl.searchParams.set('path', path);
+            readUrl.searchParams.set('fileName', fileName);
+            const response = await fetch(readUrl.toString(), {
+                method: 'GET',
+                headers: { 'Content-Type': 'application/json' }
+            });
+            if (!response.ok) return null;
+            const result = await response.json();
+            if (result.status !== 'success' || !result.data || result.data.content == null)
+                return null;
+            const content = result.data.content;
+            // PHP 对图片等返回 isBase64，保持原样返回供调用方使用（如 data:image/png;base64,content）
+            return typeof content === 'string' ? content : String(content);
+        } catch (e) {
+            KernelLogger.debug("NodeTree", `_readFileContentFromPHP 失败: ${path}/${fileName}`, e && e.message);
+            return null;
+        }
     }
     
     // 通过 PHP 服务创建真实目录
@@ -950,14 +986,14 @@ class NodeTreeCollection {
                 meta: node.__meta || {}
             };
             
-            // 序列化文件
+            // 序列化文件（仅结构+元数据，不保存文件内容；内容由后端服务实时获取）
             if (node.attributes) {
                 for (const fileName in node.attributes) {
                     const file = node.attributes[fileName];
                     const fileData = {
                         fileName: file.fileName,
                         fileSize: file.fileSize || 0,
-                        fileContent: file.fileContent || [],
+                        fileContent: [], // 不持久化内容，read_file 时从后端实时拉取
                         fileType: file.fileType,
                         fileCreatTime: file.fileCreatTime,
                         fileModifyTime: file.fileModifyTime,
@@ -1152,6 +1188,13 @@ class NodeTreeCollection {
                 }
             } catch (e) {
                 KernelLogger.warn("NodeTree", `更新磁盘使用情况失败: ${String(e)}`);
+            }
+            
+            // 将重建后的树结构（不含文件内容）写入当前分区的 filesystem_*.json（如 filesystem_C_.json、filesystem_D_.json）
+            try {
+                await this._saveToLocalStorage();
+            } catch (saveErr) {
+                KernelLogger.warn("NodeTree", `重建后保存 snapshot 失败: ${this.separateName}`, saveErr && saveErr.message);
             }
             
             KernelLogger.info("NodeTree", `从 PHP 服务重建 NodeTree 完成: ${this.separateName}`);
@@ -1395,8 +1438,13 @@ class NodeTreeCollection {
     }
 
     // 文件操作(封装)
-    // 读取文件
-    read_file(path, fileName) {
+    /**
+     * 读取文件内容。若树中仅有结构无内容（如从 PHP 重建），会从 PHP 拉取并回填内存。
+     * @param {string} path 目录路径
+     * @param {string} fileName 文件名
+     * @returns {Promise<string|null>} 文件内容，不存在或未初始化返回 null
+     */
+    async read_file(path, fileName) {
         if (!this.initialized) {
             KernelLogger.warn("NodeTree", "not initialized read_file");
             return null;
@@ -1412,10 +1460,23 @@ class NodeTreeCollection {
             KernelLogger.error("NodeTree", `read_file: 文件不存在: ${path}/${fileName}`);
             return null;
         }
-        return target.optFile(
-            FileType.FILE_OPS.READ,
-            fileObj
-        );
+        let content = target.optFile(FileType.FILE_OPS.READ, fileObj);
+        const hasNoContent = (fileObj.fileContent == null) ||
+            (Array.isArray(fileObj.fileContent) && fileObj.fileContent.length === 0);
+        if ((content === '' || content == null) && hasNoContent && typeof this._readFileContentFromPHP === 'function') {
+            const fromPHP = await this._readFileContentFromPHP(path, fileName);
+            if (fromPHP != null) {
+                if (Array.isArray(fileObj.fileContent)) {
+                    fileObj.fileContent.length = 0;
+                    for (const line of fromPHP.split(/\n/)) fileObj.fileContent.push(line);
+                } else {
+                    fileObj.fileContent = fromPHP.split(/\n/);
+                }
+                if (typeof fileObj.fileSize === 'number') fileObj.fileSize = fromPHP.length;
+                return fromPHP;
+            }
+        }
+        return content;
     }
     // 写入文件（异步，等待 PHP 操作完成）
     // 支持可选的 writeMod 参数，会传递给底层文件对象的 writeFile 方法

@@ -572,7 +572,7 @@ const APPLICATION_ASSETS = {
             supportsPreview: true,
             category: "game"
         }
-    },
+    }
 };
 
 // 不导出到全局作用域，交由POOL管理
