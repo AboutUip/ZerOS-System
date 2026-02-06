@@ -103,6 +103,12 @@
             "../kernel/filesystem/init.js",
             "../kernel/drive/LStorage.js"
         ],
+
+        // 第十二层：服务扩展（D/server 服务模块管理，依赖文件系统与进程管理器）
+        "../system/expansion/serverExpansion.js": [
+            "../kernel/filesystem/init.js",
+            "../kernel/process/processManager.js"
+        ],
         
         // 第十一层：锁屏界面（依赖用户控制系统和本地存储管理器，高优先级）
         "../system/ui/lockscreen.js": [

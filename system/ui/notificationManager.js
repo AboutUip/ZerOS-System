@@ -557,6 +557,9 @@ class NotificationManager {
         NotificationManager._notificationOverlay = overlay;
         document.body.appendChild(overlay);
         
+        // 点击遮罩层关闭通知栏
+        overlay.addEventListener('click', NotificationManager._handleOverlayClick.bind(NotificationManager));
+        
         // 更新蒙版层位置
         NotificationManager._updateNotificationOverlayPosition();
         
@@ -615,11 +618,8 @@ class NotificationManager {
         // 初始隐藏
         emptyState.style.display = 'none';
         
-        // 添加点击事件：点击空状态区域时关闭通知栏
-        emptyState.addEventListener('click', (e) => {
-            e.stopPropagation();
-            NotificationManager._hideNotificationContainer();
-        });
+        // 阻止点击事件冒泡，避免误触遮罩层或容器空白区域导致关闭
+        emptyState.addEventListener('click', (e) => e.stopPropagation());
         
         if (NotificationManager._notificationContainer) {
             // 将空状态元素插入到容器的最前面，这样在没有通知时会显示在顶部

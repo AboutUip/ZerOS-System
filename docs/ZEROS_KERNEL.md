@@ -78,7 +78,12 @@ ZerOS/
 │   │   └── DISK/          # 虚拟磁盘存储
 │   │       ├── C/         # C: 盘
 │   │       └── D/         # D: 盘
-│   │           └── application/ # 应用程序目录
+│   │           ├── application/ # 应用程序目录
+│   │           ├── plugins/     # 语言包（D/plugins）
+│   │           └── server/      # 服务模块（D/server，server-xxx.js）
+│   ├── expansion/          # 系统扩展
+│   │   ├── languagesExpansion.js # 语言包管理器
+│   │   └── serverExpansion.js   # 服务扩展（D/server 服务管理）
 │   ├── ui/                # UI 模块
 │   │   ├── guiManager.js  # GUI 窗口管理
 │   │   ├── themeManager.js # 主题管理
@@ -113,9 +118,13 @@ ZerOS/
 │   ├── core.css          # 样式文件
 │   └── assets/           # 测试资源
 └── docs/                 # 文档
-    ├── API/              # API文档
-    │   ├── README.md     # API文档索引
-    │   └── ...          # 各模块API文档
+    ├── API/              # API 文档
+    │   ├── README.md     # API 文档索引
+    │   └── ...          # 各模块 API 文档
+    ├── PLUGINS/          # 扩展与插件（语言包、服务模块编写等）
+    │   ├── README.md     # 扩展与插件索引
+    │   ├── LanguagePack.md   # 语言包格式说明
+    │   └── ServiceModule.md  # 服务模块编写指南
     ├── DEVELOPER_GUIDE.md # 开发者指南
     └── ZEROS_KERNEL.md   # 本文档
 ```

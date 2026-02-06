@@ -13,7 +13,7 @@
 
 - **路径**：`D/plugins`（或 `D:/plugins`，取决于分区名）
 - **格式**：每个语言包为一个 JSON 文件，文件名即语言标识，如 `zh-CN.json`、`en.json`
-- 语言包格式说明见 [语言包格式文档](../LanguagePack.md)
+- 语言包格式说明见 [语言包格式文档](../PLUGINS/LanguagePack.md)
 
 ## 数据来源与回落
 
@@ -207,6 +207,6 @@ async __init__(pid, initArgs) {
 
 ## 相关文档
 
-- [语言包格式 (LanguagePack.md)](../LanguagePack.md) - 语言包 JSON 格式与存放说明
+- [语言包格式 (PLUGINS/LanguagePack.md)](../PLUGINS/LanguagePack.md) - 语言包 JSON 格式与存放说明
 - [ProcessManager.md](./ProcessManager.md) - 内核 API 调用方式
 - [PermissionManager.md](./PermissionManager.md) - 权限枚举与级别

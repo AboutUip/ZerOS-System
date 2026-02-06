@@ -8,7 +8,7 @@
 - **实际路径**：在项目文件系统中对应 `system/service/DISK/D/plugins/`
 - **文件命名**：`<locale>.json`，如 `zh-CN.json`、`en.json`，其中 `locale` 为语言标识（如简体中文 `zh-CN`、英文 `en`）
 
-每个语言包是一个独立的 JSON 文件，扩展只负责读取与解析，不负责包内容的业务实现。读取时优先从 NodeTree 读，若节点不存在或读取失败则通过 FSDirve（PHP）回落读取，详见 [LanguagesExpansion API](./API/LanguagesExpansion.md) 的「数据来源与回落」。
+每个语言包是一个独立的 JSON 文件，扩展只负责读取与解析，不负责包内容的业务实现。读取时优先从 NodeTree 读，若节点不存在或读取失败则通过 FSDirve（PHP）回落读取，详见 [LanguagesExpansion API](../API/LanguagesExpansion.md) 的「数据来源与回落」。
 
 ## JSON 格式
 
@@ -70,5 +70,6 @@
 
 ## 相关文档
 
-- [LanguagesExpansion API](./API/LanguagesExpansion.md) - 语言扩展 API 与调用方式
-- [ProcessManager API](./API/ProcessManager.md) - `callKernelAPI` 与内核 API 列表
+- [LanguagesExpansion API](../API/LanguagesExpansion.md) - 语言扩展 API 与调用方式
+- [ProcessManager API](../API/ProcessManager.md) - `callKernelAPI` 与内核 API 列表
+- [扩展与插件索引](./README.md)

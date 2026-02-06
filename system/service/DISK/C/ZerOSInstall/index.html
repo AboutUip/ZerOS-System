@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ZerOS 系统安装 / ZerOS Setup</title>
+    <title>ZerOS 系统安装</title>
     <link rel="stylesheet" href="install.css">
 </head>
 <body>
@@ -11,14 +11,14 @@
     <div class="loading-screen" id="loadingScreen">
         <img src="zeros-logo.svg" alt="ZerOS Logo" class="loading-logo">
         <div class="loading-spinner"></div>
-        <div class="loading-text">正在加载安装程序... / Loading installer...</div>
+        <div class="loading-text" id="loadingText">正在加载安装程序...</div>
     </div>
     
     <div class="install-container">
         <div class="install-header">
             <img src="zeros-logo.svg" alt="ZerOS Logo" class="install-logo">
-            <h1 class="install-title">ZerOS 系统安装程序 / ZerOS Setup</h1>
-            <p class="install-subtitle">欢迎安装 ZerOS 操作系统 / Welcome to ZerOS</p>
+            <h1 class="install-title" id="installTitle">ZerOS 系统安装程序</h1>
+            <p class="install-subtitle" id="installSubtitle">欢迎安装 ZerOS 操作系统</p>
         </div>
         
         <div class="install-content" id="installContent">
@@ -84,62 +84,217 @@
             localStorage.removeItem('install_config');
         }
         
-        // 内置中英双语文案（安装界面同时展示两种语言）
+        // 获取当前安装界面语言（用户选择或默认简体中文）
+        function getCurrentLang() {
+            const config = getInstallConfig();
+            return (config && config.language) ? config.language : 'zh-CN';
+        }
+        
+        // 按当前语言取文案
+        function t(key) {
+            const lang = getCurrentLang();
+            const L = InstallI18n[lang] || InstallI18n['zh-CN'];
+            return (L && L[key] != null) ? L[key] : (InstallI18n['zh-CN'] && InstallI18n['zh-CN'][key]) || key;
+        }
+        
+        // 中英分语言文案（按用户选择动态展示）
         const InstallI18n = {
-            btn_next: '下一步 / Next',
-            btn_back: '上一步 / Back',
-            btn_ok: '确定 / OK',
-            btn_cancel: '取消 / Cancel',
-            btn_reload: '重新加载 / Reload',
-            tip: '提示 / Notice',
-            confirm_title: '确认 / Confirm',
-            error_input: '输入错误 / Invalid Input',
-            error_title: '错误 / Error',
-            warning_title: '警告 / Warning',
-            step_agreement_title: '安装协议 / License Agreement',
-            step_agreement_desc: '请仔细阅读以下协议，同意后方可继续安装。Please read the agreement below and accept to continue.',
-            step_agreement_agree: '同意并继续 / Accept and Continue',
-            step_agreement_back: '上一步 / Back',
-            step_env_title: '环境配置 / Environment',
-            step_env_desc: '请选择您的运行环境并配置端口。Select your runtime and port.',
-            step_env_php: 'PHP 环境 / PHP',
-            step_env_springboot: 'SpringBoot 环境 / SpringBoot',
-            step_env_port: '服务端口：/ Service port:',
-            step_extract_title: '解压系统文件 / Extract System Files',
-            step_extract_desc: '正在解压系统文件，请稍候... / Extracting, please wait...',
-            step_extract_prepare: '准备解压... / Preparing...',
-            step_extract_progress: '进度: / Progress:',
-            step_disk_title: '磁盘初始化 / Disk Setup',
-            step_disk_desc: '配置磁盘分区。系统盘 D: 已固定为 2GB，您可以为其他分区分配剩余空间。Configure partitions. Drive D: is fixed at 2GB; you may allocate the rest.',
-            step_disk_total: '总磁盘大小：/ Total size:',
-            step_disk_system: '系统盘 D:：/ System drive D:',
-            step_disk_fixed: '（固定，不可修改）/ (fixed)',
-            step_disk_available: '可用空间：/ Available:',
-            step_disk_add: '添加新分区 / Add partition',
-            step_disk_name: '分区名称 / Partition',
-            step_disk_size: '分区大小（例如：1GB, 500MB）/ Size (e.g. 1GB, 500MB)',
-            step_disk_placeholder: '例如: 1GB / e.g. 1GB',
-            step_disk_confirm: '确认并继续 / Confirm and Continue',
-            step_disk_system_label: '（系统盘，固定）/ (system, fixed)',
-            step_disk_delete: '删除 / Remove',
-            step_user_title: '用户设置 / User Setup',
-            step_user_desc: '创建系统管理员账户。Create the administrator account.',
-            step_user_username: '用户名 * / Username *',
-            step_user_username_placeholder: '只能使用英文字母、数字和下划线，必须以字母开头 / Letters, numbers, underscore; must start with a letter',
-            step_user_username_hint: '例如：admin, root, user123 / e.g. admin, root, user123',
-            step_user_password: '密码 * / Password *',
-            step_user_password_placeholder: '请输入密码 / Enter password',
-            step_user_password_hint: '密码不能为空 / Password is required',
-            step_user_confirm_pwd: '确认密码 * / Confirm password *',
-            step_user_confirm_placeholder: '请再次输入密码 / Enter password again',
-            step_complete_title: '安装完成！/ Installation Complete!',
-            step_complete_desc: 'ZerOS 系统已成功安装到您的服务器上。ZerOS has been installed successfully.',
-            step_complete_next: '下一步操作 / Next steps',
-            step_complete_1: '1. 重启服务器以确保所有服务正确启动 / Restart the server to start all services.',
-            step_complete_2: '2. 重启后，访问以下地址使用系统：/ Then open the system at:',
-            step_complete_3: '3. 使用您刚刚创建的管理员账户登录系统 / Log in with the administrator account you created.',
-            step_finish_btn: '完成安装并清理文件 / Finish and clean up',
-            countdown_suffix: '秒后自动进入下一步... / Auto-continue in ... sec'
+            'zh-CN': {
+                btn_next: '下一步',
+                btn_back: '上一步',
+                btn_ok: '确定',
+                btn_cancel: '取消',
+                btn_reload: '重新加载',
+                tip: '提示',
+                confirm_title: '确认',
+                error_input: '输入错误',
+                error_title: '错误',
+                warning_title: '警告',
+                step_lang_title: '选择语言',
+                step_lang_desc: '请选择安装界面及系统使用的语言。',
+                step_agreement_title: '安装协议',
+                step_agreement_desc: '请仔细阅读以下协议，同意后方可继续安装。',
+                step_agreement_agree: '同意并继续',
+                step_agreement_back: '上一步',
+                step_env_title: '环境配置',
+                step_env_desc: '请选择您的运行环境并配置端口。',
+                step_env_php: 'PHP 环境',
+                step_env_springboot: 'SpringBoot 环境',
+                step_env_port: '服务端口：',
+                step_extract_title: '解压系统文件',
+                step_extract_desc: '正在解压系统文件，请稍候...',
+                step_extract_prepare: '准备解压...',
+                step_extract_progress: '进度:',
+                step_disk_title: '磁盘初始化',
+                step_disk_desc: '配置磁盘分区。系统盘 D: 已固定为 2GB，您可以为其他分区分配剩余空间。',
+                step_disk_total: '总磁盘大小：',
+                step_disk_system: '系统盘 D:：',
+                step_disk_fixed: '（固定，不可修改）',
+                step_disk_available: '可用空间：',
+                step_disk_add: '添加新分区',
+                step_disk_name: '分区名称',
+                step_disk_size: '分区大小（例如：1GB, 500MB）',
+                step_disk_placeholder: '例如: 1GB',
+                step_disk_confirm: '确认并继续',
+                step_disk_system_label: '（系统盘，固定）',
+                step_disk_delete: '删除',
+                step_user_title: '用户设置',
+                step_user_desc: '创建系统管理员账户。',
+                step_user_username: '用户名 *',
+                step_user_username_placeholder: '只能使用英文字母、数字和下划线，必须以字母开头',
+                step_user_username_hint: '例如：admin, root, user123',
+                step_user_password: '密码 *',
+                step_user_password_placeholder: '请输入密码',
+                step_user_password_hint: '密码不能为空',
+                step_user_confirm_pwd: '确认密码 *',
+                step_user_confirm_placeholder: '请再次输入密码',
+                step_complete_title: '安装完成！',
+                step_complete_desc: 'ZerOS 系统已成功安装到您的服务器上。',
+                step_complete_next: '下一步操作',
+                step_complete_1: '1. 重启服务器以确保所有服务正确启动。',
+                step_complete_2: '2. 重启后，访问以下地址使用系统：',
+                step_complete_3: '3. 使用您刚刚创建的管理员账户登录系统。',
+                step_finish_btn: '完成安装并清理文件',
+                countdown_suffix: ' 秒后自动进入下一步...',
+                status_language_selected: '语言已选择，即将进入协议步骤...',
+                status_agreement_accepted: '协议已确认，即将进入环境配置步骤...',
+                status_env_ok: '环境验证通过，即将开始解压系统文件...',
+                status_disk_ok: '磁盘初始化完成，即将进入用户设置步骤...',
+                status_user_created: '用户创建成功，即将进入完成页面...',
+                status_extract_doing: '正在解压',
+                status_extract_ok: '解压成功',
+                status_extract_fail: '解压失败',
+                status_all_extracted: '所有文件解压完成',
+                status_verifying: '检查系统资源完整性...',
+                status_integrity_ok: '系统资源完整性检查通过',
+                status_extract_done: '系统文件解压完成！请按照以下步骤操作。',
+                status_restart_1: '重启服务器以确保所有文件正确加载。',
+                status_restart_2: '重启完成后，重新访问此安装页面（当前地址）。',
+                status_restart_3: '系统将自动继续到磁盘初始化步骤。',
+                btn_after_restart: '重启服务器后，点击此处继续安装',
+                notice_after_restart: '注意：重启后请务必重新访问此安装页面才能继续安装流程。',
+                btn_adding: '添加中...',
+                btn_initializing_disk: '正在初始化磁盘...',
+                btn_creating_user: '正在创建用户...',
+                btn_cleaning: '正在清理安装文件...',
+                btn_done_redirect: '清理完成，正在跳转...',
+                btn_cleanup_failed_redirect: '清理失败，正在跳转...',
+                error_port_invalid: '请输入有效的端口号（1-65535）',
+                error_connect_failed: '连接失败',
+                error_extract_failed: '解压失败',
+                error_disk_init_failed: '初始化失败',
+                error_user_create_failed: '创建失败',
+                error_partition_info: '请填写完整的分区信息。',
+                error_partition_size: '请输入有效的分区大小（例如：1GB, 500MB）。',
+                error_partition_total: '分区总大小不能超过',
+                error_partition_size_invalid: '请输入有效的分区大小。',
+                error_username_invalid: '用户名只能包含英文字母、数字和下划线，且必须以字母开头。',
+                error_password_required: '密码不能为空。',
+                error_password_mismatch: '两次输入的密码不一致。',
+                confirm_remove_partition: '确定要删除分区',
+                confirm_remove_suffix: '吗？',
+                page_title: 'ZerOS 系统安装',
+                page_subtitle: '欢迎安装 ZerOS 操作系统',
+                loading_text: '正在加载安装程序...'
+            },
+            'en': {
+                btn_next: 'Next',
+                btn_back: 'Back',
+                btn_ok: 'OK',
+                btn_cancel: 'Cancel',
+                btn_reload: 'Reload',
+                tip: 'Notice',
+                confirm_title: 'Confirm',
+                error_input: 'Invalid Input',
+                error_title: 'Error',
+                warning_title: 'Warning',
+                step_lang_title: 'Choose Language',
+                step_lang_desc: 'Please select the language for installation and system.',
+                step_agreement_title: 'License Agreement',
+                step_agreement_desc: 'Please read the agreement below and accept to continue.',
+                step_agreement_agree: 'Accept and Continue',
+                step_agreement_back: 'Back',
+                step_env_title: 'Environment',
+                step_env_desc: 'Select your runtime and port.',
+                step_env_php: 'PHP',
+                step_env_springboot: 'SpringBoot',
+                step_env_port: 'Service port:',
+                step_extract_title: 'Extract System Files',
+                step_extract_desc: 'Extracting, please wait...',
+                step_extract_prepare: 'Preparing...',
+                step_extract_progress: 'Progress:',
+                step_disk_title: 'Disk Setup',
+                step_disk_desc: 'Configure partitions. Drive D: is fixed at 2GB; you may allocate the rest.',
+                step_disk_total: 'Total size:',
+                step_disk_system: 'System drive D:',
+                step_disk_fixed: '(fixed)',
+                step_disk_available: 'Available:',
+                step_disk_add: 'Add partition',
+                step_disk_name: 'Partition',
+                step_disk_size: 'Size (e.g. 1GB, 500MB)',
+                step_disk_placeholder: 'e.g. 1GB',
+                step_disk_confirm: 'Confirm and Continue',
+                step_disk_system_label: '(system, fixed)',
+                step_disk_delete: 'Remove',
+                step_user_title: 'User Setup',
+                step_user_desc: 'Create the administrator account.',
+                step_user_username: 'Username *',
+                step_user_username_placeholder: 'Letters, numbers, underscore; must start with a letter',
+                step_user_username_hint: 'e.g. admin, root, user123',
+                step_user_password: 'Password *',
+                step_user_password_placeholder: 'Enter password',
+                step_user_password_hint: 'Password is required',
+                step_user_confirm_pwd: 'Confirm password *',
+                step_user_confirm_placeholder: 'Enter password again',
+                step_complete_title: 'Installation Complete!',
+                step_complete_desc: 'ZerOS has been installed successfully.',
+                step_complete_next: 'Next steps',
+                step_complete_1: '1. Restart the server to start all services.',
+                step_complete_2: '2. Then open the system at:',
+                step_complete_3: '3. Log in with the administrator account you created.',
+                step_finish_btn: 'Finish and clean up',
+                countdown_suffix: ' sec, auto-continue...',
+                status_language_selected: 'Language selected, entering agreement step...',
+                status_agreement_accepted: 'Agreement accepted, entering environment step...',
+                status_env_ok: 'Environment OK, extracting system files...',
+                status_disk_ok: 'Disk OK, entering user setup...',
+                status_user_created: 'User created, entering completion...',
+                status_extract_doing: 'Extracting',
+                status_extract_ok: 'OK',
+                status_extract_fail: 'Extract failed',
+                status_all_extracted: 'All files extracted',
+                status_verifying: 'Verifying integrity...',
+                status_integrity_ok: 'Integrity OK',
+                status_extract_done: 'Extraction complete. Follow the steps below.',
+                status_restart_1: 'Restart the server to load all files.',
+                status_restart_2: 'Then revisit this page (current URL).',
+                status_restart_3: 'Setup continues to disk initialization.',
+                btn_after_restart: 'After restart, click here to continue',
+                notice_after_restart: 'You must revisit this page after restart to continue.',
+                btn_adding: 'Adding...',
+                btn_initializing_disk: 'Initializing disk...',
+                btn_creating_user: 'Creating user...',
+                btn_cleaning: 'Cleaning up...',
+                btn_done_redirect: 'Done, redirecting...',
+                btn_cleanup_failed_redirect: 'Cleanup failed, redirecting...',
+                error_port_invalid: 'Please enter a valid port (1-65535)',
+                error_connect_failed: 'Connection failed',
+                error_extract_failed: 'Extract failed',
+                error_disk_init_failed: 'Init failed',
+                error_user_create_failed: 'Failed',
+                error_partition_info: 'Please fill in partition name and size.',
+                error_partition_size: 'Enter valid size (e.g. 1GB, 500MB).',
+                error_partition_total: 'Total size cannot exceed',
+                error_partition_size_invalid: 'Enter valid partition size.',
+                error_username_invalid: 'Username: letters, numbers, underscore; must start with a letter.',
+                error_password_required: 'Password is required.',
+                error_password_mismatch: 'Passwords do not match.',
+                confirm_remove_partition: 'Remove partition',
+                confirm_remove_suffix: '?',
+                page_title: 'ZerOS Setup',
+                page_subtitle: 'Welcome to ZerOS',
+                loading_text: 'Loading installer...'
+            }
         };
         
         // API调用函数
@@ -161,10 +316,10 @@
         function showModal(options) {
             return new Promise((resolve) => {
                 const {
-                    title = InstallI18n.tip,
+                    title = t('tip'),
                     message = '',
                     type = 'info', // info, warning, error, success
-                    buttons = [{ text: InstallI18n.btn_ok, primary: true }]
+                    buttons = [{ text: t('btn_ok'), primary: true }]
                 } = options;
                 
                 // 创建遮罩层
@@ -245,33 +400,34 @@
         }
         
         // 简化的 alert 替代函数
-        async function showAlert(message, title = InstallI18n.tip, type = 'info') {
+        async function showAlert(message, title = t('tip'), type = 'info') {
             await showModal({
                 title,
                 message,
                 type,
-                buttons: [{ text: InstallI18n.btn_ok, primary: true }]
+                buttons: [{ text: t('btn_ok'), primary: true }]
             });
         }
         
         // 简化的 confirm 替代函数
-        async function showConfirm(message, title = InstallI18n.confirm_title) {
+        async function showConfirm(message, title = t('confirm_title')) {
             return await showModal({
                 title,
                 message,
                 type: 'warning',
                 buttons: [
-                    { text: InstallI18n.btn_cancel, primary: false, value: false },
-                    { text: InstallI18n.btn_ok, primary: true, value: true }
+                    { text: t('btn_cancel'), primary: false, value: false },
+                    { text: t('btn_ok'), primary: true, value: true }
                 ]
             });
         }
         
         // 步骤0：语言选择
         function renderLanguageStep() {
+            updatePageLang();
             const html = `
-                <h2 class="step-title">选择语言 / Choose Language</h2>
-                <p class="step-description">请选择安装界面及系统使用的语言。Please select the language for installation and system.</p>
+                <h2 class="step-title">${t('step_lang_title')}</h2>
+                <p class="step-description">${t('step_lang_desc')}</p>
                 
                 <div class="language-selection">
                     <div class="language-options">
@@ -287,7 +443,7 @@
                 </div>
                 
                 <div class="btn-container">
-                    <button class="btn btn-primary" onclick="handleLanguageConfirm()">${InstallI18n.btn_next}</button>
+                    <button class="btn btn-primary" onclick="handleLanguageConfirm()">${t('btn_next')}</button>
                 </div>
             `;
             
@@ -310,14 +466,31 @@
             config.language = lang;
             saveInstallConfig(config);
             setCurrentStep(InstallState.STEP_AGREEMENT);
-            showStatusAndAutoRefresh(lang === 'zh-CN' ? '语言已选择，即将进入协议步骤...' : 'Language selected, entering agreement step...', InstallState.STEP_AGREEMENT);
+            showStatusAndAutoRefresh(t('status_language_selected'), InstallState.STEP_AGREEMENT);
+        }
+        
+        // 根据当前语言更新页面标题与头部
+        function updatePageLang() {
+            const lang = getCurrentLang();
+            document.documentElement.lang = lang === 'en' ? 'en' : 'zh-CN';
+            const L = InstallI18n[lang] || InstallI18n['zh-CN'];
+            const title = (L && L.page_title) ? L.page_title : 'ZerOS 系统安装';
+            const subtitle = (L && L.page_subtitle) ? L.page_subtitle : '欢迎安装 ZerOS 操作系统';
+            const loadingText = (L && L.loading_text) ? L.loading_text : '正在加载安装程序...';
+            document.title = title;
+            const titleEl = document.getElementById('installTitle');
+            const subtitleEl = document.getElementById('installSubtitle');
+            const loadingEl = document.getElementById('loadingText');
+            if (titleEl) titleEl.textContent = title;
+            if (subtitleEl) subtitleEl.textContent = subtitle;
+            if (loadingEl) loadingEl.textContent = loadingText;
         }
         
         // 步骤1：协议确认
         function renderAgreementStep() {
             const html = `
-                <h2 class="step-title">${InstallI18n.step_agreement_title}</h2>
-                <p class="step-description">${InstallI18n.step_agreement_desc}</p>
+                <h2 class="step-title">${t('step_agreement_title')}</h2>
+                <p class="step-description">${t('step_agreement_desc')}</p>
                 
                 <div class="agreement-content">
                     <h3>GNU通用公共许可证 (GPL v2)</h3>
@@ -379,8 +552,8 @@
                 </div>
                 
                 <div class="btn-container">
-                    <button class="btn btn-secondary" onclick="handleBackFromAgreement()">${InstallI18n.step_agreement_back}</button>
-                    <button class="btn btn-primary" id="agreeBtn" disabled onclick="handleAgree()">${InstallI18n.step_agreement_agree}</button>
+                    <button class="btn btn-secondary" onclick="handleBackFromAgreement()">${t('step_agreement_back')}</button>
+                    <button class="btn btn-primary" id="agreeBtn" disabled onclick="handleAgree()">${t('step_agreement_agree')}</button>
                 </div>
             `;
             
@@ -396,36 +569,36 @@
         
         function handleAgree() {
             setCurrentStep(InstallState.STEP_ENV_SELECT);
-            showStatusAndAutoRefresh('协议已确认，即将进入环境配置步骤... / Agreement accepted, entering environment step...', InstallState.STEP_ENV_SELECT);
+            showStatusAndAutoRefresh(t('status_agreement_accepted'), InstallState.STEP_ENV_SELECT);
         }
         
         // 步骤2：环境选择
         function renderEnvSelectStep() {
             const html = `
-                <h2 class="step-title">${InstallI18n.step_env_title}</h2>
-                <p class="step-description">${InstallI18n.step_env_desc}</p>
+                <h2 class="step-title">${t('step_env_title')}</h2>
+                <p class="step-description">${t('step_env_desc')}</p>
                 
                 <div class="env-selection">
                     <div class="env-options">
                         <div class="env-option" onclick="selectEnv('php')">
                             <input type="radio" name="env" value="php" id="env-php" checked>
-                            <label for="env-php">${InstallI18n.step_env_php}</label>
+                            <label for="env-php">${t('step_env_php')}</label>
                         </div>
                         <div class="env-option" onclick="selectEnv('springboot')">
                             <input type="radio" name="env" value="springboot" id="env-springboot">
-                            <label for="env-springboot">${InstallI18n.step_env_springboot}</label>
+                            <label for="env-springboot">${t('step_env_springboot')}</label>
                         </div>
                     </div>
                     
                     <div class="env-port-input">
-                        <label>${InstallI18n.step_env_port}</label>
+                        <label>${t('step_env_port')}</label>
                         <input type="number" id="portInput" value="8089" min="1" max="65535">
                     </div>
                 </div>
                 
                 <div class="btn-container">
-                    <button class="btn btn-secondary" onclick="handleBack()">${InstallI18n.btn_back}</button>
-                    <button class="btn btn-primary" onclick="handleEnvConfirm()">${InstallI18n.btn_next}</button>
+                    <button class="btn btn-secondary" onclick="handleBack()">${t('btn_back')}</button>
+                    <button class="btn btn-primary" onclick="handleEnvConfirm()">${t('btn_next')}</button>
                 </div>
             `;
             
@@ -445,7 +618,7 @@
             const port = parseInt(document.getElementById('portInput').value);
             
             if (!port || port < 1 || port > 65535) {
-                await showAlert('请输入有效的端口号（1-65535） / Please enter a valid port (1-65535)', InstallI18n.error_input, 'warning');
+                await showAlert(t('error_port_invalid'), t('error_input'), 'warning');
                 return;
             }
             
@@ -474,21 +647,21 @@
                         if (data.status === 'success') {
                             // 环境验证通过，重新加载
                             setCurrentStep(InstallState.STEP_EXTRACT);
-                            showStatusAndAutoRefresh('环境验证通过，即将开始解压系统文件... / Environment OK, extracting system files...', InstallState.STEP_EXTRACT);
+                            showStatusAndAutoRefresh(t('status_env_ok'), InstallState.STEP_EXTRACT);
                             return;
                         } else {
                             throw new Error('PHP服务响应异常');
                         }
                     } else {
                         setCurrentStep(InstallState.STEP_EXTRACT);
-                        showStatusAndAutoRefresh('环境验证通过，即将开始解压系统文件... / Environment OK, extracting system files...', InstallState.STEP_EXTRACT);
+                        showStatusAndAutoRefresh(t('status_env_ok'), InstallState.STEP_EXTRACT);
                         return;
                     }
                 } else {
                     throw new Error(`HTTP ${response.status}: ${response.statusText}`);
                 }
             } catch (error) {
-                await showAlert(`无法连接到 ${testUrl}\n请确保${env === 'php' ? 'PHP' : 'SpringBoot'}服务正在运行，并且端口配置正确。\n\nCannot connect. Ensure ${env === 'php' ? 'PHP' : 'SpringBoot'} is running and port is correct.\n\nError: ${error.message}`, '连接失败 / Connection failed', 'error');
+                await showAlert(`无法连接到 ${testUrl}\n请确保${env === 'php' ? 'PHP' : 'SpringBoot'}服务正在运行，并且端口配置正确。\n\nCannot connect. Ensure ${env === 'php' ? 'PHP' : 'SpringBoot'} is running and port is correct.\n\nError: ${error.message}`, t('error_connect_failed'), 'error');
             }
         }
         
@@ -514,20 +687,20 @@
             const extractUrl = 'install-extract.php';
             
             const html = `
-                <h2 class="step-title">${InstallI18n.step_extract_title}</h2>
-                <p class="step-description">${InstallI18n.step_extract_desc}</p>
+                <h2 class="step-title">${t('step_extract_title')}</h2>
+                <p class="step-description">${t('step_extract_desc')}</p>
                 
                 <div class="progress-container">
                     <div class="progress-bar">
                         <div class="progress-fill" id="progressFill" style="width: 0%">0%</div>
                     </div>
-                    <div class="progress-text" id="progressText">${InstallI18n.step_extract_prepare}</div>
+                    <div class="progress-text" id="progressText">${t('step_extract_prepare')}</div>
                 </div>
                 
                 <div class="progress-status" id="progressStatus"></div>
                 
                 <div class="btn-container" id="extractBtnContainer" style="display: none;">
-                    <button class="btn btn-secondary" onclick="location.reload()">${InstallI18n.btn_reload}</button>
+                    <button class="btn btn-secondary" onclick="location.reload()">${t('btn_reload')}</button>
                 </div>
             `;
             
@@ -546,7 +719,7 @@
             
             for (let i = 0; i < steps.length; i++) {
                 const step = steps[i];
-                addStatus(`正在解压 ${step.name}... / Extracting ${step.name}...`, 'info');
+                addStatus(`${t('status_extract_doing')} ${step.name}...`, 'info');
                 updateProgress(step.progress - 10);
                 
                 try {
@@ -558,44 +731,44 @@
                     await sleep(500); // 人工减速
                     
                     if (result.status === 'success') {
-                        addStatus(`${step.name} 解压成功 / ${step.name} OK`, 'success');
+                        addStatus(`${step.name} ${t('status_extract_ok')}`, 'success');
                         updateProgress(step.progress);
                     } else {
-                        addStatus(`${step.name} 解压失败 / failed: ${result.message}`, 'error');
+                        addStatus(`${step.name} ${t('status_extract_fail')}: ${result.message}`, 'error');
                         throw new Error(result.message);
                     }
                 } catch (error) {
-                    addStatus(`解压失败 / Extract failed: ${error.message}`, 'error');
-                    await showAlert(`解压 ${step.name} 时发生错误：${error.message}\n\nExtract error: ${error.message}`, '解压失败 / Extract failed', 'error');
+                    addStatus(`${t('status_extract_fail')}: ${error.message}`, 'error');
+                    await showAlert(`解压 ${step.name} 时发生错误：${error.message}\n\nExtract error: ${error.message}`, t('error_extract_failed'), 'error');
                     return;
                 }
             }
             
-            addStatus('所有文件解压完成 / All files extracted', 'success');
+            addStatus(t('status_all_extracted'), 'success');
             updateProgress(100);
             
             await sleep(500);
-            addStatus('检查系统资源完整性... / Verifying integrity...', 'info');
+            addStatus(t('status_verifying'), 'info');
             await sleep(500);
-            addStatus('系统资源完整性检查通过 / Integrity OK', 'success');
+            addStatus(t('status_integrity_ok'), 'success');
             
             await sleep(1000);
             addStatus('', 'info');
-            addStatus('系统文件解压完成！请按照以下步骤操作。 / Extraction complete. Follow the steps below.', 'success');
-            addStatus('1. 重启服务器以确保所有文件正确加载 / Restart the server to load all files.', 'info');
-            addStatus('2. 重启完成后，重新访问此安装页面（当前地址）/ Then revisit this page (current URL).', 'info');
-            addStatus('3. 系统将自动继续到磁盘初始化步骤 / Setup will continue to disk initialization.', 'info');
+            addStatus(t('status_extract_done'), 'success');
+            addStatus('1. ' + t('status_restart_1'), 'info');
+            addStatus('2. ' + t('status_restart_2'), 'info');
+            addStatus('3. ' + t('status_restart_3'), 'info');
             
             const restartHtml = `
                 <div style="background: #faf9f8; border: 1px solid #edebe9; border-radius: 4px; padding: 20px; margin-top: 20px;">
-                    <h3 style="color: #323130; margin-bottom: 15px; font-weight: 600;">${InstallI18n.step_complete_next}</h3>
+                    <h3 style="color: #323130; margin-bottom: 15px; font-weight: 600;">${t('step_complete_next')}</h3>
                     <ol style="color: #323130; line-height: 1.8; margin-left: 20px;">
-                        <li>重启服务器以确保所有文件正确加载 / Restart the server to load all files.</li>
-                        <li>重启完成后，重新访问此安装页面（当前地址）/ Then revisit this page.</li>
-                        <li>系统将自动继续到磁盘初始化步骤 / Setup continues to disk initialization.</li>
+                        <li>${t('status_restart_1')}</li>
+                        <li>${t('status_restart_2')}</li>
+                        <li>${t('status_restart_3')}</li>
                     </ol>
                     <p style="color: #605e5c; margin-top: 15px; font-size: 13px;">
-                        注意：重启后请务必重新访问此安装页面才能继续安装流程。 / You must revisit this page after restart to continue.
+                        ${t('notice_after_restart')}
                     </p>
                 </div>
             `;
@@ -603,7 +776,7 @@
             
             document.getElementById('extractBtnContainer').style.display = 'flex';
             document.getElementById('extractBtnContainer').innerHTML = `
-                <button class="btn btn-primary" onclick="setCurrentStep('${InstallState.STEP_DISK_INIT}'); location.reload();">重启服务器后，点击此处继续安装 / After restart, click here to continue</button>
+                <button class="btn btn-primary" onclick="setCurrentStep('${InstallState.STEP_DISK_INIT}'); location.reload();">${t('btn_after_restart')}</button>
             `;
             
             function addStatus(message, type = 'info') {
@@ -619,7 +792,7 @@
                 const text = document.getElementById('progressText');
                 fill.style.width = percent + '%';
                 fill.textContent = percent + '%';
-                text.textContent = `${InstallI18n.step_extract_progress} ${percent}%`;
+                text.textContent = `${t('step_extract_progress')} ${percent}%`;
             }
         }
         
@@ -676,41 +849,41 @@
             const partitionOptionsHtml = genPartOptions(partitions);
             
             const html = `
-                <h2 class="step-title">${InstallI18n.step_disk_title}</h2>
-                <p class="step-description">${InstallI18n.step_disk_desc}</p>
+                <h2 class="step-title">${t('step_disk_title')}</h2>
+                <p class="step-description">${t('step_disk_desc')}</p>
                 
                 <div class="partition-manager">
                     <div class="partition-info">
-                        <div><strong>${InstallI18n.step_disk_total}</strong>${formatBytes(totalSize)}</div>
-                        <div><strong>${InstallI18n.step_disk_system}</strong>${formatBytes(systemSize)} ${InstallI18n.step_disk_fixed}</div>
-                        <div><strong>${InstallI18n.step_disk_available}</strong>${formatBytes(remaining)}</div>
+                        <div><strong>${t('step_disk_total')}</strong>${formatBytes(totalSize)}</div>
+                        <div><strong>${t('step_disk_system')}</strong>${formatBytes(systemSize)} ${t('step_disk_fixed')}</div>
+                        <div><strong>${t('step_disk_available')}</strong>${formatBytes(remaining)}</div>
                     </div>
                     
                     <div class="partition-list" id="partitionList"></div>
                     
                     <div class="add-partition-section">
-                        <h4 style="color: #323130; margin-bottom: 15px; font-weight: 600;">${InstallI18n.step_disk_add}</h4>
+                        <h4 style="color: #323130; margin-bottom: 15px; font-weight: 600;">${t('step_disk_add')}</h4>
                         <div class="add-partition-form">
                             <div class="form-group">
-                                <label>${InstallI18n.step_disk_name}</label>
+                                <label>${t('step_disk_name')}</label>
                                 <select id="newPartitionName">
                                     ${partitionOptionsHtml}
                                 </select>
                             </div>
                             <div class="form-group">
-                                <label>${InstallI18n.step_disk_size}</label>
-                                <input type="text" id="newPartitionSize" placeholder="${InstallI18n.step_disk_placeholder}">
+                                <label>${t('step_disk_size')}</label>
+                                <input type="text" id="newPartitionSize" placeholder="${t('step_disk_placeholder')}">
                             </div>
                             <div class="form-group">
-                                <button class="btn btn-primary btn-small" onclick="addPartition()">${InstallI18n.step_disk_add}</button>
+                                <button class="btn btn-primary btn-small" onclick="addPartition()">${t('step_disk_add')}</button>
                             </div>
                         </div>
                     </div>
                 </div>
                 
                 <div class="btn-container">
-                    <button class="btn btn-secondary" onclick="location.reload()">${InstallI18n.btn_reload}</button>
-                    <button class="btn btn-primary" onclick="handleDiskConfirm()">${InstallI18n.step_disk_confirm}</button>
+                    <button class="btn btn-secondary" onclick="location.reload()">${t('btn_reload')}</button>
+                    <button class="btn btn-primary" onclick="handleDiskConfirm()">${t('step_disk_confirm')}</button>
                 </div>
             `;
             
@@ -747,10 +920,10 @@
                                    ${isSystem ? 'disabled' : ''} 
                                    data-partition="${name}"
                                    onchange="updatePartitionSize('${name}', this.value)">
-                            <span class="partition-size-label">${isSystem ? InstallI18n.step_disk_system_label : ''}</span>
+                            <span class="partition-size-label">${isSystem ? t('step_disk_system_label') : ''}</span>
                         </div>
                         ${!isSystem ? `<div class="partition-actions">
-                            <button class="btn btn-danger btn-small" onclick="removePartition('${name}')">${InstallI18n.step_disk_delete}</button>
+                            <button class="btn btn-danger btn-small" onclick="removePartition('${name}')">${t('step_disk_delete')}</button>
                         </div>` : ''}
                     `;
                     list.appendChild(item);
@@ -790,13 +963,13 @@
             const sizeStr = document.getElementById('newPartitionSize').value;
             
             if (!name || !sizeStr) {
-                await showAlert('请填写完整的分区信息 / Please fill in partition name and size.', InstallI18n.error_input, 'warning');
+                await showAlert(t('error_partition_info'), t('error_input'), 'warning');
                 return;
             }
             
             const size = parseBytes(sizeStr);
             if (!size || size <= 0) {
-                await showAlert('请输入有效的分区大小（例如：1GB, 500MB） / Enter valid size (e.g. 1GB, 500MB).', InstallI18n.error_input, 'warning');
+                await showAlert(t('error_partition_size'), t('error_input'), 'warning');
                 return;
             }
             
@@ -804,7 +977,7 @@
             Object.values(window.partitions).forEach(s => allocated += s);
             
             if (allocated + size > window.totalSize) {
-                await showAlert(`分区总大小不能超过 ${formatBytes(window.totalSize)} / Total size cannot exceed ${formatBytes(window.totalSize)}.`, '分区大小错误 / Invalid size', 'warning');
+                await showAlert(`${t('error_partition_total')} ${formatBytes(window.totalSize)}.`, t('error_input'), 'warning');
                 return;
             }
             
@@ -816,7 +989,7 @@
             const originalText = addBtn ? addBtn.textContent : '';
             if (addBtn) {
                 addBtn.disabled = true;
-                addBtn.textContent = '添加中... / Adding...';
+                addBtn.textContent = t('btn_adding');
                 addBtn.style.opacity = '0.6';
                 addBtn.style.cursor = 'not-allowed';
             }
@@ -847,7 +1020,7 @@
         async function updatePartitionSize(name, sizeStr) {
             const size = parseBytes(sizeStr);
             if (!size || size <= 0) {
-                await showAlert('请输入有效的分区大小 / Enter valid partition size.', InstallI18n.error_input, 'warning');
+                await showAlert(t('error_partition_size_invalid'), t('error_input'), 'warning');
                 window.renderPartitions();
                 return;
             }
@@ -858,7 +1031,7 @@
             });
             
             if (allocated + size > window.totalSize) {
-                await showAlert(`分区总大小不能超过 ${formatBytes(window.totalSize)} / Total cannot exceed ${formatBytes(window.totalSize)}.`, '分区大小错误 / Invalid size', 'warning');
+                await showAlert(`${t('error_partition_total')} ${formatBytes(window.totalSize)}.`, t('error_input'), 'warning');
                 window.renderPartitions();
                 return;
             }
@@ -867,7 +1040,7 @@
         }
         
         async function removePartition(name) {
-            const confirmed = await showConfirm(`确定要删除分区 ${name} 吗？ / Remove partition ${name}?`, '确认删除 / Confirm remove');
+            const confirmed = await showConfirm(`${t('confirm_remove_partition')} ${name} ${t('confirm_remove_suffix')}`, t('confirm_title'));
             if (confirmed) {
                 delete window.partitions[name];
                 window.renderPartitions();
@@ -899,7 +1072,7 @@
             const originalText = confirmBtn ? confirmBtn.textContent : '';
             if (confirmBtn) {
                 confirmBtn.disabled = true;
-                confirmBtn.textContent = '正在初始化磁盘... / Initializing disk...';
+                confirmBtn.textContent = t('btn_initializing_disk');
                 confirmBtn.style.opacity = '0.6';
                 confirmBtn.style.cursor = 'not-allowed';
             }
@@ -912,9 +1085,9 @@
                 
                 if (result.status === 'success') {
                     setCurrentStep(InstallState.STEP_USER_SETUP);
-                    showStatusAndAutoRefresh('磁盘初始化完成，即将进入用户设置步骤... / Disk OK, entering user setup...', InstallState.STEP_USER_SETUP);
+                    showStatusAndAutoRefresh(t('status_disk_ok'), InstallState.STEP_USER_SETUP);
                 } else {
-                    await showAlert(`磁盘初始化失败：${result.message} / Disk init failed: ${result.message}`, '初始化失败 / Init failed', 'error');
+                    await showAlert(`磁盘初始化失败：${result.message} / Disk init failed: ${result.message}`, t('error_disk_init_failed'), 'error');
                     // 恢复按钮状态
                     isConfirmingDisk = false;
                     if (confirmBtn) {
@@ -925,7 +1098,7 @@
                     }
                 }
             } catch (error) {
-                await showAlert(`磁盘初始化失败：${error.message} / Disk init failed: ${error.message}`, '初始化失败 / Init failed', 'error');
+                await showAlert(`磁盘初始化失败：${error.message} / Disk init failed: ${error.message}`, t('error_disk_init_failed'), 'error');
                 isConfirmingDisk = false;
                 if (confirmBtn) {
                     confirmBtn.disabled = false;
@@ -1097,31 +1270,31 @@
         // 步骤5：用户设置
         function renderUserSetupStep() {
             const html = `
-                <h2 class="step-title">${InstallI18n.step_user_title}</h2>
-                <p class="step-description">${InstallI18n.step_user_desc}</p>
+                <h2 class="step-title">${t('step_user_title')}</h2>
+                <p class="step-description">${t('step_user_desc')}</p>
                 
                 <div class="user-form">
                     <div class="form-group">
-                        <label>${InstallI18n.step_user_username}</label>
-                        <input type="text" id="usernameInput" placeholder="${InstallI18n.step_user_username_placeholder}">
-                        <div class="form-hint">${InstallI18n.step_user_username_hint}</div>
+                        <label>${t('step_user_username')}</label>
+                        <input type="text" id="usernameInput" placeholder="${t('step_user_username_placeholder')}">
+                        <div class="form-hint">${t('step_user_username_hint')}</div>
                     </div>
                     
                     <div class="form-group">
-                        <label>${InstallI18n.step_user_password}</label>
-                        <input type="password" id="passwordInput" placeholder="${InstallI18n.step_user_password_placeholder}">
-                        <div class="form-hint">${InstallI18n.step_user_password_hint}</div>
+                        <label>${t('step_user_password')}</label>
+                        <input type="password" id="passwordInput" placeholder="${t('step_user_password_placeholder')}">
+                        <div class="form-hint">${t('step_user_password_hint')}</div>
                     </div>
                     
                     <div class="form-group">
-                        <label>${InstallI18n.step_user_confirm_pwd}</label>
-                        <input type="password" id="passwordConfirmInput" placeholder="${InstallI18n.step_user_confirm_placeholder}">
+                        <label>${t('step_user_confirm_pwd')}</label>
+                        <input type="password" id="passwordConfirmInput" placeholder="${t('step_user_confirm_placeholder')}">
                     </div>
                 </div>
                 
                 <div class="btn-container">
-                    <button class="btn btn-secondary" onclick="location.reload()">${InstallI18n.btn_reload}</button>
-                    <button class="btn btn-primary" onclick="handleUserConfirm()">${InstallI18n.btn_next}</button>
+                    <button class="btn btn-secondary" onclick="location.reload()">${t('btn_reload')}</button>
+                    <button class="btn btn-primary" onclick="handleUserConfirm()">${t('btn_next')}</button>
                 </div>
             `;
             
@@ -1142,17 +1315,17 @@
             const passwordConfirm = document.getElementById('passwordConfirmInput').value;
             
             if (!username || !/^[a-zA-Z][a-zA-Z0-9_]*$/.test(username)) {
-                await showAlert('用户名只能包含英文字母、数字和下划线，且必须以字母开头 / Username: letters, numbers, underscore; must start with a letter.', InstallI18n.error_input, 'warning');
+                await showAlert(t('error_username_invalid'), t('error_input'), 'warning');
                 return;
             }
             
             if (!password) {
-                await showAlert('密码不能为空 / Password is required.', InstallI18n.error_input, 'warning');
+                await showAlert(t('error_password_required'), t('error_input'), 'warning');
                 return;
             }
             
             if (password !== passwordConfirm) {
-                await showAlert('两次输入的密码不一致 / Passwords do not match.', InstallI18n.error_input, 'warning');
+                await showAlert(t('error_password_mismatch'), t('error_input'), 'warning');
                 return;
             }
             
@@ -1169,7 +1342,7 @@
             const originalText = confirmBtn ? confirmBtn.textContent : '';
             if (confirmBtn) {
                 confirmBtn.disabled = true;
-                confirmBtn.textContent = '正在创建用户... / Creating user...';
+                confirmBtn.textContent = t('btn_creating_user');
                 confirmBtn.style.opacity = '0.6';
                 confirmBtn.style.cursor = 'not-allowed';
             }
@@ -1187,9 +1360,9 @@
                 
                 if (result.status === 'success') {
                     setCurrentStep(InstallState.STEP_COMPLETE);
-                    showStatusAndAutoRefresh('用户创建成功，即将进入完成页面... / User created, entering completion...', InstallState.STEP_COMPLETE);
+                    showStatusAndAutoRefresh(t('status_user_created'), InstallState.STEP_COMPLETE);
                 } else {
-                    await showAlert(`用户创建失败：${result.message} / User creation failed: ${result.message}`, '创建失败 / Failed', 'error');
+                    await showAlert(`用户创建失败：${result.message} / User creation failed: ${result.message}`, t('error_user_create_failed'), 'error');
                     // 恢复按钮状态
                     isCreatingUser = false;
                     if (confirmBtn) {
@@ -1200,7 +1373,7 @@
                     }
                 }
             } catch (error) {
-                await showAlert(`用户创建失败：${error.message} / User creation failed: ${error.message}`, '创建失败 / Failed', 'error');
+                await showAlert(`用户创建失败：${error.message} / User creation failed: ${error.message}`, t('error_user_create_failed'), 'error');
                 // 恢复按钮状态
                 isCreatingUser = false;
                 if (confirmBtn) {
@@ -1221,23 +1394,23 @@
             const html = `
                 <div class="completion-message">
                     <div class="completion-icon">✓</div>
-                    <h2 class="completion-title">${InstallI18n.step_complete_title}</h2>
+                    <h2 class="completion-title">${t('step_complete_title')}</h2>
                     <p class="completion-description">
-                        ${InstallI18n.step_complete_desc}
+                        ${t('step_complete_desc')}
                     </p>
                     
                     <div class="completion-info">
-                        <h4>${InstallI18n.step_complete_next}</h4>
-                        <p>${InstallI18n.step_complete_1}</p>
-                        <p>${InstallI18n.step_complete_2}</p>
+                        <h4>${t('step_complete_next')}</h4>
+                        <p>${t('step_complete_1')}</p>
+                        <p>${t('step_complete_2')}</p>
                         <p style="margin-left: 20px; color: #0078d4; font-weight: 600;">
                             ${baseUrl}/test/index.html
                         </p>
-                        <p>${InstallI18n.step_complete_3}</p>
+                        <p>${t('step_complete_3')}</p>
                     </div>
                     
                     <div class="btn-container">
-                        <button class="btn btn-primary" id="finishBtn" onclick="handleFinishInstall('${baseUrl}', '${serviceUrl}')">${InstallI18n.step_finish_btn}</button>
+                        <button class="btn btn-primary" id="finishBtn" onclick="handleFinishInstall('${baseUrl}', '${serviceUrl}')">${t('step_finish_btn')}</button>
                     </div>
                 </div>
             `;
@@ -1249,7 +1422,7 @@
             const btn = document.getElementById('finishBtn');
             if (btn) {
                 btn.disabled = true;
-                btn.textContent = '正在清理安装文件... / Cleaning up...';
+                btn.textContent = t('btn_cleaning');
             }
             
             // 清理安装文件
@@ -1264,7 +1437,7 @@
                 
                 // 延迟一下，确保用户看到清理完成
                 if (btn) {
-                    btn.textContent = '清理完成，正在跳转... / Done, redirecting...';
+                    btn.textContent = t('btn_done_redirect');
                 }
                 setTimeout(() => {
                     location.href = baseUrl + '/test/index.html';
@@ -1274,9 +1447,9 @@
                 // 即使清理失败，也清除本地存储并跳转
                 clearInstallData();
                 if (btn) {
-                    btn.textContent = '清理失败，正在跳转... / Cleanup failed, redirecting...';
+                    btn.textContent = t('btn_cleanup_failed_redirect');
                 }
-                await showAlert('清理安装文件时出现错误，但安装已完成。您可以稍后手动删除安装目录。\n\nCleanup had errors but installation is complete. You may delete the setup folder later.\n\n正在跳转到系统... / Redirecting...', '清理警告 / Cleanup warning', 'warning');
+                await showAlert('清理安装文件时出现错误，但安装已完成。您可以稍后手动删除安装目录。\n\nCleanup had errors but installation is complete. You may delete the setup folder later.\n\n正在跳转到系统... / Redirecting...', t('warning_title'), 'warning');
                 setTimeout(() => {
                     location.href = baseUrl + '/test/index.html';
                 }, 1000);
@@ -1291,11 +1464,11 @@
                 btnContainer.style.display = 'none';
             }
             
-            // 显示状态提示
+            // 显示状态提示（按当前语言）
             let countdown = delay / 1000;
             const hintHtml = `
                 <div class="auto-next-hint">
-                    ${statusText} <span class="countdown">${countdown}</span> 秒后自动进入下一步... / Auto-continue in <span class="countdown">${countdown}</span> sec
+                    ${statusText} <span class="countdown">${countdown}</span>${t('countdown_suffix')}
                 </div>
             `;
             const contentDiv = document.getElementById('installContent');
@@ -1330,6 +1503,7 @@
         
         // 主函数：根据当前步骤渲染相应界面
         function init() {
+            updatePageLang();
             // 显示加载动画
             const loadingScreen = document.getElementById('loadingScreen');
             if (loadingScreen) {
@@ -1347,6 +1521,7 @@
         }
         
         function renderStep() {
+            updatePageLang();
             const step = getCurrentStep();
             
             switch (step) {

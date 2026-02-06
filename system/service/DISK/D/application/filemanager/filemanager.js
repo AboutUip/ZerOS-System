@@ -2893,12 +2893,10 @@ this.fileCountText.textContent = this._getText('FM_ITEMS_COUNT_FOUND', '找到 {
                 const itemElement = this._createFileListItem(item);
                 this.fileListElement.appendChild(itemElement);
                 
-                // 在元素添加到 DOM 后启用拖拽（仅在非选择器模式下）
+                // 在元素添加到 DOM 后立即启用拖拽（仅在非选择器模式下）
+                // 同步调用避免被后续的 _renderFileList 清空列表后 setTimeout 才执行导致元素已脱离 DOM
                 if (!this._isFileSelectorMode && !this._isFolderSelectorMode) {
-                    // 使用 setTimeout 确保元素已完全添加到 DOM
-                    setTimeout(() => {
-                        this._enableItemDrag(itemElement, item);
-                    }, 0);
+                    this._enableItemDrag(itemElement, item);
                 }
             }
         },

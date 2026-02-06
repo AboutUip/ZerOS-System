@@ -19,6 +19,7 @@
 ### 快速导航
 - [快速导航](#-快速导航)
   - [入门文档](#-入门文档)
+  - [扩展与插件](#-扩展与插件)
   - [API 参考文档](#-api-参考文档)
     - [核心系统 API](#-核心系统-api必读)
     - [存储与内存 API](#-存储与内存-api)
@@ -57,6 +58,14 @@
 | [内核开发指南](./KERNEL_DEVELOPER_GUIDE.md) | 内核模块开发指南，从入门到精通 | ⭐⭐⭐⭐⭐ |
 | [内核文档](./ZEROS_KERNEL.md) | 深入理解 ZerOS 内核架构和设计原理 | ⭐⭐⭐⭐ |
 | [系统流程文档](./SYSTEM_FLOW.md) | 系统启动、程序启动/结束、内核交互、权限控制等核心流程详解 | ⭐⭐⭐⭐⭐ |
+
+### 🔌 扩展与插件
+
+| 文档 | 描述 |
+|------|------|
+| [扩展与插件索引 (PLUGINS)](./PLUGINS/README.md) | 语言包、服务模块等扩展的编写与使用说明 |
+| [语言包格式](./PLUGINS/LanguagePack.md) | D/plugins 语言包存放位置与 JSON 格式 |
+| [服务模块编写](./PLUGINS/ServiceModule.md) | D/server 服务模块命名、接口约定与生命周期 |
 
 ### 🔧 API 参考文档
 
@@ -139,6 +148,13 @@
 | [SpeechDrive](./API/SpeechDrive.md) | 语音识别驱动（基于 Web Speech API） | ✅ |
 | [MultithreadingDrive](./API/MultithreadingDrive.md) | 并发处理 | ✅ |
 
+#### 🔌 系统扩展 API
+
+| API | 描述 | 状态 |
+|-----|------|------|
+| [LanguagesExpansion](./API/LanguagesExpansion.md) | 语言包管理器（加载/设置语言、按常量名获取文本） | ✅ |
+| [ServerExpansion](./API/ServerExpansion.md) | 服务扩展（D/server 服务模块管理、start/stop 生命周期） | ✅ |
+
 ---
 
 ## 🎯 使用指南
@@ -158,6 +174,7 @@
 | **文件操作** | [FileFramework](./API/FileFramework.md) + [FSDirve](./API/FSDirve.md) + [SystemInformation](./API/SystemInformation.md) |
 | **数据存储** | [LStorage](./API/LStorage.md) + [CacheDrive](./API/CacheDrive.md) |
 | **权限管理** | [PermissionManager](./API/PermissionManager.md) |
+| **扩展/插件** | [扩展与插件索引](./PLUGINS/README.md)（语言包、服务模块编写） |
 
 ### ❓ 遇到问题时
 
@@ -203,6 +220,7 @@
 - [内核文档](./ZEROS_KERNEL.md)
 - [系统流程文档](./SYSTEM_FLOW.md)
 - [API 文档索引](./API/README.md)
+- [扩展与插件 (PLUGINS)](./PLUGINS/README.md)
 
 ---
 

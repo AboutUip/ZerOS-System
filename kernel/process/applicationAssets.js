@@ -484,6 +484,23 @@ const APPLICATION_ASSETS = {
             category: "system"
         }
     },
+
+    "servicemanager": {
+        script: "D:/application/servicemanager/servicemanager.js",
+        styles: ["D:/application/servicemanager/servicemanager.css"],
+        icon: "D:/application/servicemanager/servicemanager.svg",
+        metadata: {
+            autoStart: false,
+            priority: 3,
+            description: "系统服务管理",
+            version: "1.0.0",
+            type: "GUI",
+            alwaysShowInTaskbar: false,
+            allowMultipleInstances: false,
+            supportsPreview: true,
+            category: "system"
+        }
+    },
     
     "scheduletask": {
         script: "D:/application/scheduletask/scheduletask.js",
