@@ -53,6 +53,24 @@ class SystemInformation {
         }
     ];
     
+    // 赞助商信息（名称、链接、描述可选）
+    static SPONSORS = [
+        {
+            name: 'AxtTeam',
+            link: 'https://uapis.cn/',
+            description: 'API赞助'
+        }
+    ];
+    
+    // 合作伙伴信息（名称、链接、描述可选）
+    static PARTNERS = [
+        {
+            name: 'mc-yzy15',
+            link: 'https://github.com/mc-yzy15',
+            description: '部分ZOM程序合作'
+        }
+    ];
+    
     // 系统 Logo 路径（相对于 test/index.html）
     static LOGO_PATH = 'zeros-logo.svg';
     
@@ -352,6 +370,22 @@ class SystemInformation {
     }
     
     /**
+     * 获取赞助商列表
+     * @returns {Array<Object>} 赞助商数组 { name, link?, description? }
+     */
+    static getSponsors() {
+        return SystemInformation.SPONSORS || [];
+    }
+    
+    /**
+     * 获取合作伙伴列表
+     * @returns {Array<Object>} 合作伙伴数组 { name, link?, description? }
+     */
+    static getPartners() {
+        return SystemInformation.PARTNERS || [];
+    }
+    
+    /**
      * 获取 Logo 路径
      * @returns {string} Logo 路径
      */
@@ -371,7 +405,9 @@ class SystemInformation {
             buildDate: SystemInformation.getBuildDate(),
             description: SystemInformation.getSystemDescription(),
             logoPath: SystemInformation.getLogoPath(),
-            developers: SystemInformation.getDevelopers()
+            developers: SystemInformation.getDevelopers(),
+            sponsors: SystemInformation.getSponsors(),
+            partners: SystemInformation.getPartners()
         };
     }
     

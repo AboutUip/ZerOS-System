@@ -45,6 +45,8 @@
                 height: 700px;
                 min-width: 600px;
                 min-height: 500px;
+                max-width: 100%;
+                box-sizing: border-box;
             `;
             
             // 使用GUIManager注册窗口
@@ -116,31 +118,43 @@
             content.className = 'about-content';
             content.style.cssText = `
                 width: 100%;
+                min-width: 0;
                 height: 100%;
                 overflow-y: auto;
-                padding: 40px;
+                padding: 24px 32px 40px;
                 box-sizing: border-box;
                 display: flex;
                 flex-direction: column;
-                align-items: center;
-                gap: 30px;
+                align-items: stretch;
+                gap: 24px;
             `;
             
-            // Logo 区域
+            // 顶部：Logo + 名称 + 描述
             const logoSection = this._createLogoSection();
             content.appendChild(logoSection);
             
-            // 系统信息区域
-            const systemInfoSection = this._createSystemInfoSection();
-            content.appendChild(systemInfoSection);
-            
-            // 开发者信息区域
-            const developerSection = this._createDeveloperSection();
-            content.appendChild(developerSection);
-            
-            // 宿主环境信息区域
-            const hostInfoSection = this._createHostInfoSection();
-            content.appendChild(hostInfoSection);
+            // 主区域：两列布局（左：系统信息+宿主环境，右：开发团队 + 赞助商 + 合作）
+            const mainRow = document.createElement('div');
+            mainRow.className = 'about-main-row';
+            mainRow.style.cssText = `
+                display: grid;
+                grid-template-columns: 1fr 1.4fr;
+                gap: 24px;
+                align-items: start;
+            `;
+            const leftCol = document.createElement('div');
+            leftCol.style.cssText = 'display: flex; flex-direction: column; gap: 20px;';
+            leftCol.appendChild(this._createSystemInfoSection());
+            leftCol.appendChild(this._createHostInfoSection());
+            mainRow.appendChild(leftCol);
+            const rightCol = document.createElement('div');
+            rightCol.className = 'about-right-col';
+            rightCol.style.cssText = 'display: flex; flex-direction: column; gap: 20px;';
+            rightCol.appendChild(this._createDeveloperSection());
+            rightCol.appendChild(this._createSponsorsSection());
+            rightCol.appendChild(this._createPartnersSection());
+            mainRow.appendChild(rightCol);
+            content.appendChild(mainRow);
             
             return content;
         },
@@ -152,8 +166,8 @@
                 display: flex;
                 flex-direction: column;
                 align-items: center;
-                gap: 20px;
-                margin-bottom: 20px;
+                gap: 12px;
+                margin-bottom: 8px;
             `;
             
             // Logo 图片
@@ -172,10 +186,10 @@
                 logoImg.src = '../zeros-logo.svg';
             };
             logoImg.style.cssText = `
-                width: 150px;
-                height: 150px;
+                width: 100px;
+                height: 100px;
                 object-fit: contain;
-                filter: drop-shadow(0 8px 16px rgba(139, 92, 246, 0.3));
+                filter: drop-shadow(0 6px 12px rgba(139, 92, 246, 0.3));
             `;
             logoSection.appendChild(logoImg);
             
@@ -186,7 +200,7 @@
                 : 'ZerOS';
             systemName.textContent = sysName;
             systemName.style.cssText = `
-                font-size: 48px;
+                font-size: 36px;
                 font-weight: 700;
                 margin: 0;
                 background: linear-gradient(135deg, #8b5cf6 0%, #6c8eff 50%, #8da6ff 100%);
@@ -204,7 +218,7 @@
                 : this._getText('ABOUT_SYS_DESC', '基于浏览器实现的虚拟操作系统内核');
             description.textContent = sysDesc;
             description.style.cssText = `
-                font-size: 16px;
+                font-size: 14px;
                 color: var(--theme-text-secondary, rgba(215, 224, 221, 0.7));
                 margin: 0;
                 text-align: center;
@@ -229,12 +243,12 @@
             const title = document.createElement('h2');
             title.textContent = this._getText('ABOUT_SYSTEM_INFO', '系统信息');
             title.style.cssText = `
-                font-size: 20px;
+                font-size: 16px;
                 font-weight: 600;
-                margin: 0 0 20px 0;
+                margin: 0 0 14px 0;
                 color: var(--theme-text, #d7e0dd);
                 border-bottom: 2px solid var(--theme-primary, rgba(108, 142, 255, 0.3));
-                padding-bottom: 12px;
+                padding-bottom: 8px;
             `;
             section.appendChild(title);
             
@@ -283,23 +297,24 @@
             const title = document.createElement('h2');
             title.textContent = this._getText('ABOUT_DEVELOPER_TEAM', '开发团队');
             title.style.cssText = `
-                font-size: 20px;
+                font-size: 18px;
                 font-weight: 600;
-                margin: 0 0 20px 0;
+                margin: 0 0 16px 0;
                 color: var(--theme-text, #d7e0dd);
                 border-bottom: 2px solid var(--theme-primary, rgba(108, 142, 255, 0.3));
-                padding-bottom: 12px;
+                padding-bottom: 10px;
             `;
             section.appendChild(title);
             
-            const developerList = document.createElement('div');
-            developerList.style.cssText = `
-                display: flex;
-                flex-direction: column;
-                gap: 16px;
+            // 使用网格布局，适配开发者数量增多
+            const developerGrid = document.createElement('div');
+            developerGrid.className = 'about-developer-grid';
+            developerGrid.style.cssText = `
+                display: grid;
+                grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+                gap: 12px;
             `;
             
-            // 从 SystemInformation 获取开发者信息
             const developers = typeof SystemInformation !== 'undefined' 
                 ? SystemInformation.getDevelopers() 
                 : [
@@ -313,11 +328,151 @@
                     dev.role,
                     dev.name
                 );
-                developerList.appendChild(devItem);
+                developerGrid.appendChild(devItem);
             });
             
-            section.appendChild(developerList);
+            section.appendChild(developerGrid);
             
+            return section;
+        },
+        
+        _createSponsorsSection: function() {
+            const section = document.createElement('div');
+            section.className = 'about-sponsors';
+            section.style.cssText = `
+                width: 100%;
+                background: var(--theme-background-elevated, rgba(26, 31, 46, 0.6));
+                border: 1px solid var(--theme-border, rgba(108, 142, 255, 0.2));
+                border-radius: 12px;
+                padding: 24px;
+                box-sizing: border-box;
+            `;
+            
+            const title = document.createElement('h2');
+            title.textContent = this._getText('ABOUT_SPONSORS', '赞助商');
+            title.style.cssText = `
+                font-size: 18px;
+                font-weight: 600;
+                margin: 0 0 8px 0;
+                color: var(--theme-text, #d7e0dd);
+                border-bottom: 2px solid var(--theme-primary, rgba(108, 142, 255, 0.3));
+                padding-bottom: 10px;
+            `;
+            section.appendChild(title);
+            
+            const desc = document.createElement('p');
+            desc.textContent = this._getText('ABOUT_SPONSORS_DESC', '感谢以下赞助商对 ZerOS 的支持');
+            desc.style.cssText = `font-size: 13px; color: var(--theme-text-secondary, rgba(215, 224, 221, 0.6)); margin: 0 0 16px 0;`;
+            section.appendChild(desc);
+            
+            const sponsors = typeof SystemInformation !== 'undefined' ? SystemInformation.getSponsors() : [];
+            const grid = document.createElement('div');
+            grid.style.cssText = `display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px;`;
+            
+            if (sponsors.length === 0) {
+                const empty = document.createElement('p');
+                empty.textContent = this._getText('ABOUT_NO_SPONSORS', '暂无赞助商');
+                empty.style.cssText = `font-size: 14px; color: var(--theme-text-secondary, rgba(215, 224, 221, 0.5)); margin: 0;`;
+                grid.appendChild(empty);
+            } else {
+                sponsors.forEach(s => {
+                    const card = document.createElement('div');
+                    card.style.cssText = `
+                        padding: 14px;
+                        background: var(--theme-background-secondary, rgba(20, 25, 35, 0.4));
+                        border: 1px solid var(--theme-border, rgba(108, 142, 255, 0.15));
+                        border-radius: 8px;
+                    `;
+                    const nameEl = document.createElement(s.link ? 'a' : 'div');
+                    nameEl.textContent = s.name;
+                    if (s.link) {
+                        nameEl.href = s.link;
+                        nameEl.target = '_blank';
+                        nameEl.rel = 'noopener';
+                        nameEl.style.color = 'var(--theme-primary, #6c8eff)';
+                    }
+                    nameEl.style.cssText = (nameEl.style.cssText || '') + ' font-size: 14px; font-weight: 600; display: block; margin-bottom: 4px;';
+                    card.appendChild(nameEl);
+                    if (s.description) {
+                        const d = document.createElement('div');
+                        d.textContent = s.description;
+                        d.style.cssText = 'font-size: 12px; color: var(--theme-text-secondary, rgba(215, 224, 221, 0.6));';
+                        card.appendChild(d);
+                    }
+                    grid.appendChild(card);
+                });
+            }
+            section.appendChild(grid);
+            return section;
+        },
+        
+        _createPartnersSection: function() {
+            const section = document.createElement('div');
+            section.className = 'about-partners';
+            section.style.cssText = `
+                width: 100%;
+                background: var(--theme-background-elevated, rgba(26, 31, 46, 0.6));
+                border: 1px solid var(--theme-border, rgba(108, 142, 255, 0.2));
+                border-radius: 12px;
+                padding: 24px;
+                box-sizing: border-box;
+            `;
+            
+            const title = document.createElement('h2');
+            title.textContent = this._getText('ABOUT_PARTNERS', '合作');
+            title.style.cssText = `
+                font-size: 18px;
+                font-weight: 600;
+                margin: 0 0 8px 0;
+                color: var(--theme-text, #d7e0dd);
+                border-bottom: 2px solid var(--theme-primary, rgba(108, 142, 255, 0.3));
+                padding-bottom: 10px;
+            `;
+            section.appendChild(title);
+            
+            const desc = document.createElement('p');
+            desc.textContent = this._getText('ABOUT_PARTNERS_DESC', '感谢以下合作伙伴与 ZerOS 的协作');
+            desc.style.cssText = `font-size: 13px; color: var(--theme-text-secondary, rgba(215, 224, 221, 0.6)); margin: 0 0 16px 0;`;
+            section.appendChild(desc);
+            
+            const partners = typeof SystemInformation !== 'undefined' ? SystemInformation.getPartners() : [];
+            const grid = document.createElement('div');
+            grid.style.cssText = `display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px;`;
+            
+            if (partners.length === 0) {
+                const empty = document.createElement('p');
+                empty.textContent = this._getText('ABOUT_NO_PARTNERS', '暂无合作方');
+                empty.style.cssText = `font-size: 14px; color: var(--theme-text-secondary, rgba(215, 224, 221, 0.5)); margin: 0;`;
+                grid.appendChild(empty);
+            } else {
+                partners.forEach(p => {
+                    const card = document.createElement('div');
+                    card.style.cssText = `
+                        padding: 14px;
+                        background: var(--theme-background-secondary, rgba(20, 25, 35, 0.4));
+                        border: 1px solid var(--theme-border, rgba(108, 142, 255, 0.15));
+                        border-radius: 8px;
+                    `;
+                    const nameEl = document.createElement(p.link ? 'a' : 'div');
+                    nameEl.textContent = p.name;
+                    if (p.link) {
+                        nameEl.href = p.link;
+                        nameEl.target = '_blank';
+                        nameEl.rel = 'noopener';
+                        nameEl.style.color = 'var(--theme-primary, #6c8eff)';
+                    }
+                    nameEl.style.cssText = (nameEl.style.cssText || '') + ' font-size: 14px; font-weight: 600; display: block; margin-bottom: 4px;';
+                    card.appendChild(nameEl);
+                    if (p.description) {
+                        const d = document.createElement('div');
+                        d.textContent = p.description;
+                        d.style.cssText = 'font-size: 12px; color: var(--theme-text-secondary, rgba(215, 224, 221, 0.6));';
+                        card.appendChild(d);
+                    }
+                    grid.appendChild(card);
+                });
+            }
+            section.appendChild(grid);
             return section;
         },
         
@@ -336,12 +491,12 @@
             const title = document.createElement('h2');
             title.textContent = this._getText('ABOUT_HOST_ENV', '宿主环境');
             title.style.cssText = `
-                font-size: 20px;
+                font-size: 16px;
                 font-weight: 600;
-                margin: 0 0 20px 0;
+                margin: 0 0 14px 0;
                 color: var(--theme-text, #d7e0dd);
                 border-bottom: 2px solid var(--theme-primary, rgba(108, 142, 255, 0.3));
-                padding-bottom: 12px;
+                padding-bottom: 8px;
             `;
             section.appendChild(title);
             
@@ -407,11 +562,12 @@
         
         _createDeveloperItem: function(organization, role, name) {
             const item = document.createElement('div');
+            item.className = 'about-developer-card';
             item.style.cssText = `
                 display: flex;
                 flex-direction: column;
-                gap: 8px;
-                padding: 16px;
+                gap: 4px;
+                padding: 12px 14px;
                 background: var(--theme-background-secondary, rgba(20, 25, 35, 0.4));
                 border: 1px solid var(--theme-border, rgba(108, 142, 255, 0.15));
                 border-radius: 8px;
@@ -419,26 +575,15 @@
             
             const orgEl = document.createElement('div');
             orgEl.textContent = organization;
-            orgEl.style.cssText = `
-                font-size: 16px;
-                font-weight: 600;
-                color: var(--theme-primary, #6c8eff);
-            `;
+            orgEl.style.cssText = `font-size: 14px; font-weight: 600; color: var(--theme-primary, #6c8eff);`;
             
             const roleEl = document.createElement('div');
             roleEl.textContent = role;
-            roleEl.style.cssText = `
-                font-size: 13px;
-                color: var(--theme-text-secondary, rgba(215, 224, 221, 0.6));
-            `;
+            roleEl.style.cssText = `font-size: 12px; color: var(--theme-text-secondary, rgba(215, 224, 221, 0.6));`;
             
             const nameEl = document.createElement('div');
             nameEl.textContent = name;
-            nameEl.style.cssText = `
-                font-size: 14px;
-                color: var(--theme-text, #d7e0dd);
-                margin-top: 4px;
-            `;
+            nameEl.style.cssText = `font-size: 13px; color: var(--theme-text, #d7e0dd);`;
             
             item.appendChild(orgEl);
             item.appendChild(roleEl);

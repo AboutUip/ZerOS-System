@@ -38,7 +38,9 @@
 
 .about-system-info,
 .about-developer,
-.about-host-info {
+.about-host-info,
+.about-sponsors,
+.about-partners {
     animation: slideIn 0.6s ease-out;
     animation-fill-mode: both;
 }
@@ -55,6 +57,40 @@
     animation-delay: 0.3s;
 }
 
+.about-sponsors {
+    animation-delay: 0.35s;
+}
+
+.about-partners {
+    animation-delay: 0.4s;
+}
+
+/* 主区域两列布局：窄屏时改为单列 */
+.about-main-row {
+    display: grid;
+    grid-template-columns: 1fr 1.4fr;
+    gap: 24px;
+    align-items: start;
+}
+
+@media (max-width: 768px) {
+    .about-main-row {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* 开发团队网格：适配开发者增多 */
+.about-developer-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 12px;
+}
+
+.about-developer .about-developer-grid > div {
+    padding: 12px 14px;
+    min-height: auto;
+}
+
 @keyframes slideIn {
     from {
         opacity: 0;
@@ -68,14 +104,28 @@
 
 .about-system-info h2,
 .about-developer h2,
-.about-host-info h2 {
+.about-host-info h2,
+.about-sponsors h2,
+.about-partners h2 {
     transition: color 0.3s ease;
 }
 
 .about-system-info:hover h2,
 .about-developer:hover h2,
-.about-host-info:hover h2 {
+.about-host-info:hover h2,
+.about-sponsors:hover h2,
+.about-partners:hover h2 {
     color: var(--theme-primary, #6c8eff);
+}
+
+.about-sponsors a,
+.about-partners a {
+    text-decoration: none;
+}
+
+.about-sponsors a:hover,
+.about-partners a:hover {
+    text-decoration: underline;
 }
 
 /* 滚动条样式 */
