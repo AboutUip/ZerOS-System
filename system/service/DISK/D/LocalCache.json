@@ -1,11 +1,11 @@
 {
   "system": {
     "system.dailyQuote": {
-      "value": "往往幻想能够置身云端。",
+      "value": "我觉得，我这辈子最灿烂的笑容，大概都奉献给我电脑屏幕了。",
       "expiresAt": 0,
-      "createdAt": 1770470690299,
-      "updatedAt": 1770470690299,
-      "size": 35
+      "createdAt": 1770485961256,
+      "updatedAt": 1770485961256,
+      "size": 86
     }
   },
   "programs": {
@@ -21,6 +21,94 @@
         "createdAt": 1766148289293,
         "updatedAt": 1766148289293,
         "size": 161
+      }
+    },
+    "TaskbarManager": {
+      "weather:兴县": {
+        "value": {
+          "code": 200,
+          "data": {
+            "city": "山西省 吕梁市",
+            "today": {
+              "current_temp": "-11℃",
+              "current_cond": "晴",
+              "low": "-12℃",
+              "quality": "--"
+            },
+            "low_temperature": -12,
+            "tips": "建议穿羽绒服、棉裤，做好全面防寒",
+            "seven_day": [
+              {
+                "date": "2026-02-08",
+                "cond": "晴",
+                "high": "4℃",
+                "low": "-12℃"
+              },
+              {
+                "date": "2026-02-09",
+                "cond": "多云",
+                "high": "6℃",
+                "low": "-6℃"
+              },
+              {
+                "date": "2026-02-10",
+                "cond": "晴",
+                "high": "3℃",
+                "low": "-9℃"
+              }
+            ],
+            "life_indices": {
+              "clothing": {
+                "level": "严寒",
+                "brief": "极冷",
+                "advice": "建议穿羽绒服、棉裤，做好全面防寒"
+              },
+              "uv": {
+                "level": "中等",
+                "brief": "中等",
+                "advice": "紫外线中等，建议涂抹SPF15+防晒霜，戴帽子"
+              },
+              "car_wash": {
+                "level": "非常适宜",
+                "brief": "极佳",
+                "advice": "天气晴好，非常适合洗车，洗后能保持较长时间"
+              },
+              "drying": {
+                "level": "非常适宜",
+                "brief": "极佳",
+                "advice": "天气晴好干燥，非常适合晾晒衣物和被褥"
+              },
+              "air_conditioner": {
+                "level": "建议制热",
+                "brief": "寒冷",
+                "advice": "建议开启空调制热或使用其他取暖设备"
+              },
+              "cold_risk": {
+                "level": "较低",
+                "brief": "较少发",
+                "advice": "感冒风险较低，注意适当增减衣物"
+              },
+              "exercise": {
+                "level": "非常适宜",
+                "brief": "极佳",
+                "advice": "天气非常适合户外运动，尽情享受吧"
+              },
+              "comfort": {
+                "level": "极冷",
+                "brief": "寒冷",
+                "advice": "体感寒冷，注意保暖防寒"
+              }
+            },
+            "feels_like": -17,
+            "wind_direction": "东南风",
+            "wind_power": "2",
+            "humidity": 45
+          }
+        },
+        "expiresAt": 1770524606872,
+        "createdAt": 1770481406872,
+        "updatedAt": 1770481406872,
+        "size": 1413
       }
     }
   }

@@ -73,6 +73,7 @@ ZerOS/
 │   │   ├── FSDirve.php    # 文件系统驱动服务（PHP 后端）
 │   │   ├── CompressionDirve.php # 压缩驱动服务（PHP 后端）
 │   │   ├── ImageProxy.php # 图片代理服务（PHP 后端）
+│   │   ├── BrowserProxy.php # 浏览器网页代理（PHP 后端）
 │   │   ├── module-proxy.php # 模块代理服务（PHP 后端）
 │   │   # 注意：SpringBoot 后端提供相同的服务接口，路径无 .php 后缀
 │   │   └── DISK/          # 虚拟磁盘存储

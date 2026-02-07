@@ -56,9 +56,9 @@ class SystemInformation {
     // 赞助商信息（名称、链接、描述可选）
     static SPONSORS = [
         {
-            name: 'AxtTeam',
+            name: 'UApiPro-免费API服务平台|100+公共API接口',
             link: 'https://uapis.cn/',
-            description: 'API赞助'
+            description: '专业的免费API服务平台，提供QQ查询、Bilibili信息、文本处理、AES加密解密等100+稳定API接口。已服务1000万+次调用，开发者首选的API工具箱。'
         }
     ];
     
@@ -96,6 +96,7 @@ class SystemInformation {
         IMAGE_PROXY: 'ImageProxy',
         AUDIO_PROXY: 'audio-proxy',
         MODULE_PROXY: 'module-proxy',
+        BROWSER_PROXY: 'BrowserProxy',
         DISKMANAGER: 'DISKMANAGER'
     };
     
@@ -275,6 +276,22 @@ class SystemInformation {
      */
     static getModuleProxyUrl() {
         return new URL(SystemInformation.getModuleProxyPath(), SystemInformation.getOrigin()).toString();
+    }
+    
+    /**
+     * 获取浏览器代理服务路径（用于绕过 iframe 限制）
+     * @returns {string} 服务路径（不含 origin）
+     */
+    static getBrowserProxyPath() {
+        return SystemInformation.getServicePath(SystemInformation.SERVICE_NAMES.BROWSER_PROXY);
+    }
+    
+    /**
+     * 获取浏览器代理服务URL
+     * @returns {string} 完整的浏览器代理服务URL
+     */
+    static getBrowserProxyUrl() {
+        return new URL(SystemInformation.getBrowserProxyPath(), SystemInformation.getOrigin()).toString();
     }
     
     /**

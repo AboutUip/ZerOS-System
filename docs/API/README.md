@@ -55,6 +55,7 @@
 - [FSDirve.md](./FSDirve.md) - 文件系统驱动服务（支持 PHP 和 SpringBoot 后端） ✅
 - [CompressionDrive.md](./CompressionDrive.md) - 压缩驱动服务（ZIP/RAR 压缩解压缩，支持 PHP 和 SpringBoot 后端） ✅
 - [DISKMANAGER.md](./DISKMANAGER.md) - 磁盘分区管理服务（分区的创建、检查、删除、合并等） ✅
+- [BrowserProxy.md](./BrowserProxy.md) - 浏览器网页代理服务（绕过 iframe 限制） ✅
 - [SystemInformation.md](./SystemInformation.md) - 系统信息和后端服务管理 ✅
 
 ### 信号系统
@@ -132,6 +133,7 @@
 - ScheduleTaskManager
 - FSDirve (后端服务，支持 PHP 和 SpringBoot)
 - DISKMANAGER (磁盘分区管理服务)
+- BrowserProxy (浏览器网页代理服务)
 - SystemInformation (系统信息和后端服务管理)
 
 **基础设施**

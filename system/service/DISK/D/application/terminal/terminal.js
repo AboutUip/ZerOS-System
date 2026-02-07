@@ -7466,12 +7466,14 @@ function escapeHtml(s){
                             payload.write('  exception <level> [message]  - 触发指定等级的异常（用于测试）');
                             payload.write('    levels: kernel, system, program, service');
                             payload.write('    message: 可选的异常消息（默认使用测试消息）');
+                            payload.write('  geography [--clear] [--high]  - 地理位置调试（--clear 清除缓存后重新获取，--high 启用高精度定位）');
+                            payload.write('  weather [--city 城市] [--raw]  - 天气调试（--city 指定城市，否则用定位；--raw 输出原始 JSON）');
                             payload.write('');
                             payload.write('Examples:');
                             payload.write('  debug exception service "测试服务异常"');
-                            payload.write('  debug exception program');
-                            payload.write('  debug exception system "系统资源耗尽"');
-                            payload.write('  debug exception kernel "内核模块错误"');
+                            payload.write('  debug geography');
+                            payload.write('  debug weather');
+                            payload.write('  debug weather --city 兴县 --raw');
                             return;
                         }
                         
@@ -7562,6 +7564,140 @@ function escapeHtml(s){
                                 }
                             } else {
                                 payload.write('debug exception: ProcessManager 不可用');
+                            }
+                        } else if (action === 'geography') {
+                            // 地理位置调试：支持 --clear 清除缓存、--high 高精度
+                            const hasClear = payload.args.includes('--clear');
+                            const hasHigh = payload.args.includes('--high');
+                            let terminalPid = null;
+                            if (terminalInstance && terminalInstance.pid) {
+                                terminalPid = terminalInstance.pid;
+                            } else if (terminalInstance && terminalInstance.tabManager && terminalInstance.tabManager.pid) {
+                                terminalPid = terminalInstance.tabManager.pid;
+                            }
+                            if (typeof ProcessManager === 'undefined' || typeof ProcessManager.callKernelAPI !== 'function') {
+                                payload.write('debug geography: ProcessManager 不可用');
+                                return;
+                            }
+                            if (!terminalPid) {
+                                payload.write('debug geography: 无法获取终端进程 PID');
+                                return;
+                            }
+                            try {
+                                const supported = await ProcessManager.callKernelAPI(terminalPid, 'Geography.isSupported', []);
+                                payload.write('Geography 调试');
+                                payload.write('---');
+                                payload.write(`浏览器支持地理位置: ${supported ? '是' : '否'}`);
+                                if (hasClear) {
+                                    await ProcessManager.callKernelAPI(terminalPid, 'Geography.clearCache', []);
+                                    payload.write('已清除位置缓存');
+                                } else {
+                                    const cached = await ProcessManager.callKernelAPI(terminalPid, 'Geography.getCachedLocation', []);
+                                    payload.write(`缓存: ${cached ? '有（未过期）' : '无或已过期'}`);
+                                }
+                                payload.write('正在获取当前位置...');
+                                const loc = await ProcessManager.callKernelAPI(terminalPid, 'Geography.getCurrentPosition', [
+                                    { enableHighAccuracy: !!hasHigh, timeout: 15000 }
+                                ]);
+                                if (!loc) {
+                                    payload.write('获取结果: 无数据');
+                                    return;
+                                }
+                                payload.write('---');
+                                payload.write(`名称/地区 (name): ${loc.name != null ? loc.name : '(无)'}`);
+                                payload.write(`地址 (address): ${loc.address != null ? loc.address : '(无)'}`);
+                                payload.write(`纬度 (latitude): ${loc.latitude != null ? loc.latitude : '(无)'}`);
+                                payload.write(`经度 (longitude): ${loc.longitude != null ? loc.longitude : '(无)'}`);
+                                payload.write(`精度来源 (source): ${loc.source || '(无)'}`);
+                                if (loc.accuracy != null) payload.write(`精度半径 (accuracy): ${loc.accuracy} m`);
+                                payload.write('---');
+                                payload.write('完成');
+                            } catch (err) {
+                                payload.write(`debug geography: 错误: ${err.message}`);
+                                if (typeof KernelLogger !== 'undefined') {
+                                    KernelLogger.debug('Terminal', 'debug geography 失败', err);
+                                }
+                            }
+                        } else if (action === 'weather') {
+                            const cityIdx = payload.args.indexOf('--city');
+                            const cityArg = cityIdx >= 0 && payload.args[cityIdx + 1] ? payload.args[cityIdx + 1] : null;
+                            const hasRaw = payload.args.includes('--raw');
+                            let terminalPid = null;
+                            if (terminalInstance && terminalInstance.pid) {
+                                terminalPid = terminalInstance.pid;
+                            } else if (terminalInstance && terminalInstance.tabManager && terminalInstance.tabManager.pid) {
+                                terminalPid = terminalInstance.tabManager.pid;
+                            }
+                            try {
+                                let cityName = cityArg;
+                                if (!cityName && typeof ProcessManager !== 'undefined' && typeof ProcessManager.callKernelAPI === 'function' && terminalPid) {
+                                    payload.write('正在获取定位城市...');
+                                    try {
+                                        const loc = await ProcessManager.callKernelAPI(terminalPid, 'Geography.getCurrentPosition', [{ enableHighAccuracy: false, timeout: 10000 }]);
+                                        cityName = (loc && loc.name) ? loc.name : null;
+                                    } catch (e) {
+                                        cityName = null;
+                                    }
+                                }
+                                if (!cityName) {
+                                    cityName = '北京';
+                                    payload.write(`未指定 --city 且定位失败，使用默认城市: ${cityName}`);
+                                }
+                                const weatherUrl = `https://uapis.cn/api/v1/misc/weather?city=${encodeURIComponent(cityName)}&extended=true&indices=true&forecast=true`;
+                                payload.write('Weather 调试');
+                                payload.write('---');
+                                payload.write(`请求城市: ${cityName}`);
+                                payload.write(`请求: ${weatherUrl}`);
+                                payload.write('请求中...');
+                                const resp = await fetch(weatherUrl);
+                                if (!resp.ok) {
+                                    payload.write(`HTTP 错误: ${resp.status} ${resp.statusText}`);
+                                    return;
+                                }
+                                const text = await resp.text();
+                                let data;
+                                try {
+                                    data = JSON.parse(text);
+                                } catch (e) {
+                                    payload.write('响应不是有效 JSON');
+                                    if (hasRaw) payload.write(text.substring(0, 500));
+                                    return;
+                                }
+                                if (hasRaw) {
+                                    payload.write('---');
+                                    payload.write(JSON.stringify(data, null, 2).substring(0, 3000));
+                                    if (JSON.stringify(data).length > 3000) payload.write('...(已截断)');
+                                    payload.write('---');
+                                    payload.write('完成');
+                                    return;
+                                }
+                                payload.write('---');
+                                payload.write(`城市: ${data.city || '(无)'} | 省份: ${data.province || '(无)'}`);
+                                payload.write(`天气: ${data.weather || '(无)'} | 温度: ${data.temperature != null ? data.temperature + '℃' : '(无)'} | 体感: ${data.feels_like != null ? data.feels_like + '℃' : '(无)'}`);
+                                payload.write(`气温: ${data.temp_min != null ? data.temp_min : '--'} ~ ${data.temp_max != null ? data.temp_max : '--'}℃`);
+                                payload.write(`风向/风力: ${data.wind_direction || '--'} ${data.wind_power || ''} | 湿度: ${data.humidity != null ? data.humidity + '%' : '--'}`);
+                                const forecast = Array.isArray(data.forecast) ? data.forecast : [];
+                                payload.write(`预报条数: ${forecast.length}`);
+                                if (forecast.length > 0) {
+                                    forecast.slice(0, 5).forEach((d, i) => {
+                                        payload.write(`  ${d.date}: ${d.weather_day || d.weather_night || '--'} ${d.temp_min != null ? d.temp_min : '--'}~${d.temp_max != null ? d.temp_max : '--'}℃`);
+                                    });
+                                    if (forecast.length > 5) payload.write(`  ... 共 ${forecast.length} 天`);
+                                }
+                                const li = data.life_indices || {};
+                                if (Object.keys(li).length > 0) {
+                                    payload.write('生活指数:');
+                                    if (li.clothing) payload.write(`  穿衣: ${li.clothing.brief || li.clothing.advice || ''}`);
+                                    if (li.comfort) payload.write(`  舒适: ${li.comfort.brief || li.comfort.advice || ''}`);
+                                    if (li.exercise) payload.write(`  运动: ${li.exercise.brief || li.exercise.advice || ''}`);
+                                }
+                                payload.write('---');
+                                payload.write('完成');
+                            } catch (err) {
+                                payload.write(`debug weather: 错误: ${err.message}`);
+                                if (typeof KernelLogger !== 'undefined') {
+                                    KernelLogger.debug('Terminal', 'debug weather 失败', err);
+                                }
                             }
                         } else {
                             payload.write(`debug: 未知的操作 '${action}'`);

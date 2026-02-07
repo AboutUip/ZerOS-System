@@ -138,12 +138,12 @@ await ServerExpansion.start('myservice');
 
 ## 内置服务示例
 
-- **announcement**（`server-announcement.js`）：系统公告通知获取，每 3 分钟拉取公告 API，按等级弹通知或打日志。详见 [公告服务（ServerAnnouncement）](../SERVER/ServerAnnouncement.md)。
+- **notice**（`server-notice.js`）：系统公告通知获取，每 3 分钟拉取公告 API，按等级弹通知或打日志。详见 [通知服务（ServerNotice）](../SERVER/ServerNotice.md)。
 
 ## 相关文档
 
 - [服务文档（SERVER）](../SERVER/README.md) - D/server 服务模块编写与各服务说明
 - [服务模块编写指南](../SERVER/ServiceModule.md) - D/server 服务模块的编写约定与示例
-- [公告服务（ServerAnnouncement）](../SERVER/ServerAnnouncement.md) - 内置公告服务说明与 ZerOS API 使用
+- [通知服务（ServerNotice）](../SERVER/ServerNotice.md) - 内置通知服务说明与 ZerOS API 使用
 - [扩展与插件索引](../PLUGINS/README.md) - 语言包等扩展文档
 - [Starter](./Starter.md) - BootLoader 与模块加载顺序

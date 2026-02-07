@@ -271,6 +271,18 @@ console.log(fsUrl); // 'http://localhost:8089/system/service/FSDirve.php'
 
 **返回值**: `string` - ModuleProxy 服务完整URL
 
+#### `getBrowserProxyPath()`
+
+获取浏览器网页代理服务路径（用于 ZerOS 内置浏览器绕过 iframe 限制）。
+
+**返回值**: `string` - BrowserProxy 服务路径
+
+#### `getBrowserProxyUrl()`
+
+获取浏览器网页代理服务完整URL。
+
+**返回值**: `string` - BrowserProxy 服务完整URL
+
 ### URL 构建方法
 
 #### `buildServiceUrl(serviceName, params)`
@@ -322,7 +334,8 @@ SystemInformation.SERVICE_NAMES = {
     COMPRESSION_DIRVE: 'CompressionDirve',  // 压缩驱动
     IMAGE_PROXY: 'ImageProxy',        // 图片代理
     AUDIO_PROXY: 'audio-proxy',      // 音频代理
-    MODULE_PROXY: 'module-proxy'      // 模块代理
+    MODULE_PROXY: 'module-proxy',    // 模块代理
+    BROWSER_PROXY: 'BrowserProxy'    // 浏览器网页代理
 };
 ```
 

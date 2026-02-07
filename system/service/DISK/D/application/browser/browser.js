@@ -11,7 +11,7 @@
         iframe: null,
         addressBar: null,
         bookmarksBar: null,
-        currentUrl: 'https://www.baidu.com',
+        currentUrl: 'https://www.bing.com/',
         history: [], // 浏览历史记录
         historyIndex: -1, // 当前历史记录索引
         backBtn: null,
@@ -234,6 +234,55 @@
         },
         
         /**
+         * 构建代理 URL（用于绕过 X-Frame-Options、CSP 等 iframe 限制）
+         * @param {string} targetUrl - 目标网页 URL
+         * @returns {string} 代理服务 URL
+         */
+        _buildProxyUrl: function(targetUrl) {
+            // 浏览器代理仅提供 PHP 版本，始终使用 .php 后缀
+            let proxyPath = (typeof SystemInformation !== 'undefined' && SystemInformation.getBrowserProxyPath)
+                ? SystemInformation.getBrowserProxyPath()
+                : '/system/service/BrowserProxy.php';
+            if (!proxyPath.endsWith('.php')) {
+                proxyPath = '/system/service/BrowserProxy.php';
+            }
+            const origin = (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin)
+                ? SystemInformation.getOrigin()
+                : (window.location.origin || '');
+            const proxyBase = origin + proxyPath;
+            return proxyBase + '?url=' + encodeURIComponent(targetUrl);
+        },
+        
+        /**
+         * 判断是否应使用代理加载（外部 http/https 经代理以绕过 CORS 与 iframe 限制）
+         */
+        _shouldUseProxy: function(url) {
+            try {
+                const parsed = new URL(url);
+                return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+            } catch (e) {
+                return false;
+            }
+        },
+        
+        /**
+         * 从代理 URL 中提取目标 URL
+         * @param {string} href - 可能是代理 URL 的链接
+         * @returns {string|null} 提取的目标 URL，非代理链接则返回 null
+         */
+        _extractUrlFromProxy: function(href) {
+            try {
+                const u = new URL(href, window.location.origin);
+                if (u.pathname.indexOf('BrowserProxy') !== -1 && u.searchParams.has('url')) {
+                    return u.searchParams.get('url');
+                }
+            } catch (e) {
+                // 忽略
+            }
+            return null;
+        },
+        
+        /**
          * 导航到指定URL
          */
         _navigateTo: function(url, addToHistory = true) {
@@ -271,12 +320,10 @@
             this.iframe.classList.add('loading');
             this._showLoading(true);
             
-            // 通过 NetworkManager 记录网络请求（如果可用）
-            // 注意：iframe.src 的加载会自动被 NetworkManager 拦截（在降级模式下）
-            // 这里我们只是确保 NetworkManager 已初始化
-            
-            // 设置iframe源（iframe 的加载会被 NetworkManager 自动拦截）
-            this.iframe.src = url;
+            // 使用 x-frame-bypass 或 PHP 代理绕过 X-Frame-Options、CSP frame-ancestors 等 iframe 限制
+            const useBypass = this._supportsXFrameBypass() && this._shouldUseProxy(url);
+            const iframeSrc = useBypass ? url : (this._shouldUseProxy(url) ? this._buildProxyUrl(url) : url);
+            this.iframe.src = iframeSrc;
             
             // 监听加载完成
             this.iframe.onload = () => {
@@ -284,23 +331,28 @@
                 this._showLoading(false);
                 
                 if (this.addressBar) {
-                    try {
-                        // 尝试获取iframe的实际URL（可能因为跨域限制失败）
-                        const iframeUrl = this.iframe.contentWindow.location.href;
-                        this.addressBar.value = iframeUrl;
-                        this.currentUrl = iframeUrl;
-                        // 更新历史记录中的URL（如果不同）
-                        if (addToHistory && this.historyIndex >= 0) {
-                            this.history[this.historyIndex] = iframeUrl;
-                        }
-                        
-                        // 尝试注入导航拦截脚本（仅对同源页面有效）
+                    // 使用代理时 iframe.location 为代理 URL，地址栏显示真实 URL（this.currentUrl）
+                    // 直接加载时尝试从 iframe 获取（可能因跨域失败）
+                    if (this._shouldUseProxy(url)) {
+                        this.addressBar.value = this.currentUrl;
+                        // 代理加载的页面与父页面同源，可注入导航拦截
                         setTimeout(() => {
                             this._injectNavigationInterceptor();
                         }, 100);
-                    } catch (e) {
-                        // 跨域限制，使用设置的URL
-                        this.addressBar.value = url;
+                    } else {
+                        try {
+                            const iframeUrl = this.iframe.contentWindow.location.href;
+                            this.addressBar.value = iframeUrl;
+                            this.currentUrl = iframeUrl;
+                            if (addToHistory && this.historyIndex >= 0) {
+                                this.history[this.historyIndex] = iframeUrl;
+                            }
+                            setTimeout(() => {
+                                this._injectNavigationInterceptor();
+                            }, 100);
+                        } catch (e) {
+                            this.addressBar.value = url;
+                        }
                     }
                 }
             };
@@ -569,13 +621,28 @@
         },
         
         /**
+         * 检测是否支持 x-frame-bypass（Customized Built-in Element，Chrome/Firefox 支持）
+         */
+        _supportsXFrameBypass: function() {
+            try {
+                const test = document.createElement('iframe', { is: 'x-frame-bypass' });
+                return typeof test.load === 'function';
+            } catch (e) {
+                return false;
+            }
+        },
+        
+        /**
          * 创建内容区域（iframe）
          */
         _createContent: function() {
             const content = document.createElement('div');
             content.className = 'browser-content';
             
-            const iframe = document.createElement('iframe');
+            const useXFrameBypass = this._supportsXFrameBypass();
+            const iframe = useXFrameBypass
+                ? document.createElement('iframe', { is: 'x-frame-bypass' })
+                : document.createElement('iframe');
             iframe.className = 'browser-iframe';
             iframe.frameBorder = '0';
             iframe.allow = 'fullscreen';
@@ -600,6 +667,7 @@
             `;
             
             this.iframe = iframe;
+            iframe.name = 'browser-content-frame';
             content.appendChild(iframe);
             
             // 加载指示器
@@ -637,114 +705,65 @@
                     return;
                 }
                 
-                // 安全增强：拦截 window.top 访问，防止沙箱逃逸
-                try {
-                    // 重定义 window.top，防止页面访问父窗口
-                    Object.defineProperty(iframeWindow, 'top', {
-                        get: function() {
-                            // 返回自身，而不是父窗口
-                            return iframeWindow;
-                        },
-                        configurable: false
-                    });
-                    
-                    // 重定义 window.parent，防止页面访问父窗口
-                    Object.defineProperty(iframeWindow, 'parent', {
-                        get: function() {
-                            // 返回自身，而不是父窗口
-                            return iframeWindow;
-                        },
-                        configurable: false
-                    });
-                    
-                    // 拦截 window.frameElement，防止页面检测到自己在 iframe 中
-                    Object.defineProperty(iframeWindow, 'frameElement', {
-                        get: function() {
-                            return null; // 返回 null，让页面认为不在 iframe 中
-                        },
-                        configurable: false
-                    });
-                } catch (e) {
-                    // 如果无法重定义（某些浏览器可能不允许），记录警告但继续
-                    if (typeof KernelLogger !== 'undefined') {
-                        KernelLogger.warn('Browser', '无法增强安全性（拦截 window.top）', e);
-                    }
-                }
-                
                 // 同源，可以注入脚本
                 const self = this;
                 
-                // 拦截所有链接点击
-                const interceptLinks = () => {
-                    const links = iframeDocument.querySelectorAll('a[href]');
-                    links.forEach(link => {
-                        // 移除旧的事件监听器（如果存在）
-                        const newLink = link.cloneNode(true);
-                        link.parentNode.replaceChild(newLink, link);
-                        
-                        newLink.addEventListener('click', (e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            
-                            const href = newLink.getAttribute('href');
-                            const target = newLink.getAttribute('target');
-                            
-                            // 移除 target 属性，确保在浏览器内打开
-                            if (target) {
-                                newLink.removeAttribute('target');
-                            }
-                            
-                            if (href) {
-                                let targetUrl = href;
-                                
-                                // 处理相对URL
-                                if (href.startsWith('#')) {
-                                    // 锚点链接，在iframe内处理
-                                    // 允许默认行为（滚动到锚点）
-                                    try {
-                                        const anchor = iframeDocument.querySelector(href);
-                                        if (anchor) {
-                                            anchor.scrollIntoView({ behavior: 'smooth' });
-                                        }
-                                    } catch (e) {
-                                        // 忽略错误
-                                    }
-                                    return;
-                                } else if (href.startsWith('/')) {
-                                    // 绝对路径
-                                    try {
-                                        const currentUrl = new URL(iframeWindow.location.href);
-                                        targetUrl = currentUrl.origin + href;
-                                    } catch (e) {
-                                        if (typeof KernelLogger !== 'undefined') {
-                                            KernelLogger.warn('Browser', '无法解析相对URL', href);
-                                        }
-                                        return;
-                                    }
-                                } else if (!href.startsWith('http://') && !href.startsWith('https://') && !href.startsWith('javascript:') && !href.startsWith('mailto:') && !href.startsWith('tel:')) {
-                                    // 相对路径
-                                    try {
-                                        const currentUrl = new URL(iframeWindow.location.href);
-                                        targetUrl = new URL(href, currentUrl.href).href;
-                                    } catch (e) {
-                                        if (typeof KernelLogger !== 'undefined') {
-                                            KernelLogger.warn('Browser', '无法解析相对URL', href);
-                                        }
-                                        return;
-                                    }
-                                } else if (href.startsWith('javascript:') || href.startsWith('mailto:') || href.startsWith('tel:')) {
-                                    // 特殊协议，允许默认行为
-                                    return;
-                                }
-                                
-                                // 在浏览器内导航
-                                self._navigateTo(targetUrl);
-                            }
-                        });
-                    });
+                // 从点击目标向上查找最近的 <a href>
+                const findLink = (el) => {
+                    while (el && el !== iframeDocument.body) {
+                        if (el.tagName === 'A' && el.getAttribute('href')) return el;
+                        el = el.parentElement;
+                    }
+                    return null;
                 };
                 
-                // 拦截 window.open
+                // 解析链接 URL 为绝对地址
+                const resolveLinkUrl = (href, linkEl) => {
+                    if (!href) return null;
+                    let targetUrl = href;
+                    const extractedFromProxy = self._extractUrlFromProxy(href);
+                    if (extractedFromProxy) return extractedFromProxy;
+                    if (href.startsWith('#')) return null;
+                    try {
+                        const base = (self.currentUrl && self.currentUrl.startsWith('http')) ? self.currentUrl : (iframeWindow.location.href.startsWith('http') ? iframeWindow.location.href : 'https://example.com/');
+                        return new URL(href, base).href;
+                    } catch (e) {
+                        return null;
+                    }
+                };
+                
+                // 仅拦截会“离开当前视图”的链接：target=_blank/_top/_parent、Ctrl+点击、中键
+                const captureHandler = (e) => {
+                    const link = findLink(e.target);
+                    if (!link) return;
+                    const href = link.getAttribute('href');
+                    if (!href) return;
+                    if (href.startsWith('javascript:') || href.startsWith('mailto:') || href.startsWith('tel:')) return;
+                    
+                    const target = (link.getAttribute('target') || '_self').toLowerCase();
+                    const wouldLeaveView = target === '_blank' || target === '_top' || target === '_parent' || e.ctrlKey || e.metaKey || e.button === 1;
+                    if (!wouldLeaveView) return;
+                    
+                    e.preventDefault();
+                    e.stopPropagation();
+                    e.stopImmediatePropagation();
+                    
+                    if (href.startsWith('#')) {
+                        try {
+                            const anchor = iframeDocument.querySelector(href);
+                            if (anchor) anchor.scrollIntoView({ behavior: 'smooth' });
+                        } catch (err) {}
+                        return;
+                    }
+                    const targetUrl = resolveLinkUrl(href, link);
+                    if (targetUrl) self._navigateTo(targetUrl);
+                };
+                
+                ['click', 'auxclick'].forEach(ev => {
+                    iframeDocument.addEventListener(ev, captureHandler, true);
+                });
+                
+                // 拦截 window.open（防止通过 open 打开新窗口）
                 const originalOpen = iframeWindow.open;
                 iframeWindow.open = function(url, target, features) {
                     if (url) {
@@ -795,42 +814,46 @@
                         e.preventDefault();
                         e.stopPropagation();
                         
-                        const action = form.getAttribute('action') || iframeWindow.location.href;
-                        const method = form.getAttribute('method') || 'GET';
+                        let action = form.getAttribute('action') || '';
+                        const extractedFromProxy = action ? self._extractUrlFromProxy(action) : null;
+                        if (extractedFromProxy) {
+                            action = extractedFromProxy;
+                        }
+                        const baseHref = (self.currentUrl && self.currentUrl.startsWith('http')) ? self.currentUrl : 'https://example.com/';
+                        const actionUrl = (action && !action.startsWith('about:')) ? action : baseHref.replace(/\?.*$/, '');
+                        const method = (form.getAttribute('method') || 'GET').toUpperCase();
                         
-                        if (method.toUpperCase() === 'GET') {
-                            // GET 请求，构建查询字符串
-                            const formData = new FormData(form);
-                            const params = new URLSearchParams(formData);
-                            const url = new URL(action, iframeWindow.location.href);
-                            params.forEach((value, key) => {
-                                url.searchParams.append(key, value);
-                            });
-                            self._navigateTo(url.href);
-                        } else {
-                            // POST 请求，显示提示（因为无法在iframe内提交POST）
-                            if (typeof KernelLogger !== 'undefined') {
-                                KernelLogger.warn('Browser', 'POST 表单提交需要在浏览器内处理');
+                        try {
+                            const fullActionUrl = new URL(actionUrl, baseHref).href;
+                            if (method === 'POST' && self._shouldUseProxy(fullActionUrl)) {
+                                const proxyUrl = self._buildProxyUrl(fullActionUrl);
+                                const origAction = form.action;
+                                const origTarget = form.target;
+                                form.action = proxyUrl;
+                                form.target = self.iframe && self.iframe.name ? self.iframe.name : '_self';
+                                self.currentUrl = fullActionUrl;
+                                if (self.addressBar) self.addressBar.value = fullActionUrl;
+                                self.history.push(fullActionUrl);
+                                self.historyIndex = self.history.length - 1;
+                                self._updateNavigationButtons();
+                                form.submit();
+                                form.action = origAction;
+                                form.target = origTarget;
+                            } else {
+                                const formData = new FormData(form);
+                                const params = new URLSearchParams(formData);
+                                const url = new URL(actionUrl, baseHref);
+                                params.forEach((value, key) => {
+                                    url.searchParams.append(key, value);
+                                });
+                                self._navigateTo(url.href);
                             }
-                            self._navigateTo(action);
+                        } catch (err) {
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.warn('Browser', '表单 action URL 解析失败', { action, baseHref, err });
+                            }
                         }
                     });
-                });
-                
-                // 初始拦截
-                if (iframeDocument.readyState === 'loading') {
-                    iframeDocument.addEventListener('DOMContentLoaded', interceptLinks);
-                } else {
-                    interceptLinks();
-                }
-                
-                // 监听动态添加的链接
-                const observer = new MutationObserver(() => {
-                    interceptLinks();
-                });
-                observer.observe(iframeDocument.body, {
-                    childList: true,
-                    subtree: true
                 });
                 
             } catch (e) {

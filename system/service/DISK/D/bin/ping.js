@@ -88,6 +88,7 @@
                     let host = null;
                     let count = 4;  // 默认 4 个包
                     let continuous = false;  // 是否持续 ping
+                    let useRemote = false;    // 是否使用远程 API
 
                     for (let i = 0; i < args.length; i++) {
                         const arg = args[i];
@@ -112,20 +113,18 @@
                             }
                             i++;  // 跳过下一个参数
                         } else if (arg === '-t' || arg === '--continuous') {
-                            // 持续 ping（如果同时指定了 -c，则忽略 -c）
                             continuous = true;
+                        } else if (arg === '-R' || arg === '--remote') {
+                            useRemote = true;
                         } else if (arg === '-h' || arg === '--help') {
-                            // 帮助选项（虽然前面已经检查过，但这里也处理一下）
                             this._showUsage();
                             setTimeout(async () => {
                                 await this._selfClose();
                             }, 300);
                             return;
                         } else if (!host && !arg.startsWith('-')) {
-                            // 目标主机
                             host = arg;
                         } else if (arg.startsWith('-')) {
-                            // 未知选项
                             this.terminal.write(`ping: 无效的选项 -- ${arg}\n`);
                             this._showUsage();
                             setTimeout(async () => {
@@ -144,11 +143,17 @@
                     }
 
                     this.targetHost = host;
-                    // 持续 ping 模式设置最大包数量（100个），确保程序能够自关闭
-                    this.pingCount = continuous ? 100 : count;
                     this.isRunning = true;
 
-                    // 开始 ping
+                    if (useRemote) {
+                        await this._pingRemote(host);
+                        setTimeout(async () => {
+                            await this._selfClose();
+                        }, 300);
+                        return;
+                    }
+
+                    this.pingCount = continuous ? 100 : count;
                     await this._startPing();
                 } catch (error) {
                     if (typeof KernelLogger !== 'undefined') {
@@ -166,18 +171,73 @@
         /**
          * 显示使用说明
          */
+        /**
+         * 远程 Ping API 地址（uapis.cn）
+         */
+        PING_REMOTE_API_URL: 'https://uapis.cn/api/v1/network/ping',
+
         _showUsage: function() {
             this.terminal.write('用法: ping [选项] <主机>\n');
             this.terminal.write('\n');
             this.terminal.write('选项:\n');
             this.terminal.write('  -c <数量>        发送指定数量的包后停止\n');
             this.terminal.write('  -t, --continuous 持续 ping 直到手动停止 (Ctrl+C)\n');
+            this.terminal.write('  -R, --remote     使用远程 API 执行 ping（单次，返回 min/avg/max 延迟）\n');
             this.terminal.write('  -h, --help       显示此帮助信息\n');
             this.terminal.write('\n');
             this.terminal.write('示例:\n');
             this.terminal.write('  ping www.example.com\n');
             this.terminal.write('  ping -c 10 www.example.com\n');
-            this.terminal.write('  ping -t www.example.com\n');
+            this.terminal.write('  ping --remote baidu.com\n');
+        },
+
+        /**
+         * 使用远程 API 执行 ping（uapis.cn）
+         * @param {string} host 目标主机
+         */
+        _pingRemote: async function(host) {
+            const url = `${this.PING_REMOTE_API_URL}?host=${encodeURIComponent(host)}`;
+            this.terminal.write(`正在通过远程 API Ping ${host} ...\n`);
+            this.terminal.write('\n');
+            try {
+                const response = await fetch(url);
+                if (!response.ok) {
+                    this.terminal.write(`远程 Ping 失败: HTTP ${response.status} ${response.statusText}\n`);
+                    return;
+                }
+                const text = await response.text();
+                let data;
+                try {
+                    data = JSON.parse(text);
+                } catch (e) {
+                    this.terminal.write('远程 Ping 响应解析失败\n');
+                    return;
+                }
+                if (!data || typeof data !== 'object') {
+                    this.terminal.write('远程 Ping 响应数据无效\n');
+                    return;
+                }
+                const resHost = data.host || host;
+                const ip = data.ip != null ? data.ip : '--';
+                const location = data.location != null ? data.location : '--';
+                const minMs = data.min != null ? Number(data.min) : null;
+                const avgMs = data.avg != null ? Number(data.avg) : null;
+                const maxMs = data.max != null ? Number(data.max) : null;
+                this.terminal.write(`${resHost} 的 Ping 统计信息 (远程):\n`);
+                this.terminal.write(`    IP: ${ip}\n`);
+                this.terminal.write(`    位置: ${location}\n`);
+                if (minMs != null || avgMs != null || maxMs != null) {
+                    const fmt = (v) => (v != null ? (Math.round(v * 100) / 100) + 'ms' : '--');
+                    this.terminal.write(`    往返行程的估计时间(以毫秒为单位):\n`);
+                    this.terminal.write(`    最短 = ${fmt(minMs)}，最长 = ${fmt(maxMs)}，平均 = ${fmt(avgMs)}\n`);
+                }
+                this.terminal.write('\n');
+            } catch (err) {
+                this.terminal.write(`远程 Ping 错误: ${err.message || '未知错误'}\n`);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.debug('Ping', '远程 Ping 失败', err);
+                }
+            }
         },
 
         /**

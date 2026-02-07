@@ -57,6 +57,11 @@ class TaskbarManager {
     // 天气API最大失败次数（超过此次数后不再请求API）
     static WEATHER_API_MAX_FAILURES = 3;
     
+    /**
+     * 天气 API 地址（uapis.cn，支持 city 参数与 forecast/life_indices）
+     */
+    static WEATHER_API_URL = 'https://uapis.cn/api/v1/misc/weather';
+    
     // 自定义任务栏图标管理
     static _customIcons = new Map(); // Map<iconId, CustomIconData>
     static _customIconIdCounter = 0; // 自定义图标ID计数器
@@ -5056,26 +5061,62 @@ class TaskbarManager {
     }
     
     /**
+     * 将 uapis.cn 天气 API 响应规范化为组件使用的 data 结构
+     * @param {Object} raw - uapis.cn 原始响应（province, city, weather, temperature, temp_min, temp_max, forecast[], life_indices, feels_like 等）
+     * @returns {Object} 规范化后的 data 对象（与旧 API 的 data 形状一致）
+     */
+    static _normalizeUapisWeatherData(raw) {
+        if (!raw || typeof raw !== 'object') return null;
+        const forecastList = Array.isArray(raw.forecast) ? raw.forecast : [];
+        const today = forecastList[0] || {};
+        const cityDisplay = raw.city ? (raw.province ? `${raw.province} ${raw.city}` : raw.city) : '未知城市';
+        const tips = (raw.life_indices && (raw.life_indices.clothing?.advice || raw.life_indices.comfort?.advice)) || '';
+        return {
+            city: cityDisplay,
+            today: {
+                current_temp: raw.temperature != null ? `${raw.temperature}℃` : (today.temp_max != null ? `${today.temp_max}℃` : '--℃'),
+                current_cond: raw.weather || today.weather_day || today.weather_night || '未知',
+                low: raw.temp_min != null ? `${raw.temp_min}℃` : (today.temp_min != null ? `${today.temp_min}℃` : '--℃'),
+                quality: '--'
+            },
+            low_temperature: raw.temp_min != null ? raw.temp_min : (today.temp_min != null ? today.temp_min : null),
+            tips: tips,
+            seven_day: forecastList.map(f => ({
+                date: f.date,
+                cond: f.weather_day || f.weather_night || '--',
+                high: f.temp_max != null ? `${f.temp_max}℃` : '--',
+                low: f.temp_min != null ? `${f.temp_min}℃` : '--'
+            })),
+            life_indices: raw.life_indices || null,
+            feels_like: raw.feels_like != null ? raw.feels_like : null,
+            wind_direction: raw.wind_direction || null,
+            wind_power: raw.wind_power || null,
+            humidity: raw.humidity != null ? raw.humidity : null
+        };
+    }
+    
+    /**
      * 更新天气UI
      * @param {HTMLElement} container - 天气容器元素
      * @param {HTMLElement} tempText - 温度文本元素
      * @param {HTMLElement} descText - 描述文本元素
      * @param {HTMLElement} iconElement - 图标元素
-     * @param {Object} weatherData - 天气数据
+     * @param {Object} weatherData - 天气数据（含 code 与 data，或已为规范化 data 的兼容结构）
      */
     static _updateWeatherUI(container, tempText, descText, iconElement, weatherData) {
-        if (!weatherData || !weatherData.data) {
+        const data = weatherData && weatherData.data != null ? weatherData.data : (weatherData || null);
+        if (!data || !data.today) {
             return;
         }
         
-        const today = weatherData.data.today;
+        const today = data.today;
         
         // 更新温度文本（如果存在）
         if (tempText) {
             if (today && today.current_temp) {
                 tempText.textContent = today.current_temp;
-            } else if (weatherData.data.low_temperature !== undefined) {
-                tempText.textContent = `${weatherData.data.low_temperature}℃`;
+            } else if (data.low_temperature !== undefined) {
+                tempText.textContent = `${data.low_temperature}℃`;
             } else {
                 tempText.textContent = '--℃';
             }
@@ -5106,14 +5147,14 @@ class TaskbarManager {
         
         // 更新工具提示（包含温度信息，特别是垂直布局时）
         const tooltip = container.querySelector('.taskbar-icon-tooltip');
-        if (tooltip && weatherData.data.city) {
-            const tempInfo = today && today.current_temp ? today.current_temp : (weatherData.data.low_temperature !== undefined ? `${weatherData.data.low_temperature}℃` : '');
+        if (tooltip && data.city) {
+            const tempInfo = today && today.current_temp ? today.current_temp : (data.low_temperature !== undefined ? `${data.low_temperature}℃` : '');
             const condInfo = today && today.current_cond ? today.current_cond : '天气';
-            tooltip.textContent = `${weatherData.data.city} ${tempInfo} ${condInfo}`;
+            tooltip.textContent = `${data.city} ${tempInfo} ${condInfo}`;
         }
         
         // 保存天气数据到容器，以便在面板中显示
-        container._weatherData = weatherData.data;
+        container._weatherData = data;
     }
     
     /**
@@ -5344,40 +5385,32 @@ class TaskbarManager {
                         KernelLogger.debug("TaskbarManager", `BOM 方法失败: ${bomError.message}，降级到直接调用 API`);
                             
                         try {
-                            const cityResponse = await fetch('https://api-v1.cenguigui.cn/api/UserInfo/apilet.php');
+                            const cityResponse = await fetch('https://uapis.cn/api/v1/network/myip?source=commercial');
                             if (!cityResponse.ok) {
                                 throw new Error(`获取城市信息失败: ${cityResponse.status}`);
                             }
-                            
-                            // 先读取文本内容（避免响应流被重复读取）
                             const cityText = await cityResponse.text();
-                            
-                            // 检查响应类型
                             const contentType = cityResponse.headers.get('content-type') || '';
                             const isJson = contentType.includes('application/json');
-                            
                             let cityData;
                             if (isJson) {
                                 try {
-                                    // 尝试解析 JSON
                                     cityData = JSON.parse(cityText);
                                 } catch (jsonError) {
-                                    // JSON 解析失败
                                     KernelLogger.error("TaskbarManager", `城市信息 API JSON 解析失败，响应内容: ${cityText.substring(0, 500)}`);
                                     throw new Error(`城市信息 API 返回了无效的 JSON 响应`);
                                 }
                             } else {
-                                // 响应不是 JSON，可能是 HTML 错误页面
                                 KernelLogger.error("TaskbarManager", `城市信息 API 返回了非 JSON 响应 (Content-Type: ${contentType})，响应内容: ${cityText.substring(0, 500)}`);
                                 throw new Error(`城市信息 API 返回了非 JSON 响应 (可能是服务器错误)`);
                             }
-                            
-                            if (!cityData || cityData.code !== '200' || !cityData.data || cityData.data.length === 0) {
+                            if (!cityData || typeof cityData !== 'object') {
                                 throw new Error('城市信息数据无效');
                             }
-                            
-                            // 获取城市名称（使用第一个结果）
-                            requestCityName = cityData.data[0].name;
+                            requestCityName = (cityData.district != null ? String(cityData.district).trim() : null) || (cityData.region != null ? String(cityData.region).trim() : null);
+                            if (!requestCityName) {
+                                throw new Error('城市信息缺少 district/region');
+                            }
                         } catch (cityApiError) {
                             // 城市信息 API 也失败，使用默认城市
                             requestCityName = '晋城'; // 默认城市
@@ -5429,48 +5462,44 @@ class TaskbarManager {
                     }
                 }
                 
-                // 3. 缓存不存在或过期，实时请求天气API
+                // 3. 缓存不存在或过期，实时请求天气API（uapis.cn）
                 // 注意：失败次数检查已在外部完成，这里直接请求API
                 KernelLogger.debug("TaskbarManager", `从API获取天气数据: ${requestCityName}（失败次数: ${TaskbarManager._weatherApiFailureCount}/${TaskbarManager.WEATHER_API_MAX_FAILURES}）`);
                 
                 try {
-                    const weatherResponse = await fetch(`https://api-v1.cenguigui.cn/api/WeatherInfo/?city=${encodeURIComponent(requestCityName)}`);
+                    const weatherUrl = `${TaskbarManager.WEATHER_API_URL}?city=${encodeURIComponent(requestCityName)}&extended=true&indices=true&forecast=true`;
+                    const weatherResponse = await fetch(weatherUrl);
                     if (!weatherResponse.ok) {
                         throw new Error(`获取天气信息失败: ${weatherResponse.status}`);
                     }
-                        
-                // 先读取文本内容（避免响应流被重复读取）
-                const weatherText = await weatherResponse.text();
-                
-                // 检查响应类型
-                const weatherContentType = weatherResponse.headers.get('content-type') || '';
-                const isWeatherJson = weatherContentType.includes('application/json');
-                
-                let requestWeatherData;
-                if (isWeatherJson) {
-                    try {
-                        // 尝试解析 JSON
-                        requestWeatherData = JSON.parse(weatherText);
-                    } catch (jsonError) {
-                        // JSON 解析失败
-                        KernelLogger.error("TaskbarManager", `天气 API JSON 解析失败，响应内容: ${weatherText.substring(0, 500)}`);
-                        throw new Error(`天气 API 返回了无效的 JSON 响应`);
+                    
+                    const weatherText = await weatherResponse.text();
+                    const weatherContentType = weatherResponse.headers.get('content-type') || '';
+                    const isWeatherJson = weatherContentType.includes('application/json');
+                    
+                    let rawWeather;
+                    if (isWeatherJson) {
+                        try {
+                            rawWeather = JSON.parse(weatherText);
+                        } catch (jsonError) {
+                            KernelLogger.error("TaskbarManager", `天气 API JSON 解析失败，响应内容: ${weatherText.substring(0, 500)}`);
+                            throw new Error(`天气 API 返回了无效的 JSON 响应`);
+                        }
+                    } else {
+                        KernelLogger.error("TaskbarManager", `天气 API 返回了非 JSON 响应 (Content-Type: ${weatherContentType})，响应内容: ${weatherText.substring(0, 500)}`);
+                        throw new Error(`天气 API 返回了非 JSON 响应 (可能是服务器错误)`);
                     }
-                } else {
-                    // 响应不是 JSON，可能是 HTML 错误页面
-                    KernelLogger.error("TaskbarManager", `天气 API 返回了非 JSON 响应 (Content-Type: ${weatherContentType})，响应内容: ${weatherText.substring(0, 500)}`);
-                    throw new Error(`天气 API 返回了非 JSON 响应 (可能是服务器错误)`);
-                }
-                
-                    if (!requestWeatherData || requestWeatherData.code !== 200 || !requestWeatherData.data) {
+                    
+                    const normalizedData = TaskbarManager._normalizeUapisWeatherData(rawWeather);
+                    if (!normalizedData || !normalizedData.today) {
                         throw new Error('天气数据无效');
                     }
                     
-                    // API请求成功，重置失败计数器
+                    const requestWeatherData = { code: 200, data: normalizedData };
+                    
                     TaskbarManager._weatherApiFailureCount = 0;
                     KernelLogger.debug("TaskbarManager", `天气API请求成功，重置失败计数器`);
                     
-                    // 4. 将天气响应加入缓存（12小时生命周期）
                     if (typeof CacheDrive !== 'undefined') {
                         try {
                             await CacheDrive.set(cacheKey, requestWeatherData, {
@@ -5483,7 +5512,6 @@ class TaskbarManager {
                         }
                     }
                     
-                    // 写入进程内短期缓存（5 分钟）
                     TaskbarManager._weatherMemoryCache.set(cacheKey, {
                         data: requestWeatherData,
                         city: requestCityName,
@@ -5958,6 +5986,19 @@ class TaskbarManager {
         
         const today = weatherData.today || {};
         const sevenDay = weatherData.seven_day || [];
+        const feelsLike = weatherData.feels_like != null ? weatherData.feels_like : null;
+        const lifeIndices = weatherData.life_indices || {};
+        const windDir = weatherData.wind_direction || null;
+        const windPower = weatherData.wind_power || null;
+        const humidity = weatherData.humidity != null ? weatherData.humidity : null;
+        
+        // 生活指数摘要（穿衣、舒适、运动等）
+        const lifeLines = [];
+        if (lifeIndices.clothing) lifeLines.push({ label: '穿衣', text: lifeIndices.clothing.advice || lifeIndices.clothing.brief });
+        if (lifeIndices.comfort) lifeLines.push({ label: '舒适', text: lifeIndices.comfort.advice || lifeIndices.comfort.brief });
+        if (lifeIndices.exercise) lifeLines.push({ label: '运动', text: lifeIndices.exercise.advice || lifeIndices.exercise.brief });
+        if (lifeIndices.car_wash) lifeLines.push({ label: '洗车', text: lifeIndices.car_wash.brief });
+        if (lifeIndices.uv) lifeLines.push({ label: '紫外线', text: lifeIndices.uv.advice || lifeIndices.uv.brief });
         
         // 更新当前天气区域
         const currentWeather = panel.querySelector('#weather-panel-current');
@@ -5978,23 +6019,28 @@ class TaskbarManager {
                         </div>
                         <div style="font-size: 32px; font-weight: 600; color: rgba(215, 224, 221, 0.95);">${currentTemp}</div>
                     </div>
-                    <div style="display: flex; justify-content: space-between; font-size: 12px; color: rgba(215, 224, 221, 0.7);">
+                    <div style="display: flex; justify-content: space-between; flex-wrap: wrap; gap: 4px; font-size: 12px; color: rgba(215, 224, 221, 0.7);">
                         <span>最低: ${low}</span>
+                        ${feelsLike != null ? `<span>体感: ${feelsLike}℃</span>` : ''}
                         <span>空气质量: ${quality}</span>
+                        ${windDir ? `<span>${windDir} ${windPower ? windPower + '级' : ''}</span>` : ''}
+                        ${humidity != null ? `<span>湿度: ${humidity}%</span>` : ''}
                     </div>
                     ${tips ? `<div style="font-size: 11px; color: rgba(215, 224, 221, 0.6); margin-top: 4px;">${tips}</div>` : ''}
+                    ${lifeLines.length > 0 ? `<div style="font-size: 11px; color: rgba(215, 224, 221, 0.55); margin-top: 8px; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 8px;">
+                        ${lifeLines.map(l => `<div style="margin-bottom: 4px;"><strong>${l.label}:</strong> ${l.text}</div>`).join('')}
+                    </div>` : ''}
                 </div>
             `;
         }
         
-        // 更新未来7天天气预报
+        // 更新未来预报（API 返回几天就显示几天，最多 7 天；跳过今天）
         const forecast = panel.querySelector('#weather-panel-forecast');
         if (forecast && sevenDay.length > 0) {
-            // 只显示未来7天（跳过今天）
             const futureDays = sevenDay.slice(1, 8);
             
             forecast.innerHTML = `
-                <div style="font-size: 14px; font-weight: 600; color: rgba(215, 224, 221, 0.95); margin-bottom: 12px;">未来7天</div>
+                <div style="font-size: 14px; font-weight: 600; color: rgba(215, 224, 221, 0.95); margin-bottom: 12px;">未来${futureDays.length}天</div>
                 <div style="display: flex; flex-direction: column; gap: 8px;">
                     ${futureDays.map(day => {
                         const date = new Date(day.date);

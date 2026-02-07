@@ -1,4 +1,4 @@
-﻿// 地理位置驱动管理器
+// 地理位置驱动管理器
 // 负责管理系统级的地理位置功能，包括高精度定位、低精度定位、地址信息获取等
 // 提供统一的地理位置 API 供程序使用
 
@@ -26,9 +26,9 @@ class GeographyDrive {
     };
     
     /**
-     * 第三方 API 地址
+     * 第三方 API 地址（基于 IP 的定位，核心数据为 district）
      */
-    static API_URL = 'https://api-v1.cenguigui.cn/api/UserInfo/apilet.php';
+    static API_URL = 'https://uapis.cn/api/v1/network/myip?source=commercial';
     
     // ==================== 内部状态 ====================
     
@@ -280,22 +280,13 @@ class GeographyDrive {
     }
     
     /**
-     * 使用第三方 API 获取位置信息
-     * @param {Object|null} nativeLocation - 原生 API 获取的位置信息（可选）
-     * @returns {Promise<Object>} 位置信息对象
+     * 使用第三方 API 获取位置信息（uapis.cn myip，基于 IP 定位，核心数据为 district）
+     * @param {Object|null} nativeLocation - 原生 API 获取的位置信息（可选，本 API 不依赖此参数）
+     * @returns {Promise<Object>} 位置信息对象 { name, geo, address, source }
      */
     static async _getApiLocation(nativeLocation) {
         try {
-            // 构建请求参数
-            const params = new URLSearchParams();
-            if (nativeLocation) {
-                params.append('latitude', nativeLocation.latitude);
-                params.append('longitude', nativeLocation.longitude);
-            }
-            
-            // 发送请求
-            const url = GeographyDrive.API_URL + (params.toString() ? '?' + params.toString() : '');
-            const response = await fetch(url, {
+            const response = await fetch(GeographyDrive.API_URL, {
                 method: 'GET',
                 headers: {
                     'Accept': 'application/json'
@@ -306,49 +297,45 @@ class GeographyDrive {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
             
-            // 先读取文本内容（避免响应流被重复读取）
             const text = await response.text();
-            
-            // 检查响应类型
             const contentType = response.headers.get('content-type') || '';
             const isJson = contentType.includes('application/json');
             
             let data;
             if (isJson) {
                 try {
-                    // 尝试解析 JSON
                     data = JSON.parse(text);
                 } catch (jsonError) {
-                    // JSON 解析失败
                     KernelLogger.error("GeographyDrive", `JSON 解析失败，响应内容: ${text.substring(0, 500)}`);
                     throw new Error(`API 返回了无效的 JSON 响应: ${jsonError.message}`);
                 }
             } else {
-                // 响应不是 JSON，可能是 HTML 错误页面
                 KernelLogger.error("GeographyDrive", `API 返回了非 JSON 响应 (Content-Type: ${contentType})，响应内容: ${text.substring(0, 500)}`);
                 throw new Error(`API 返回了非 JSON 响应 (可能是服务器错误页面)`);
             }
             
-            // 检查响应格式
             if (!data || typeof data !== 'object') {
                 throw new Error('API 响应数据格式错误');
             }
             
-            if (data.code !== '200' || !Array.isArray(data.data) || data.data.length === 0) {
-                throw new Error('API 响应格式错误或数据为空');
+            // uapis.cn myip 响应: ip, region, isp, latitude, longitude, district 等，核心数据为 district
+            const name = data.district != null ? String(data.district).trim() : (data.region != null ? String(data.region).trim() : null);
+            const geo = (data.latitude != null && data.longitude != null)
+                ? { latitude: Number(data.latitude), longitude: Number(data.longitude) }
+                : null;
+            const address = data.region != null ? String(data.region).trim() : null;
+            
+            if (!name && !geo) {
+                throw new Error('API 响应缺少有效位置数据（district/region 或 latitude/longitude）');
             }
             
-            // 使用 data[0]（市区）作为数据源
-            const cityData = data.data[0];
-            
             return {
-                name: cityData.name || null,
-                geo: cityData.geo || null,
-                address: cityData.address || null,
+                name: name || null,
+                geo: geo,
+                address: address || null,
                 source: nativeLocation ? GeographyDrive.ACCURACY.HIGH : GeographyDrive.ACCURACY.LOW
             };
         } catch (error) {
-            // 第三方 API 请求失败，静默降级（只记录调试日志）
             KernelLogger.debug("GeographyDrive", `第三方 API 请求失败: ${error.message}`);
             throw error;
         }

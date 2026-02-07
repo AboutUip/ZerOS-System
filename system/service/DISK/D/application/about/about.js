@@ -366,24 +366,28 @@
             section.appendChild(desc);
             
             const sponsors = typeof SystemInformation !== 'undefined' ? SystemInformation.getSponsors() : [];
-            const grid = document.createElement('div');
-            grid.style.cssText = `display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px;`;
+            const list = document.createElement('div');
+            list.style.cssText = `display: flex; flex-direction: column; gap: 8px;`;
             
             if (sponsors.length === 0) {
                 const empty = document.createElement('p');
                 empty.textContent = this._getText('ABOUT_NO_SPONSORS', '暂无赞助商');
                 empty.style.cssText = `font-size: 14px; color: var(--theme-text-secondary, rgba(215, 224, 221, 0.5)); margin: 0;`;
-                grid.appendChild(empty);
+                list.appendChild(empty);
             } else {
                 sponsors.forEach(s => {
-                    const card = document.createElement('div');
-                    card.style.cssText = `
-                        padding: 14px;
+                    const bar = document.createElement('div');
+                    bar.style.cssText = `
+                        display: flex; flex-direction: column; align-items: stretch;
+                        padding: 12px 16px;
                         background: var(--theme-background-secondary, rgba(20, 25, 35, 0.4));
                         border: 1px solid var(--theme-border, rgba(108, 142, 255, 0.15));
                         border-radius: 8px;
+                        width: 100%;
+                        box-sizing: border-box;
+                        gap: 6px;
                     `;
-                    const nameEl = document.createElement(s.link ? 'a' : 'div');
+                    const nameEl = document.createElement(s.link ? 'a' : 'span');
                     nameEl.textContent = s.name;
                     if (s.link) {
                         nameEl.href = s.link;
@@ -391,18 +395,18 @@
                         nameEl.rel = 'noopener';
                         nameEl.style.color = 'var(--theme-primary, #6c8eff)';
                     }
-                    nameEl.style.cssText = (nameEl.style.cssText || '') + ' font-size: 14px; font-weight: 600; display: block; margin-bottom: 4px;';
-                    card.appendChild(nameEl);
+                    nameEl.style.cssText = (nameEl.style.cssText || '') + ' font-size: 14px; font-weight: 600;';
+                    bar.appendChild(nameEl);
                     if (s.description) {
                         const d = document.createElement('div');
                         d.textContent = s.description;
-                        d.style.cssText = 'font-size: 12px; color: var(--theme-text-secondary, rgba(215, 224, 221, 0.6));';
-                        card.appendChild(d);
+                        d.style.cssText = 'font-size: 13px; color: var(--theme-text-secondary, rgba(215, 224, 221, 0.6)); margin: 0; line-height: 1.4;';
+                        bar.appendChild(d);
                     }
-                    grid.appendChild(card);
+                    list.appendChild(bar);
                 });
             }
-            section.appendChild(grid);
+            section.appendChild(list);
             return section;
         },
         

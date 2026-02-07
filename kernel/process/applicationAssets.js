@@ -151,7 +151,8 @@ const APPLICATION_ASSETS = {
         styles: ["D:/application/browser/browser.css"],
         icon: "D:/application/browser/browser.svg",
         assets: [
-            "D:/application/browser/assets/booklink.js"
+            "D:/application/browser/assets/booklink.js",
+            "D:/application/browser/assets/x-frame-bypass.js"
         ],
         metadata: {
             autoStart: false,

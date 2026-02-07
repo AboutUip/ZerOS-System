@@ -1,11 +1,11 @@
-# 公告服务（server-announcement）
+# 通知服务（server-notice）
 
 ## 概述
 
-`server-announcement` 是 ZerOS 内置的**系统公告通知获取服务**，由 ServerExpansion 从 `D/server` 加载。服务启动后每隔 3 分钟请求公告 API，按 `subTime` 去重，新公告按等级弹通知或仅记录日志。
+`server-notice` 是 ZerOS 内置的**系统公告通知获取服务**，由 ServerExpansion 从 `D/server` 加载。服务启动后每隔 3 分钟请求公告 API，按 `subTime` 去重，新公告按等级弹通知或仅记录日志。
 
-- **服务 ID**：`announcement`（对应文件 `server-announcement.js`）
-- **位置**：`D/server/server-announcement.js`（项目内 `system/service/DISK/D/server/server-announcement.js`）
+- **服务 ID**：`notice`（对应文件 `server-notice.js`）
+- **位置**：`D/server/server-notice.js`（项目内 `system/service/DISK/D/server/server-notice.js`）
 - **依赖**：ServerExpansion 已随 BootLoader 加载；服务运行在主窗口，可访问内核全局对象。
 
 ## 功能说明
@@ -19,7 +19,7 @@
 
 ## 公告 API 约定
 
-- **地址**：脚本内常量 `ANNOUNCE_API_URL`，当前默认为空；正式使用前需在 `server-announcement.js` 中配置为实际 URL。
+- **地址**：脚本内常量 `ANNOUNCE_API_URL`，正式使用前需在 `server-notice.js` 中配置为实际 URL。
 - **方法**：GET（或当前 `fetch` 默认行为）。
 - **响应格式**：JSON，且需包含 `data` 字段：
   - **单条**：`{ "data": { "level": 0|1|2, "title": "", "content": "", "subTime": "唯一标识" } }`
@@ -44,15 +44,15 @@
 
 ## 生命周期与状态
 
-- **__init__**：仅首次 `ServerExpansion.start('announcement')` 时调用一次，打日志。
+- **__init__**：仅首次 `ServerExpansion.start('notice')` 时调用一次，打日志。
 - **__start__**：开始轮询（立即拉取一次 + 每 3 分钟一次）。
 - **__stop__**：清除定时器，停止轮询。
 - **__status__**：返回 `{ running, lastFetchTime, lastSubTime, lastError, apiUrl }`，其中 `apiUrl` 为“(已配置)”或“(未配置)”。
-- **__info__**：返回 `{ name: 'Announcement', version: '1.0', description: 'ZerOS系统公告通知获取' }`。
+- **__info__**：返回 `{ name: 'SystemNotice', version: '1.0', description: 'ZerOS系统公告通知获取' }`。
 
 ## 配置与自启
 
-- **配置 API 地址**：编辑 `server-announcement.js` 顶部常量 `ANNOUNCE_API_URL`，填入实际公告 API 的完整 URL。
+- **配置 API 地址**：编辑 `server-notice.js` 顶部常量 `ANNOUNCE_API_URL`，填入实际公告 API 的完整 URL。
 - **自启**：在「系统服务管理」中勾选该服务的「系统启动时自动启动此服务」，会通过计划任务创建 SYSTEM_STARTUP 类型的服务任务，实现开机自启。
 
 ## 相关文档

@@ -147,7 +147,7 @@ const tasks = await ProcessManager.callKernelAPI(
   - `taskType` (string, 可选): 任务类型，`'program'` | `'command'` | `'service'`，默认 `'program'`
   - `programName` (string, 当 taskType 为 `program` 时必需): 程序名称
   - `command` (string, 当 taskType 为 `command` 时必需): 要执行的命令
-  - `serviceId` (string, 当 taskType 为 `service` 时必需): 服务 ID（ServerExpansion 中的服务标识，如 `announcement`）
+  - `serviceId` (string, 当 taskType 为 `service` 时必需): 服务 ID（ServerExpansion 中的服务标识，如 `notice`）
   - `serviceAction` (string, 当 taskType 为 `service` 时可选): 服务操作，`'start'` | `'stop'`，默认 `'start'`
   - `triggerType` (string, 必需): 触发类型（`SYSTEM_STARTUP`、`SYSTEM_SHUTDOWN`、`SPECIFIC_TIME`、`TIME_RANGE`、`INTERVAL`）
   - `triggerConfig` (Object, 必需): 触发配置（根据触发类型不同而不同）
@@ -485,13 +485,13 @@ const taskId = await ProcessManager.callKernelAPI(
 ### 示例 6: 创建服务任务（启动/停止 ServerExpansion 服务）
 
 ```javascript
-// 创建每天 09:00 启动公告服务的任务
+// 创建每天 09:00 启动通知服务的任务
 const taskId = await ProcessManager.callKernelAPI(
     this.pid,
     'ScheduleTask.create',
     [{
         taskType: 'service',
-        serviceId: 'announcement',
+        serviceId: 'notice',
         serviceAction: 'start',
         triggerType: 'SPECIFIC_TIME',
         triggerConfig: { time: '09:00' },
@@ -505,7 +505,7 @@ const taskId2 = await ProcessManager.callKernelAPI(
     'ScheduleTask.create',
     [{
         taskType: 'service',
-        serviceId: 'announcement',
+        serviceId: 'notice',
         serviceAction: 'stop',
         triggerType: 'SYSTEM_SHUTDOWN',
         triggerConfig: {},

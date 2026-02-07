@@ -136,6 +136,11 @@ class LStorage {
         cacheTTL: 1000 // 1秒缓存
     };
 
+    /** 初始化完成时间戳（用于关键键空值时延迟重载） */
+    static _initTime = 0;
+    /** 关键键已尝试重载标记，避免重复重载 */
+    static _criticalKeyReloadAttempted = { 'desktop.icons': false, 'registry': false };
+
     /**
      * 规范化路径（移除末尾斜杠，除非是根路径如 "D:"）
      * @param {string} path 路径
@@ -171,6 +176,8 @@ class LStorage {
             // 加载存储数据（允许在加载时保存新文件）
             await LStorage._loadStorageData(true);
             LStorage._initialized = true;
+            LStorage._initTime = Date.now();
+            LStorage._criticalKeyReloadAttempted = { 'desktop.icons': false, 'registry': false };
             KernelLogger.info("LStorage", "本地存储管理器初始化完成");
         } catch (error) {
             KernelLogger.error("LStorage", `初始化失败: ${error.message}`, error);
@@ -180,6 +187,35 @@ class LStorage {
                 programs: {}
             };
             LStorage._initialized = true;
+            LStorage._initTime = Date.now();
+            LStorage._criticalKeyReloadAttempted = { 'desktop.icons': false, 'registry': false };
+        }
+    }
+
+    /**
+     * 当关键键（desktop.icons、registry）为空且处于初始化后短时间窗口内时，强制从文件重载一次，避免重启后概率性丢失
+     * @param {string} key 存储键
+     * @returns {Promise<void>}
+     */
+    static async _maybeReloadCriticalKey(key) {
+        if (key !== 'desktop.icons' && key !== 'registry') return;
+        const sys = LStorage._storageData && LStorage._storageData.system;
+        const val = sys ? sys[key] : undefined;
+        const isEmpty = key === 'desktop.icons'
+            ? (!Array.isArray(val) || val.length === 0)
+            : (val === undefined || val === null || typeof val !== 'object' || Array.isArray(val));
+        if (!isEmpty) return;
+        const elapsed = Date.now() - LStorage._initTime;
+        if (elapsed > 10000) return; // 仅初始化后 10 秒内重试
+        if (LStorage._criticalKeyReloadAttempted[key]) return;
+        LStorage._criticalKeyReloadAttempted[key] = true;
+        try {
+            LStorage._requestCache.readCache = null;
+            LStorage._requestCache.readCacheTime = 0;
+            await LStorage._loadStorageData(false);
+            KernelLogger.info("LStorage", `关键键 ${key} 为空，已从文件重新加载`);
+        } catch (e) {
+            KernelLogger.debug("LStorage", `关键键 ${key} 重载失败: ${e.message}`);
         }
     }
 
@@ -490,13 +526,21 @@ class LStorage {
             const filePath = LStorage.STORAGE_FILE_PATH;
             const fileName = LStorage.STORAGE_FILE_NAME;
 
-            // 检查缓存
+            // 检查缓存：若缓存中关键键（desktop.icons、registry）为空，则不使用缓存，强制从文件重读，避免重启后概率性丢失
             const now = Date.now();
-            if (LStorage._requestCache.readCache !== null &&
-                (now - LStorage._requestCache.readCacheTime) < LStorage._requestCache.cacheTTL) {
-                KernelLogger.debug("LStorage", "使用缓存数据");
-                LStorage._storageData = LStorage._requestCache.readCache;
-                return;
+            const cacheValid = LStorage._requestCache.readCache !== null &&
+                (now - LStorage._requestCache.readCacheTime) < LStorage._requestCache.cacheTTL;
+            if (cacheValid) {
+                const sys = LStorage._requestCache.readCache.system;
+                const iconsEmpty = !sys || !Array.isArray(sys['desktop.icons']) || sys['desktop.icons'].length === 0;
+                const registryEmpty = !sys || typeof sys['registry'] !== 'object' || Array.isArray(sys['registry']);
+                if (iconsEmpty || registryEmpty) {
+                    KernelLogger.debug("LStorage", "缓存中关键键(desktop.icons/registry)为空，跳过缓存并从文件重新加载");
+                } else {
+                    KernelLogger.debug("LStorage", "使用缓存数据");
+                    LStorage._storageData = LStorage._requestCache.readCache;
+                    return;
+                }
             }
 
             // 检查文件是否存在
@@ -1137,6 +1181,11 @@ class LStorage {
         // 特殊处理：applicationTable 存储在独立的文件中
         if (key === 'applicationTable') {
             return await LStorage._getApplicationTable();
+        }
+
+        // 关键键（桌面图标、注册表）为空时在初始化后短时间窗口内强制从文件重载一次，减少重启后概率性丢失
+        if (key === 'desktop.icons' || key === 'registry') {
+            await LStorage._maybeReloadCriticalKey(key);
         }
 
         // 检查是否为内核模块调用
@@ -2236,10 +2285,15 @@ class LStorage {
 
     /**
      * 清除读取缓存（用于强制刷新）
+     * 同时重置关键键重载标记，使后续 getSystemStorage('desktop.icons'/'registry') 可再次尝试从文件重载
      */
     static clearCache() {
         LStorage._requestCache.readCache = null;
         LStorage._requestCache.readCacheTime = 0;
+        if (LStorage._criticalKeyReloadAttempted) {
+            LStorage._criticalKeyReloadAttempted['desktop.icons'] = false;
+            LStorage._criticalKeyReloadAttempted['registry'] = false;
+        }
         KernelLogger.debug("LStorage", "读取缓存已清除");
     }
 

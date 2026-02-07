@@ -110,11 +110,12 @@ const pid = (typeof ProcessManager !== 'undefined' && ProcessManager.SERVER_SERV
 
 ## 内置服务示例
 
-- **announcement**：`D/server/server-announcement.js`，系统公告通知获取（轮询 API、按等级弹通知）。详见 [公告服务（ServerAnnouncement）](./ServerAnnouncement.md)。
+- **notice**：`D/server/server-notice.js`，系统公告通知获取（轮询 API、按等级弹通知）。详见 [通知服务（ServerNotice）](./ServerNotice.md)。
 
 ## 相关文档
 
 - [ServerExpansion API](../API/ServerExpansion.md) - 服务扩展 API 说明
-- [公告服务（ServerAnnouncement）](./ServerAnnouncement.md) - 内置公告服务说明与 ZerOS API 使用
+- [通知服务（ServerNotice）](./ServerNotice.md) - 内置通知服务说明与 ZerOS API 使用
+- [浏览器代理（BrowserProxy）](../API/BrowserProxy.md) - 浏览器网页代理服务（PHP 后端）
 - [扩展与插件索引](../PLUGINS/README.md) - 语言包、服务模块等扩展文档
 - [文档中心](../README.md)
