@@ -13,6 +13,21 @@
         blacklist: new Set(), // 程序黑名单
         whitelist: new Set(), // 程序白名单
         autoGrantEnabled: true, // 是否启用自动授予（仅普通权限）
+        _languageChangeUnsubscribe: null,
+
+        /** 多语言文案：优先使用 LanguagesExpansion，否则返回 fallback */
+        _getText: function (key, fallback) {
+            try {
+                const LanguagesExpansion = (typeof POOL !== 'undefined' && POOL && typeof POOL.__GET__ === 'function')
+                    ? POOL.__GET__('KERNEL_GLOBAL_POOL', 'LanguagesExpansion')
+                    : (typeof window !== 'undefined' ? window.LanguagesExpansion : null);
+                if (LanguagesExpansion && typeof LanguagesExpansion.getText === 'function') {
+                    const value = LanguagesExpansion.getText(key);
+                    if (value && value !== key) return value;
+                }
+            } catch (e) {}
+            return fallback != null ? fallback : key;
+        },
 
         __init__: async function (pid, initArgs) {
             if (typeof KernelLogger !== 'undefined') {
@@ -69,7 +84,7 @@
                 }
 
                 const windowInfo = GUIManager.registerWindow(pid, this.window, {
-                    title: '权限管控中心',
+                    title: this._getText('PERMC_TITLE', '权限管控中心'),
                     icon: icon,
                     onClose: () => {
                         // 窗口关闭时终止程序
@@ -114,15 +129,54 @@
             // 注册键盘快捷键
             this._registerKeyboardShortcuts();
 
+            // 订阅语言切换，刷新界面文案
+            const LanguagesExpansion = (typeof POOL !== 'undefined' && POOL && typeof POOL.__GET__ === 'function')
+                ? POOL.__GET__('KERNEL_GLOBAL_POOL', 'LanguagesExpansion')
+                : (typeof window !== 'undefined' ? window.LanguagesExpansion : null);
+            if (LanguagesExpansion && typeof LanguagesExpansion.onLanguageChange === 'function') {
+                this._languageChangeUnsubscribe = LanguagesExpansion.onLanguageChange(() => {
+                    this._refreshAllUITexts();
+                });
+            }
+
             // 延迟加载数据，确保进程已完全注册
             setTimeout(async () => {
                 await this._refreshData();
             }, 100);
         },
 
+        /** 语言切换时刷新所有界面文案 */
+        _refreshAllUITexts: function () {
+            if (!this.window) return;
+            const titleEl = this.window.querySelector('.zos-window-title');
+            if (titleEl) titleEl.textContent = this._getText('PERMC_TITLE', '权限管控中心');
+            const toolbar = this.window.querySelector('.permissioncontrol-toolbar');
+            if (toolbar) {
+                const refreshBtn = toolbar.querySelector('button');
+                if (refreshBtn) refreshBtn.textContent = this._getText('PERMC_BTN_REFRESH', '刷新');
+                const autoLabel = toolbar.querySelector('label');
+                if (autoLabel && autoLabel.lastChild) {
+                    autoLabel.lastChild.textContent = this._getText('PERMC_AUTO_GRANT', '自动授予普通权限');
+                }
+            }
+            const navKeys = { overview: 'PERMC_NAV_OVERVIEW', programs: 'PERMC_NAV_PROGRAMS', permissions: 'PERMC_NAV_PERMISSIONS', blacklist: 'PERMC_NAV_BLACKLIST', whitelist: 'PERMC_NAV_WHITELIST', audit: 'PERMC_NAV_AUDIT', systemlogs: 'PERMC_NAV_SYSTEMLOGS' };
+            const navFallbacks = { overview: '概览', programs: '程序权限', permissions: '权限统计', blacklist: '黑名单', whitelist: '白名单', audit: '审计日志', systemlogs: '系统日志' };
+            this.window.querySelectorAll('.permissioncontrol-nav-item').forEach(item => {
+                const tab = item.dataset.tab;
+                const key = navKeys[tab];
+                const labelSpan = item.querySelector('span:last-child');
+                if (key && labelSpan) labelSpan.textContent = this._getText(key, navFallbacks[tab] || tab);
+            });
+        },
+
         __exit__: async function () {
             if (typeof KernelLogger !== 'undefined') {
                 KernelLogger.debug('PermissionControl', '__exit__ 被调用');
+            }
+
+            if (this._languageChangeUnsubscribe && typeof this._languageChangeUnsubscribe === 'function') {
+                this._languageChangeUnsubscribe();
+                this._languageChangeUnsubscribe = null;
             }
 
             // 清理定时器
@@ -145,9 +199,9 @@
 
         __info__: function () {
             return {
-                name: '权限管控中心',
+                name: (typeof PERMISSIONCONTROL !== 'undefined' && PERMISSIONCONTROL._getText) ? PERMISSIONCONTROL._getText('PERMC_TITLE', '权限管控中心') : '权限管控中心',
                 type: 'GUI',
-                description: '权限管控、统计、黑名单、白名单管理工具',
+                description: (typeof PERMISSIONCONTROL !== 'undefined' && PERMISSIONCONTROL._getText) ? PERMISSIONCONTROL._getText('PERMC_DESCRIPTION', '权限管控、统计、黑名单、白名单管理工具') : '权限管控、统计、黑名单、白名单管理工具',
                 version: '1.0.0',
                 author: 'ZerOS Team',
                 copyright: '© 2025 ZerOS',
@@ -187,7 +241,7 @@
             `;
 
             // 刷新按钮
-            const refreshBtn = this._createToolbarButton('刷新', async () => {
+            const refreshBtn = this._createToolbarButton(this._getText('PERMC_BTN_REFRESH', '刷新'), async () => {
                 await this._refreshData();
             });
             toolbar.appendChild(refreshBtn);
@@ -212,7 +266,7 @@
                 this._saveSettings();
             });
             autoGrantLabel.appendChild(autoGrantCheckbox);
-            autoGrantLabel.appendChild(document.createTextNode('自动授予普通权限'));
+            autoGrantLabel.appendChild(document.createTextNode(this._getText('PERMC_AUTO_GRANT', '自动授予普通权限')));
             toolbar.appendChild(autoGrantLabel);
 
             return toolbar;
@@ -274,13 +328,13 @@
             `;
 
             const navItems = [
-                { id: 'overview', label: '概览', icon: '📊' },
-                { id: 'programs', label: '程序权限', icon: '📱' },
-                { id: 'permissions', label: '权限统计', icon: '📈' },
-                { id: 'blacklist', label: '黑名单', icon: '🚫' },
-                { id: 'whitelist', label: '白名单', icon: '✅' },
-                { id: 'audit', label: '审计日志', icon: '📋' },
-                { id: 'systemlogs', label: '系统日志', icon: '📝' }
+                { id: 'overview', labelKey: 'PERMC_NAV_OVERVIEW', label: this._getText('PERMC_NAV_OVERVIEW', '概览'), icon: '📊' },
+                { id: 'programs', labelKey: 'PERMC_NAV_PROGRAMS', label: this._getText('PERMC_NAV_PROGRAMS', '程序权限'), icon: '📱' },
+                { id: 'permissions', labelKey: 'PERMC_NAV_PERMISSIONS', label: this._getText('PERMC_NAV_PERMISSIONS', '权限统计'), icon: '📈' },
+                { id: 'blacklist', labelKey: 'PERMC_NAV_BLACKLIST', label: this._getText('PERMC_NAV_BLACKLIST', '黑名单'), icon: '🚫' },
+                { id: 'whitelist', labelKey: 'PERMC_NAV_WHITELIST', label: this._getText('PERMC_NAV_WHITELIST', '白名单'), icon: '✅' },
+                { id: 'audit', labelKey: 'PERMC_NAV_AUDIT', label: this._getText('PERMC_NAV_AUDIT', '审计日志'), icon: '📋' },
+                { id: 'systemlogs', labelKey: 'PERMC_NAV_SYSTEMLOGS', label: this._getText('PERMC_NAV_SYSTEMLOGS', '系统日志'), icon: '📝' }
             ];
 
             navItems.forEach(item => {
@@ -413,12 +467,12 @@
             `;
 
             const statCards = [
-                { label: '已注册程序', value: stats?.totalPrograms || 0, color: '#6C8EFF' },
-                { label: '总权限数', value: stats?.totalPermissions || 0, color: '#8B5CF6' },
-                { label: '审计日志', value: stats?.auditLogSize || 0, color: '#10B981' },
-                { label: '违规记录', value: stats?.violationLogSize || 0, color: '#EF4444' },
-                { label: '黑名单程序', value: this.blacklist.size, color: '#F59E0B' },
-                { label: '白名单程序', value: this.whitelist.size, color: '#3B82F6' }
+                { label: this._getText('PERMC_STAT_PROGRAMS', '已注册程序'), value: stats?.totalPrograms || 0, color: '#6C8EFF' },
+                { label: this._getText('PERMC_STAT_PERMISSIONS', '总权限数'), value: stats?.totalPermissions || 0, color: '#8B5CF6' },
+                { label: this._getText('PERMC_STAT_AUDIT', '审计日志'), value: stats?.auditLogSize || 0, color: '#10B981' },
+                { label: this._getText('PERMC_STAT_VIOLATIONS', '违规记录'), value: stats?.violationLogSize || 0, color: '#EF4444' },
+                { label: this._getText('PERMC_STAT_BLACKLIST', '黑名单程序'), value: this.blacklist.size, color: '#F59E0B' },
+                { label: this._getText('PERMC_STAT_WHITELIST', '白名单程序'), value: this.whitelist.size, color: '#3B82F6' }
             ];
 
             statCards.forEach(card => {
@@ -445,7 +499,7 @@
                     const violationsSection = document.createElement('div');
                     violationsSection.style.cssText = 'margin-top: 24px;';
                     violationsSection.innerHTML = `
-                        <h3 style="font-size: 16px; color: rgba(215, 224, 221, 0.9); margin-bottom: 12px;">最近违规记录</h3>
+                        <h3 style="font-size: 16px; color: rgba(215, 224, 221, 0.9); margin-bottom: 12px;">` + this._getText('PERMC_RECENT_VIOLATIONS', '最近违规') + `</h3>
                     `;
                     const violationsList = document.createElement('div');
                     violationsList.style.cssText = `
@@ -486,7 +540,7 @@
             `;
 
             if (typeof ProcessManager === 'undefined' || typeof PermissionManager === 'undefined') {
-                container.innerHTML = '<div style="color: rgba(255, 95, 87, 0.8);">ProcessManager 或 PermissionManager 不可用</div>';
+                container.innerHTML = '<div style="color: rgba(255, 95, 87, 0.8);">' + this._getText('PERMC_PM_UNAVAILABLE', 'ProcessManager 或 PermissionManager 不可用') + '</div>';
                 this.contentPanel.appendChild(container);
                 return;
             }
@@ -524,11 +578,11 @@
             const thead = document.createElement('thead');
             thead.innerHTML = `
                 <tr style="background: rgba(108, 142, 255, 0.1);">
-                    <th style="padding: 12px; text-align: left; color: rgba(215, 224, 221, 0.9); font-size: 13px; font-weight: 600;">程序名称</th>
+                    <th style="padding: 12px; text-align: left; color: rgba(215, 224, 221, 0.9); font-size: 13px; font-weight: 600;">` + this._getText('PERMC_HEADER_PROGRAM', '程序名称') + `</th>
                     <th style="padding: 12px; text-align: left; color: rgba(215, 224, 221, 0.9); font-size: 13px; font-weight: 600;">PID</th>
-                    <th style="padding: 12px; text-align: center; color: rgba(215, 224, 221, 0.9); font-size: 13px; font-weight: 600;">权限数</th>
-                    <th style="padding: 12px; text-align: center; color: rgba(215, 224, 221, 0.9); font-size: 13px; font-weight: 600;">状态</th>
-                    <th style="padding: 12px; text-align: center; color: rgba(215, 224, 221, 0.9); font-size: 13px; font-weight: 600;">操作</th>
+                    <th style="padding: 12px; text-align: center; color: rgba(215, 224, 221, 0.9); font-size: 13px; font-weight: 600;">` + this._getText('PERMC_HEADER_PERM_COUNT', '权限数') + `</th>
+                    <th style="padding: 12px; text-align: center; color: rgba(215, 224, 221, 0.9); font-size: 13px; font-weight: 600;">` + this._getText('PERMC_HEADER_STATUS', '状态') + `</th>
+                    <th style="padding: 12px; text-align: center; color: rgba(215, 224, 221, 0.9); font-size: 13px; font-weight: 600;">` + this._getText('PERMC_HEADER_ACTION', '操作') + `</th>
                 </tr>
             `;
             table.appendChild(thead);
@@ -564,7 +618,7 @@
                             color: rgba(108, 142, 255, 0.9);
                             font-size: 12px;
                             cursor: pointer;
-                        ">查看权限</button>
+                        ">${this._getText('PERMC_VIEW_PERM', '查看权限')}</button>
                     </td>
                 `;
                 tbody.appendChild(row);
@@ -574,7 +628,7 @@
                 const row = document.createElement('tr');
                 row.innerHTML = `
                     <td colspan="5" style="padding: 24px; text-align: center; color: rgba(215, 224, 221, 0.5);">
-                        暂无运行的程序
+                        ${this._getText('PERMC_NO_RUNNING_PROGRAMS', '暂无运行的程序')}
                     </td>
                 `;
                 tbody.appendChild(row);
@@ -613,13 +667,13 @@
             content.style.cssText = 'padding: 20px; max-height: 400px; overflow-y: auto;';
             
             const title = document.createElement('h3');
-            title.textContent = `${programName} (PID: ${pid}) 的权限`;
+            title.textContent = `${programName} (PID: ${pid}) - ` + this._getText('PERMC_PROGRAM_PERMISSIONS', '程序权限');
             title.style.cssText = 'font-size: 16px; color: rgba(215, 224, 221, 0.9); margin-bottom: 16px;';
             content.appendChild(title);
 
             if (permissions.length === 0) {
                 const emptyMsg = document.createElement('div');
-                emptyMsg.textContent = '该程序暂无权限';
+                    emptyMsg.textContent = this._getText('PERMC_NO_PERMISSIONS', '该程序暂无权限');
                 emptyMsg.style.cssText = 'color: rgba(215, 224, 221, 0.5); text-align: center; padding: 24px;';
                 content.appendChild(emptyMsg);
             } else {
@@ -649,7 +703,7 @@
                 height: 500,
                 content: () => content,
                 buttons: [
-                    { text: '关闭', action: 'close', primary: true }
+                    { text: this._getText('PERMC_CLOSE', '关闭'), action: 'close', primary: true }
                 ]
             });
         },
@@ -666,7 +720,7 @@
             `;
 
             if (typeof PermissionManager === 'undefined') {
-                container.innerHTML = '<div style="color: rgba(255, 95, 87, 0.8);">PermissionManager 不可用</div>';
+                container.innerHTML = '<div style="color: rgba(255, 95, 87, 0.8);">' + this._getText('PERMC_PM_UNAVAILABLE', 'PermissionManager 不可用') + '</div>';
                 this.contentPanel.appendChild(container);
                 return;
             }
@@ -774,7 +828,7 @@
             `;
 
             if (this.blacklist.size === 0) {
-                list.innerHTML = '<div style="color: rgba(215, 224, 221, 0.5); text-align: center; padding: 24px;">黑名单为空</div>';
+                list.innerHTML = '<div style="color: rgba(215, 224, 221, 0.5); text-align: center; padding: 24px;">' + this._getText('PERMC_BLACKLIST_EMPTY', '黑名单为空') + '</div>';
             } else {
                 this.blacklist.forEach(programName => {
                     const item = document.createElement('div');
@@ -925,7 +979,7 @@
             `;
 
             if (typeof PermissionManager === 'undefined') {
-                container.innerHTML = '<div style="color: rgba(255, 95, 87, 0.8);">PermissionManager 不可用</div>';
+                container.innerHTML = '<div style="color: rgba(255, 95, 87, 0.8);">' + this._getText('PERMC_PM_UNAVAILABLE', 'PermissionManager 不可用') + '</div>';
                 this.contentPanel.appendChild(container);
                 return;
             }
@@ -1087,13 +1141,14 @@
          * 显示添加黑名单对话框
          */
         _showAddBlacklistDialog: async function () {
+            const self = this;
             const programs = this._getAvailablePrograms();
             
             // 统一使用自定义对话框，以便支持选择程序按钮
             {
                 // 降级方案：使用自定义对话框
                 const result = await this._showCustomDialog({
-                    title: '添加黑名单',
+                    title: this._getText('PERMC_ADD_BLACKLIST', '添加黑名单'),
                     width: 400,
                     height: 200,
                     content: () => {
@@ -1101,7 +1156,7 @@
                         container.style.cssText = 'padding: 20px;';
                         
                         const label = document.createElement('label');
-                        label.textContent = '程序名称:';
+                        label.textContent = self._getText('PERMC_LABEL_PROGRAM', '程序名称:');
                         label.style.cssText = 'display: block; margin-bottom: 8px; color: rgba(215, 224, 221, 0.9); font-size: 13px;';
                         container.appendChild(label);
                         
@@ -1112,14 +1167,14 @@
                         const input = document.createElement('input');
                         input.type = 'text';
                         input.id = 'blacklist-program-input';
-                        input.placeholder = '例如: filemanager';
+                        input.placeholder = self._getText('PERMC_PLACEHOLDER_PROGRAM', '例如: filemanager');
                         input.style.cssText = 'flex: 1; padding: 8px; background: rgba(20, 20, 30, 0.5); border: 1px solid rgba(108, 142, 255, 0.3); border-radius: 6px; color: rgba(215, 224, 221, 0.9); font-size: 13px; box-sizing: border-box;';
                         inputContainer.appendChild(input);
                         
                         // 选择程序按钮
                         const selectBtn = document.createElement('button');
                         selectBtn.type = 'button';
-                        selectBtn.textContent = '选择程序';
+                        selectBtn.textContent = self._getText('PERMC_SELECT_PROGRAM', '选择程序');
                         selectBtn.style.cssText = `
                             padding: 8px 16px;
                             background: rgba(139, 92, 246, 0.3);
@@ -1147,9 +1202,9 @@
                         return container;
                     },
                     buttons: [
-                        { text: '取消', action: 'cancel' },
+                        { text: self._getText('PERMC_CANCEL', '取消'), action: 'cancel' },
                         {
-                            text: '添加',
+                            text: self._getText('PERMC_ADD', '添加'),
                             action: 'confirm',
                             primary: true,
                             getData: (dialogWindow) => {
@@ -1195,13 +1250,14 @@
          * 显示添加白名单对话框
          */
         _showAddWhitelistDialog: async function () {
+            const self = this;
             const programs = this._getAvailablePrograms();
             
             // 统一使用自定义对话框，以便支持选择程序按钮
             {
                 // 降级方案：使用自定义对话框
                 const result = await this._showCustomDialog({
-                    title: '添加白名单',
+                    title: this._getText('PERMC_ADD_WHITELIST', '添加白名单'),
                     width: 400,
                     height: 200,
                     content: () => {
@@ -1209,7 +1265,7 @@
                         container.style.cssText = 'padding: 20px;';
                         
                         const label = document.createElement('label');
-                        label.textContent = '程序名称:';
+                        label.textContent = self._getText('PERMC_LABEL_PROGRAM', '程序名称:');
                         label.style.cssText = 'display: block; margin-bottom: 8px; color: rgba(215, 224, 221, 0.9); font-size: 13px;';
                         container.appendChild(label);
                         
@@ -1220,14 +1276,14 @@
                         const input = document.createElement('input');
                         input.type = 'text';
                         input.id = 'whitelist-program-input';
-                        input.placeholder = '例如: filemanager';
+                        input.placeholder = self._getText('PERMC_PLACEHOLDER_PROGRAM', '例如: filemanager');
                         input.style.cssText = 'flex: 1; padding: 8px; background: rgba(20, 20, 30, 0.5); border: 1px solid rgba(108, 142, 255, 0.3); border-radius: 6px; color: rgba(215, 224, 221, 0.9); font-size: 13px; box-sizing: border-box;';
                         inputContainer.appendChild(input);
                         
                         // 选择程序按钮
                         const selectBtn = document.createElement('button');
                         selectBtn.type = 'button';
-                        selectBtn.textContent = '选择程序';
+                        selectBtn.textContent = self._getText('PERMC_SELECT_PROGRAM', '选择程序');
                         selectBtn.style.cssText = `
                             padding: 8px 16px;
                             background: rgba(139, 92, 246, 0.3);
@@ -1255,9 +1311,9 @@
                         return container;
                     },
                     buttons: [
-                        { text: '取消', action: 'cancel' },
+                        { text: self._getText('PERMC_CANCEL', '取消'), action: 'cancel' },
                         {
-                            text: '添加',
+                            text: self._getText('PERMC_ADD', '添加'),
                             action: 'confirm',
                             primary: true,
                             getData: (dialogWindow) => {
@@ -1486,7 +1542,7 @@
                 let dialogWindowId = null;
                 if (typeof GUIManager !== 'undefined') {
                     const windowInfo = GUIManager.registerWindow(this.pid, dialogWindow, {
-                        title: options.title || '对话框',
+                        title: options.title || this._getText('PERMC_DIALOG', '对话框'),
                         onClose: () => {
                             closeDialog('cancel');
                         }
@@ -1562,7 +1618,7 @@
 
             // 筛选器标题
             const filterTitle = document.createElement('div');
-            filterTitle.textContent = '筛选条件';
+            filterTitle.textContent = this._getText('PERMC_FILTER', '筛选条件');
             filterTitle.style.cssText = `
                 font-size: 14px;
                 font-weight: 600;
@@ -1584,7 +1640,7 @@
             const levelContainer = document.createElement('div');
             levelContainer.style.cssText = 'display: flex; flex-direction: column; gap: 4px;';
             const levelLabel = document.createElement('label');
-            levelLabel.textContent = '日志级别:';
+            levelLabel.textContent = this._getText('PERMC_LEVEL', '日志级别:');
             levelLabel.style.cssText = 'font-size: 12px; color: rgba(215, 224, 221, 0.7);';
             levelContainer.appendChild(levelLabel);
             const levelSelect = document.createElement('select');
@@ -1611,7 +1667,7 @@
             const subsystemContainer = document.createElement('div');
             subsystemContainer.style.cssText = 'display: flex; flex-direction: column; gap: 4px;';
             const subsystemLabel = document.createElement('label');
-            subsystemLabel.textContent = '子系统:';
+            subsystemLabel.textContent = this._getText('PERMC_SUBSYSTEM', '子系统:');
             subsystemLabel.style.cssText = 'font-size: 12px; color: rgba(215, 224, 221, 0.7);';
             subsystemContainer.appendChild(subsystemLabel);
             const subsystemSelect = document.createElement('select');
@@ -1624,7 +1680,7 @@
                 color: rgba(215, 224, 221, 0.9);
                 font-size: 13px;
             `;
-            subsystemSelect.innerHTML = '<option value="">全部</option>';
+            subsystemSelect.innerHTML = '<option value="">' + this._getText('PERMC_ALL', '全部') + '</option>';
             subsystemContainer.appendChild(subsystemSelect);
             filterForm.appendChild(subsystemContainer);
 
@@ -1638,7 +1694,7 @@
             const keywordInput = document.createElement('input');
             keywordInput.type = 'text';
             keywordInput.id = 'log-keyword-filter';
-            keywordInput.placeholder = '搜索日志内容...';
+            keywordInput.placeholder = this._getText('PERMC_SEARCH_PLACEHOLDER', '搜索日志内容...');
             keywordInput.style.cssText = `
                 padding: 6px 12px;
                 background: rgba(20, 20, 30, 0.8);
@@ -1654,7 +1710,7 @@
             const limitContainer = document.createElement('div');
             limitContainer.style.cssText = 'display: flex; flex-direction: column; gap: 4px;';
             const limitLabel = document.createElement('label');
-            limitLabel.textContent = '显示数量:';
+            limitLabel.textContent = this._getText('PERMC_LIMIT', '显示数量:');
             limitLabel.style.cssText = 'font-size: 12px; color: rgba(215, 224, 221, 0.7);';
             limitContainer.appendChild(limitLabel);
             const limitInput = document.createElement('input');
@@ -1694,7 +1750,7 @@
             buttonContainer.appendChild(refreshBtn);
 
             const clearBtn = document.createElement('button');
-            clearBtn.textContent = '清空筛选';
+            clearBtn.textContent = this._getText('PERMC_CLEAR_FILTER', '清空筛选');
             clearBtn.style.cssText = `
                 padding: 6px 16px;
                 background: rgba(108, 142, 255, 0.1);
@@ -1727,7 +1783,7 @@
             const loadSubsystems = async () => {
                 try {
                     const subsystems = await ProcessManager.callKernelAPI(this.pid, 'Log.getSubsystems', []);
-                    subsystemSelect.innerHTML = '<option value="">全部</option>';
+                    subsystemSelect.innerHTML = '<option value="">' + this._getText('PERMC_ALL', '全部') + '</option>';
                     subsystems.forEach(subsystem => {
                         const option = document.createElement('option');
                         option.value = subsystem;
@@ -1744,7 +1800,7 @@
             // 加载日志
             const loadLogs = async () => {
                 try {
-                    logListContainer.innerHTML = '<div style="text-align: center; padding: 24px; color: rgba(215, 224, 221, 0.5);">加载中...</div>';
+                    logListContainer.innerHTML = '<div style="text-align: center; padding: 24px; color: rgba(215, 224, 221, 0.5);">' + this._getText('PERMC_LOADING', '加载中...') + '</div>';
                     
                     // 检查 ProcessManager 是否可用
                     if (typeof ProcessManager === 'undefined' || typeof ProcessManager.callKernelAPI !== 'function') {
@@ -1837,7 +1893,7 @@
                     logListContainer.appendChild(table);
 
                 } catch (error) {
-                    logListContainer.innerHTML = `<div style="color: rgba(255, 95, 87, 0.8); padding: 24px;">加载日志失败: ${error.message}</div>`;
+                    logListContainer.innerHTML = '<div style="color: rgba(255, 95, 87, 0.8); padding: 24px;">' + this._getText('PERMC_LOAD_LOG_FAIL', '加载日志失败') + ': ' + (error.message || '') + '</div>';
                     if (typeof KernelLogger !== 'undefined') {
                         KernelLogger.error('PermissionControl', `加载系统日志失败: ${error.message}`, error);
                     }

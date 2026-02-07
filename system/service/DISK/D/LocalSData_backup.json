@@ -1,21 +1,30 @@
 {
   "system": {
     "permissionManager.permissions": {
-      "servicemanager": [
+      "themeanimator": [
+        "SYSTEM_STORAGE_READ",
+        "SYSTEM_STORAGE_WRITE",
         "GUI_WINDOW_CREATE",
-        "EVENT_LISTENER"
+        "THEME_READ",
+        "SYSTEM_NOTIFICATION",
+        "EVENT_LISTENER",
+        "CACHE_READ",
+        "CACHE_WRITE",
+        "KERNEL_DISK_READ",
+        "KERNEL_DISK_LIST",
+        "NETWORK_ACCESS"
       ]
     },
     "system.style": "macos",
     "desktop.icons": [
       {
-        "id": 1,
+        "id": 7,
         "programName": "filemanager",
         "name": "文件管理器",
         "icon": "D:/application/filemanager/filemanager.svg",
         "description": "文件管理器",
         "position": null,
-        "createdAt": 1770396619925
+        "createdAt": 1770441468556
       }
     ],
     "musicplayer.settings": {
@@ -121,19 +130,13 @@
         "lyrics": "[00:00.000] 《其实》\n[00:04.160] 词：薛之谦\n[00:08.170] 曲：薛之谦\n[00:16.020] 随便找个理由\n[00:19.580] 决定了就别回头\n[00:23.490] 不爱你的人\n[00:25.760] 说什么都没用\n[00:31.340] 分开时难过不能说\n[00:35.360] 谁没谁不能好好过\n[00:39.540] 那天我们走了很久没有争吵过\n[00:47.720] 分开时难过不要说\n[00:51.770] 如果被你一笑而过\n[00:55.840] 还不如让你选择想要的生活\n[01:03.910] 分开后我会笑着说\n[01:07.950] 当朋友问你关于我\n[01:12.100] 我都会轻描淡写仿佛没爱过\n[01:20.120] 其实我根本没人说\n[01:24.320] 其实我没你不能活\n[01:28.390] 其实我给你的爱比你想的多\n[01:48.830] 分开时难过不能说\n[01:52.740] 谁没谁不能好好过\n[01:56.720] 那天我们走了很久没有争吵过\n[02:04.910] 分开时难过不要说\n[02:09.040] 如果被你一笑而过\n[02:13.090] 还不如让你选择想要的生活\n[02:21.250] 分开后我会笑着说\n[02:25.380] 当朋友问你关于我\n[02:29.590] 我都会轻描淡写仿佛没爱过\n[02:37.420] 其实我根本没人说\n[02:41.520] 其实我没你不能活\n[02:45.610] 其实我给你的爱比你想的多\n[02:53.910] 其实我爱你比你想的多得多\n"
       }
     },
-    "system.desktopBackground": "local_D__cache_wallpaper_community_409819_mp4",
+    "system.desktopBackground": "local_D__cache_wallpaper_community_4958_mp4",
     "system.localDesktopBackgrounds": [
       {
         "id": "local_C___back2_png",
         "name": "back2.png",
         "description": "本地图片: C://back2.png",
         "path": "C://back2.png"
-      },
-      {
-        "id": "local_D__cache_random_anime_bg_1766148286160_jpg",
-        "name": "random_anime_bg_1766148286160.jpg",
-        "description": "本地图片: D:/cache/random_anime_bg_1766148286160.jpg",
-        "path": "D:/cache/random_anime_bg_1766148286160.jpg"
       },
       {
         "id": "local_D__cache_wallpaper_community_143121_mp4",
@@ -158,13 +161,31 @@
         "name": "wallpaper_community_354652.mp4",
         "description": "Local video: D:/cache/wallpaper_community_354652.mp4 (muted loop)",
         "path": "D:/cache/wallpaper_community_354652.mp4"
+      },
+      {
+        "id": "local_D__cache_wallpaper_community_315795_mp4",
+        "name": "wallpaper_community_315795.mp4",
+        "description": "本地视频: D:/cache/wallpaper_community_315795.mp4（静音循环播放）",
+        "path": "D:/cache/wallpaper_community_315795.mp4"
+      },
+      {
+        "id": "local_D__cache_wallpaper_community_59833_mp4",
+        "name": "wallpaper_community_59833.mp4",
+        "description": "Local video: D:/cache/wallpaper_community_59833.mp4 (muted loop)",
+        "path": "D:/cache/wallpaper_community_59833.mp4"
+      },
+      {
+        "id": "local_D__cache_wallpaper_community_4958_mp4",
+        "name": "wallpaper_community_4958.mp4",
+        "description": "Local video: D:/cache/wallpaper_community_4958.mp4 (muted loop)",
+        "path": "D:/cache/wallpaper_community_4958.mp4"
       }
     ],
     "taskbarPosition": "bottom",
     "system.animationPreset": "elegant",
     "desktop.autoArrange": true,
     "desktop.arrangement": "list",
-    "system.theme": "default",
+    "system.theme": "glass",
     "browser.bookmarks": [
       {
         "name": "必应",
@@ -180,7 +201,16 @@
     ],
     "system.randomAnimeBgStatus": "success",
     "cryptDrive.keys": {
-      "keys": {},
+      "keys": {
+        "key_1770442995245_szok1d7oi": {
+          "publicKey": "-----BEGIN PUBLIC KEY-----\nMIGeMA0GCSqGSIb3DQEBAQUAA4GMADCBiAKBgHSbLjKJ+u41Iv+4eoUHZSyVkGyf\njmPXvqNnIW+YVcplwOIrHV35KSrjhY6ttkBzwQiJsauJzmSSMoorRUme82UtxmaI\n2i0CvdLMgNWBEV38rsnNQy64Ckh9VGQOFFc8OYJmB7qnWMoJ19D8GMJF5moKAHCy\nkIuovy+PLF4x1oXbAgMBAAE=\n-----END PUBLIC KEY-----",
+          "privateKey": "-----BEGIN RSA PRIVATE KEY-----\nMIICWwIBAAKBgHSbLjKJ+u41Iv+4eoUHZSyVkGyfjmPXvqNnIW+YVcplwOIrHV35\nKSrjhY6ttkBzwQiJsauJzmSSMoorRUme82UtxmaI2i0CvdLMgNWBEV38rsnNQy64\nCkh9VGQOFFc8OYJmB7qnWMoJ19D8GMJF5moKAHCykIuovy+PLF4x1oXbAgMBAAEC\ngYBuIwieib8ucZgOK2Pl9Jc2ZkpUntwyJ9wToNxu+FbH5hYqSYjicu3UabSDkEYd\nWHgSJWRgXrhIO+JqqPY31F+VgZUZvtbacd59u4UjD+DpoqQ8wnEOkCs/8Yiwo8rk\nVkwJpCiEG47DC3tQ2ZXAZ0CwJxD0mTY31xKb9jSrYeSo8QJBALc+KD3zZrIOMCfl\n0oJqSHqCVLZ24zfCAi1I3Ci4/udsDEcPOSm124kkTjfY8EyYVuFOQL4XFV/jpoDA\njJfZ/5kCQQCi57JTjP0kd9bG2m7ziUOSsz+d2iQZl1OuEOxJV4XvI4pxU77Aa1NW\nOPyxnrIlXqtibMjS7Uv/G+ooXqLUS2mTAkBT8Hg0sLvZUqCClkeRECi1XeB6WQmK\nsCeZIOghC2VRE3CoWHPiBHlVYDkoYgrpu1sJCHSl3yMecsUB87IzmVv5AkAQCQSJ\nquAkHdO7YTb4q/NF1nUVoapaBoZLJQlNMttRLctr2lV1dVsPqq5dAYUBnq76EkE2\nWftYEjRbYu1ePkoXAkEAkAluSJI72CWUXsl2BNLGUs/Ap5a7PEwEtRLUEP8EaWSO\nzecXoABzZE3UlgWsQwCOc1rfQph42H7+ZO2hXJ52nw==\n-----END RSA PRIVATE KEY-----",
+          "createdAt": 1770442995245,
+          "expiresAt": null,
+          "description": "CommunicationKey",
+          "tags": []
+        }
+      },
       "defaultKeyId": null
     },
     "userControl.users": {
@@ -189,7 +219,7 @@
         "password": "61b249bf6d604d14120821f43625e84e",
         "avatar": "avatar_root_1766272534753.jpg",
         "createdAt": 1766271155991,
-        "lastLogin": 1770397406784
+        "lastLogin": 1770448568446
       },
       "TestUser": {
         "level": "USER",

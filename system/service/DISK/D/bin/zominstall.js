@@ -49,6 +49,8 @@
         __init__: async function(pid, initArgs = {}) {
             this.pid = pid;
             this.terminal = initArgs.terminal;
+            /** 进程绑定的内核 API（由 ProcessManager 注入），在 setTimeout 等异步回调中调用时不会触发 PID 调用栈校验失败 */
+            this.kernelAPI = initArgs.kernelAPI || null;
 
             if (!this.terminal) {
                 throw new Error('ZOMInstall 程序需要终端环境');
@@ -154,6 +156,32 @@
         /**
          * 显示使用说明
          */
+        /**
+         * 是否可通过内核 API 调用（kernelAPI.call 或 ProcessManager.callKernelAPI）
+         */
+        _callKernelAPIAvailable: function() {
+            if (this.kernelAPI && typeof this.kernelAPI.call === 'function') {
+                return true;
+            }
+            return typeof ProcessManager !== 'undefined' && typeof ProcessManager.callKernelAPI === 'function';
+        },
+
+        /**
+         * 调用内核 API（优先使用注入的 kernelAPI.call，避免 setTimeout 内调用时 PID 调用栈校验失败）
+         * @param {string} apiName API 名称
+         * @param {Array} args 参数数组
+         * @returns {Promise<any>}
+         */
+        _callKernelAPI: async function(apiName, args) {
+            if (this.kernelAPI && typeof this.kernelAPI.call === 'function') {
+                return this.kernelAPI.call(apiName, args || []);
+            }
+            if (typeof ProcessManager !== 'undefined' && typeof ProcessManager.callKernelAPI === 'function') {
+                return ProcessManager.callKernelAPI(this.pid, apiName, args || []);
+            }
+            throw new Error('内核 API 不可用');
+        },
+
         _showUsage: function() {
             this.terminal.write('用法: zominstall <zom文件路径>\n');
             this.terminal.write('\n');
@@ -446,8 +474,8 @@
             }
 
             // 写入目标文件
-            if (typeof ProcessManager !== 'undefined' && typeof ProcessManager.callKernelAPI === 'function') {
-                await ProcessManager.callKernelAPI(this.pid, 'FileSystem.write', [targetPath, content, 'OVERWRITE']);
+            if (this._callKernelAPIAvailable()) {
+                await this._callKernelAPI('FileSystem.write', [targetPath, content, 'OVERWRITE']);
             } else {
                 // 降级方案：使用 PHP 服务
                 const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
@@ -484,8 +512,8 @@
          * 删除文件
          */
         _deleteFile: async function(filePath) {
-            if (typeof ProcessManager !== 'undefined' && typeof ProcessManager.callKernelAPI === 'function') {
-                await ProcessManager.callKernelAPI(this.pid, 'FileSystem.delete', [filePath]);
+            if (this._callKernelAPIAvailable()) {
+                await this._callKernelAPI('FileSystem.delete', [filePath]);
             } else {
                 // 降级方案：使用 PHP 服务
                 const pathParts = filePath.split('/');
@@ -547,7 +575,7 @@
             // 这样可以避免 nodeTree 缓存问题
             const usePHPFirst = true; // 优先使用 PHP 服务
             
-            if (usePHPFirst || typeof ProcessManager === 'undefined' || typeof ProcessManager.callKernelAPI !== 'function') {
+            if (usePHPFirst || !this._callKernelAPIAvailable()) {
                 // 使用 PHP 服务直接读取（绕过 nodeTree，直接从文件系统读取）
                 // 解析路径：分离目录和文件名
                 const pathParts = jsonPath.split('/');
@@ -639,7 +667,7 @@
                         this.terminal.write(`文件存在性检查失败: ${e.message}，继续尝试读取...\n`);
                     }
                     
-                    content = await ProcessManager.callKernelAPI(this.pid, 'FileSystem.read', [jsonPath]);
+                    content = await this._callKernelAPI('FileSystem.read', [jsonPath]);
                     
                     // 详细检查返回的内容
                     this.terminal.write(`读取结果类型: ${typeof content}\n`);
@@ -737,9 +765,9 @@
             try {
                 // 1. 检查动态安装的程序
                 let existingApp = null;
-                if (typeof ProcessManager !== 'undefined' && typeof ProcessManager.callKernelAPI === 'function') {
-                    // 使用 ProcessManager API，这样 LStorage 可以正确获取 PID
-                    existingApp = await ProcessManager.callKernelAPI(this.pid, 'Application.get', [programName]);
+                if (this._callKernelAPIAvailable()) {
+                    // 使用 kernelAPI.call 或 ProcessManager API，避免 setTimeout 内调用时 PID 调用栈校验失败
+                    existingApp = await this._callKernelAPI('Application.get', [programName]);
                 } else if (typeof LStorage !== 'undefined') {
                     existingApp = await LStorage.getInstalledApplication(programName);
                 }
@@ -1009,12 +1037,12 @@
             
             this.terminal.write(`准备复制 ${Object.keys(sourceFiles).length} 个文件到 application/ 目录...\n`);
 
-            // 使用 ProcessManager API 安装程序（通过内核 API，确保权限验证正确）
-            if (typeof ProcessManager === 'undefined' || typeof ProcessManager.callKernelAPI !== 'function') {
-                throw new Error('ProcessManager 不可用，无法安装程序');
+            // 使用内核 API 安装程序（优先 kernelAPI.call，避免 PID 调用栈校验失败）
+            if (!this._callKernelAPIAvailable()) {
+                throw new Error('内核 API 不可用，无法安装程序');
             }
 
-            await ProcessManager.callKernelAPI(this.pid, 'Application.install', [programName, asset, sourceFiles]);
+            await this._callKernelAPI('Application.install', [programName, asset, sourceFiles]);
         },
 
         /**
@@ -1024,10 +1052,10 @@
             const files = [];
 
             // 使用 FileSystem.list API
-            if (typeof ProcessManager !== 'undefined' && typeof ProcessManager.callKernelAPI === 'function') {
+            if (this._callKernelAPIAvailable()) {
                 try {
                     this.terminal.write(`[调试] 使用 FileSystem.list API 列出目录: ${dirPath}\n`);
-                    const items = await ProcessManager.callKernelAPI(this.pid, 'FileSystem.list', [dirPath]);
+                    const items = await this._callKernelAPI('FileSystem.list', [dirPath]);
                     this.terminal.write(`[调试] FileSystem.list 返回 ${Array.isArray(items) ? items.length : 0} 个项目\n`);
                     if (Array.isArray(items)) {
                         for (const item of items) {
@@ -1117,8 +1145,8 @@
         _isDirectory: async function(path) {
             try {
                 // 尝试列出该路径，如果能列出则可能是目录
-                if (typeof ProcessManager !== 'undefined' && typeof ProcessManager.callKernelAPI === 'function') {
-                    await ProcessManager.callKernelAPI(this.pid, 'FileSystem.list', [path]);
+                if (this._callKernelAPIAvailable()) {
+                    await this._callKernelAPI('FileSystem.list', [path]);
                     return true;
                 }
             } catch (error) {
@@ -1464,8 +1492,8 @@
                     : `${targetBasePath}/${scriptFile}`;
                 
                 try {
-                    if (typeof ProcessManager !== 'undefined' && typeof ProcessManager.callKernelAPI === 'function') {
-                        await ProcessManager.callKernelAPI(this.pid, 'FileSystem.read', [scriptPath]);
+                    if (this._callKernelAPIAvailable()) {
+                        await this._callKernelAPI('FileSystem.read', [scriptPath]);
                         verifiedCount++;
                     }
                 } catch (e) {
@@ -1480,8 +1508,8 @@
                             ? style
                             : `${targetBasePath}/${style}`;
                         try {
-                            if (typeof ProcessManager !== 'undefined' && typeof ProcessManager.callKernelAPI === 'function') {
-                                await ProcessManager.callKernelAPI(this.pid, 'FileSystem.read', [stylePath]);
+                            if (this._callKernelAPIAvailable()) {
+                                await this._callKernelAPI('FileSystem.read', [stylePath]);
                                 verifiedCount++;
                             }
                         } catch (e) {
@@ -1497,8 +1525,8 @@
                         ? appConfig.icon
                         : `${targetBasePath}/${appConfig.icon}`;
                     try {
-                        if (typeof ProcessManager !== 'undefined' && typeof ProcessManager.callKernelAPI === 'function') {
-                            await ProcessManager.callKernelAPI(this.pid, 'FileSystem.read', [iconPath]);
+                        if (this._callKernelAPIAvailable()) {
+                            await this._callKernelAPI('FileSystem.read', [iconPath]);
                             verifiedCount++;
                         }
                     } catch (e) {

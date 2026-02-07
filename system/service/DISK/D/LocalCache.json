@@ -1,27 +1,15 @@
 {
   "system": {
     "system.dailyQuote": {
-      "value": "只要他握着我的心脏，我就不是风，被束缚着命悬他人之手。",
+      "value": "如果一个人感到寂寞的时候，就读书吧。想象一下，那个人在思考什么，想传达什么。那样的话，或许就会找到绝美的宝藏。",
       "expiresAt": 0,
-      "createdAt": 1770397403511,
-      "updatedAt": 1770397403511,
-      "size": 83
+      "createdAt": 1770448564175,
+      "updatedAt": 1770448564175,
+      "size": 167
     }
   },
   "programs": {
     "themeanimator": {
-      "random_anime_bg:random_anime_bg_1766148286160.jpg": {
-        "value": {
-          "filePath": "D:/cache/random_anime_bg_1766148286160.jpg",
-          "fileName": "random_anime_bg_1766148286160.jpg",
-          "timestamp": 1766148286160,
-          "source": "api-v1.cenguigui.cn"
-        },
-        "expiresAt": 0,
-        "createdAt": 1766148286384,
-        "updatedAt": 1766148286384,
-        "size": 161
-      },
       "random_anime_bg:random_anime_bg_1766148289243.jpg": {
         "value": {
           "filePath": "D:/cache/random_anime_bg_1766148289243.jpg",

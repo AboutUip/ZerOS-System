@@ -1904,7 +1904,14 @@ class ProcessManager {
                     ProcessManager._log(2, `[启动程序] 调用 __init__ 方法`, standardizedInitArgs);
                     ProcessManager._log(2, `[启动程序] 调用 __init__ 方法`, standardizedInitArgs);
 
-                    await programClass.__init__(pid, standardizedInitArgs);
+                    // 在 __init__ 执行期间设置 LStorage 上下文 PID，确保程序直接调用 LStorage.getSystemStorage（如权限管控中心读取 permissionControl.blacklist）时能正确解析调用者并校验危险权限
+                    const oldLStorageContextPid = (typeof LStorage !== 'undefined' && LStorage._currentContextPid !== undefined) ? LStorage._currentContextPid : undefined;
+                    if (typeof LStorage !== 'undefined') LStorage._currentContextPid = pid;
+                    try {
+                        await programClass.__init__(pid, standardizedInitArgs);
+                    } finally {
+                        if (typeof LStorage !== 'undefined') LStorage._currentContextPid = oldLStorageContextPid != null ? oldLStorageContextPid : null;
+                    }
                     processInfo.status = 'running';
 
                     // 保存进程表（状态已更新为 running）

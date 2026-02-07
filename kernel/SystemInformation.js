@@ -32,6 +32,11 @@ class SystemInformation {
             name: 'yan'
         },
         {
+            organization: '个人开发者',
+            role: '后端开发者',
+            name:'qianjiangjiangjiang'
+        },
+        {
             organization: 'KitePromiss 工作室',
             role: '后端开发者',
             name: 'xianyu'

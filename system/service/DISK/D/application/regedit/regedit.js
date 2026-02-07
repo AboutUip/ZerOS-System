@@ -15,7 +15,29 @@
         childWindows: [], // 子窗口列表
         currentStorageType: 'localSData', // 当前编辑的存储类型：'localSData'、'localCache' 或 'applicationTable'
         _selectedValue: null, // 当前选中的值 { parentPath, key, row }
-        
+        _languageChangeUnsubscribe: null,
+
+        /** 多语言文案：优先使用 LanguagesExpansion，否则返回 fallback */
+        _getText: function(key, fallback) {
+            try {
+                const LanguagesExpansion = (typeof POOL !== 'undefined' && POOL && typeof POOL.__GET__ === 'function')
+                    ? POOL.__GET__('KERNEL_GLOBAL_POOL', 'LanguagesExpansion')
+                    : (typeof window !== 'undefined' ? window.LanguagesExpansion : null);
+                if (LanguagesExpansion && typeof LanguagesExpansion.getText === 'function') {
+                    const value = LanguagesExpansion.getText(key);
+                    if (value && value !== key) return value;
+                }
+            } catch (e) {}
+            return fallback != null ? fallback : key;
+        },
+
+        /** 当前存储类型的显示标签（多语言） */
+        _getStorageTypeLabel: function(storageType) {
+            if (storageType === 'localCache') return this._getText('REGEDIT_LOCAL_CACHE', 'LocalCache');
+            if (storageType === 'applicationTable') return this._getText('REGEDIT_APPLICATION_TABLE', 'ApplicationTable');
+            return this._getText('REGEDIT_LOCAL_SDATA', 'LocalSData');
+        },
+
         __init__: async function(pid, initArgs) {
             this.pid = pid;
             
@@ -64,7 +86,7 @@
                 }
                 
                 const windowInfo = GUIManager.registerWindow(pid, this.window, {
-                    title: '注册表编辑器',
+                    title: this._getText('REGEDIT_TITLE', '注册表编辑器'),
                     icon: icon,
                     onClose: () => {
                         // onClose 回调只做清理工作，不调用 _closeWindow 或 unregisterWindow
@@ -133,8 +155,8 @@
                 color: rgba(215, 224, 221, 0.8);
             `;
             valueHeader.innerHTML = `
-                <div style="width: 200px; font-weight: bold;">名称</div>
-                <div style="flex: 1; font-weight: bold;">数据</div>
+                <div style="width: 200px; font-weight: bold;">` + this._getText('KEY_NAME', '名称') + `</div>
+                <div style="flex: 1; font-weight: bold;">` + this._getText('REGEDIT_DATA', '数据') + `</div>
             `;
             rightPanel.appendChild(valueHeader);
             
@@ -180,6 +202,16 @@
             this.refreshTimer = setInterval(() => {
                 this._refreshData();
             }, 2000);
+            
+            // 语言变更时刷新界面文案
+            const LanguagesExpansion = (typeof POOL !== 'undefined' && POOL && typeof POOL.__GET__ === 'function')
+                ? POOL.__GET__('KERNEL_GLOBAL_POOL', 'LanguagesExpansion')
+                : (typeof window !== 'undefined' ? window.LanguagesExpansion : null);
+            if (LanguagesExpansion && typeof LanguagesExpansion.onLanguageChange === 'function') {
+                this._languageChangeUnsubscribe = LanguagesExpansion.onLanguageChange(() => {
+                    this._refreshAllUITexts();
+                });
+            }
         },
         
         /**
@@ -199,7 +231,8 @@
             
             // 存储类型切换标签
             const typeLabel = document.createElement('div');
-            typeLabel.textContent = '存储类型:';
+            typeLabel.className = 'regedit-type-label';
+            typeLabel.textContent = this._getText('REGEDIT_STORAGE_TYPE', '存储类型:');
             typeLabel.style.cssText = `
                 color: rgba(215, 224, 221, 0.7);
                 font-size: 12px;
@@ -215,9 +248,9 @@
             `;
             
             const storageTypes = [
-                { value: 'localSData', label: 'LocalSData' },
-                { value: 'localCache', label: 'LocalCache' },
-                { value: 'applicationTable', label: 'ApplicationTable' }
+                { value: 'localSData', labelKey: 'REGEDIT_LOCAL_SDATA', label: this._getText('REGEDIT_LOCAL_SDATA', 'LocalSData') },
+                { value: 'localCache', labelKey: 'REGEDIT_LOCAL_CACHE', label: this._getText('REGEDIT_LOCAL_CACHE', 'LocalCache') },
+                { value: 'applicationTable', labelKey: 'REGEDIT_APPLICATION_TABLE', label: this._getText('REGEDIT_APPLICATION_TABLE', 'ApplicationTable') }
             ];
             
             const self = this;
@@ -229,18 +262,20 @@
                         self._renderTree();
                         self._selectPath('');
                         // 更新按钮状态
-                        buttonGroup.querySelectorAll('div').forEach(b => {
-                            if (b.textContent === type.label) {
+                        buttonGroup.querySelectorAll('.regedit-storage-btn').forEach(b => {
+                            if (b.dataset.storageType === type.value) {
                                 b.style.background = 'rgba(108, 142, 255, 0.3)';
                                 b.style.borderColor = 'rgba(108, 142, 255, 0.6)';
-                            } else {
-                                b.style.background = 'transparent';
-                                b.style.borderColor = 'rgba(108, 142, 255, 0.2)';
-                            }
+} else {
+                    b.style.background = 'transparent';
+                    b.style.borderColor = 'rgba(108, 142, 255, 0.2)';
+                }
                         });
                     }
                 });
                 
+                btn.className = 'regedit-storage-btn';
+                btn.dataset.storageType = type.value;
                 // 设置初始状态
                 if (self.currentStorageType === type.value) {
                     btn.style.background = 'rgba(108, 142, 255, 0.3)';
@@ -258,17 +293,50 @@
             menuBar.appendChild(buttonGroup);
             
             // 刷新按钮
-            const refreshBtn = this._createMenuButton('刷新', async () => {
+            const refreshBtn = this._createMenuButton(this._getText('KEY_REFRESH', '刷新'), async () => {
                 await self._refreshData();
                 self._renderTree();
                 self._renderValues(self.selectedPath);
             });
+            refreshBtn.className = 'regedit-refresh-btn';
             refreshBtn.style.marginLeft = 'auto';
             menuBar.appendChild(refreshBtn);
             
             return menuBar;
         },
         
+        /**
+         * 语言切换后刷新所有界面文案
+         */
+        _refreshAllUITexts: function() {
+            if (!this.window) return;
+            const titleEl = this.window.querySelector('.zos-window-title');
+            if (titleEl) titleEl.textContent = this._getText('REGEDIT_TITLE', '注册表编辑器');
+            const fileEl = this.window.querySelector('.regedit-menu-file');
+            if (fileEl) fileEl.textContent = this._getText('REGEDIT_MENU_FILE', '文件(F)');
+            const editEl = this.window.querySelector('.regedit-menu-edit');
+            if (editEl) editEl.textContent = this._getText('REGEDIT_MENU_EDIT', '编辑(E)');
+            const viewEl = this.window.querySelector('.regedit-menu-view');
+            if (viewEl) viewEl.textContent = this._getText('REGEDIT_MENU_VIEW', '查看(V)');
+            const refreshEl = this.window.querySelector('.regedit-menu-refresh');
+            if (refreshEl) refreshEl.textContent = this._getText('REGEDIT_MENU_REFRESH', '刷新(R)');
+            const storageTypeBtn = this.window.querySelector('.regedit-storage-type-btn');
+            if (storageTypeBtn) storageTypeBtn.textContent = this._getStorageTypeLabel(this.currentStorageType);
+            const valueHeader = this.window.querySelector('.regedit-value-header');
+            if (valueHeader) {
+                valueHeader.innerHTML = '<div style="width: 200px; font-weight: bold;">' + this._getText('KEY_NAME', '名称') + '</div><div style="flex: 1; font-weight: bold;">' + this._getText('REGEDIT_DATA', '数据') + '</div>';
+            }
+            this._renderTree();
+            if (this.selectedPath !== undefined && this.selectedPath !== null) {
+                this._renderValues(this.selectedPath);
+            }
+            this.childWindows.forEach(function(cw) {
+                const key = cw.key != null ? cw.key : (cw.path ? cw.path.split('.').pop() : '');
+                const titleEl = cw.window && cw.window.querySelector ? cw.window.querySelector('.zos-window-title') : null;
+                if (titleEl && key) titleEl.textContent = key + ' - ' + this._getText('REGEDIT_TITLE', '注册表编辑器');
+            }.bind(this));
+        },
+
         /**
          * 加载注册表数据
          */
@@ -449,11 +517,11 @@
             `;
             let rootLabel;
             if (this.currentStorageType === 'localCache') {
-                rootLabel = 'LocalCache';
+                rootLabel = this._getText('REGEDIT_LOCAL_CACHE', 'LocalCache');
             } else if (this.currentStorageType === 'applicationTable') {
-                rootLabel = 'ApplicationTable';
+                rootLabel = this._getText('REGEDIT_APPLICATION_TABLE', 'ApplicationTable');
             } else {
-                rootLabel = 'LocalSData';
+                rootLabel = this._getText('REGEDIT_LOCAL_SDATA', 'LocalSData');
             }
             root.innerHTML = `<span style="margin-right: 5px;">📁</span>${rootLabel}`;
             // 使用 EventManager 注册点击事件（如果可用且有权限）
@@ -476,7 +544,7 @@
             
             if (this.currentStorageType === 'applicationTable') {
                 // ApplicationTable 节点
-                const applicationsNode = this._createTreeNode('applications', 'Applications', this.storageData.applications || {}, expandedPaths, 0);
+                const applicationsNode = this._createTreeNode('applications', this._getText('REGEDIT_APPLICATIONS', 'Applications'), this.storageData.applications || {}, expandedPaths, 0);
                 this.treeContainer.appendChild(applicationsNode);
                 // 注意：applications 的子节点路径应该是 'applications.程序名'
                 if (expandedPaths.has('applications')) {
@@ -484,7 +552,7 @@
                 }
             } else {
                 // System节点
-                const systemNode = this._createTreeNode('system', 'System', this.storageData.system || {}, expandedPaths, 0);
+                const systemNode = this._createTreeNode('system', this._getText('REGEDIT_SYSTEM', 'System'), this.storageData.system || {}, expandedPaths, 0);
                 this.treeContainer.appendChild(systemNode);
                 // 注意：system 的子节点路径应该是 'system.键名'，键名可能包含点号
                 if (expandedPaths.has('system')) {
@@ -492,7 +560,7 @@
                 }
                 
                 // Programs节点
-                const programsNode = this._createTreeNode('programs', 'Programs', this.storageData.programs || {}, expandedPaths, 0);
+                const programsNode = this._createTreeNode('programs', this._getText('REGEDIT_PROGRAMS', 'Programs'), this.storageData.programs || {}, expandedPaths, 0);
                 this.treeContainer.appendChild(programsNode);
                 // 注意：programs 的子节点路径应该是 'programs.键名'
                 if (expandedPaths.has('programs')) {
@@ -687,7 +755,7 @@
                 if (typeof KernelLogger !== 'undefined') {
                     KernelLogger.warn('RegEdit', 'storageData 未加载');
                 }
-                this.valueContainer.innerHTML = '<div style="padding: 20px; color: rgba(255, 100, 100, 0.7);">数据未加载，请刷新</div>';
+                this.valueContainer.innerHTML = '<div style="padding: 20px; color: rgba(255, 100, 100, 0.7);">' + this._getText('REGEDIT_DATA_NOT_LOADED', '数据未加载，请刷新') + '</div>';
                 return;
             }
             
@@ -700,7 +768,7 @@
             }
             
             if (data === null || data === undefined) {
-                this.valueContainer.innerHTML = '<div style="padding: 20px; color: rgba(215, 224, 221, 0.5);">无数据</div>';
+                this.valueContainer.innerHTML = '<div style="padding: 20px; color: rgba(215, 224, 221, 0.5);">' + this._getText('REGEDIT_NO_DATA', '无数据') + '</div>';
                 return;
             }
             
@@ -720,7 +788,7 @@
                 
                 // 如果路径为空，使用"（默认）"作为键名
                 if (!currentKey) {
-                    currentKey = '（默认）';
+                    currentKey = this._getText('REGEDIT_DEFAULT_KEY', '（默认）');
                 }
                 
                 // 创建一个特殊的值行，显示基本类型的值
@@ -947,7 +1015,7 @@
             
             // 使用GUIManager注册窗口
             const windowInfo = GUIManager.registerWindow(this.pid, editWindow, {
-                title: `编辑值: ${key}`,
+                title: this._getText('REGEDIT_EDIT_VALUE', '编辑值').replace('{0}', key),
                 icon: icon,
                 windowId: windowId,
                 onClose: () => {
@@ -1052,7 +1120,7 @@
             `;
             
             const cancelBtn = document.createElement('button');
-            cancelBtn.textContent = '取消';
+            cancelBtn.textContent = this._getText('KEY_CANCEL', '取消');
             cancelBtn.style.cssText = `
                         padding: 8px 20px;
                         background: rgba(100, 100, 100, 0.3);
@@ -1064,7 +1132,7 @@
             `;
             
             const saveBtn = document.createElement('button');
-            saveBtn.textContent = '保存';
+            saveBtn.textContent = this._getText('KEY_SAVE', '保存');
             saveBtn.style.cssText = `
                         padding: 8px 20px;
                         background: rgba(108, 142, 255, 0.3);
@@ -1132,7 +1200,7 @@
                         if (valueType === 'number') {
                             newValue = parseFloat(newValueText);
                             if (isNaN(newValue)) {
-                                throw new Error('无效的数字');
+                                throw new Error(this._getText('REGEDIT_INVALID_NUMBER', '无效的数字'));
                             }
                         } else if (valueType === 'boolean') {
                             newValue = newValueText === 'true';
@@ -1155,9 +1223,9 @@
                     this._renderValues(this.selectedPath);
                 } catch (error) {
                         if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                            GUIManager.showAlert('保存失败: ' + error.message);
+                            GUIManager.showAlert(this._getText('REGEDIT_SAVE_FAILED', '保存失败') + ': ' + error.message);
                         } else {
-                    alert('保存失败: ' + error.message);
+                    alert(this._getText('REGEDIT_SAVE_FAILED', '保存失败') + ': ' + error.message);
                 }
                     }
                 });
@@ -1184,7 +1252,7 @@
                             if (valueType === 'number') {
                                 newValue = parseFloat(newValueText);
                                 if (isNaN(newValue)) {
-                                    throw new Error('无效的数字');
+                                    throw new Error(this._getText('REGEDIT_INVALID_NUMBER', '无效的数字'));
                                 }
                             } else if (valueType === 'boolean') {
                                 newValue = newValueText === 'true';
@@ -1207,9 +1275,9 @@
                         this._renderValues(this.selectedPath);
                     } catch (error) {
                         if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                            GUIManager.showAlert('保存失败: ' + error.message);
+                            GUIManager.showAlert(this._getText('REGEDIT_SAVE_FAILED', '保存失败') + ': ' + error.message);
                         } else {
-                            alert('保存失败: ' + error.message);
+                            alert(this._getText('REGEDIT_SAVE_FAILED', '保存失败') + ': ' + error.message);
                         }
                 }
             });
@@ -1584,13 +1652,13 @@
                     
                     return [
                         {
-                            label: '编辑',
+                            label: self._getText('KEY_EDIT', '编辑'),
                             action: () => {
                                 self._editValue(parentPath, key, value);
                             }
                         },
                         {
-                            label: '删除',
+                            label: self._getText('KEY_DELETE', '删除'),
                             danger: true,
                             action: () => {
                                 self._deleteValue(parentPath, key);
@@ -1600,25 +1668,25 @@
                             separator: true
                         },
                         {
-                            label: '新建字符串值',
+                            label: self._getText('REGEDIT_NEW_STRING', '新建字符串值'),
                             action: () => {
                                 self._newValue(parentPath, 'string');
                             }
                         },
                         {
-                            label: '新建数字值',
+                            label: self._getText('REGEDIT_NEW_NUMBER', '新建数字值'),
                             action: () => {
                                 self._newValue(parentPath, 'number');
                             }
                         },
                         {
-                            label: '新建布尔值',
+                            label: self._getText('REGEDIT_NEW_BOOLEAN', '新建布尔值'),
                             action: () => {
                                 self._newValue(parentPath, 'boolean');
                             }
                         },
                         {
-                            label: '新建对象',
+                            label: self._getText('REGEDIT_NEW_OBJECT', '新建对象'),
                             action: () => {
                                 self._newValue(parentPath, 'object');
                             }
@@ -1678,13 +1746,13 @@
             `;
             
             const menuItems = [
-                { label: '编辑', action: () => this._editValue(parentPath, key, value) },
-                { label: '删除', action: () => this._deleteValue(parentPath, key) },
+                { label: this._getText('KEY_EDIT', '编辑'), action: () => this._editValue(parentPath, key, value) },
+                { label: this._getText('KEY_DELETE', '删除'), action: () => this._deleteValue(parentPath, key) },
                 { type: 'separator' },
-                { label: '新建字符串值', action: () => this._newValue(parentPath, 'string') },
-                { label: '新建数字值', action: () => this._newValue(parentPath, 'number') },
-                { label: '新建布尔值', action: () => this._newValue(parentPath, 'boolean') },
-                { label: '新建对象', action: () => this._newValue(parentPath, 'object') },
+                { label: this._getText('REGEDIT_NEW_STRING', '新建字符串值'), action: () => this._newValue(parentPath, 'string') },
+                { label: this._getText('REGEDIT_NEW_NUMBER', '新建数字值'), action: () => this._newValue(parentPath, 'number') },
+                { label: this._getText('REGEDIT_NEW_BOOLEAN', '新建布尔值'), action: () => this._newValue(parentPath, 'boolean') },
+                { label: this._getText('REGEDIT_NEW_OBJECT', '新建对象'), action: () => this._newValue(parentPath, 'object') },
             ];
             
             menuItems.forEach(item => {
@@ -1773,31 +1841,35 @@
             `;
             
             // 文件菜单
-            const fileMenu = this._createMenuButton('文件(F)', () => {
+            const fileMenu = this._createMenuButton(this._getText('REGEDIT_MENU_FILE', '文件(F)'), () => {
                 // 可以添加文件菜单功能
             });
+            fileMenu.className = (fileMenu.className || '') + ' regedit-menu-file';
             menuBar.appendChild(fileMenu);
             
             // 编辑菜单
-            const editMenu = this._createMenuButton('编辑(E)', () => {
+            const editMenu = this._createMenuButton(this._getText('REGEDIT_MENU_EDIT', '编辑(E)'), () => {
                 // 可以添加编辑菜单功能
             });
+            editMenu.className = (editMenu.className || '') + ' regedit-menu-edit';
             menuBar.appendChild(editMenu);
             
             // 查看菜单
-            const viewMenu = this._createMenuButton('查看(V)', () => {
+            const viewMenu = this._createMenuButton(this._getText('REGEDIT_MENU_VIEW', '查看(V)'), () => {
                 // 可以添加查看菜单功能
             });
+            viewMenu.className = (viewMenu.className || '') + ' regedit-menu-view';
             menuBar.appendChild(viewMenu);
             
             // 刷新按钮
-            const refreshBtn = this._createMenuButton('刷新(R)', () => {
+            const refreshBtn = this._createMenuButton(this._getText('REGEDIT_MENU_REFRESH', '刷新(R)'), () => {
                 this._refreshData();
                 this._renderTree();
                 if (this.selectedPath) {
                     this._renderValues(this.selectedPath);
                 }
             });
+            refreshBtn.className = (refreshBtn.className || '') + ' regedit-menu-refresh';
             menuBar.appendChild(refreshBtn);
             
             // 存储类型切换按钮
@@ -1813,7 +1885,7 @@
                 font-size: 12px;
                 margin-left: auto;
             `;
-            storageTypeBtn.textContent = 'LocalSData';
+            storageTypeBtn.textContent = this._getStorageTypeLabel(this.currentStorageType);
             storageTypeBtn.addEventListener('mouseenter', () => {
                 storageTypeBtn.style.background = 'rgba(108, 142, 255, 0.2)';
             });
@@ -1821,14 +1893,10 @@
                 storageTypeBtn.style.background = 'transparent';
             });
             storageTypeBtn.addEventListener('click', () => {
-                // 切换存储类型
-                if (this.currentStorageType === 'localSData') {
-                    this.currentStorageType = 'localCache';
-                    storageTypeBtn.textContent = 'LocalCache';
-                } else {
-                    this.currentStorageType = 'localSData';
-                    storageTypeBtn.textContent = 'LocalSData';
-                }
+                // 切换存储类型：localSData -> localCache -> applicationTable -> localSData
+                const next = { localSData: 'localCache', localCache: 'applicationTable', applicationTable: 'localSData' };
+                this.currentStorageType = next[this.currentStorageType] || 'localSData';
+                storageTypeBtn.textContent = this._getStorageTypeLabel(this.currentStorageType);
                 // 重新加载数据并刷新显示
                 this._loadRegistryData().then(() => {
                     this._renderTree();
@@ -1877,7 +1945,7 @@
             }
             
             const windowInfo = GUIManager.registerWindow(this.pid, childWindow, {
-                title: `${key} - 注册表编辑器`,
+                title: key + ' - ' + this._getText('REGEDIT_TITLE', '注册表编辑器'),
                 icon: icon,
                 windowId: windowId,
                 onClose: () => {
@@ -1925,7 +1993,7 @@
                 color: rgba(215, 224, 221, 0.7);
                 font-family: monospace;
             `;
-            pathDisplay.textContent = `路径: ${fullPath}`;
+            pathDisplay.textContent = this._getText('KEY_PATH', '路径') + ': ' + fullPath;
             content.appendChild(pathDisplay);
             
             // 创建值列表容器
@@ -1951,8 +2019,8 @@
                 font-weight: bold;
             `;
             valueHeader.innerHTML = `
-                <div style="width: 200px;">名称</div>
-                <div style="flex: 1;">数据</div>
+                <div style="width: 200px;">` + this._getText('KEY_NAME', '名称') + `</div>
+                <div style="flex: 1;">` + this._getText('REGEDIT_DATA', '数据') + `</div>
             `;
             valueList.appendChild(valueHeader);
             
@@ -1979,11 +2047,12 @@
             // 添加到容器
             guiContainer.appendChild(childWindow);
             
-            // 保存子窗口引用
+            // 保存子窗口引用（含 key 供语言切换时更新标题）
             this.childWindows.push({
                 windowId: actualWindowId,
                 window: childWindow,
                 path: fullPath,
+                key: key,
                 data: data,
                 windowInfo: windowInfo
             });
@@ -2234,7 +2303,7 @@
             if (!this._selectedValue || !this._selectedValue.key) {
                 // 没有选中的值，提示用户
                 if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                    await GUIManager.showAlert('请先选择一个值', '提示', 'info');
+                    await GUIManager.showAlert(this._getText('REGEDIT_SELECT_VALUE_FIRST', '请先选择一个值'), this._getText('KEY_INFO', '提示'), 'info');
                 }
                 return;
             }
@@ -2364,9 +2433,9 @@
                     KernelLogger.error('RegEdit', '删除值失败', error);
                 }
                 if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                    GUIManager.showAlert('删除失败: ' + error.message);
+                    GUIManager.showAlert(this._getText('REGEDIT_DELETE_FAILED', '删除失败') + ': ' + error.message);
                 } else {
-                alert('删除失败: ' + error.message);
+                alert(this._getText('REGEDIT_DELETE_FAILED', '删除失败') + ': ' + error.message);
                 }
             }
         },
@@ -2375,7 +2444,7 @@
          * 新建值
          */
         _newValue: async function(parentPath, type) {
-            const keyName = prompt('请输入键名:');
+            const keyName = prompt(this._getText('REGEDIT_PROMPT_KEY_NAME', '请输入键名:'));
             if (!keyName || !keyName.trim()) {
                 return;
             }
@@ -2407,9 +2476,9 @@
                     KernelLogger.error('RegEdit', '新建值失败', error);
                 }
                 if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                    GUIManager.showAlert('新建失败: ' + error.message);
+                    GUIManager.showAlert(this._getText('REGEDIT_NEW_FAILED', '新建失败') + ': ' + error.message);
                 } else {
-                alert('新建失败: ' + error.message);
+                alert(this._getText('REGEDIT_NEW_FAILED', '新建失败') + ': ' + error.message);
                 }
             }
         },
@@ -2418,6 +2487,11 @@
          * 退出程序
          */
         __exit__: async function() {
+            if (this._languageChangeUnsubscribe && typeof this._languageChangeUnsubscribe === 'function') {
+                this._languageChangeUnsubscribe();
+                this._languageChangeUnsubscribe = null;
+            }
+            
             // 清理定时器
             if (this.refreshTimer) {
                 clearInterval(this.refreshTimer);
@@ -2464,7 +2538,7 @@
                 name: 'RegEdit',
                 type: 'GUI',
                 version: '1.0.0',
-                description: '注册表编辑器',
+                description: this._getText('REGEDIT_DESCRIPTION', '注册表编辑器'),
                 author: 'ZerOS Team',
                 copyright: '© 2025 ZerOS',
                 permissions: typeof PermissionManager !== 'undefined' ? [

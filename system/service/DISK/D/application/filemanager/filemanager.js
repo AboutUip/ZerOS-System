@@ -160,22 +160,16 @@
             // 初始化内存管理
             this._initMemory(pid);
             
-            // 默认显示根目录视图（显示所有磁盘分区）
+            // 无参打开时显示「此电脑」根视图（磁盘列表），由用户选择进入哪个磁盘；有参时再进入指定路径
             this._setCurrentPath(null);
             
-            // 如果指定了初始路径，则使用指定路径
             if (initArgs && initArgs.args && initArgs.args.length > 0) {
                 const specifiedPath = initArgs.args[0];
-                // 只有在明确指定路径时才使用，否则保持根目录视图
                 if (specifiedPath && specifiedPath !== '\\' && specifiedPath !== '') {
                     this._setCurrentPath(specifiedPath);
                 }
-            } else if (initArgs && initArgs.cwd) {
-                const cwdPath = initArgs.cwd;
-                if (cwdPath && cwdPath !== '\\' && cwdPath !== '') {
-                    this._setCurrentPath(cwdPath);
-                }
             }
+            // 不再根据 cwd 默认进入 D:，无参即展示磁盘列表（类似 Windows 资源管理器「此电脑」）
             
             // 获取 GUI 容器
             const guiContainer = initArgs.guiContainer || document.getElementById('gui-container');
@@ -877,7 +871,7 @@
         /**
          * 创建侧边栏项
          */
-        _createSidebarItem: function(name, label, onClick, isActive = false) {
+        _createSidebarItem: function(name, label, onClick, isActive = false, iconType = 'folder') {
             const item = document.createElement('div');
             item.className = 'filemanager-sidebar-item';
             item.style.cssText = `
@@ -903,8 +897,13 @@
                 flex-shrink: 0;
             `;
             const iconImg = document.createElement('img');
+            // iconType: 'folder' | 'drive' | 'drive-system'，侧栏「此电脑」用 folder，分区用 drive，系统盘 D: 用 drive-system
             let iconUrl = 'D:/application/filemanager/assets/folder.svg';
-            // 使用 ProcessManager.convertVirtualPathToUrl 转换路径
+            if (iconType === 'drive-system') {
+                iconUrl = 'D:/application/filemanager/assets/drive-system.svg';
+            } else if (iconType === 'drive') {
+                iconUrl = 'D:/application/filemanager/assets/drive.svg';
+            }
             if (typeof ProcessManager !== 'undefined' && typeof ProcessManager.convertVirtualPathToUrl === 'function') {
                 iconUrl = ProcessManager.convertVirtualPathToUrl(iconUrl);
             }
@@ -1017,14 +1016,15 @@
                 }
             }
             
-            // 排序并添加磁盘项
+            // 排序并添加磁盘项（使用磁盘图标；D: 为系统盘使用 drive-system）
             disks.sort();
             for (const diskName of disks) {
                 const currentPath = this._getCurrentPath();
                 const isActive = currentPath === diskName;
+                const iconType = (diskName === 'D:') ? 'drive-system' : 'drive';
                 const diskItem = this._createSidebarItem(diskName, diskName, () => {
                     this._loadDirectory(diskName);
-                }, isActive);
+                }, isActive, iconType);
                 diskList.appendChild(diskItem);
             }
         },
@@ -2056,7 +2056,41 @@ this.fileCountText.textContent = this._getText('FM_ITEMS_COUNT_FOUND', '找到 {
         },
         
         /**
-         * 加载根目录（显示所有磁盘分区）
+         * 构建根视图下的磁盘项（含分区总大小、已用、可用，便于展示类似 Windows 资源管理器「此电脑」）
+         * @param {string} diskName 分区名，如 'D:'
+         * @returns {{ name, type, path, isRoot, totalSize, usedSize, freeSize }}
+         */
+        _makeRootDiskItem: function(diskName) {
+            let totalSize = 0;
+            let freeSize = 0;
+            if (typeof Disk !== 'undefined') {
+                try {
+                    if (Disk.diskSeparateSize && Disk.diskSeparateSize.has(diskName)) {
+                        totalSize = Disk.diskSeparateSize.get(diskName) || 0;
+                    }
+                    if (Disk.diskFreeMap && Disk.diskFreeMap.has(diskName)) {
+                        freeSize = Disk.diskFreeMap.get(diskName) || 0;
+                    }
+                } catch (e) {
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.debug('FileManager', `获取分区 ${diskName} 容量失败: ${e.message}`);
+                    }
+                }
+            }
+            const usedSize = totalSize >= freeSize ? totalSize - freeSize : 0;
+            return {
+                name: diskName,
+                type: 'directory',
+                path: diskName,
+                isRoot: true,
+                totalSize: totalSize,
+                usedSize: usedSize,
+                freeSize: freeSize
+            };
+        },
+
+        /**
+         * 加载根目录（显示所有磁盘分区及占用/空闲大小，类似 Windows 资源管理器「此电脑」）
          */
         _loadRootDirectory: async function() {
             // 确保窗口和文件列表容器已创建
@@ -2112,12 +2146,7 @@ this.fileCountText.textContent = this._getText('FM_ITEMS_COUNT_FOUND', '找到 {
                         if (diskMap && diskMap.size > 0) {
                             for (const [diskName, coll] of diskMap) {
                                 if (coll && typeof coll === 'object') {
-                                    fileList.push({
-                                        name: diskName,
-                                        type: 'directory',
-                                        path: diskName,
-                                        isRoot: true  // 标记为根目录项
-                                    });
+                                    fileList.push(this._makeRootDiskItem(diskName));
                                 }
                             }
                         }
@@ -2147,12 +2176,7 @@ this.fileCountText.textContent = this._getText('FM_ITEMS_COUNT_FOUND', '找到 {
                             if (coll && typeof coll === 'object') {
                                 // 验证集合是否已初始化
                                 if (coll.initialized !== false) {
-                                    fileList.push({
-                                        name: diskName,
-                                        type: 'directory',
-                                        path: diskName,
-                                        isRoot: true
-                                    });
+                                    fileList.push(this._makeRootDiskItem(diskName));
                                     if (typeof KernelLogger !== 'undefined') {
                                         KernelLogger.debug('FileManager', `成功添加磁盘分区: ${diskName}`);
                                     }
@@ -2465,6 +2489,9 @@ this.fileCountText.textContent = this._getText('FM_ITEMS_COUNT_FOUND', '找到 {
         _createFileListItem: function(item) {
             const itemElement = document.createElement('div');
             itemElement.className = 'filemanager-item';
+            if (item.isRoot) {
+                itemElement.classList.add('filemanager-item-disk');
+            }
             itemElement.dataset.type = item.type;
             itemElement.dataset.path = item.path;
             itemElement.dataset.itemName = item.name;
@@ -2596,7 +2623,14 @@ this.fileCountText.textContent = this._getText('FM_ITEMS_COUNT_FOUND', '找到 {
             
             let iconUrl = '';
             if (item.type === 'directory') {
-                iconUrl = 'D:/application/filemanager/assets/folder.svg';
+                // 根视图下的磁盘分区使用磁盘图标，与文件夹区分；系统盘 D: 使用系统盘图标
+                if (item.isRoot) {
+                    iconUrl = (item.name === 'D:' || item.path === 'D:')
+                        ? 'D:/application/filemanager/assets/drive-system.svg'
+                        : 'D:/application/filemanager/assets/drive.svg';
+                } else {
+                    iconUrl = 'D:/application/filemanager/assets/folder.svg';
+                }
             } else {
                 const fileType = item.fileType || 'BINARY';
                 switch (fileType) {
@@ -2637,7 +2671,7 @@ this.fileCountText.textContent = this._getText('FM_ITEMS_COUNT_FOUND', '找到 {
             const iconImg = document.createElement('img');
             iconImg.src = iconUrl;
             iconImg.alt = item.type === 'directory' ? this._getText('KEY_FOLDER', '文件夹') : this._getText('KEY_FILE', '文件');
-            iconImg.style.cssText = 'width: 24px; height: 24px;';
+            iconImg.style.cssText = item.isRoot ? 'width: 48px; height: 48px;' : 'width: 24px; height: 24px;';
             icon.appendChild(iconImg);
             
             // 名称
@@ -2645,22 +2679,59 @@ this.fileCountText.textContent = this._getText('FM_ITEMS_COUNT_FOUND', '找到 {
             name.className = 'filemanager-item-name';
             name.textContent = item.name;
             
-            // 大小（仅文件显示）
+            // 大小：文件显示字节大小；根视图磁盘项显示「可用 / 总容量」+ 进度条
             const size = document.createElement('div');
             size.className = 'filemanager-item-size';
             if (item.type === 'file') {
                 size.textContent = this._formatFileSize(item.size || 0);
+            } else if (item.isRoot && (item.totalSize != null || item.freeSize != null)) {
+                const freeStr = this._formatFileSize(item.freeSize || 0);
+                const totalStr = this._formatFileSize(item.totalSize || 0);
+                size.textContent = this._getText('FM_DISK_FREE_TOTAL', '{0} 可用，共 {1}').replace('{0}', freeStr).replace('{1}', totalStr);
             } else {
                 size.textContent = '';
             }
             
-            // 多选模式下，在选择框之后添加图标
-            if (checkbox) {
-                itemElement.appendChild(checkbox);
+            // 根视图磁盘项：添加容量进度条（显示已用/总容量）
+            let progressWrap = null;
+            if (item.isRoot && item.totalSize != null && item.totalSize > 0) {
+                progressWrap = document.createElement('div');
+                progressWrap.className = 'filemanager-disk-progress';
+                const progressFill = document.createElement('div');
+                progressFill.className = 'filemanager-disk-progress-fill';
+                const usedRatio = item.usedSize != null ? Math.min(1, Math.max(0, item.usedSize / item.totalSize)) : 0;
+                progressFill.style.width = (usedRatio * 100) + '%';
+                progressWrap.appendChild(progressFill);
             }
-            itemElement.appendChild(icon);
-            itemElement.appendChild(name);
-            itemElement.appendChild(size);
+            
+            // 根视图磁盘项：Windows 风格 = 左图标，右列（名称 / 进度条 / 容量文字）
+            if (item.isRoot) {
+                const diskHead = document.createElement('div');
+                diskHead.className = 'filemanager-disk-head';
+                diskHead.appendChild(icon);
+                const diskBody = document.createElement('div');
+                diskBody.className = 'filemanager-disk-body';
+                diskBody.appendChild(name);
+                if (progressWrap) {
+                    diskBody.appendChild(progressWrap);
+                }
+                diskBody.appendChild(size);
+                diskHead.appendChild(diskBody);
+                if (checkbox) {
+                    itemElement.appendChild(checkbox);
+                }
+                itemElement.appendChild(diskHead);
+            } else {
+                if (checkbox) {
+                    itemElement.appendChild(checkbox);
+                }
+                itemElement.appendChild(icon);
+                itemElement.appendChild(name);
+                itemElement.appendChild(size);
+                if (progressWrap) {
+                    itemElement.appendChild(progressWrap);
+                }
+            }
             
             // 基础样式（视图模式特定的样式由 CSS 类控制）
             itemElement.style.cssText = `
@@ -2878,6 +2949,14 @@ this.fileCountText.textContent = this._getText('FM_ITEMS_COUNT_FOUND', '找到 {
                     'view-tiles'
                 );
                 this.fileListElement.classList.add(`view-${this._viewMode}`);
+            }
+            
+            // 根视图（此电脑）下为磁盘列表，使用独立磁盘卡片布局，与文件夹列表区分
+            const isDiskView = fileList.length > 0 && fileList[0].isRoot === true;
+            if (isDiskView) {
+                this.fileListElement.classList.add('filemanager-filelist--disks');
+            } else {
+                this.fileListElement.classList.remove('filemanager-filelist--disks');
             }
             
             // 渲染每个文件/目录项
@@ -3737,36 +3816,9 @@ this.fileCountText.textContent = this._getText('FM_ITEMS_COUNT_FOUND', '找到 {
                             url = new URL('/system/service/FSDirve.php', origin);
                         }
                         url.searchParams.set('action', 'read_file');
-                        // D: 是系统盘，优先从 D:/bin 读取 zominstall.js
-                        // 如果 D: 不存在，尝试从第一个可用分区的 bin 目录读取
-                        let zominstallPath = 'D:/bin';
-                        let zominstallFileName = 'zominstall.js';
-                        
-                        // 检查 D: 分区是否存在（通过尝试列出目录）
-                        try {
-                            const checkUrl = new URL(url.toString());
-                            checkUrl.searchParams.set('action', 'list');
-                            checkUrl.searchParams.set('path', 'D:');
-                            const checkResponse = await fetch(checkUrl.toString());
-                            if (!checkResponse.ok) {
-                                // D: 不存在，尝试从其他分区查找
-                                // 按字母顺序检查所有分区（A-Z）
-                                for (let i = 0; i < 26; i++) {
-                                    const letter = String.fromCharCode(65 + i); // A-Z
-                                    if (letter === 'D') continue; // 跳过 D，已经检查过
-                                    const testPath = `${letter}:/bin`;
-                                    checkUrl.searchParams.set('path', testPath);
-                                    const testResponse = await fetch(checkUrl.toString());
-                                    if (testResponse.ok) {
-                                        zominstallPath = testPath;
-                                        break;
-                                    }
-                                }
-                            }
-                        } catch (e) {
-                            // 检查失败，使用默认的 D:/bin
-                        }
-                        
+                        // bin 仅存在于系统盘 D:，只从 D:/bin 读取 zominstall.js，不扫描其他分区
+                        const zominstallPath = 'D:/bin';
+                        const zominstallFileName = 'zominstall.js';
                         url.searchParams.set('path', zominstallPath);
                         url.searchParams.set('fileName', zominstallFileName);
                         

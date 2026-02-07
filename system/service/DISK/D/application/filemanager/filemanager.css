@@ -278,6 +278,114 @@
     min-width: 80px;
 }
 
+/* ========== 磁盘视图（此电脑根视图，Windows 风格：左图标 + 右名称/进度/容量） ========== */
+.filemanager-filelist.filemanager-filelist--disks {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 12px 16px;
+    align-content: start;
+}
+
+.filemanager-filelist.filemanager-filelist--disks .filemanager-item-disk {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 16px;
+    padding: 14px 18px;
+    min-height: 72px;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(40, 45, 60, 0.4);
+    transition: border-color 0.2s, background 0.2s;
+}
+
+.filemanager-filelist.filemanager-filelist--disks .filemanager-item-disk:hover {
+    border-color: rgba(108, 142, 255, 0.25);
+    background: rgba(50, 55, 75, 0.5);
+}
+
+.filemanager-filelist.filemanager-filelist--disks .filemanager-item-disk .filemanager-disk-head {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 16px;
+    flex: 1;
+    min-width: 0;
+}
+
+.filemanager-filelist.filemanager-filelist--disks .filemanager-item-disk .filemanager-item-icon {
+    width: 48px;
+    height: 48px;
+    margin-bottom: 0;
+    flex-shrink: 0;
+}
+
+.filemanager-filelist.filemanager-filelist--disks .filemanager-item-disk .filemanager-item-icon img {
+    width: 40px;
+    height: 40px;
+}
+
+.filemanager-filelist.filemanager-filelist--disks .filemanager-item-disk .filemanager-disk-body {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    flex: 1;
+    min-width: 0;
+}
+
+.filemanager-filelist.filemanager-filelist--disks .filemanager-item-disk .filemanager-item-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.95);
+    text-align: left;
+    margin-bottom: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.filemanager-filelist.filemanager-filelist--disks .filemanager-item-disk .filemanager-disk-progress {
+    width: 100%;
+    max-width: 200px;
+    flex-shrink: 0;
+}
+
+.filemanager-filelist.filemanager-filelist--disks .filemanager-item-disk .filemanager-item-size {
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.6);
+    text-align: left;
+    min-width: unset;
+    line-height: 1.3;
+    margin-bottom: 0;
+}
+
+/* 磁盘卡片容量进度条（显示已用比例，剩余为空白） */
+.filemanager-filelist.filemanager-filelist--disks .filemanager-item-disk .filemanager-disk-progress {
+    width: 100%;
+    height: 6px;
+    border-radius: 3px;
+    background: rgba(255, 255, 255, 0.12);
+    overflow: hidden;
+    flex-shrink: 0;
+}
+
+.filemanager-filelist.filemanager-filelist--disks .filemanager-item-disk .filemanager-disk-progress-fill {
+    height: 100%;
+    border-radius: 3px;
+    background: linear-gradient(90deg, rgba(108, 142, 255, 0.6), rgba(108, 142, 255, 0.85));
+    transition: width 0.3s ease;
+}
+
+.filemanager-filelist.filemanager-filelist--disks .filemanager-item-disk.selected .filemanager-disk-progress-fill {
+    background: linear-gradient(90deg, rgba(108, 142, 255, 0.7), rgba(108, 142, 255, 1));
+}
+
+.filemanager-filelist.filemanager-filelist--disks .filemanager-item-disk.selected {
+    border-color: rgba(108, 142, 255, 0.6);
+    background: rgba(108, 142, 255, 0.15);
+}
+
 /* 大图标视图 */
 .filemanager-filelist.view-large-icons {
     display: grid;

@@ -11,6 +11,21 @@
         keyListContainer: null,
         selectedKeyId: null,
         refreshTimer: null,
+        _languageChangeUnsubscribe: null,
+
+        /** 多语言文案：优先使用 LanguagesExpansion，否则返回 fallback */
+        _getText: function (key, fallback) {
+            try {
+                const LanguagesExpansion = (typeof POOL !== 'undefined' && POOL && typeof POOL.__GET__ === 'function')
+                    ? POOL.__GET__('KERNEL_GLOBAL_POOL', 'LanguagesExpansion')
+                    : (typeof window !== 'undefined' ? window.LanguagesExpansion : null);
+                if (LanguagesExpansion && typeof LanguagesExpansion.getText === 'function') {
+                    const value = LanguagesExpansion.getText(key);
+                    if (value && value !== key) return value;
+                }
+            } catch (e) {}
+            return fallback != null ? fallback : key;
+        },
 
         __init__: async function (pid, initArgs) {
             if (typeof KernelLogger !== 'undefined') {
@@ -58,7 +73,7 @@
                 }
 
                 const windowInfo = GUIManager.registerWindow(pid, this.window, {
-                    title: '密钥管理器',
+                    title: this._getText('AUTH_TITLE', '密钥管理器'),
                     icon: icon,
                     onClose: () => {
                         // 窗口关闭时终止程序
@@ -105,6 +120,16 @@
             
             // 注册右键菜单
             this._registerKeyContextMenu();
+
+            // 订阅语言切换，刷新界面文案
+            const LanguagesExpansion = (typeof POOL !== 'undefined' && POOL && typeof POOL.__GET__ === 'function')
+                ? POOL.__GET__('KERNEL_GLOBAL_POOL', 'LanguagesExpansion')
+                : (typeof window !== 'undefined' ? window.LanguagesExpansion : null);
+            if (LanguagesExpansion && typeof LanguagesExpansion.onLanguageChange === 'function') {
+                this._languageChangeUnsubscribe = LanguagesExpansion.onLanguageChange(() => {
+                    this._refreshAllUITexts();
+                });
+            }
             
             // 延迟加载密钥列表，确保进程已完全注册
             setTimeout(async () => {
@@ -112,9 +137,34 @@
             }, 100);
         },
 
+        /** 语言切换时刷新所有界面文案 */
+        _refreshAllUITexts: function () {
+            if (!this.window) return;
+            const titleEl = this.window.querySelector('.zos-window-title');
+            if (titleEl) titleEl.textContent = this._getText('AUTH_TITLE', '密钥管理器');
+            const toolbar = this.window.querySelector('.authenticator-toolbar');
+            if (toolbar) {
+                const genBtn = toolbar.querySelector('.authenticator-toolbar-generate');
+                if (genBtn) genBtn.textContent = this._getText('AUTH_BTN_GENERATE', '生成密钥');
+                const importBtn = toolbar.querySelector('.authenticator-toolbar-import');
+                if (importBtn) importBtn.textContent = this._getText('AUTH_BTN_IMPORT', '导入密钥');
+                const refreshBtn = toolbar.querySelector('.authenticator-toolbar-refresh');
+                if (refreshBtn) refreshBtn.textContent = this._getText('AUTH_BTN_REFRESH', '刷新');
+            }
+            const keyListTitle = this.window.querySelector('.authenticator-key-list-title');
+            if (keyListTitle) keyListTitle.textContent = this._getText('AUTH_KEY_LIST', '密钥列表');
+            const placeholder = this.window.querySelector('.authenticator-detail-placeholder');
+            if (placeholder) placeholder.textContent = this._getText('AUTH_SELECT_KEY_HINT', '请从左侧选择一个密钥查看详情');
+        },
+
         __exit__: async function () {
             if (typeof KernelLogger !== 'undefined') {
                 KernelLogger.debug('Authenticator', '__exit__ 被调用');
+            }
+
+            if (this._languageChangeUnsubscribe && typeof this._languageChangeUnsubscribe === 'function') {
+                this._languageChangeUnsubscribe();
+                this._languageChangeUnsubscribe = null;
             }
 
             // 清理定时器
@@ -140,9 +190,9 @@
 
         __info__: function () {
             return {
-                name: '密钥管理器',
+                name: (typeof AUTHENTICATOR !== 'undefined' && AUTHENTICATOR._getText) ? AUTHENTICATOR._getText('AUTH_TITLE', '密钥管理器') : '密钥管理器',
                 type: 'GUI',
-                description: 'RSA 公钥私钥管理工具',
+                description: (typeof AUTHENTICATOR !== 'undefined' && AUTHENTICATOR._getText) ? AUTHENTICATOR._getText('AUTH_DESCRIPTION', 'RSA 公钥私钥管理工具') : 'RSA 公钥私钥管理工具',
                 version: '1.0.0',
                 author: 'ZerOS Team',
                 copyright: '© 2025 ZerOS',
@@ -186,21 +236,24 @@
             `;
 
             // 生成密钥按钮
-            const generateBtn = this._createButton('生成密钥', async () => {
+            const generateBtn = this._createButton(this._getText('AUTH_BTN_GENERATE', '生成密钥'), async () => {
                 await this._showGenerateKeyDialog();
             });
+            generateBtn.className = 'authenticator-toolbar-generate';
             toolbar.appendChild(generateBtn);
 
             // 导入密钥按钮
-            const importBtn = this._createButton('导入密钥', async () => {
+            const importBtn = this._createButton(this._getText('AUTH_BTN_IMPORT', '导入密钥'), async () => {
                 await this._showImportKeyDialog();
             });
+            importBtn.className = 'authenticator-toolbar-import';
             toolbar.appendChild(importBtn);
 
             // 刷新按钮
-            const refreshBtn = this._createButton('刷新', async () => {
+            const refreshBtn = this._createButton(this._getText('AUTH_BTN_REFRESH', '刷新'), async () => {
                 await this._refreshKeyList();
             });
+            refreshBtn.className = 'authenticator-toolbar-refresh';
             toolbar.appendChild(refreshBtn);
 
             return toolbar;
@@ -267,7 +320,8 @@
 
             // 列表标题
             const title = document.createElement('div');
-            title.textContent = '密钥列表';
+            title.className = 'authenticator-key-list-title';
+            title.textContent = this._getText('AUTH_KEY_LIST', '密钥列表');
             title.style.cssText = `
                 height: 40px;
                 display: flex;
@@ -318,7 +372,8 @@
             `;
 
             const placeholder = document.createElement('div');
-            placeholder.textContent = '请从左侧选择一个密钥查看详情';
+            placeholder.className = 'authenticator-detail-placeholder';
+            placeholder.textContent = this._getText('AUTH_SELECT_KEY_HINT', '请从左侧选择一个密钥查看详情');
             placeholder.style.cssText = `
                 text-align: center;
                 color: rgba(215, 224, 221, 0.5);
@@ -341,7 +396,7 @@
             }
 
             if (typeof ProcessManager === 'undefined') {
-                this.keyListContainer.innerHTML = '<div style="padding: 16px; color: rgba(255, 95, 87, 0.8);">ProcessManager 不可用</div>';
+                this.keyListContainer.innerHTML = '<div style="padding: 16px; color: rgba(255, 95, 87, 0.8);">' + this._getText('AUTH_PM_UNAVAILABLE', 'ProcessManager 不可用') + '</div>';
                 return;
             }
 
@@ -362,7 +417,7 @@
 
                 if (keys.length === 0) {
                     const emptyMsg = document.createElement('div');
-                    emptyMsg.textContent = '暂无密钥';
+                    emptyMsg.textContent = this._getText('AUTH_NO_KEYS', '暂无密钥');
                     emptyMsg.style.cssText = `
                         padding: 16px;
                         text-align: center;
@@ -384,7 +439,7 @@
                 if (typeof KernelLogger !== 'undefined') {
                     KernelLogger.error('Authenticator', '刷新密钥列表失败', error);
                 }
-                this.keyListContainer.innerHTML = `<div style="padding: 16px; color: rgba(255, 95, 87, 0.8);">加载失败: ${error.message}</div>`;
+                this.keyListContainer.innerHTML = '<div style="padding: 16px; color: rgba(255, 95, 87, 0.8);">' + this._getText('AUTH_LOAD_FAIL', '加载失败') + ': ' + (error.message || '') + '</div>';
             }
         },
 
@@ -395,6 +450,7 @@
             const item = document.createElement('div');
             item.className = 'authenticator-key-item';
             item.dataset.keyId = keyInfo.keyId;
+            item.dataset.isDefault = keyInfo.isDefault ? '1' : '0';
 
             const isSelected = this.selectedKeyId === keyInfo.keyId;
 
@@ -426,16 +482,16 @@
 
             const infoParts = [];
             if (keyInfo.isDefault) {
-                infoParts.push('默认');
+                infoParts.push(this._getText('AUTH_DEFAULT', '默认'));
             }
             const createdDate = new Date(keyInfo.createdAt);
             infoParts.push(createdDate.toLocaleDateString());
             if (keyInfo.expiresAt) {
                 const expiresDate = new Date(keyInfo.expiresAt);
                 if (expiresDate < new Date()) {
-                    infoParts.push('已过期');
+                    infoParts.push(this._getText('AUTH_EXPIRED', '已过期'));
                 } else {
-                    infoParts.push(`过期: ${expiresDate.toLocaleDateString()}`);
+                    infoParts.push(this._getText('AUTH_EXPIRES', '过期') + ': ' + expiresDate.toLocaleDateString());
                 }
             }
 
@@ -516,7 +572,7 @@
             }
 
             if (typeof ProcessManager === 'undefined') {
-                detailContent.innerHTML = '<div style="color: rgba(255, 95, 87, 0.8);">ProcessManager 不可用</div>';
+                detailContent.innerHTML = '<div style="color: rgba(255, 95, 87, 0.8);">' + this._getText('AUTH_PM_UNAVAILABLE', 'ProcessManager 不可用') + '</div>';
                 return;
             }
 
@@ -528,7 +584,7 @@
                     [keyId]
                 );
                 if (!keyInfo) {
-                    detailContent.innerHTML = '<div style="color: rgba(255, 95, 87, 0.8);">密钥不存在或已过期</div>';
+                    detailContent.innerHTML = '<div style="color: rgba(255, 95, 87, 0.8);">' + this._getText('AUTH_KEY_NOT_FOUND', '密钥不存在或已过期') + '</div>';
                     return;
                 }
 
@@ -552,42 +608,42 @@
                 basicInfo.appendChild(title);
 
                 // 密钥ID
-                const keyIdRow = this._createDetailRow('密钥ID', keyInfo.keyId);
+                const keyIdRow = this._createDetailRow(this._getText('AUTH_KEY_ID', '密钥ID'), keyInfo.keyId);
                 basicInfo.appendChild(keyIdRow);
 
                 // 创建时间
                 const createdAt = new Date(keyInfo.createdAt);
-                const createdAtRow = this._createDetailRow('创建时间', createdAt.toLocaleString());
+                const createdAtRow = this._createDetailRow(this._getText('AUTH_CREATED_AT', '创建时间'), createdAt.toLocaleString());
                 basicInfo.appendChild(createdAtRow);
 
                 // 过期时间
                 if (keyInfo.expiresAt) {
                     const expiresAt = new Date(keyInfo.expiresAt);
-                    const expiresAtRow = this._createDetailRow('过期时间', expiresAt.toLocaleString());
+                    const expiresAtRow = this._createDetailRow(this._getText('AUTH_EXPIRES_AT', '过期时间'), expiresAt.toLocaleString());
                     basicInfo.appendChild(expiresAtRow);
                 } else {
-                    const expiresAtRow = this._createDetailRow('过期时间', '永不过期');
+                    const expiresAtRow = this._createDetailRow(this._getText('AUTH_EXPIRES_AT', '过期时间'), this._getText('AUTH_NEVER_EXPIRES', '永不过期'));
                     basicInfo.appendChild(expiresAtRow);
                 }
 
                 // 是否默认
-                const isDefaultRow = this._createDetailRow('默认密钥', keyInfo.isDefault ? '是' : '否');
+                const isDefaultRow = this._createDetailRow(this._getText('AUTH_IS_DEFAULT', '默认密钥'), keyInfo.isDefault ? this._getText('AUTH_YES', '是') : this._getText('AUTH_NO', '否'));
                 basicInfo.appendChild(isDefaultRow);
 
                 // 标签
                 if (keyInfo.tags && keyInfo.tags.length > 0) {
-                    const tagsRow = this._createDetailRow('标签', keyInfo.tags.join(', '));
+                    const tagsRow = this._createDetailRow(this._getText('AUTH_TAGS', '标签'), keyInfo.tags.join(', '));
                     basicInfo.appendChild(tagsRow);
                 }
 
                 detailContent.appendChild(basicInfo);
 
                 // 公钥
-                const publicKeySection = this._createKeySection('公钥', fullKeyInfo.publicKey, true);
+                const publicKeySection = this._createKeySection(this._getText('AUTH_PUBLIC_KEY', '公钥'), fullKeyInfo.publicKey, true);
                 detailContent.appendChild(publicKeySection);
 
                 // 私钥
-                const privateKeySection = this._createKeySection('私钥', fullKeyInfo.privateKey, false);
+                const privateKeySection = this._createKeySection(this._getText('AUTH_PRIVATE_KEY', '私钥'), fullKeyInfo.privateKey, false);
                 detailContent.appendChild(privateKeySection);
 
                 // 操作按钮
@@ -596,20 +652,20 @@
 
                 // 设置为默认按钮
                 if (!keyInfo.isDefault) {
-                    const setDefaultBtn = this._createActionButton('设为默认', async () => {
+                    const setDefaultBtn = this._createActionButton(this._getText('AUTH_SET_DEFAULT', '设为默认'), async () => {
                         await this._setDefaultKey(keyId);
                     });
                     actions.appendChild(setDefaultBtn);
                 }
 
                 // 导出密钥按钮
-                const exportBtn = this._createActionButton('导出密钥', async () => {
+                const exportBtn = this._createActionButton(this._getText('AUTH_EXPORT_KEY', '导出密钥'), async () => {
                     await this._exportKey(keyId, fullKeyInfo);
                 });
                 actions.appendChild(exportBtn);
 
                 // 删除密钥按钮
-                const deleteBtn = this._createActionButton('删除密钥', async () => {
+                const deleteBtn = this._createActionButton(this._getText('AUTH_DELETE_KEY', '删除密钥'), async () => {
                     await this._deleteKey(keyId);
                 }, true);
                 actions.appendChild(deleteBtn);
@@ -619,7 +675,7 @@
                 if (typeof KernelLogger !== 'undefined') {
                     KernelLogger.error('Authenticator', '显示密钥详情失败', error);
                 }
-                detailContent.innerHTML = `<div style="color: rgba(255, 95, 87, 0.8);">加载失败: ${error.message}</div>`;
+                detailContent.innerHTML = '<div style="color: rgba(255, 95, 87, 0.8);">' + this._getText('AUTH_LOAD_FAIL', '加载失败') + ': ' + (error.message || '') + '</div>';
             }
         },
 
@@ -762,7 +818,7 @@
                             `;
 
             const keyText = document.createElement('textarea');
-            keyText.value = key || '密钥不可用';
+            keyText.value = key || this._getText('AUTH_KEY_UNAVAILABLE', '密钥不可用');
             keyText.readOnly = true;
             keyText.style.cssText = `
                                 width: 100%;
@@ -779,7 +835,7 @@
 
             // 复制按钮
             const copyBtn = document.createElement('button');
-            copyBtn.textContent = '复制';
+            copyBtn.textContent = this._getText('AUTH_COPY', '复制');
             copyBtn.style.cssText = `
                                 position: absolute;
                                 top: 8px;
@@ -799,9 +855,9 @@
                         e.stopPropagation();
                         keyText.select();
                         document.execCommand('copy');
-                        copyBtn.textContent = '已复制';
+                        copyBtn.textContent = this._getText('AUTH_COPIED', '已复制');
                         setTimeout(() => {
-                            copyBtn.textContent = '复制';
+                            copyBtn.textContent = this._getText('AUTH_COPY', '复制');
                         }, 2000);
                     }
                 }, {
@@ -812,9 +868,9 @@
                 copyBtn.addEventListener('click', () => {
                     keyText.select();
                     document.execCommand('copy');
-                    copyBtn.textContent = '已复制';
+                    copyBtn.textContent = this._getText('AUTH_COPIED', '已复制');
                     setTimeout(() => {
-                        copyBtn.textContent = '复制';
+                        copyBtn.textContent = this._getText('AUTH_COPY', '复制');
                     }, 2000);
                 });
             }
@@ -873,8 +929,9 @@
          * 显示生成密钥对话框
          */
         _showGenerateKeyDialog: async function () {
+            const self = this;
             const result = await this._showCustomDialog({
-                title: '生成密钥对',
+                title: this._getText('AUTH_GEN_DIALOG_TITLE', '生成密钥对'),
                 width: 500,
                 height: 380,
                 content: () => {
@@ -883,46 +940,39 @@
                     
                     // 描述输入
                     const descLabel = document.createElement('label');
-                    descLabel.textContent = '描述:';
+                    descLabel.textContent = self._getText('AUTH_LABEL_DESC', '描述:');
                     descLabel.style.cssText = 'display: block; margin-bottom: 8px; color: rgba(215, 224, 221, 0.9); font-size: 13px;';
                     container.appendChild(descLabel);
                     
                     const descInput = document.createElement('input');
                     descInput.type = 'text';
                     descInput.id = 'auth-key-description';
-                    descInput.placeholder = '密钥描述';
+                    descInput.placeholder = self._getText('AUTH_PLACEHOLDER_DESC', '密钥描述');
                     descInput.style.cssText = 'width: 100%; padding: 8px; margin-bottom: 16px; background: rgba(20, 20, 30, 0.5); border: 1px solid rgba(108, 142, 255, 0.3); border-radius: 6px; color: rgba(215, 224, 221, 0.9); font-size: 13px; box-sizing: border-box;';
                     container.appendChild(descInput);
                     
                     // 密钥长度选择
                     const sizeLabel = document.createElement('label');
-                    sizeLabel.textContent = '密钥长度:';
+                    sizeLabel.textContent = self._getText('AUTH_LABEL_KEY_SIZE', '密钥长度:');
                     sizeLabel.style.cssText = 'display: block; margin-bottom: 8px; color: rgba(215, 224, 221, 0.9); font-size: 13px;';
                     container.appendChild(sizeLabel);
                     
                     const sizeSelect = document.createElement('select');
                     sizeSelect.id = 'auth-key-size';
                     sizeSelect.style.cssText = 'width: 100%; padding: 8px; margin-bottom: 16px; background: rgba(20, 20, 30, 0.5); border: 1px solid rgba(108, 142, 255, 0.3); border-radius: 6px; color: rgba(215, 224, 221, 0.9); font-size: 13px; box-sizing: border-box;';
-                    sizeSelect.innerHTML = '<option value="1024">1024 位</option><option value="2048" selected>2048 位（推荐）</option><option value="4096">4096 位</option>';
+                    sizeSelect.innerHTML = '<option value="1024">' + self._getText('AUTH_KEY_SIZE_1024', '1024 位') + '</option><option value="2048" selected>' + self._getText('AUTH_KEY_SIZE_2048', '2048 位（推荐）') + '</option><option value="4096">' + self._getText('AUTH_KEY_SIZE_4096', '4096 位') + '</option>';
                     container.appendChild(sizeSelect);
                     
                     // 过期时间选择
                     const expireLabel = document.createElement('label');
-                    expireLabel.textContent = '过期时间:';
+                    expireLabel.textContent = self._getText('AUTH_LABEL_EXPIRE', '过期时间:');
                     expireLabel.style.cssText = 'display: block; margin-bottom: 8px; color: rgba(215, 224, 221, 0.9); font-size: 13px;';
                     container.appendChild(expireLabel);
                     
                     const expireSelect = document.createElement('select');
                     expireSelect.id = 'auth-key-expire';
                     expireSelect.style.cssText = 'width: 100%; padding: 8px; margin-bottom: 16px; background: rgba(20, 20, 30, 0.5); border: 1px solid rgba(108, 142, 255, 0.3); border-radius: 6px; color: rgba(215, 224, 221, 0.9); font-size: 13px; box-sizing: border-box;';
-                    expireSelect.innerHTML = `
-                        <option value="0">永不过期</option>
-                        <option value="86400000">1 天</option>
-                        <option value="604800000">7 天</option>
-                        <option value="2592000000">30 天</option>
-                        <option value="7776000000">90 天</option>
-                        <option value="31536000000">1 年</option>
-                    `;
+                    expireSelect.innerHTML = '<option value="0">' + self._getText('AUTH_EXPIRE_NEVER', '永不过期') + '</option><option value="86400000">' + self._getText('AUTH_EXPIRE_1D', '1 天') + '</option><option value="604800000">' + self._getText('AUTH_EXPIRE_7D', '7 天') + '</option><option value="2592000000">' + self._getText('AUTH_EXPIRE_30D', '30 天') + '</option><option value="7776000000">' + self._getText('AUTH_EXPIRE_90D', '90 天') + '</option><option value="31536000000">' + self._getText('AUTH_EXPIRE_1Y', '1 年') + '</option>';
                     container.appendChild(expireSelect);
                     
                     // 设为默认复选框
@@ -934,15 +984,15 @@
                     defaultCheckbox.id = 'auth-set-as-default';
                     defaultCheckbox.style.cssText = 'margin-right: 8px; cursor: pointer;';
                     defaultLabel.appendChild(defaultCheckbox);
-                    defaultLabel.appendChild(document.createTextNode('设为默认密钥'));
+                    defaultLabel.appendChild(document.createTextNode(self._getText('AUTH_SET_AS_DEFAULT', '设为默认密钥')));
                     container.appendChild(defaultLabel);
                     
                     return container;
                 },
                 buttons: [
-                    { text: '取消', action: 'cancel' },
+                    { text: this._getText('AUTH_CANCEL', '取消'), action: 'cancel' },
                     { 
-                        text: '生成', 
+                        text: this._getText('AUTH_GENERATE', '生成'), 
                         action: 'confirm', 
                         primary: true,
                         getData: (dialogWindow) => {
@@ -1012,7 +1062,7 @@
                 }
 
                 if (!description) {
-                    await this._showAlert('请输入密钥描述', '提示', 'warning');
+                    await this._showAlert(this._getText('AUTH_ALERT_ENTER_DESC', '请输入密钥描述'), this._getText('AUTH_ALERT_TIP', '提示'), 'warning');
                     return;
                 }
 
@@ -1024,7 +1074,7 @@
                         setAsDefault: setAsDefault
                     });
                 } catch (error) {
-                    await this._showAlert(`生成密钥失败: ${error.message}`, '错误', 'error');
+                    await this._showAlert(this._getText('AUTH_GEN_FAIL', '生成密钥失败') + ': ' + (error.message || ''), this._getText('AUTH_ALERT_ERROR', '错误'), 'error');
                 }
             }
         },
@@ -1065,8 +1115,9 @@
          * 显示导入密钥对话框
          */
         _showImportKeyDialog: async function () {
+            const self = this;
             const result = await this._showCustomDialog({
-                title: '导入密钥对',
+                title: this._getText('AUTH_IMPORT_DIALOG_TITLE', '导入密钥对'),
                 width: 600,
                 height: 500,
                 content: () => {
@@ -1075,47 +1126,47 @@
                     
                     // 公钥输入
                     const pubLabel = document.createElement('label');
-                    pubLabel.textContent = '公钥 (PEM 格式):';
+                    pubLabel.textContent = self._getText('AUTH_PUBLIC_PEM', '公钥 (PEM 格式):');
                     pubLabel.style.cssText = 'display: block; margin-bottom: 8px; color: rgba(215, 224, 221, 0.9); font-size: 13px;';
                     container.appendChild(pubLabel);
                     
                     const pubTextarea = document.createElement('textarea');
                     pubTextarea.id = 'auth-import-public-key';
-                    pubTextarea.placeholder = '-----BEGIN PUBLIC KEY-----\n...\n-----END PUBLIC KEY-----';
+                    pubTextarea.placeholder = self._getText('AUTH_IMPORT_PLACEHOLDER_PUB', '-----BEGIN PUBLIC KEY-----\n...\n-----END PUBLIC KEY-----');
                     pubTextarea.style.cssText = 'width: 100%; min-height: 100px; padding: 8px; margin-bottom: 16px; background: rgba(20, 20, 30, 0.5); border: 1px solid rgba(108, 142, 255, 0.3); border-radius: 6px; color: rgba(215, 224, 221, 0.9); font-family: monospace; font-size: 11px; box-sizing: border-box; resize: vertical;';
                     container.appendChild(pubTextarea);
                     
                     // 私钥输入
                     const privLabel = document.createElement('label');
-                    privLabel.textContent = '私钥 (PEM 格式):';
+                    privLabel.textContent = self._getText('AUTH_PRIVATE_PEM', '私钥 (PEM 格式):');
                     privLabel.style.cssText = 'display: block; margin-bottom: 8px; color: rgba(215, 224, 221, 0.9); font-size: 13px;';
                     container.appendChild(privLabel);
                     
                     const privTextarea = document.createElement('textarea');
                     privTextarea.id = 'auth-import-private-key';
-                    privTextarea.placeholder = '-----BEGIN RSA PRIVATE KEY-----\n...\n-----END RSA PRIVATE KEY-----';
+                    privTextarea.placeholder = self._getText('AUTH_IMPORT_PLACEHOLDER_PRIV', '-----BEGIN RSA PRIVATE KEY-----\n...\n-----END RSA PRIVATE KEY-----');
                     privTextarea.style.cssText = 'width: 100%; min-height: 100px; padding: 8px; margin-bottom: 16px; background: rgba(20, 20, 30, 0.5); border: 1px solid rgba(108, 142, 255, 0.3); border-radius: 6px; color: rgba(215, 224, 221, 0.9); font-family: monospace; font-size: 11px; box-sizing: border-box; resize: vertical;';
                     container.appendChild(privTextarea);
                     
                     // 描述输入
                     const descLabel = document.createElement('label');
-                    descLabel.textContent = '描述:';
+                    descLabel.textContent = self._getText('AUTH_LABEL_DESC', '描述:');
                     descLabel.style.cssText = 'display: block; margin-bottom: 8px; color: rgba(215, 224, 221, 0.9); font-size: 13px;';
                     container.appendChild(descLabel);
                     
                     const descInput = document.createElement('input');
                     descInput.type = 'text';
                     descInput.id = 'auth-import-key-description';
-                    descInput.placeholder = '密钥描述';
+                    descInput.placeholder = self._getText('AUTH_PLACEHOLDER_DESC', '密钥描述');
                     descInput.style.cssText = 'width: 100%; padding: 8px; background: rgba(20, 20, 30, 0.5); border: 1px solid rgba(108, 142, 255, 0.3); border-radius: 6px; color: rgba(215, 224, 221, 0.9); font-size: 13px; box-sizing: border-box;';
                     container.appendChild(descInput);
                     
                     return container;
                 },
                 buttons: [
-                    { text: '取消', action: 'cancel' },
+                    { text: this._getText('AUTH_CANCEL', '取消'), action: 'cancel' },
                     { 
-                        text: '导入', 
+                        text: this._getText('AUTH_IMPORT', '导入'), 
                         action: 'confirm', 
                         primary: true,
                         getData: (dialogWindow) => {
@@ -1169,14 +1220,14 @@
                 }
 
                 if (!publicKey || !privateKey) {
-                    await this._showAlert('公钥和私钥不能为空', '错误', 'error');
+                    await this._showAlert(this._getText('AUTH_IMPORT_EMPTY', '公钥和私钥不能为空'), this._getText('AUTH_ALERT_ERROR', '错误'), 'error');
                     return;
                 }
 
                 try {
                     await this._importKey(publicKey, privateKey, { description: description });
                 } catch (error) {
-                    await this._showAlert(`导入密钥失败: ${error.message}`, '错误', 'error');
+                    await this._showAlert(this._getText('AUTH_IMPORT_FAIL', '导入密钥失败') + ': ' + (error.message || ''), this._getText('AUTH_ALERT_ERROR', '错误'), 'error');
                 }
             }
         },
@@ -1243,7 +1294,7 @@
                 if (typeof KernelLogger !== 'undefined') {
                     KernelLogger.error('Authenticator', '设置默认密钥失败', error);
                 }
-                await this._showAlert(`设置默认密钥失败: ${error.message}`, '错误', 'error');
+                await this._showAlert(this._getText('AUTH_SET_DEFAULT_FAIL', '设置默认密钥失败') + ': ' + (error.message || ''), this._getText('AUTH_ALERT_ERROR', '错误'), 'error');
             }
         },
 
@@ -1324,7 +1375,7 @@
                             if (typeof KernelLogger !== 'undefined') {
                                 KernelLogger.error('Authenticator', '导出密钥失败', error);
                             }
-                            await this._showAlert(`导出密钥失败: ${error.message}`, '错误', 'error');
+                            await this._showAlert(this._getText('AUTH_EXPORT_FAIL', '导出密钥失败') + ': ' + (error.message || ''), this._getText('AUTH_ALERT_ERROR', '错误'), 'error');
                         }
                     }
                 });
@@ -1332,7 +1383,7 @@
                 if (typeof KernelLogger !== 'undefined') {
                     KernelLogger.error('Authenticator', '导出密钥失败', error);
                 }
-                await this._showAlert(`导出密钥失败: ${error.message}`, '错误', 'error');
+                await this._showAlert(this._getText('AUTH_EXPORT_FAIL', '导出密钥失败') + ': ' + (error.message || ''), this._getText('AUTH_ALERT_ERROR', '错误'), 'error');
             }
         },
 
@@ -1345,7 +1396,8 @@
             }
 
             // 确认删除
-            const confirmed = await this._showConfirm(`确定要删除密钥 "${keyId}" 吗？\n此操作无法恢复。`, '删除确认', 'danger');
+            const confirmMsg = (this._getText('AUTH_DELETE_CONFIRM', '确定要删除密钥 "{0}" 吗？\n此操作无法恢复。')).replace('{0}', keyId);
+            const confirmed = await this._showConfirm(confirmMsg, this._getText('AUTH_DELETE_CONFIRM_TITLE', '删除确认'), 'danger');
             if (!confirmed) {
                 return;
             }
@@ -1366,7 +1418,7 @@
                     this.selectedKeyId = null;
                     const detailContent = document.getElementById('authenticator-detail-content');
                     if (detailContent) {
-                        detailContent.innerHTML = '<div style="text-align: center; color: rgba(215, 224, 221, 0.5); margin-top: 100px; font-size: 14px;">请从左侧选择一个密钥查看详情</div>';
+                        detailContent.innerHTML = '<div style="text-align: center; color: rgba(215, 224, 221, 0.5); margin-top: 100px; font-size: 14px;">' + this._getText('AUTH_SELECT_KEY_HINT', '请从左侧选择一个密钥查看详情') + '</div>';
                     }
                 }
 
@@ -1378,7 +1430,7 @@
                 if (typeof KernelLogger !== 'undefined') {
                     KernelLogger.error('Authenticator', '删除密钥失败', error);
                 }
-                await this._showAlert(`删除密钥失败: ${error.message}`, '错误', 'error');
+                await this._showAlert(this._getText('AUTH_DELETE_FAIL', '删除密钥失败') + ': ' + (error.message || ''), this._getText('AUTH_ALERT_ERROR', '错误'), 'error');
             }
         },
 
@@ -1506,7 +1558,7 @@
                 let dialogWindowId = null;
                 if (typeof GUIManager !== 'undefined') {
                     const windowInfo = GUIManager.registerWindow(this.pid, dialogWindow, {
-                        title: options.title || '对话框',
+                        title: options.title || this._getText('AUTH_DIALOG', '对话框'),
                         onClose: () => {
                             closeDialog('cancel');
                         }
@@ -1522,7 +1574,8 @@
         /**
          * 显示提示框（替代 alert）
          */
-        _showAlert: async function (message, title = '提示', type = 'info') {
+        _showAlert: async function (message, title, type = 'info') {
+            if (title == null || title === '') title = this._getText('AUTH_ALERT_TIP', '提示');
             if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
                 return await GUIManager.showAlert(message, title, type);
             }
@@ -1545,7 +1598,7 @@
                     return container;
                 },
                 buttons: [
-                    { text: '确定', action: 'ok', primary: true }
+                    { text: this._getText('AUTH_OK', '确定'), action: 'ok', primary: true }
                 ]
             });
         },
@@ -1553,7 +1606,8 @@
         /**
          * 显示确认框（替代 confirm）
          */
-        _showConfirm: async function (message, title = '确认', type = 'warning') {
+        _showConfirm: async function (message, title, type = 'warning') {
+            if (title == null || title === '') title = this._getText('AUTH_CONFIRM', '确认');
             if (typeof GUIManager !== 'undefined' && typeof GUIManager.showConfirm === 'function') {
                 return await GUIManager.showConfirm(message, title, type);
             }
@@ -1577,8 +1631,8 @@
                     return container;
                 },
                 buttons: [
-                    { text: '取消', action: 'cancel' },
-                    { text: '确定', action: 'confirm', primary: true }
+                    { text: this._getText('AUTH_CANCEL', '取消'), action: 'cancel' },
+                    { text: this._getText('AUTH_OK', '确定'), action: 'confirm', primary: true }
                 ]
             });
             return result === 'confirm';
@@ -1605,17 +1659,14 @@
                     }
 
                     const keyId = item.dataset.keyId;
-                    
-                    // 从列表项文本判断是否默认（同步方式）
-                    const infoText = item.querySelector('div:last-child')?.textContent || '';
-                    const isDefault = infoText.includes('默认');
+                    const isDefault = item.dataset.isDefault === '1';
 
                     const menuItems = [];
 
                     // 设为默认（如果不是默认密钥）
                     if (!isDefault) {
                         menuItems.push({
-                            label: '设为默认',
+                            label: self._getText('AUTH_SET_DEFAULT', '设为默认'),
                             action: async () => {
                                 await self._setDefaultKey(keyId);
                             }
@@ -1624,20 +1675,20 @@
 
                     // 导出密钥
                     menuItems.push({
-                        label: '导出密钥',
+                        label: self._getText('AUTH_EXPORT_KEY', '导出密钥'),
                         action: async () => {
                             try {
                                 const fullKeyInfo = await self._getFullKeyInfo(keyId);
                                 await self._exportKey(keyId, fullKeyInfo);
                             } catch (error) {
-                                await self._showAlert(`导出密钥失败: ${error.message}`, '错误', 'error');
+                                await self._showAlert(self._getText('AUTH_EXPORT_FAIL', '导出密钥失败') + ': ' + (error.message || ''), self._getText('AUTH_ALERT_ERROR', '错误'), 'error');
                             }
                         }
                     });
 
-                    // 删除密钥
+                    // 删除
                     menuItems.push({
-                        label: '删除',
+                        label: self._getText('AUTH_DELETE', '删除'),
                         action: async () => {
                             await self._deleteKey(keyId);
                         }

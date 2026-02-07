@@ -986,9 +986,47 @@ class DesktopManager {
             } else if (savedIcons.length === 0) {
                 KernelLogger.info("DesktopManager", "桌面图标数组为空");
             }
+            
+            // 重启后 LStorage 可能尚未从 D: 读完 LocalSData，若首次未读到图标则延迟重试（最多 2 次）
+            const hasNoIcons = !savedIcons || !Array.isArray(savedIcons) || savedIcons.length === 0;
+            if (hasNoIcons && typeof DesktopManager._desktopIconsRetryCount === 'undefined') {
+                DesktopManager._desktopIconsRetryCount = 0;
+            }
+            if (hasNoIcons && DesktopManager._desktopIconsRetryCount < 2) {
+                DesktopManager._desktopIconsRetryCount++;
+                const delayMs = DesktopManager._desktopIconsRetryCount * 1500;
+                KernelLogger.info("DesktopManager", `未读到桌面图标，${delayMs}ms 后重试（第 ${DesktopManager._desktopIconsRetryCount} 次）`);
+                setTimeout(async () => {
+                    if (typeof LStorage !== 'undefined' && typeof LStorage.clearCache === 'function') {
+                        LStorage.clearCache();
+                    }
+                    await DesktopManager._loadDesktopIcons();
+                }, delayMs);
+            } else if (hasNoIcons) {
+                DesktopManager._desktopIconsRetryCount = 0;
+            } else {
+                DesktopManager._desktopIconsRetryCount = 0;
+            }
         } catch (e) {
             KernelLogger.error("DesktopManager", `加载桌面图标失败: ${e.message}`, e);
             KernelLogger.error("DesktopManager", `错误堆栈: ${e.stack || '无堆栈信息'}`);
+            // 失败时也重试一次
+            if (typeof DesktopManager._desktopIconsRetryCount === 'undefined') {
+                DesktopManager._desktopIconsRetryCount = 0;
+            }
+            if (DesktopManager._desktopIconsRetryCount < 2) {
+                DesktopManager._desktopIconsRetryCount++;
+                const delayMs = 1500 * DesktopManager._desktopIconsRetryCount;
+                KernelLogger.info("DesktopManager", `加载桌面图标异常，${delayMs}ms 后重试`);
+                setTimeout(async () => {
+                    if (typeof LStorage !== 'undefined' && typeof LStorage.clearCache === 'function') {
+                        LStorage.clearCache();
+                    }
+                    await DesktopManager._loadDesktopIcons();
+                }, delayMs);
+            } else {
+                DesktopManager._desktopIconsRetryCount = 0;
+            }
         }
         
         // 排列图标
