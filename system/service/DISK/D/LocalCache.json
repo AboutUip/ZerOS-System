@@ -1,11 +1,11 @@
 {
   "system": {
     "system.dailyQuote": {
-      "value": "我觉得，我这辈子最灿烂的笑容，大概都奉献给我电脑屏幕了。",
+      "value": "谁都有权利幸福，困难的是享受；谁都有权利幸福，困难的是履行；谁都有权利幸福，困难的是妥协。",
       "expiresAt": 0,
-      "createdAt": 1770485961256,
-      "updatedAt": 1770485961256,
-      "size": 86
+      "createdAt": 1770539106297,
+      "updatedAt": 1770539106297,
+      "size": 137
     }
   },
   "programs": {
@@ -30,25 +30,25 @@
           "data": {
             "city": "山西省 吕梁市",
             "today": {
-              "current_temp": "-11℃",
+              "current_temp": "3℃",
               "current_cond": "晴",
-              "low": "-12℃",
+              "low": "-10℃",
               "quality": "--"
             },
-            "low_temperature": -12,
+            "low_temperature": -10,
             "tips": "建议穿羽绒服、棉裤，做好全面防寒",
             "seven_day": [
               {
                 "date": "2026-02-08",
                 "cond": "晴",
-                "high": "4℃",
-                "low": "-12℃"
+                "high": "5℃",
+                "low": "-10℃"
               },
               {
                 "date": "2026-02-09",
                 "cond": "多云",
                 "high": "6℃",
-                "low": "-6℃"
+                "low": "-7℃"
               },
               {
                 "date": "2026-02-10",
@@ -84,9 +84,9 @@
                 "advice": "建议开启空调制热或使用其他取暖设备"
               },
               "cold_risk": {
-                "level": "较低",
-                "brief": "较少发",
-                "advice": "感冒风险较低，注意适当增减衣物"
+                "level": "中等",
+                "brief": "易发",
+                "advice": "感冒风险中等，注意保暖和作息规律"
               },
               "exercise": {
                 "level": "非常适宜",
@@ -99,16 +99,16 @@
                 "advice": "体感寒冷，注意保暖防寒"
               }
             },
-            "feels_like": -17,
-            "wind_direction": "东南风",
+            "feels_like": -2,
+            "wind_direction": "西风",
             "wind_power": "2",
-            "humidity": 45
+            "humidity": 16
           }
         },
-        "expiresAt": 1770524606872,
-        "createdAt": 1770481406872,
-        "updatedAt": 1770481406872,
-        "size": 1413
+        "expiresAt": 1770573862834,
+        "createdAt": 1770530662834,
+        "updatedAt": 1770530662834,
+        "size": 1407
       }
     }
   }

@@ -14,6 +14,10 @@ class TaskbarManager {
     static _showingSelectorProgramName = null;
     // 更新定时器引用
     static _updateTimer = null;
+    // 是否正在渲染任务栏（防止并发渲染导致重复/错乱）
+    static _renderInProgress = false;
+    // 渲染期间若有新的 update 请求，完成后再执行一次
+    static _pendingUpdate = false;
     // 观察器定时器引用
     static _observerInterval = null;
     // 观察器是否已初始化
@@ -38,6 +42,8 @@ class TaskbarManager {
     // 语言切换监听是否已注册
     static _languageChangeRegistered = false;
     static _languageChangeUnsubscribe = null;
+    // 后台进程托盘右键诊断：document 级 contextmenu 是否已注册（用于排查右击无菜单）
+    static _backgroundTrayMenuDocListenerAdded = false;
     
     // 天气缓存键前缀
     static WEATHER_CACHE_PREFIX = 'weather:';
@@ -223,6 +229,34 @@ class TaskbarManager {
         if (!taskbar) {
             KernelLogger.warn("TaskbarManager", "任务栏元素不存在");
             return;
+        }
+        
+        // document 级 contextmenu 监听（仅注册一次）：右击在后台进程项上时直接在此处理并弹出菜单（避免依赖 panel 上的监听，因事件可能未到达 panel）
+        if (!TaskbarManager._backgroundTrayMenuDocListenerAdded) {
+            TaskbarManager._backgroundTrayMenuDocListenerAdded = true;
+            document.addEventListener('contextmenu', (e) => {
+                const t = e.target;
+                const panel = t && typeof t.closest === 'function' && t.closest('#taskbar-background-processes-panel');
+                const item = t && typeof t.closest === 'function' && t.closest('.taskbar-background-processes-item');
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.debug('TaskbarManager', `[BackgroundTrayMenu] document contextmenu targetTag=${t ? t.tagName : 'null'} targetId=${t && t.id ? t.id : ''} targetClass=${t && t.className ? String(t.className).slice(0, 60) : ''} inPanel=${!!panel} isItem=${!!item}`);
+                }
+                if (!item || !panel) return;
+                e.preventDefault();
+                e.stopPropagation();
+                const pid = parseInt(item.dataset.pid, 10);
+                const processInfo = item._processInfo;
+                if (!pid || isNaN(pid)) {
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.warn('TaskbarManager', `[BackgroundTrayMenu] 无效 pid dataset.pid=${item.dataset.pid}`);
+                    }
+                    return;
+                }
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.debug('TaskbarManager', `[BackgroundTrayMenu] document 处理并显示菜单 pid=${pid} xy=(${e.clientX},${e.clientY})`);
+                }
+                TaskbarManager._showBackgroundProcessTrayContextMenu(e.clientX, e.clientY, pid, panel, processInfo || { pid });
+            }, true);
         }
         
         // 监听风格变更，更新系统图标
@@ -857,12 +891,14 @@ class TaskbarManager {
      * @param {HTMLElement} taskbar 任务栏元素
      */
     static async _renderTaskbar(taskbar) {
-        // 确保任务栏已清空（防止重复添加）
-        if (taskbar) {
-            taskbar.innerHTML = '';
-        }
-        
-        // 获取固定程序列表
+        TaskbarManager._renderInProgress = true;
+        try {
+            // 确保任务栏已清空（防止重复添加）
+            if (taskbar) {
+                taskbar.innerHTML = '';
+            }
+            
+            // 获取固定程序列表
         let pinnedPrograms = [];
         if (typeof LStorage !== 'undefined' && typeof LStorage.getSystemStorage === 'function') {
             try {
@@ -929,6 +965,10 @@ class TaskbarManager {
                     }
                     // 排除CLI程序创建的独立终端（它们不应该在任务栏显示为"terminal"程序）
                     if (processInfo.isCLITerminal) {
+                        continue;
+                    }
+                    // 排除后台进程（后台进程不显示在任务栏）
+                    if (processInfo.isBackground) {
                         continue;
                     }
                     // 只显示运行中的程序（不包括已退出的）
@@ -1199,28 +1239,31 @@ class TaskbarManager {
         // 根据任务栏位置调整右侧容器样式
         const position = taskbarPosition;
         if (position === 'left' || position === 'right') {
-            // 侧边任务栏：垂直布局
+            // 侧边任务栏：垂直布局（紧凑间距）
             rightContainer.style.cssText = `
                 display: flex;
                 flex-direction: column;
                 align-items: center;
-                gap: 8px;
+                gap: 4px;
                 width: 100%;
                 margin-left: 0;
                 margin-top: auto;
             `;
         } else {
-            // 顶部/底部任务栏：水平布局
+            // 顶部/底部任务栏：水平布局（紧凑间距）
             rightContainer.style.cssText = `
                 display: flex;
                 flex-direction: row;
                 align-items: center;
-                gap: 8px;
+                gap: 4px;
                 margin-left: auto;
             `;
         }
         
-        // 添加右侧系统组件（从左到右：网络、电池、天气、时间、通知、电源）
+        // 添加右侧系统组件（从左到右：后台进程、网络、电池、天气、时间、通知、电源）
+        const backgroundProcessesDisplay = TaskbarManager._createBackgroundProcessesDisplay();
+        rightContainer.appendChild(backgroundProcessesDisplay);
+        
         const networkDisplay = TaskbarManager._createNetworkDisplay();
         rightContainer.appendChild(networkDisplay);
         
@@ -1250,6 +1293,13 @@ class TaskbarManager {
         // rightContainer.appendChild(powerButton);
         
         taskbar.appendChild(rightContainer);
+        } finally {
+            TaskbarManager._renderInProgress = false;
+            if (TaskbarManager._pendingUpdate) {
+                TaskbarManager._pendingUpdate = false;
+                TaskbarManager.update();
+            }
+        }
     }
     
     /**
@@ -1302,6 +1352,7 @@ class TaskbarManager {
             { id: 'taskbar-network-panel', method: '_hideNetworkPanel', hasParam: false },
             { id: 'taskbar-battery-panel', method: '_hideBatteryPanel', hasParam: false },
             { id: 'taskbar-brightness-panel', method: '_hideBrightnessPanel', hasParam: false },
+            { id: 'taskbar-background-processes-panel', method: '_hideBackgroundProcessesPanel', hasParam: true },
             { id: 'taskbar-power-menu', method: '_hidePowerMenu', hasParam: true }
         ];
         
@@ -1947,13 +1998,13 @@ class TaskbarManager {
             }
         }
         
-        // 获取正在运行的程序
+        // 获取正在运行的程序（排除后台进程，与任务栏一致）
         const runningPrograms = new Set();
         if (typeof ProcessManager !== 'undefined' && typeof ProcessManager.PROCESS_TABLE !== 'undefined') {
             try {
                 const processTable = ProcessManager.PROCESS_TABLE;
                 for (const [pid, processInfo] of processTable) {
-                    if (!processInfo.isExploit && processInfo.status === 'running') {
+                    if (!processInfo.isExploit && processInfo.status === 'running' && !processInfo.isBackground) {
                         runningPrograms.add(processInfo.programName);
                     }
                 }
@@ -4009,6 +4060,10 @@ class TaskbarManager {
      * 更新任务栏
      */
     static update() {
+        if (TaskbarManager._renderInProgress) {
+            TaskbarManager._pendingUpdate = true;
+            return;
+        }
         const taskbar = document.getElementById('taskbar');
         if (taskbar) {
             // 清空任务栏，避免重复渲染
@@ -4555,41 +4610,38 @@ class TaskbarManager {
         // 获取任务栏位置，根据位置调整样式
         const position = TaskbarManager._taskbarPosition || 'bottom';
         
-        // 基础样式
+        // 基础样式（紧凑布局）
         let baseStyle = `
             display: flex;
             justify-content: center;
-            padding: 8px 12px;
-            min-width: 120px;
+            padding: 6px 8px;
+            min-width: 96px;
             border-radius: 10px;
             cursor: default;
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             user-select: none;
         `;
         
-        // 根据任务栏位置调整样式
         if (position === 'left' || position === 'right') {
-            // 侧边任务栏：只显示微型圆形时钟
             baseStyle += `
                 flex-direction: column;
                 align-items: center;
                 justify-content: center;
                 height: 48px;
-                width: 48px;
-                min-width: 48px;
+                width: 40px;
+                min-width: 40px;
                 margin-right: 0;
                 margin-left: 0;
                 margin-bottom: 4px;
                 padding: 0;
             `;
         } else {
-            // 顶部/底部任务栏：水平布局，右对齐
             baseStyle += `
                 flex-direction: column;
                 align-items: flex-end;
                 height: 48px;
                 width: auto;
-                margin-right: 8px;
+                margin-right: 4px;
                 margin-left: auto;
             `;
         }
@@ -4811,40 +4863,37 @@ class TaskbarManager {
         // 获取任务栏位置，根据位置调整样式
         const position = TaskbarManager._taskbarPosition || 'bottom';
         
-        // 基础样式
+        // 基础样式（紧凑布局）
         let baseStyle = `
             display: flex;
             justify-content: center;
             align-items: center;
-            padding: 8px 12px;
-            min-width: 80px;
+            padding: 6px 8px;
+            min-width: 64px;
             border-radius: 10px;
             cursor: pointer;
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             user-select: none;
-            gap: 8px;
+            gap: 4px;
         `;
         
-        // 根据任务栏位置调整样式
         const isVertical = position === 'left' || position === 'right';
         
         if (isVertical) {
-            // 侧边任务栏：垂直布局，紧凑显示
             baseStyle += `
                 flex-direction: column;
                 height: 48px;
-                width: 48px;
-                min-width: 48px;
+                width: 40px;
+                min-width: 40px;
                 padding: 4px;
                 gap: 2px;
             `;
         } else {
-            // 顶部/底部任务栏：水平布局，完整显示
             baseStyle += `
                 flex-direction: row;
                 height: 48px;
                 width: auto;
-                min-width: 70px;
+                min-width: 58px;
             `;
         }
         
@@ -6629,20 +6678,18 @@ class TaskbarManager {
             flex-shrink: 0;
         `;
         
-        // 根据任务栏位置调整样式
+        // 根据任务栏位置调整样式（紧凑布局）
         if (position === 'left' || position === 'right') {
-            // 侧边任务栏：垂直布局，全宽
             baseStyle += `
-                padding: 8px 4px;
-                min-width: 48px;
+                padding: 4px 2px;
+                min-width: 36px;
                 width: 100%;
                 height: 48px;
             `;
         } else {
-            // 顶部/底部任务栏：水平布局
             baseStyle += `
-                padding: 0 12px;
-                min-width: 48px;
+                padding: 0 6px;
+                min-width: 38px;
                 height: 48px;
             `;
         }
@@ -6810,20 +6857,18 @@ class TaskbarManager {
             flex-shrink: 0;
         `;
         
-        // 根据任务栏位置调整样式
+        // 根据任务栏位置调整样式（紧凑布局）
         if (position === 'left' || position === 'right') {
-            // 侧边任务栏：垂直布局，全宽
             baseStyle += `
-                padding: 8px 4px;
-                min-width: 48px;
+                padding: 4px 2px;
+                min-width: 36px;
                 width: 100%;
                 height: 48px;
             `;
         } else {
-            // 顶部/底部任务栏：水平布局
             baseStyle += `
-                padding: 0 12px;
-                min-width: 48px;
+                padding: 0 6px;
+                min-width: 38px;
                 height: 48px;
             `;
         }
@@ -6942,20 +6987,18 @@ class TaskbarManager {
             flex-shrink: 0;
         `;
         
-        // 根据任务栏位置调整样式
+        // 根据任务栏位置调整样式（紧凑布局）
         if (position === 'left' || position === 'right') {
-            // 侧边任务栏：垂直布局，全宽
             baseStyle += `
-                padding: 8px 4px;
-                min-width: 48px;
+                padding: 4px 2px;
+                min-width: 36px;
                 width: 100%;
                 height: 48px;
             `;
         } else {
-            // 顶部/底部任务栏：水平布局
             baseStyle += `
-                padding: 0 12px;
-                min-width: 48px;
+                padding: 0 6px;
+                min-width: 38px;
                 height: 48px;
             `;
         }
@@ -9225,6 +9268,570 @@ class TaskbarManager {
         iconContainer._updateBadge = updateBadge;
         
         return iconContainer;
+    }
+    
+    /**
+     * 创建后台进程托盘图标（向上展开的 SVG，类似 Windows 系统托盘）
+     * @returns {HTMLElement} 托盘容器元素
+     */
+    static _createBackgroundProcessesDisplay() {
+        const container = document.createElement('div');
+        container.className = 'taskbar-background-processes-display';
+        container.dataset.backgroundProcessesTray = 'true';
+        
+        const position = TaskbarManager._taskbarPosition || 'bottom';
+        // 与网络/电池一致的布局与过渡，更紧凑；默认给轻微背景与更醒目的图标色
+        let baseStyle = `
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            user-select: none;
+            position: relative;
+            flex-shrink: 0;
+        `;
+        if (position === 'left' || position === 'right') {
+            baseStyle += `
+                padding: 4px 2px;
+                min-width: 36px;
+                width: 100%;
+                height: 48px;
+            `;
+        } else {
+            baseStyle += `
+                padding: 0 4px;
+                min-width: 30px;
+                height: 48px;
+            `;
+        }
+        container.style.cssText = baseStyle;
+        container.dataset.taskbarPosition = position;
+        
+        // 向上展开的箭头/chevron SVG（无背景，仅通过图标颜色与尺寸醒目）
+        const icon = document.createElement('div');
+        icon.className = 'taskbar-background-processes-icon';
+        icon.innerHTML = `
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M7 14l5-5 5 5H7z" fill="currentColor"/>
+            </svg>
+        `;
+        let iconTransform = 'none';
+        if (position === 'top') iconTransform = 'rotate(180deg)';
+        else if (position === 'left') iconTransform = 'rotate(90deg)';
+        else if (position === 'right') iconTransform = 'rotate(-90deg)';
+        const defaultIconColor = 'rgba(245, 243, 252, 0.98)';
+        icon.style.cssText = `
+            width: var(--style-icon-size-small, 18px);
+            height: var(--style-icon-size-small, 18px);
+            color: ${defaultIconColor};
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transform: ${iconTransform};
+            transition: var(--style-icon-transition, all 0.3s ease);
+        `;
+        container.appendChild(icon);
+        
+        // 悬停效果：仅图标颜色过渡，无背景色
+        container.addEventListener('mouseenter', () => {
+            icon.style.color = 'rgba(139, 92, 246, 1)';
+        });
+        container.addEventListener('mouseleave', () => {
+            icon.style.color = defaultIconColor;
+        });
+        
+        const tooltip = document.createElement('div');
+        tooltip.className = 'taskbar-icon-tooltip';
+        tooltip.textContent = TaskbarManager._getText('TASKBAR_BACKGROUND_PROCESSES', '后台进程');
+        container.appendChild(tooltip);
+        
+        container.addEventListener('click', (e) => {
+            e.stopPropagation();
+            TaskbarManager._toggleBackgroundProcessesPanel(container);
+        });
+        
+        return container;
+    }
+    
+    /**
+     * 切换后台进程面板（显示/隐藏）
+     * @param {HTMLElement} trayContainer 托盘图标容器
+     */
+    static _toggleBackgroundProcessesPanel(trayContainer) {
+        let panel = document.getElementById('taskbar-background-processes-panel');
+        if (panel && panel.classList.contains('visible')) {
+            TaskbarManager._hideBackgroundProcessesPanel(panel);
+        } else {
+            TaskbarManager._closeAllTaskbarPopups('taskbar-background-processes-panel');
+            if (!panel) {
+                panel = TaskbarManager._createBackgroundProcessesPanel();
+            }
+            TaskbarManager._updateBackgroundProcessesPanelContent(panel);
+            TaskbarManager._showBackgroundProcessesPanel(panel, trayContainer);
+        }
+    }
+    
+    /**
+     * 更新后台进程面板内容（列表或“无后台进程”）
+     * @param {HTMLElement} panel 面板元素
+     */
+    static _updateBackgroundProcessesPanelContent(panel) {
+        const listContainer = panel.querySelector('.taskbar-background-processes-list');
+        if (!listContainer) return;
+        listContainer.innerHTML = '';
+        
+        const list = typeof ProcessManager !== 'undefined' && typeof ProcessManager.getBackgroundProcesses === 'function'
+            ? ProcessManager.getBackgroundProcesses()
+            : [];
+        
+        const textColor = panel._themeTextColor || 'rgba(215, 224, 221, 0.9)';
+        const sectionBg = panel._themeSectionBg || 'rgba(139, 92, 246, 0.1)';
+        
+        if (list.length === 0) {
+            const empty = document.createElement('div');
+            empty.className = 'taskbar-background-processes-empty';
+            empty.textContent = TaskbarManager._getText('TASKBAR_NO_BACKGROUND_PROCESSES', '无后台进程');
+            empty.style.cssText = `
+                padding: 20px;
+                color: ${textColor};
+                font-size: 14px;
+                text-align: center;
+                opacity: 0.8;
+            `;
+            listContainer.appendChild(empty);
+            return;
+        }
+        
+        const grid = document.createElement('div');
+        grid.className = 'taskbar-background-processes-grid';
+        grid.style.cssText = `
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+            gap: 8px;
+            max-height: 280px;
+            overflow-y: auto;
+        `;
+        for (const processInfo of list) {
+            const pid = processInfo.pid;
+            const programName = processInfo.programName || '';
+            let iconPath = null;
+            let displayName = programName;
+            if (typeof ApplicationAssetManager !== 'undefined' && typeof ApplicationAssetManager.getProgramInfo === 'function') {
+                try {
+                    const programInfo = ApplicationAssetManager.getProgramInfo(programName);
+                    if (programInfo) {
+                        iconPath = programInfo.icon || null;
+                        displayName = (programInfo.metadata && programInfo.metadata.name) || programName;
+                    }
+                } catch (e) { /* ignore */ }
+            }
+            
+            const item = document.createElement('div');
+            item.className = 'taskbar-background-processes-item';
+            item.dataset.pid = String(pid);
+            item._processInfo = processInfo;
+            item.style.cssText = `
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: 6px;
+                padding: 12px 8px;
+                border-radius: 8px;
+                cursor: pointer;
+                transition: all 0.3s ease;
+            `;
+            item.title = displayName;
+            
+            const iconWrap = document.createElement('div');
+            iconWrap.style.cssText = `width: 32px; height: 32px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; border-radius: 8px;`;
+            if (iconPath && typeof ProcessManager !== 'undefined' && typeof ProcessManager.convertVirtualPathToUrl === 'function') {
+                const img = document.createElement('img');
+                img.src = ProcessManager.convertVirtualPathToUrl(iconPath);
+                img.alt = displayName;
+                img.style.cssText = 'width: 100%; height: 100%; object-fit: contain;';
+                iconWrap.appendChild(img);
+            } else {
+                iconWrap.innerHTML = `<div style="width:24px;height:24px;border-radius:6px;background:rgba(255,255,255,0.15);"></div>`;
+            }
+            item.appendChild(iconWrap);
+            
+            const label = document.createElement('span');
+            label.textContent = displayName.length > 8 ? displayName.slice(0, 7) + '…' : displayName;
+            label.style.cssText = `font-size: 12px; color: ${textColor}; text-align: center; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;`;
+            item.appendChild(label);
+            
+            item.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const clickHandler = typeof ProcessManager !== 'undefined' && typeof ProcessManager.getBackgroundTrayClickHandler === 'function'
+                    ? ProcessManager.getBackgroundTrayClickHandler(pid) : null;
+                if (clickHandler && typeof clickHandler === 'function') {
+                    try {
+                        clickHandler();
+                    } catch (err) {
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn("TaskbarManager", `后台进程托盘单击回调失败 PID ${pid}: ${err.message}`);
+                        }
+                    }
+                }
+                // 无论是否注册了回调，都转为前台并显示该进程的 GUI 窗口（保证点击后窗口一定会出现）
+                if (typeof ProcessManager !== 'undefined' && typeof ProcessManager.setProcessBackground === 'function') {
+                    ProcessManager.setProcessBackground(pid, false);
+                }
+                if (typeof GUIManager !== 'undefined' && typeof GUIManager.showWindowsForPid === 'function') {
+                    GUIManager.showWindowsForPid(pid);
+                }
+                TaskbarManager.update();
+                TaskbarManager._hideBackgroundProcessesPanel(panel);
+            });
+            item.addEventListener('mouseenter', () => { item.style.background = sectionBg; });
+            item.addEventListener('mouseleave', () => { item.style.background = ''; });
+            
+            grid.appendChild(item);
+        }
+        listContainer.appendChild(grid);
+    }
+    
+    /**
+     * 显示后台进程托盘项的右键菜单（程序可注册菜单项，系统自动追加「关闭」）
+     * @param {number} x 客户端 X
+     * @param {number} y 客户端 Y
+     * @param {number} pid 进程 ID
+     * @param {HTMLElement} panel 后台进程面板（用于选择后关闭）
+     * @param {Object} processInfo 进程信息（含 isExploit 等）
+     */
+    static _showBackgroundProcessTrayContextMenu(x, y, pid, panel, processInfo) {
+        const LOG_TAG = 'BackgroundTrayMenu';
+        if (typeof KernelLogger !== 'undefined') {
+            KernelLogger.debug('TaskbarManager', `[${LOG_TAG}] _showBackgroundProcessTrayContextMenu 进入 pid=${pid} xy=(${x},${y})`);
+        }
+        const menu = document.createElement('div');
+        menu.className = 'taskbar-app-context-menu';
+        menu.style.cssText = 'position: fixed; z-index: 100002; min-width: 140px;';
+        menu.style.left = `${x}px`;
+        menu.style.top = `${y}px`;
+        
+        const closeMenu = () => {
+            menu.remove();
+            document.removeEventListener('click', closeMenu, true);
+        };
+        
+        let items = [];
+        try {
+            if (typeof ProcessManager !== 'undefined' && typeof ProcessManager.getBackgroundTrayContextMenuItems === 'function') {
+                items = ProcessManager.getBackgroundTrayContextMenuItems(pid) || [];
+            }
+        } catch (e) {
+            if (typeof KernelLogger !== 'undefined') {
+                KernelLogger.warn("TaskbarManager", `获取后台进程右键菜单项失败 PID ${pid}: ${e.message}`);
+            }
+        }
+        if (!Array.isArray(items)) items = [];
+        
+        for (const { label, onClick } of items) {
+            const menuItem = document.createElement('div');
+            menuItem.className = 'taskbar-app-context-menu-item';
+            menuItem.textContent = label;
+            menuItem.addEventListener('click', (e) => {
+                e.stopPropagation();
+                try {
+                    if (typeof onClick === 'function') onClick();
+                } catch (err) {
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.warn("TaskbarManager", `后台进程托盘菜单项回调失败: ${err.message}`);
+                    }
+                }
+                closeMenu();
+                if (panel) TaskbarManager._hideBackgroundProcessesPanel(panel);
+            });
+            menu.appendChild(menuItem);
+        }
+        
+        if (items.length > 0) {
+            const sep = document.createElement('div');
+            sep.className = 'taskbar-app-context-menu-separator';
+            menu.appendChild(sep);
+        }
+        
+        // 始终添加「退出程序」项（系统自动添加，程序不可移除）
+        const closeItem = document.createElement('div');
+        closeItem.className = 'taskbar-app-context-menu-item taskbar-app-context-menu-item-danger';
+        closeItem.textContent = TaskbarManager._getText('TASKBAR_EXIT_PROGRAM', '退出程序');
+        closeItem.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (processInfo && processInfo.isExploit && typeof GUIManager !== 'undefined' && typeof GUIManager.getWindowsByPid === 'function') {
+                const windows = GUIManager.getWindowsByPid(pid);
+                for (const windowInfo of Array.from(windows)) {
+                    if (windowInfo.windowId) GUIManager._closeWindow(windowInfo.windowId, false);
+                }
+            } else if (typeof ProcessManager !== 'undefined' && typeof ProcessManager.killProgram === 'function') {
+                ProcessManager.killProgram(pid);
+            }
+            closeMenu();
+            if (panel) TaskbarManager._hideBackgroundProcessesPanel(panel);
+        });
+        menu.appendChild(closeItem);
+        
+        document.body.appendChild(menu);
+        if (typeof KernelLogger !== 'undefined') {
+            KernelLogger.debug('TaskbarManager', `[${LOG_TAG}] 菜单已 appendChild 到 body, left=${menu.style.left} top=${menu.style.top} zIndex=${menu.style.zIndex}`);
+        }
+        setTimeout(() => document.addEventListener('click', closeMenu, true), 0);
+    }
+    
+    /**
+     * 创建后台进程面板（样式与网络/电池等托盘弹出组件一致）
+     * @returns {HTMLElement} 面板元素
+     */
+    static _createBackgroundProcessesPanel() {
+        const panel = document.createElement('div');
+        panel.id = 'taskbar-background-processes-panel';
+        panel.className = 'taskbar-background-processes-panel';
+        
+        const themeManager = typeof POOL !== 'undefined' && typeof POOL.__GET__ === 'function'
+            ? POOL.__GET__("KERNEL_GLOBAL_POOL", "ThemeManager")
+            : (typeof ThemeManager !== 'undefined' ? ThemeManager : null);
+        let panelBg = 'rgba(30, 30, 35, 0.98)';
+        let borderColor = 'rgba(108, 142, 255, 0.2)';
+        let textColor = 'rgba(215, 224, 221, 0.9)';
+        let sectionBg = 'rgba(139, 92, 246, 0.1)';
+        if (themeManager) {
+            try {
+                const currentTheme = themeManager.getCurrentTheme();
+                if (currentTheme && currentTheme.colors) {
+                    panelBg = currentTheme.colors.backgroundElevated || currentTheme.colors.backgroundSecondary || currentTheme.colors.background || panelBg;
+                    borderColor = currentTheme.colors.border || (currentTheme.colors.primary ? currentTheme.colors.primary + '33' : 'rgba(108, 142, 255, 0.2)');
+                    textColor = currentTheme.colors.text || textColor;
+                    sectionBg = currentTheme.colors.backgroundSecondary || currentTheme.colors.backgroundTertiary || sectionBg;
+                }
+            } catch (e) { /* ignore */ }
+        }
+        // 边框与背景均写在 cssText 中，避免后续覆盖导致白边或背景丢失
+        panel.style.cssText = `
+            position: fixed;
+            width: 360px;
+            max-height: 400px;
+            border-radius: 16px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            border: 1px solid ${borderColor};
+            padding: 20px;
+            overflow-y: auto;
+            z-index: 99998;
+            display: none;
+            background-color: ${panelBg};
+        `;
+        
+        const content = document.createElement('div');
+        content.className = 'taskbar-background-processes-panel-content';
+        
+        const section = document.createElement('div');
+        section.className = 'background-processes-panel-section';
+        
+        const title = document.createElement('div');
+        title.className = 'background-processes-panel-title';
+        title.textContent = TaskbarManager._getText('TASKBAR_BACKGROUND_PROCESSES', '后台进程');
+        title.style.cssText = `
+            font-size: 14px;
+            font-weight: 600;
+            color: ${textColor};
+            margin-bottom: 12px;
+        `;
+        section.appendChild(title);
+        
+        const listContainer = document.createElement('div');
+        listContainer.className = 'taskbar-background-processes-list';
+        section.appendChild(listContainer);
+        content.appendChild(section);
+        panel.appendChild(content);
+        
+        panel._themeTextColor = textColor;
+        panel._themeSectionBg = sectionBg;
+        
+        // 在面板上委托 contextmenu（捕获阶段），确保右击任意后台进程图标都能弹出菜单（不依赖每次刷新的 grid）
+        const LOG_TAG_BG_MENU = 'BackgroundTrayMenu';
+        panel.addEventListener('contextmenu', (e) => {
+            if (typeof KernelLogger !== 'undefined') {
+                KernelLogger.debug('TaskbarManager', `[${LOG_TAG_BG_MENU}] panel contextmenu 触发 targetClass=${(e.target && e.target.className) || ''} tagName=${(e.target && e.target.tagName) || ''}`);
+            }
+            const item = e.target.closest('.taskbar-background-processes-item');
+            if (!item) {
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.debug('TaskbarManager', `[${LOG_TAG_BG_MENU}] 未命中 .taskbar-background-processes-item，忽略`);
+                }
+                return;
+            }
+            e.preventDefault();
+            e.stopPropagation();
+            const pid = parseInt(item.dataset.pid, 10);
+            const processInfo = item._processInfo;
+            if (!pid || isNaN(pid)) {
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.warn('TaskbarManager', `[${LOG_TAG_BG_MENU}] 无效 pid dataset.pid=${item.dataset.pid}`);
+                }
+                return;
+            }
+            if (typeof KernelLogger !== 'undefined') {
+                KernelLogger.debug('TaskbarManager', `[${LOG_TAG_BG_MENU}] 显示菜单 pid=${pid} xy=(${e.clientX},${e.clientY})`);
+            }
+            TaskbarManager._showBackgroundProcessTrayContextMenu(e.clientX, e.clientY, pid, panel, processInfo || { pid });
+        }, true);
+        
+        document.body.appendChild(panel);
+        return panel;
+    }
+    
+    /**
+     * 显示后台进程面板（根据任务栏方向定位）
+     * @param {HTMLElement} panel 面板元素
+     * @param {HTMLElement} trayContainer 托盘图标容器
+     */
+    static _showBackgroundProcessesPanel(panel, trayContainer) {
+        if (!panel || !trayContainer) return;
+        if (typeof NotificationManager !== 'undefined' && typeof NotificationManager._hideNotificationContainer === 'function') {
+            NotificationManager._hideNotificationContainer();
+        }
+        if (panel._hideTimeout) {
+            clearTimeout(panel._hideTimeout);
+            panel._hideTimeout = null;
+        }
+        // 重置内联样式（与网络/电池一致）
+        panel.style.display = '';
+        panel.style.opacity = '';
+        panel.style.visibility = '';
+        panel.style.left = '';
+        panel.style.right = '';
+        panel.style.top = '';
+        panel.style.bottom = '';
+        const position = TaskbarManager._taskbarPosition || 'bottom';
+        const containerRect = trayContainer.getBoundingClientRect();
+        const viewportWidth = window.innerWidth;
+        const viewportHeight = window.innerHeight;
+        const padding = 20;
+        // 先显示元素以获取实际尺寸（与网络/电池一致）
+        panel.classList.add('visible');
+        
+        setTimeout(() => {
+            const panelRect = panel.getBoundingClientRect();
+            const actualWidth = panelRect.width || 260;
+            const actualHeight = panelRect.height || 200;
+            let panelLeft, panelTop;
+            switch (position) {
+                case 'top':
+                    panelLeft = containerRect.left + (containerRect.width / 2) - (actualWidth / 2);
+                    if (panelLeft < padding) panelLeft = padding;
+                    if (panelLeft + actualWidth > viewportWidth - padding) panelLeft = viewportWidth - actualWidth - padding;
+                    panelTop = containerRect.bottom + 10;
+                    if (panelTop + actualHeight > viewportHeight - padding) panelTop = Math.max(padding, viewportHeight - actualHeight - padding);
+                    panel.style.left = `${panelLeft}px`;
+                    panel.style.top = `${panelTop}px`;
+                    break;
+                case 'bottom':
+                    panelLeft = containerRect.left + (containerRect.width / 2) - (actualWidth / 2);
+                    if (panelLeft < padding) panelLeft = padding;
+                    if (panelLeft + actualWidth > viewportWidth - padding) panelLeft = viewportWidth - actualWidth - padding;
+                    panel.style.left = `${panelLeft}px`;
+                    panel.style.bottom = `${viewportHeight - containerRect.top + 10}px`;
+                    break;
+                case 'left':
+                    panelTop = containerRect.top + (containerRect.height / 2) - (actualHeight / 2);
+                    if (panelTop < padding) panelTop = padding;
+                    if (panelTop + actualHeight > viewportHeight - padding) panelTop = viewportHeight - actualHeight - padding;
+                    panelLeft = containerRect.right + 10;
+                    if (panelLeft + actualWidth > viewportWidth - padding) panelLeft = viewportWidth - actualWidth - padding;
+                    panel.style.left = `${panelLeft}px`;
+                    panel.style.top = `${panelTop}px`;
+                    break;
+                case 'right':
+                    panelTop = containerRect.top + (containerRect.height / 2) - (actualHeight / 2);
+                    if (panelTop < padding) panelTop = padding;
+                    if (panelTop + actualHeight > viewportHeight - padding) panelTop = viewportHeight - actualHeight - padding;
+                    panelLeft = containerRect.left - actualWidth - 10;
+                    if (panelLeft < padding) panelLeft = padding;
+                    panel.style.left = `${panelLeft}px`;
+                    panel.style.top = `${panelTop}px`;
+                    break;
+                default:
+                    panel.style.left = `${Math.max(padding, containerRect.left + (containerRect.width / 2) - (actualWidth / 2))}px`;
+                    panel.style.bottom = `${viewportHeight - containerRect.top + 10}px`;
+            }
+            panel.style.display = 'block';
+            if (typeof AnimateManager !== 'undefined') {
+                AnimateManager.addAnimationClasses(panel, 'PANEL', 'OPEN');
+            }
+        }, 0);
+        
+        // 与网络/电池一致：使用 EventManager 注册点击外部关闭，降级方案使用 click + mousedown、capture: true
+        if (typeof EventManager !== 'undefined' && typeof EventManager.registerMenu === 'function') {
+            EventManager.registerMenu(
+                'background-processes-panel',
+                panel,
+                () => {
+                    TaskbarManager._hideBackgroundProcessesPanel(panel);
+                },
+                ['.taskbar-background-processes-display']
+            );
+        } else {
+            const closeOnClickOutside = (e) => {
+                if (!panel.contains(e.target) && !trayContainer.contains(e.target)) {
+                    TaskbarManager._hideBackgroundProcessesPanel(panel);
+                    document.removeEventListener('click', closeOnClickOutside, true);
+                    document.removeEventListener('mousedown', closeOnClickOutside, true);
+                }
+            };
+            setTimeout(() => {
+                document.addEventListener('click', closeOnClickOutside, true);
+                document.addEventListener('mousedown', closeOnClickOutside, true);
+            }, 0);
+            panel._closeOnClickOutside = closeOnClickOutside;
+        }
+    }
+    
+    /**
+     * 隐藏后台进程面板（带关闭动画）
+     * @param {HTMLElement} panel 面板元素（可选，不传则通过 id 查找）
+     * @param {*} _unused 保留（与 _closeAllTaskbarPopups 调用约定一致）
+     * @param {boolean} immediate 是否立即关闭（跳过动画，由 _closeAllTaskbarPopups 传入 true）
+     */
+    static _hideBackgroundProcessesPanel(panel, _unused, immediate = false) {
+        const p = panel || document.getElementById('taskbar-background-processes-panel');
+        if (!p) return;
+        if (typeof EventManager !== 'undefined' && typeof EventManager.unregisterMenu === 'function') {
+            EventManager.unregisterMenu('background-processes-panel');
+        } else {
+            if (p._closeOnClickOutside) {
+                document.removeEventListener('click', p._closeOnClickOutside, true);
+                document.removeEventListener('mousedown', p._closeOnClickOutside, true);
+                p._closeOnClickOutside = null;
+            }
+        }
+        if (p._hideTimeout) {
+            clearTimeout(p._hideTimeout);
+            p._hideTimeout = null;
+        }
+        if (immediate) {
+            if (typeof AnimateManager !== 'undefined') {
+                AnimateManager.stopAnimation(p);
+                AnimateManager.removeAnimationClasses(p);
+            }
+            p.classList.remove('visible');
+            p.style.display = 'none';
+            return;
+        }
+        // 使用 AnimateManager 添加关闭动画
+        let closeDuration = 150;
+        if (typeof AnimateManager !== 'undefined') {
+            const config = AnimateManager.addAnimationClasses(p, 'PANEL', 'CLOSE');
+            closeDuration = config ? config.duration : 150;
+        }
+        p._hideTimeout = setTimeout(() => {
+            if (typeof AnimateManager !== 'undefined') {
+                AnimateManager.removeAnimationClasses(p);
+            }
+            p.classList.remove('visible');
+            p.style.display = 'none';
+            p._hideTimeout = null;
+        }, closeDuration);
     }
     
     /**
@@ -11557,11 +12164,15 @@ class TaskbarManager {
                 return false;
             }
             
-            // 检查进程是否仍在运行
+            // 检查进程是否仍在运行，且非后台进程（后台进程不显示在多任务选择器中）
             if (typeof ProcessManager !== 'undefined' && windowInfo.pid) {
                 const processInfo = ProcessManager.getProcessInfo(windowInfo.pid);
                 if (!processInfo || processInfo.status !== 'running') {
                     KernelLogger.debug("TaskbarManager", `窗口 ${windowInfo.windowId} 的进程 ${windowInfo.pid} 已退出，跳过`);
+                    return false;
+                }
+                if (processInfo.isBackground) {
+                    KernelLogger.debug("TaskbarManager", `窗口 ${windowInfo.windowId} 属于后台进程，不显示在多任务选择器`);
                     return false;
                 }
             }

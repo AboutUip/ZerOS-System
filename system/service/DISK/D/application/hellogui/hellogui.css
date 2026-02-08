@@ -1,0 +1,13 @@
+/* Hello GUI - 支持后台的测试程序 */
+
+.hellogui-window {
+    box-sizing: border-box;
+}
+
+.hellogui-content {
+    background: rgba(26, 31, 46, 0.6);
+}
+
+.hellogui-hello:hover {
+    opacity: 0.9;
+}

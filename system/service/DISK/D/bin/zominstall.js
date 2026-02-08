@@ -1643,7 +1643,10 @@
             this._closing = true;
 
             try {
-                if (typeof ProcessManager !== 'undefined' && typeof ProcessManager.requestSelfTermination === 'function') {
+                // 优先使用 __init__ 注入的 kernelAPI.call（跳过调用栈校验，避免 VM 中运行导致 PID 校验失败）
+                if (this.kernelAPI && typeof this.kernelAPI.call === 'function') {
+                    await this.kernelAPI.call('Process.requestSelfTermination', []);
+                } else if (typeof ProcessManager !== 'undefined' && typeof ProcessManager.requestSelfTermination === 'function') {
                     await ProcessManager.requestSelfTermination(this.pid);
                 }
             } catch (error) {

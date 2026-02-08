@@ -32,7 +32,7 @@ GUIManager.init();
 - `options` (Object): 选项对象
   - `title` (string): 窗口标题
   - `icon` (string): 窗口图标路径（可选）
-  - `onClose` (Function): 关闭回调 `() => {}`。**重要**：此回调在窗口关闭时被调用，用于执行清理工作。回调不应调用 `GUIManager.unregisterWindow()` 或 `GUIManager._closeWindow()`，因为窗口关闭流程由 GUIManager 统一管理。如果回调中已经关闭了窗口（通过 `unregisterWindow`），GUIManager 会检测到并跳过后续关闭流程。GUIManager 会在窗口关闭后自动检查该 PID 是否还有其他窗口，如果没有且不是 Exploit 程序（PID 10000），会自动 kill 进程。
+  - `onClose` (Function): 关闭回调 `() => {}`。**重要**：此回调在窗口关闭时被调用，用于执行清理工作。回调不应调用 `GUIManager.unregisterWindow()` 或 `GUIManager._closeWindow()`，因为窗口关闭流程由 GUIManager 统一管理。如果回调中已经关闭了窗口（通过 `unregisterWindow`），GUIManager 会检测到并跳过后续关闭流程。GUIManager 会在窗口关闭后自动检查该 PID 是否还有其他窗口，如果没有且不是 Exploit 程序（PID 10000），会自动 kill 进程。**支持「关闭转后台」**：若程序支持「点击关闭时转为后台」而不真正退出，可在 onClose 中设置 `GUIManager.getWindowInfo(windowId)._backgroundRequested = true`、隐藏窗口并调用 `Process.requestBackground`；GUIManager 检测到 `_backgroundRequested` 后将只隐藏窗口、不注销不 kill 进程，用户可从托盘单击该后台进程再次恢复窗口并转为前台。
   - `onMinimize` (Function): 最小化回调（可选）`() => {}`
   - `onMaximize` (Function): 最大化回调（可选）`(isMaximized: boolean) => {}`。参数 `isMaximized` 表示窗口是否最大化（`true` 为最大化，`false` 为还原）
   - `windowId` (string): 窗口 ID（可选，如果不提供则自动生成）
@@ -108,6 +108,20 @@ GUIManager.unregisterWindow(pid);
 GUIManager.focusWindow('window_1234_1234567890_abc');
 // 或
 GUIManager.focusWindow(pid);
+```
+
+#### `showWindowsForPid(pid)`
+
+显示某进程的所有窗口并聚焦第一个窗口。用于从后台恢复：将该 PID 下所有被设为 `display:none` 的窗口恢复显示，并将焦点给该进程的第一个窗口。任务栏在用户点击后台进程托盘项时会调用此方法，确保点击后 GUI 窗口一定会出现。
+
+**参数**:
+- `pid` (number): 进程 ID
+
+**返回值**: 无
+
+**示例**:
+```javascript
+GUIManager.showWindowsForPid(pid);
 ```
 
 ### 窗口状态管理

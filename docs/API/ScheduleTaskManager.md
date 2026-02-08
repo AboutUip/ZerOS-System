@@ -7,6 +7,7 @@
 ## 特性
 
 - **多种任务类型**：支持执行程序（`program`）、执行命令（`command`）、服务（`service`，即 ServerExpansion 服务的启动/停止）
+- **程序任务后台启动**：类型为程序的计划任务默认以后台方式启动（不显示在任务栏、Ctrl+单击多任务选择器）；可通过任务配置 `runInBackground: false` 改为前台启动
 - **多种触发类型**：支持系统启动、系统关闭、特定时间、时间区间、间隔时间等触发方式
 - **权限管控**：普通计划任务需要特殊权限，系统启动后的计划任务需要危险权限（仅管理员可授予）
 - **持久化存储**：计划任务数据自动保存到 `LocalSData.json`，系统重启后自动恢复
@@ -146,6 +147,7 @@ const tasks = await ProcessManager.callKernelAPI(
 - `taskConfig` (Object, 必需): 任务配置
   - `taskType` (string, 可选): 任务类型，`'program'` | `'command'` | `'service'`，默认 `'program'`
   - `programName` (string, 当 taskType 为 `program` 时必需): 程序名称
+  - `runInBackground` (boolean, 当 taskType 为 `program` 时可选): 是否以后台方式启动程序；默认 `true`（不显示在任务栏、多任务选择器）；设为 `false` 时以前台方式启动
   - `command` (string, 当 taskType 为 `command` 时必需): 要执行的命令
   - `serviceId` (string, 当 taskType 为 `service` 时必需): 服务 ID（ServerExpansion 中的服务标识，如 `notice`）
   - `serviceAction` (string, 当 taskType 为 `service` 时可选): 服务操作，`'start'` | `'stop'`，默认 `'start'`
@@ -362,6 +364,7 @@ await ProcessManager.callKernelAPI(
     id: string,                    // 任务ID（自动生成）
     taskType: string,               // 任务类型：'program' | 'command' | 'service'
     programName?: string,           // 程序名称（taskType === 'program' 时）
+    runInBackground?: boolean,      // 是否以后台方式启动程序（taskType === 'program' 时，默认 true）
     command?: string,               // 命令（taskType === 'command' 时）
     serviceId?: string,             // 服务 ID（taskType === 'service' 时）
     serviceAction?: string,        // 服务操作：'start' | 'stop'（taskType === 'service' 时）

@@ -37,7 +37,9 @@ TaskbarManager.init();
 
 #### `update()`
 
-更新任务栏（重新渲染）。
+更新任务栏（重新渲染）。内部会清空任务栏容器后异步执行 `_renderTaskbar`。
+
+**防并发渲染**：若在本次渲染尚未完成时再次调用 `update()`，不会立即启动新一轮渲染，而是设置 `_pendingUpdate`；当前次 `_renderTaskbar` 在 `finally` 中结束后，若存在待处理更新则会再执行一次 `update()`，从而避免并发渲染导致任务栏重复/错乱（例如从托盘单击后台进程恢复时触发的多次更新）。
 
 **示例**:
 ```javascript
@@ -162,6 +164,19 @@ await TaskbarManager.setPinnedPrograms(['filemanager', 'browser', 'musicplayer']
 - **运行中**: 程序图标正常显示
 - **最小化**: 程序图标可能显示为最小化状态
 - **多实例**: 同一程序的多个实例会合并显示
+
+### 后台进程托盘
+
+任务栏可展示**后台进程**（已转后台、窗口隐藏但未退出的程序）。用户点击后台进程图标时：
+
+- **单击**：无论该进程是否注册了 `Process.registerBackgroundTrayClick` 回调，任务栏都会：
+  1. 若已注册单击回调，先执行该回调；
+  2. 将进程设为前台（`ProcessManager.setProcessBackground(pid, false)`）；
+  3. 调用 `GUIManager.showWindowsForPid(pid)` 显示该进程的所有 GUI 窗口并聚焦第一个窗口；
+  4. 刷新任务栏并关闭后台进程面板。
+- **右击**：始终弹出右键菜单。右击事件在 **document 层**（capture 阶段）统一处理，只要点击目标在「后台进程面板」内的某一项（`.taskbar-background-processes-item`）上，即会弹出菜单；菜单包含系统自动添加的「退出程序」项，以及程序通过 `Process.registerBackgroundTrayContextMenu` 注册的自定义菜单项。
+
+因此，点击后台程序图标后，其 GUI 窗口一定会被显示并置顶；右击后台进程项一定会弹出菜单（含「退出程序」）。程序可通过 ProcessManager 文档中的 `Process.registerBackgroundTrayClick` / `Process.registerBackgroundTrayContextMenu` 注册自定义单击或右键菜单行为。调试时可在 KernelLogger 中按 `[BackgroundTrayMenu]` 过滤相关日志。
 
 ### 通知徽章
 

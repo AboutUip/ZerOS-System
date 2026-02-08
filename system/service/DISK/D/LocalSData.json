@@ -11,6 +11,15 @@
         "description": "文件管理器",
         "position": null,
         "createdAt": 1770482301374
+      },
+      {
+        "id": 10,
+        "programName": "webviewer",
+        "name": "WebViewer",
+        "icon": "D:/application/webviewer/webviewer.svg",
+        "description": "WebViewer",
+        "position": null,
+        "createdAt": 1770525751934
       }
     ],
     "musicplayer.settings": {
@@ -205,7 +214,7 @@
         "password": "61b249bf6d604d14120821f43625e84e",
         "avatar": "avatar_root_1766272534753.jpg",
         "createdAt": 1766271155991,
-        "lastLogin": 1770485964063
+        "lastLogin": 1770539110299
       },
       "TestUser": {
         "level": "USER",
@@ -270,7 +279,7 @@
     "exceptionHandler.kernelExceptionTimestamp": 1768413452064,
     "exceptionHandler.blockNormalBoot": false,
     "languagesExpansion": {
-      "currentLocale": "en"
+      "currentLocale": "zh-CN"
     }
   },
   "programs": {}

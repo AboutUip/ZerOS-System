@@ -43,6 +43,7 @@
         // 数据键名（存储在内存中）
         _selectedPidKey: 'selectedPid',
         _filterExitedKey: 'filterExited',
+        _filterBackgroundKey: 'filterBackground',
         _logFilterKey: 'logFilter',
         
         // 搜索和排序（临时状态，不需要存储到内存）
@@ -544,6 +545,37 @@
                 filterCheckbox.appendChild(filterInput);
                 filterCheckbox.appendChild(filterLabel);
                 toolbar.appendChild(filterCheckbox);
+                
+                // 运行模式筛选：全部 / 前台 / 后台
+                const filterBgContainer = document.createElement('div');
+                filterBgContainer.style.cssText = `display: flex; align-items: center; gap: 6px; margin-left: 8px;`;
+                const filterBgLabel = document.createElement('span');
+                filterBgLabel.textContent = this._getText('TASKMANAGER_FILTER_MODE', '显示:');
+                filterBgLabel.style.cssText = `font-size: 12px; color: #aab2c0;`;
+                const filterBgSelect = document.createElement('select');
+                filterBgSelect.style.cssText = `
+                    padding: 4px 8px;
+                    border: 1px solid rgba(108, 142, 255, 0.3);
+                    background: rgba(108, 142, 255, 0.1);
+                    color: #e8ecf0;
+                    border-radius: 4px;
+                    font-size: 12px;
+                    cursor: pointer;
+                    outline: none;
+                `;
+                filterBgSelect.innerHTML = `
+                    <option value="all">${this._getText('TASKMANAGER_FILTER_ALL', '全部')}</option>
+                    <option value="foreground">${this._getText('TASKMANAGER_FILTER_FOREGROUND', '前台')}</option>
+                    <option value="background">${this._getText('TASKMANAGER_FILTER_BACKGROUND', '后台')}</option>
+                `;
+                filterBgSelect.value = this._getFilterBackground();
+                filterBgSelect.addEventListener('change', (e) => {
+                    this._setFilterBackground(e.target.value);
+                    this._updateProcessList();
+                });
+                filterBgContainer.appendChild(filterBgLabel);
+                filterBgContainer.appendChild(filterBgSelect);
+                toolbar.appendChild(filterBgContainer);
             }
             
             toolbar.appendChild(refreshBtn);
@@ -856,6 +888,14 @@
                 filteredProcesses = processes.filter(p => p.status === 'running');
             }
             
+            // 运行模式过滤：全部 / 前台 / 后台
+            const filterBg = this._getFilterBackground();
+            if (filterBg === 'foreground') {
+                filteredProcesses = filteredProcesses.filter(p => !p.isBackground);
+            } else if (filterBg === 'background') {
+                filteredProcesses = filteredProcesses.filter(p => !!p.isBackground);
+            }
+            
             // 搜索过滤
             if (this._searchQuery) {
                 filteredProcesses = filteredProcesses.filter(p => {
@@ -867,7 +907,15 @@
             
             if (filteredProcesses.length === 0) {
                 const empty = document.createElement('div');
-                empty.textContent = this._searchQuery ? this._getText('TASKMANAGER_NO_MATCH_PROCESS', '未找到匹配的进程') : (filterExited ? this._getText('TASKMANAGER_NO_RUNNING', '没有运行中的进程') : this._getText('TASKMANAGER_NO_PROCESS', '没有进程'));
+                let emptyMsg = this._getText('TASKMANAGER_NO_PROCESS', '没有进程');
+                if (this._searchQuery) {
+                    emptyMsg = this._getText('TASKMANAGER_NO_MATCH_PROCESS', '未找到匹配的进程');
+                } else if (filterExited) {
+                    emptyMsg = this._getText('TASKMANAGER_NO_RUNNING', '没有运行中的进程');
+                } else if (filterBg === 'foreground' || filterBg === 'background') {
+                    emptyMsg = this._getText('TASKMANAGER_NO_FILTER_MATCH', '没有符合条件的进程');
+                }
+                empty.textContent = emptyMsg;
                 empty.style.cssText = `
                     padding: 20px;
                     text-align: center;
@@ -975,6 +1023,8 @@
                 align-items: center;
             `;
             
+            const statusWrap = document.createElement('span');
+            statusWrap.style.cssText = `display: flex; align-items: center; gap: 6px;`;
             const status = document.createElement('span');
             const statusColors = {
                 'running': '#4ade80',
@@ -984,7 +1034,20 @@
             status.textContent = process.status === 'running' ? this._getText('TASKMANAGER_STATUS_RUNNING', '运行中') : 
                                 process.status === 'loading' ? this._getText('KEY_LOADING', '加载中…') : this._getText('TASKMANAGER_STATUS_EXITED', '已退出');
             status.style.color = statusColors[process.status] || '#aab2c0';
-            info.appendChild(status);
+            statusWrap.appendChild(status);
+            if (process.isBackground && process.status === 'running') {
+                const bgBadge = document.createElement('span');
+                bgBadge.textContent = this._getText('TASKMANAGER_BACKGROUND_BADGE', '后台');
+                bgBadge.style.cssText = `
+                    font-size: 10px;
+                    padding: 2px 6px;
+                    border-radius: 4px;
+                    background: rgba(139, 92, 246, 0.25);
+                    color: rgba(200, 180, 255, 0.95);
+                `;
+                statusWrap.appendChild(bgBadge);
+            }
+            info.appendChild(statusWrap);
             
             // 尝试获取内存信息
             let memInfo = null;
@@ -1616,6 +1679,7 @@
             const otherInfo = this._createInfoSection(this._getText('TASKMANAGER_SECTION_OTHER', '其他信息'), [
                 { label: this._getText('TASKMANAGER_IS_EXPLOIT', '是否Exploit'), value: process.isExploit ? this._getText('TASKMANAGER_YES', '是') : this._getText('TASKMANAGER_NO', '否') },
                 { label: this._getText('TASKMANAGER_IS_CLI', '是否CLI'), value: process.isCLI ? this._getText('TASKMANAGER_YES', '是') : this._getText('TASKMANAGER_NO', '否') },
+                { label: this._getText('TASKMANAGER_RUN_MODE', '运行模式'), value: process.isBackground ? this._getText('TASKMANAGER_BACKGROUND', '后台') : this._getText('TASKMANAGER_FOREGROUND', '前台') },
                 { label: this._getText('TASKMANAGER_IS_MINIMIZED', '是否最小化'), value: process.isMinimized ? this._getText('TASKMANAGER_YES', '是') : this._getText('TASKMANAGER_NO', '否') },
                 { label: this._getText('TASKMANAGER_SCRIPT_PATH', '脚本路径'), value: process.scriptPath || this._getText('TASKMANAGER_UNKNOWN', '未知') },
             ]);
@@ -1678,6 +1742,64 @@
                     this._killProcess(process.pid, process.programName);
                 });
                 buttonsContainer.appendChild(killBtn);
+            }
+            
+            // 转为前台按钮（仅对运行中的后台、非Exploit进程显示）
+            if (process.isBackground && process.status === 'running' && !process.isExploit && typeof ProcessManager !== 'undefined' && typeof ProcessManager.setProcessBackground === 'function') {
+                const toForegroundBtn = document.createElement('button');
+                toForegroundBtn.textContent = this._getText('TASKMANAGER_TO_FOREGROUND', '转为前台');
+                toForegroundBtn.style.cssText = `
+                    padding: 10px 20px;
+                    border: 1px solid rgba(108, 142, 255, 0.3);
+                    background: rgba(108, 142, 255, 0.1);
+                    color: #6c8eff;
+                    border-radius: 6px;
+                    cursor: pointer;
+                    font-size: 13px;
+                    font-weight: 500;
+                    transition: all 0.2s;
+                `;
+                toForegroundBtn.addEventListener('mouseenter', () => {
+                    toForegroundBtn.style.background = 'rgba(108, 142, 255, 0.2)';
+                });
+                toForegroundBtn.addEventListener('mouseleave', () => {
+                    toForegroundBtn.style.background = 'rgba(108, 142, 255, 0.1)';
+                });
+                toForegroundBtn.addEventListener('click', () => {
+                    ProcessManager.setProcessBackground(pid, false);
+                    this._updateProcessList();
+                    this._updateProcessDetail(pid);
+                });
+                buttonsContainer.appendChild(toForegroundBtn);
+            }
+            
+            // 转为后台按钮（仅对运行中的前台、非Exploit进程显示）
+            if (!process.isBackground && process.status === 'running' && !process.isExploit && typeof ProcessManager !== 'undefined' && typeof ProcessManager.setProcessBackground === 'function') {
+                const toBackgroundBtn = document.createElement('button');
+                toBackgroundBtn.textContent = this._getText('TASKMANAGER_TO_BACKGROUND', '转为后台');
+                toBackgroundBtn.style.cssText = `
+                    padding: 10px 20px;
+                    border: 1px solid rgba(139, 92, 246, 0.3);
+                    background: rgba(139, 92, 246, 0.1);
+                    color: #a78bfa;
+                    border-radius: 6px;
+                    cursor: pointer;
+                    font-size: 13px;
+                    font-weight: 500;
+                    transition: all 0.2s;
+                `;
+                toBackgroundBtn.addEventListener('mouseenter', () => {
+                    toBackgroundBtn.style.background = 'rgba(139, 92, 246, 0.2)';
+                });
+                toBackgroundBtn.addEventListener('mouseleave', () => {
+                    toBackgroundBtn.style.background = 'rgba(139, 92, 246, 0.1)';
+                });
+                toBackgroundBtn.addEventListener('click', () => {
+                    ProcessManager.setProcessBackground(pid, true);
+                    this._updateProcessList();
+                    this._updateProcessDetail(pid);
+                });
+                buttonsContainer.appendChild(toBackgroundBtn);
             }
             
             // 查看内存按钮
@@ -2662,6 +2784,28 @@
                         this._killProcess(process.pid, process.programName);
                     },
                     danger: true
+                });
+            }
+            // 后台进程：添加「转为前台」
+            if (process.isBackground && process.status === 'running' && !process.isExploit && typeof ProcessManager !== 'undefined' && typeof ProcessManager.setProcessBackground === 'function') {
+                items.push({
+                    text: this._getText('TASKMANAGER_TO_FOREGROUND', '转为前台'),
+                    action: () => {
+                        ProcessManager.setProcessBackground(process.pid, false);
+                        this._updateProcessList();
+                        this._updateProcessDetail(process.pid);
+                    }
+                });
+            }
+            // 前台进程：添加「转为后台」
+            if (!process.isBackground && process.status === 'running' && !process.isExploit && typeof ProcessManager !== 'undefined' && typeof ProcessManager.setProcessBackground === 'function') {
+                items.push({
+                    text: this._getText('TASKMANAGER_TO_BACKGROUND', '转为后台'),
+                    action: () => {
+                        ProcessManager.setProcessBackground(process.pid, true);
+                        this._updateProcessList();
+                        this._updateProcessDetail(process.pid);
+                    }
                 });
             }
             
@@ -4355,6 +4499,20 @@
         _setFilterExited: function(value) {
             if (typeof MemoryUtils !== 'undefined' && this.pid) {
                 MemoryUtils.storeData(this.pid, this._filterExitedKey, value);
+            }
+        },
+        
+        _getFilterBackground: function() {
+            if (typeof MemoryUtils !== 'undefined' && this.pid) {
+                const value = MemoryUtils.loadData(this.pid, this._filterBackgroundKey);
+                return value === 'foreground' || value === 'background' ? value : 'all';
+            }
+            return 'all';
+        },
+        
+        _setFilterBackground: function(value) {
+            if (typeof MemoryUtils !== 'undefined' && this.pid) {
+                MemoryUtils.storeData(this.pid, this._filterBackgroundKey, value);
             }
         },
         

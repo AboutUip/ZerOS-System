@@ -52,6 +52,7 @@ class PermissionManager {
         
         // 程序管理权限
         PROCESS_MANAGE: 'PROCESS_MANAGE',               // 管理其他进程
+        PROCESS_BACKGROUND: 'PROCESS_BACKGROUND',       // 申请由前台转为后台进程（普通权限，仅自身）
         
         // 主题权限
         THEME_READ: 'THEME_READ',                       // 读取主题
@@ -195,6 +196,7 @@ class PermissionManager {
         
         // 危险权限（需要明确授权）
         [PermissionManager.PERMISSION.PROCESS_MANAGE]: PermissionManager.PERMISSION_LEVEL.DANGEROUS,
+        [PermissionManager.PERMISSION.PROCESS_BACKGROUND]: PermissionManager.PERMISSION_LEVEL.NORMAL,  // 申请转为后台进程为普通权限（仅自身）
         [PermissionManager.PERMISSION.SCHEDULE_TASK_STARTUP]: PermissionManager.PERMISSION_LEVEL.DANGEROUS,  // 系统启动后的计划任务需要危险权限
         
         // 应用程序管理权限（危险权限，仅管理员可授予）
@@ -1490,6 +1492,10 @@ class PermissionManager {
             [PermissionManager.PERMISSION.PROCESS_MANAGE]: {
                 name: '管理进程',
                 description: '允许程序管理其他进程（危险操作）'
+            },
+            [PermissionManager.PERMISSION.PROCESS_BACKGROUND]: {
+                name: '转为后台进程',
+                description: '允许程序申请由前台转为后台运行（不清理资源，仅从任务栏隐藏）'
             },
             [PermissionManager.PERMISSION.THEME_READ]: {
                 name: '读取主题',

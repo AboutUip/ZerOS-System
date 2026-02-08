@@ -1,4 +1,4 @@
-﻿// GUI管理器：统一管理所有GUI程序的窗口层叠显示和焦点管理
+// GUI管理器：统一管理所有GUI程序的窗口层叠显示和焦点管理
 // 提供统一的窗口样式和控件（最小化、最大化、关闭）
 
 KernelLogger.info("GUIManager", "模块初始化");
@@ -743,6 +743,19 @@ class GUIManager {
         
         // 如果窗口已被 onClose 回调关闭，直接返回
         if (windowClosedByCallback) {
+            return;
+        }
+        
+        // 如果 onClose 中请求转为后台（不真正关闭窗口，仅隐藏），则只隐藏窗口并返回，不注销、不 kill 进程
+        if (windowInfo._backgroundRequested) {
+            windowInfo._backgroundRequested = false;
+            if (windowInfo.window && windowInfo.window.style) {
+                windowInfo.window.style.display = 'none';
+            }
+            // 恢复 onClose，以便下次点击关闭按钮仍能走「转后台」逻辑
+            if (onCloseCallback) {
+                windowInfo.onClose = onCloseCallback;
+            }
             return;
         }
         
@@ -1498,6 +1511,21 @@ class GUIManager {
         
         const firstWindowId = Array.from(windowIds)[0];
         return GUIManager._windows.get(firstWindowId) || null;
+    }
+    
+    /**
+     * 显示某进程的所有窗口并聚焦第一个（用于从后台恢复：取消 display:none 并置顶）
+     * @param {number} pid 进程 ID
+     */
+    static showWindowsForPid(pid) {
+        const windows = GUIManager.getWindowsByPid(pid);
+        if (!windows || windows.length === 0) return;
+        for (const winInfo of windows) {
+            if (winInfo.window && winInfo.window.style && winInfo.window.style.display === 'none') {
+                winInfo.window.style.display = '';
+            }
+        }
+        GUIManager.focusWindow(pid);
     }
     
     /**

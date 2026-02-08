@@ -112,6 +112,44 @@ class DesktopManager {
     }
     
     /**
+     * 内核引导完成时调用：解决「进度条加载超过一次」或依赖晚于桌面初始化导致的图标消失
+     * - 若尚未初始化则执行 init（依赖与 DOM 已就绪）
+     * - 若已初始化但图标数为 0 则清缓存并重新从存储加载
+     * - 若图标容器已脱离 DOM（如引导阶段 DOM 被重建）则重置并重新初始化
+     */
+    static async _onKernelBootComplete() {
+        if (typeof document === 'undefined' || !document.body) return;
+        try {
+            // 1. 尚未初始化：引导完成后补一次 init（避免 500ms 时 LStorage/FS 未就绪）
+            if (!DesktopManager._initialized) {
+                KernelLogger.info("DesktopManager", "kernelBootComplete：尚未初始化，执行 init");
+                await DesktopManager.init();
+                return;
+            }
+            // 2. 已初始化但图标数为 0：清缓存并从存储重新加载（注册表存在但首读为空）
+            if (DesktopManager._icons.size === 0) {
+                KernelLogger.info("DesktopManager", "kernelBootComplete：当前无图标，清缓存并重新加载桌面图标");
+                if (typeof LStorage !== 'undefined' && typeof LStorage.clearCache === 'function') {
+                    LStorage.clearCache();
+                }
+                await DesktopManager._loadDesktopIcons();
+                return;
+            }
+            // 3. 图标容器已脱离 DOM（进度条/引导导致 DOM 重建）：重置并重新初始化
+            const containerInDom = DesktopManager._iconsContainer && document.body.contains(DesktopManager._iconsContainer);
+            if (!containerInDom && DesktopManager._iconsContainer) {
+                KernelLogger.info("DesktopManager", "kernelBootComplete：图标容器已脱离 DOM，重新初始化桌面");
+                DesktopManager._initialized = false;
+                DesktopManager._desktopContainer = null;
+                DesktopManager._iconsContainer = null;
+                await DesktopManager.init();
+            }
+        } catch (e) {
+            KernelLogger.error("DesktopManager", `kernelBootComplete 处理失败: ${e.message}`, e);
+        }
+    }
+    
+    /**
      * 创建图标容器
      */
     static _createIconsContainer() {
@@ -3847,15 +3885,19 @@ class DesktopManager {
     }
 }
 
-// 自动初始化（延迟，等待其他模块加载）
+// 自动初始化（延迟，等待其他模块加载）；并监听 kernelBootComplete 以应对「进度条加载超过一次」导致的图标消失
 if (typeof document !== 'undefined') {
-    // 等待DOM和依赖模块加载
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', () => {
-            setTimeout(() => DesktopManager.init(), 500);
-        });
-    } else {
+    const scheduleInitAndBootComplete = () => {
         setTimeout(() => DesktopManager.init(), 500);
+        if (document.body && !document.body.hasAttribute('data-desktop-boot-listener')) {
+            document.body.setAttribute('data-desktop-boot-listener', '1');
+            document.body.addEventListener('kernelBootComplete', () => DesktopManager._onKernelBootComplete());
+        }
+    };
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', scheduleInitAndBootComplete);
+    } else {
+        scheduleInitAndBootComplete();
     }
 }
 

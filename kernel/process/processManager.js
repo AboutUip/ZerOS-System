@@ -93,6 +93,7 @@ class ProcessManager {
     //         savedHeight: number
     //     },
     //     requestedModules: Set<string>  // 该进程请求的动态模块集合
+    //     isBackground: boolean  // 是否为后台进程（runInBackground 启动）
     // }
 
     /**
@@ -116,6 +117,10 @@ class ProcessManager {
                 for (const [pid, info] of data) {
                     // 反序列化：恢复Map和Set对象
                     const deserializedInfo = { ...info };
+                    // 兼容旧数据：无 isBackground 时默认为 false
+                    if (deserializedInfo.isBackground === undefined) {
+                        deserializedInfo.isBackground = false;
+                    }
 
                     // 恢复 memoryRefs (Map)
                     if (Array.isArray(info.memoryRefs)) {
@@ -143,6 +148,10 @@ class ProcessManager {
                 // 兼容对象格式
                 for (const [pid, info] of Object.entries(data)) {
                     const deserializedInfo = { ...info };
+                    // 兼容旧数据：无 isBackground 时默认为 false
+                    if (deserializedInfo.isBackground === undefined) {
+                        deserializedInfo.isBackground = false;
+                    }
 
                     // 恢复 memoryRefs (Map)
                     if (Array.isArray(info.memoryRefs)) {
@@ -564,6 +573,11 @@ class ProcessManager {
     // 降级方案：临时存储（仅在KernelMemory不可用时使用）
     static _fallbackProcessTable = null;
     static _fallbackNextPid = undefined;
+
+    /** 后台进程托盘：按 PID 注册的单击回调 Map<pid, function> */
+    static _backgroundTrayClickHandlers = new Map();
+    /** 后台进程托盘：按 PID 注册的右键菜单项提供者 Map<pid, function>，提供者返回 Array<{ label: string, onClick: function }> */
+    static _backgroundTrayContextMenuProviders = new Map();
 
     // DOM 观察器（全局，观察 document.body 的变化）
     static _globalDOMObserver = null;
@@ -1476,6 +1490,7 @@ class ProcessManager {
             terminalPid: null,  // 关联的终端PID（如果是CLI程序且创建了独立终端）
             launchedFromTerminal: false,  // 是否从终端内启动
             isCLITerminal: false,  // 是否为CLI程序创建的独立终端（不应在任务栏显示为terminal程序）
+            isBackground: !!(initArgs && initArgs.runInBackground),  // 是否为后台进程（由 runInBackground 启动）
             requestedModules: new Set()  // 该进程请求的动态模块集合
         };
 
@@ -2077,6 +2092,7 @@ class ProcessManager {
     static async killProgram(pid, force = false) {
         ProcessManager._log(2, `终止程序 PID: ${pid}`, { force });
 
+        // 前台与后台进程均会被强制终止，不做区分（kill 命令、任务管理器「关闭/强制退出」均走此逻辑）
         const processInfo = ProcessManager.PROCESS_TABLE.get(pid);
         if (!processInfo) {
             ProcessManager._log(1, `程序 PID ${pid} 不存在`);
@@ -2257,6 +2273,10 @@ class ProcessManager {
                     ProcessManager._log(1, `清理程序 PID ${pid} 的上下文菜单失败: ${e.message}`);
                 }
             }
+
+            // 清理后台进程托盘回调（单击与右键菜单）
+            ProcessManager._backgroundTrayClickHandlers.delete(pid);
+            ProcessManager._backgroundTrayContextMenuProviders.delete(pid);
 
             // 清理程序创建的桌面组件
             if (typeof DesktopManager !== 'undefined' && typeof DesktopManager.cleanupProgramComponents === 'function') {
@@ -2781,6 +2801,104 @@ class ProcessManager {
     }
 
     /**
+     * 获取所有运行中的后台进程
+     * @returns {Array<Object>} 后台进程信息数组（status === 'running' 且 isBackground === true）
+     */
+    static getBackgroundProcesses() {
+        const background = [];
+        ProcessManager.PROCESS_TABLE.forEach((processInfo, pid) => {
+            if (processInfo.status === 'running' && processInfo.isBackground === true) {
+                background.push({ ...processInfo, pid });
+            }
+        });
+        return background;
+    }
+
+    /**
+     * 设置进程的前台/后台状态（前端转后台或后台转前端）
+     * @param {number} pid 进程 ID
+     * @param {boolean} isBackground 是否为后台（true=后台，false=前台）
+     * @returns {boolean} 是否设置成功
+     */
+    static setProcessBackground(pid, isBackground) {
+        const processInfo = ProcessManager.PROCESS_TABLE.get(pid);
+        if (!processInfo) {
+            ProcessManager._log(1, `程序 PID ${pid} 不存在`);
+            return false;
+        }
+        if (processInfo.status !== 'running') {
+            ProcessManager._log(1, `程序 PID ${pid} 状态为 ${processInfo.status}，无法设置前后台`);
+            return false;
+        }
+        processInfo.isBackground = !!isBackground;
+        const rawTable = ProcessManager._getProcessTable();
+        rawTable.set(pid, processInfo);
+        ProcessManager._saveProcessTable(rawTable);
+        ProcessManager._processTableCache = null;
+        ProcessManager._protectedProcessTableCache = null;
+        ProcessManager._invalidateUsedPidsCache();
+        ProcessManager._log(2, `进程 PID ${pid} 已设置为 ${isBackground ? '后台' : '前台'}`);
+        if (typeof TaskbarManager !== 'undefined' && typeof TaskbarManager.update === 'function') {
+            TaskbarManager.update();
+        }
+        return true;
+    }
+
+    /**
+     * 注册后台进程托盘的单击回调（仅限该 PID 使用，由程序通过内核 API 为自己注册）
+     * @param {number} pid 进程 ID
+     * @param {Function} callback 单击时调用，无参数
+     */
+    static registerBackgroundTrayClick(pid, callback) {
+        if (typeof callback !== 'function') {
+            ProcessManager._log(1, 'registerBackgroundTrayClick: callback 必须为函数');
+            return;
+        }
+        ProcessManager._backgroundTrayClickHandlers.set(pid, callback);
+        ProcessManager._log(2, `已注册后台托盘单击回调 PID ${pid}`);
+    }
+
+    /**
+     * 注册后台进程托盘的右键菜单项提供者（仅限该 PID 使用）。菜单会自动追加「关闭」项。
+     * @param {number} pid 进程 ID
+     * @param {Function} getItems 返回菜单项数组 () => Array<{ label: string, onClick: function }>
+     */
+    static registerBackgroundTrayContextMenu(pid, getItems) {
+        if (typeof getItems !== 'function') {
+            ProcessManager._log(1, 'registerBackgroundTrayContextMenu: getItems 必须为函数');
+            return;
+        }
+        ProcessManager._backgroundTrayContextMenuProviders.set(pid, getItems);
+        ProcessManager._log(2, `已注册后台托盘右键菜单提供者 PID ${pid}`);
+    }
+
+    /**
+     * 获取某 PID 的后台托盘单击回调（供任务栏等调用）
+     * @param {number} pid 进程 ID
+     * @returns {Function|null}
+     */
+    static getBackgroundTrayClickHandler(pid) {
+        return ProcessManager._backgroundTrayClickHandlers.get(pid) || null;
+    }
+
+    /**
+     * 获取某 PID 的后台托盘右键菜单项（调用提供者并返回数组，供任务栏展示菜单）
+     * @param {number} pid 进程 ID
+     * @returns {Array<{ label: string, onClick: function }>}
+     */
+    static getBackgroundTrayContextMenuItems(pid) {
+        const provider = ProcessManager._backgroundTrayContextMenuProviders.get(pid);
+        if (!provider || typeof provider !== 'function') return [];
+        try {
+            const items = provider();
+            return Array.isArray(items) ? items.filter(i => i && typeof i.label === 'string' && typeof i.onClick === 'function') : [];
+        } catch (e) {
+            ProcessManager._log(1, `getBackgroundTrayContextMenuItems PID ${pid} 失败: ${e.message}`);
+            return [];
+        }
+    }
+
+    /**
      * 列出所有进程（包含内存信息）
      * @returns {Array<Object>} 进程信息数组
      */
@@ -3152,9 +3270,16 @@ class ProcessManager {
             'Event.register': PermissionManager.PERMISSION.EVENT_LISTENER,
             'Event.unregister': PermissionManager.PERMISSION.EVENT_LISTENER,
 
-            // 进程管理API
+            // 进程管理API（需 PROCESS_MANAGE 权限，供任务管理器等使用）
             'Process.manage': PermissionManager.PERMISSION.PROCESS_MANAGE,
+            'Process.getRunningProcesses': PermissionManager.PERMISSION.PROCESS_MANAGE,
+            'Process.getBackgroundProcesses': PermissionManager.PERMISSION.PROCESS_MANAGE,
+            'Process.getProcessInfo': PermissionManager.PERMISSION.PROCESS_MANAGE,
             'Process.requestSelfTermination': null,  // 程序自终止不需要权限（只能终止自己）
+            'Process.requestBackground': PermissionManager.PERMISSION.PROCESS_BACKGROUND,  // 程序申请由前台转后台（仅自身，普通权限）
+            'Process.requestForeground': null,   // 程序请求转为前台（仅自身，不需权限）
+            'Process.registerBackgroundTrayClick': PermissionManager.PERMISSION.PROCESS_BACKGROUND,  // 注册后台托盘单击回调（仅自身）
+            'Process.registerBackgroundTrayContextMenu': PermissionManager.PERMISSION.PROCESS_BACKGROUND,  // 注册后台托盘右键菜单项（仅自身）
 
             // 应用程序管理API（危险权限，仅管理员可授予）
             'Application.install': PermissionManager.PERMISSION.APPLICATION_INSTALL,
@@ -4784,7 +4909,26 @@ class ProcessManager {
                 return await LStorage.getAllEnvironmentVariables();
             },
 
-            // 进程管理API
+            // 进程管理API（供任务管理器等通过 kernelAPI.call 调用，需 PROCESS_MANAGE 权限）
+            'Process.manage': async (targetPid, force = false) => {
+                if (targetPid == null || typeof targetPid !== 'number') {
+                    throw new Error('Process.manage: targetPid 必须为数字');
+                }
+                return await ProcessManager.killProgram(targetPid, !!force);
+            },
+            'Process.getRunningProcesses': async () => {
+                return ProcessManager.getRunningProcesses();
+            },
+            'Process.getBackgroundProcesses': async () => {
+                return ProcessManager.getBackgroundProcesses();
+            },
+            'Process.getProcessInfo': async (targetPid) => {
+                if (targetPid !== undefined && targetPid !== null && typeof targetPid !== 'number') {
+                    throw new Error('Process.getProcessInfo: targetPid 必须为数字或省略');
+                }
+                // 无参数或 null/undefined 时返回所有进程信息，否则返回指定 PID 的进程信息
+                return ProcessManager.getProcessInfo((targetPid !== undefined && targetPid !== null) ? targetPid : null);
+            },
             'Process.requestSelfTermination': async () => {
                 // 程序请求自终止，强制关闭程序
                 // 注意：pid 参数从 callKernelAPI 的上下文自动获取
@@ -4792,6 +4936,30 @@ class ProcessManager {
                     throw new Error('Process.requestSelfTermination: 无法获取进程 ID');
                 }
                 return await ProcessManager.requestSelfTermination(pid);
+            },
+            'Process.requestBackground': async () => {
+                // 程序请求转为后台（前端转后台）：从任务栏和多任务选择器中隐藏，仍在运行
+                if (!pid) {
+                    throw new Error('Process.requestBackground: 无法获取进程 ID');
+                }
+                return ProcessManager.setProcessBackground(pid, true);
+            },
+            'Process.requestForeground': async () => {
+                // 程序请求转为前台：重新在任务栏和多任务选择器中显示
+                if (!pid) {
+                    throw new Error('Process.requestForeground: 无法获取进程 ID');
+                }
+                return ProcessManager.setProcessBackground(pid, false);
+            },
+            'Process.registerBackgroundTrayClick': async (callback) => {
+                // 程序注册后台托盘单击回调（仅自身，需 PROCESS_BACKGROUND）
+                if (!pid) throw new Error('Process.registerBackgroundTrayClick: 无法获取进程 ID');
+                ProcessManager.registerBackgroundTrayClick(pid, callback);
+            },
+            'Process.registerBackgroundTrayContextMenu': async (getItems) => {
+                // 程序注册后台托盘右键菜单项提供者（仅自身，需 PROCESS_BACKGROUND）。系统会自动追加「关闭」项。
+                if (!pid) throw new Error('Process.registerBackgroundTrayContextMenu: 无法获取进程 ID');
+                ProcessManager.registerBackgroundTrayContextMenu(pid, getItems);
             },
 
             // 应用程序管理API

@@ -43,6 +43,7 @@
         __init__: async function(pid, initArgs = {}) {
             this.pid = pid;
             this.terminal = initArgs.terminal;
+            this._kernelAPI = initArgs.kernelAPI || null;
 
             if (!this.terminal) {
                 throw new Error('PS 程序需要终端环境');
@@ -390,21 +391,21 @@
                 }
             }
 
-            if (ProcessMgr) {
+            if (ProcessMgr || this._kernelAPI) {
                 try {
-                    // 优先通过内核 API 调用 requestSelfTermination（强制自终止）
-                    if (typeof ProcessMgr.callKernelAPI === 'function') {
+                    // 优先使用 __init__ 注入的 kernelAPI.call（跳过调用栈校验，避免 VM 中运行导致 PID 校验失败）
+                    if (this._kernelAPI && typeof this._kernelAPI.call === 'function') {
+                        await this._kernelAPI.call('Process.requestSelfTermination', []);
+                    } else if (typeof ProcessMgr.callKernelAPI === 'function') {
                         await ProcessMgr.callKernelAPI(this.pid, 'Process.requestSelfTermination', []);
                     } else if (typeof ProcessMgr.requestSelfTermination === 'function') {
-                        // 如果内核 API 不可用，尝试直接方法
                         await ProcessMgr.requestSelfTermination(this.pid);
                     } else if (typeof ProcessMgr.killProgram === 'function') {
-                        // 降级到 killProgram
                         await ProcessMgr.killProgram(this.pid, true);
                     }
                 } catch (error) {
                     // 如果所有方法都失败，尝试强制关闭
-                    if (typeof ProcessMgr.killProgram === 'function') {
+                    if (ProcessMgr && typeof ProcessMgr.killProgram === 'function') {
                         try {
                             await ProcessMgr.killProgram(this.pid, true);
                         } catch (forceError) {

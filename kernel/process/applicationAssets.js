@@ -573,6 +573,25 @@ const APPLICATION_ASSETS = {
             supportsPreview: true,
             category: "system"  // 系统应用
         }
+    },
+
+    // Hello GUI - 支持后台的测试程序
+    "hellogui": {
+        script: "D:/application/hellogui/hellogui.js",
+        styles: ["D:/application/hellogui/hellogui.css"],
+        icon: "D:/application/hellogui/hellogui.svg",
+        metadata: {
+            autoStart: false,
+            priority: 5,
+            description: "Hello（支持后台的 GUI 测试）",
+            version: "1.0.0",
+            type: "GUI",
+            alwaysShowInTaskbar: false,
+            allowMultipleInstances: true,
+            supportsPreview: false,
+            category: "system",
+            showOnDesktop: true
+        }
     }
 };
 

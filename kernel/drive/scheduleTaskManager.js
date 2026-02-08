@@ -411,6 +411,8 @@ class ScheduleTaskManager {
         // 根据任务类型设置相应字段
         if (taskType === ScheduleTaskManager.TASK_TYPE.PROGRAM) {
             task.programName = taskConfig.programName;
+            // 是否以后台方式启动程序（默认 true：不显示在任务栏；false：前台显示）
+            task.runInBackground = taskConfig.runInBackground !== false;
         } else if (taskType === ScheduleTaskManager.TASK_TYPE.COMMAND) {
             task.command = taskConfig.command;
         } else if (taskType === ScheduleTaskManager.TASK_TYPE.SERVICE) {
@@ -549,7 +551,17 @@ class ScheduleTaskManager {
             task.triggerConfig = updates.triggerConfig;
         }
 
-        if (task.taskType === ScheduleTaskManager.TASK_TYPE.SERVICE) {
+        if (task.taskType === ScheduleTaskManager.TASK_TYPE.PROGRAM) {
+            if (updates.programName !== undefined) {
+                if (typeof updates.programName !== 'string') {
+                    throw new Error("程序名称必须是字符串");
+                }
+                task.programName = updates.programName;
+            }
+            if (updates.runInBackground !== undefined) {
+                task.runInBackground = Boolean(updates.runInBackground);
+            }
+        } else if (task.taskType === ScheduleTaskManager.TASK_TYPE.SERVICE) {
             if (updates.serviceId !== undefined) {
                 if (typeof updates.serviceId !== 'string') {
                     throw new Error("服务 ID 必须是字符串");
@@ -700,10 +712,12 @@ class ScheduleTaskManager {
                     throw new Error(`程序不存在: ${programName}`);
                 }
                 
-                // 启动程序
+                // 启动程序（计划任务默认以后台方式启动，不显示在任务栏；任务可配置 runInBackground: false 改为前台）
+                const runInBackground = task.runInBackground !== false;
                 await ProcessManager.startProgram(programName, {
                     scheduledTask: true,
-                    taskId: taskId
+                    taskId: taskId,
+                    runInBackground: runInBackground
                 });
             } else if (taskType === ScheduleTaskManager.TASK_TYPE.COMMAND) {
                 // 执行命令

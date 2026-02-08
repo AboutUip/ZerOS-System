@@ -1,83 +1,61 @@
 <svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <!-- 渐变定义 -->
-    <linearGradient id="logoGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#8b5cf6;stop-opacity:1" />
-      <stop offset="50%" style="stop-color:#6c8eff;stop-opacity:1" />
-      <stop offset="100%" style="stop-color:#8da6ff;stop-opacity:1" />
-    </linearGradient>
-    
-    <linearGradient id="logoGradientInner" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#0f1555;stop-opacity:1" />
-      <stop offset="100%" style="stop-color:#8b5cf6;stop-opacity:1" />
-    </linearGradient>
-    
-    <!-- 发光效果 -->
-    <filter id="glow">
-      <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+    <!-- 外圈环：紫蓝光晕（内外缘协调） -->
+    <filter id="ringGlow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="8" result="blur"/>
+      <feFlood flood-color="#5a4a9a" flood-opacity="0.6"/>
+      <feComposite in2="blur" operator="in" result="glow"/>
       <feMerge>
-        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="glow"/>
         <feMergeNode in="SourceGraphic"/>
       </feMerge>
     </filter>
-    
-    <!-- 动画定义 -->
-    <style>
-      @keyframes pulse {
-        0%, 100% { opacity: 1; transform: scale(1); }
-        50% { opacity: 0.8; transform: scale(1.05); }
-      }
-      
-      @keyframes rotate {
-        from { transform: rotate(0deg); }
-        to { transform: rotate(360deg); }
-      }
-      
-      @keyframes shimmer {
-        0% { transform: translateX(-100%); }
-        100% { transform: translateX(100%); }
-      }
-      
-      .logo-circle {
-        animation: pulse 3s ease-in-out infinite;
-      }
-      
-      .logo-inner {
-        animation: rotate 20s linear infinite;
-      }
-      
-      .logo-shimmer {
-        animation: shimmer 2s ease-in-out infinite;
-      }
-    </style>
+    <!-- 中心蓝盘：径向渐变、略凸感 -->
+    <radialGradient id="glowCircle" cx="45%" cy="45%" r="55%">
+      <stop offset="0%" style="stop-color:#a8d4ff"/>
+      <stop offset="30%" style="stop-color:#6eb0ff"/>
+      <stop offset="60%" style="stop-color:#3b82f6"/>
+      <stop offset="100%" style="stop-color:#1e3a8a"/>
+    </radialGradient>
+    <filter id="circleGlow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <!-- Z：亮白 + 轻微蓝光晕 -->
+    <linearGradient id="zFill" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#fff"/>
+      <stop offset="100%" style="stop-color:#e8ecf0"/>
+    </linearGradient>
+    <filter id="zGlow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="1.2" result="blur"/>
+      <feFlood flood-color="#93c5ff" flood-opacity="0.5"/>
+      <feComposite in2="blur" operator="in" result="soft"/>
+      <feMerge>
+        <feMergeNode in="soft"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
   </defs>
-  
-  <!-- 背景圆形（外圈） -->
-  <circle cx="100" cy="100" r="85" fill="url(#logoGradient)" filter="url(#glow)" class="logo-circle" opacity="0.9"/>
-  
-  <!-- 中间圆形（内圈） -->
-  <circle cx="100" cy="100" r="65" fill="url(#logoGradientInner)" opacity="0.7"/>
-  
-  <!-- 中心Z字母（ZerOS的首字母） -->
-  <g transform="translate(100, 100)">
-    <!-- Z字母主体 -->
-    <path d="M -35 -25 L 35 -25 L 35 -15 L -15 -15 L 35 15 L 35 25 L -35 25 L -35 15 L 15 15 L -35 -15 Z" 
-          fill="#ffffff" 
-          opacity="0.95"
-          filter="url(#glow)"/>
-    
-    <!-- 装饰性线条 -->
-    <line x1="-40" y1="-30" x2="-30" y2="-20" stroke="#8b5cf6" stroke-width="2" opacity="0.6"/>
-    <line x1="30" y1="20" x2="40" y2="30" stroke="#8b5cf6" stroke-width="2" opacity="0.6"/>
+  <!-- 按比例缩小，使整体（含光晕）不超出范围，居中 -->
+  <g transform="translate(100,100) scale(0.85) translate(-100,-100)">
+    <!-- 外圈紫蓝光晕层（与背景、蓝盘过渡协调） -->
+    <circle cx="100" cy="100" r="106" fill="#4a3d7a" opacity="0.35" filter="url(#ringGlow)"/>
+    <!-- 深色紫靛环 -->
+    <circle cx="100" cy="100" r="100" fill="#1e1b2e" filter="url(#ringGlow)"/>
+    <!-- 环内缘过渡光（与蓝盘衔接） -->
+    <circle cx="100" cy="100" r="76" fill="#3d4a6a" opacity="0.25" filter="url(#ringGlow)"/>
+    <!-- 中心蓝盘 -->
+    <circle cx="100" cy="100" r="72" fill="url(#glowCircle)" filter="url(#circleGlow)"/>
+    <!-- 中心 Z（带轻微蓝光晕） -->
+    <path d="M 62 78 L 138 78 L 62 122 L 138 122" 
+          fill="none" 
+          stroke="url(#zFill)" 
+          stroke-width="18" 
+          stroke-linecap="round" 
+          stroke-linejoin="round"
+          filter="url(#zGlow)"/>
   </g>
-  
-  <!-- 旋转装饰环 -->
-  <g class="logo-inner" transform="translate(100, 100)">
-    <circle cx="0" cy="0" r="50" fill="none" stroke="rgba(139, 92, 246, 0.3)" stroke-width="2" stroke-dasharray="5,5"/>
-    <circle cx="0" cy="0" r="45" fill="none" stroke="rgba(108, 142, 255, 0.2)" stroke-width="1.5" stroke-dasharray="3,3"/>
-  </g>
-  
-  <!-- 闪烁高光效果 -->
-  <rect x="50" y="50" width="100" height="100" fill="url(#logoGradient)" opacity="0.2" class="logo-shimmer" transform="rotate(45 100 100)"/>
 </svg>
-

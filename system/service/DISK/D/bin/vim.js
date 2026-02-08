@@ -47,6 +47,7 @@
         __init__: async function (pid, initArgs = {}) {
             this.pid = pid;
             this.terminal = initArgs.terminal;
+            this._kernelAPI = initArgs.kernelAPI || null;
 
             if (!this.terminal) {
                 throw new Error('VIM 程序需要终端环境');
@@ -57,7 +58,7 @@
             const cwd = initArgs.cwd || 'C:';
 
             // 创建VimEditor实例
-            const editor = new VimEditor(pid, this.terminal, cwd);
+            const editor = new VimEditor(pid, this.terminal, cwd, this._kernelAPI);
             this._instances.set(pid, editor);
 
             // 使用 setTimeout 延迟执行，确保进程状态已设置为 running
@@ -108,9 +109,12 @@
                 }
             }
 
-            if (ProcessMgr) {
+            if (ProcessMgr || this._kernelAPI) {
                 try {
-                    if (typeof ProcessMgr.callKernelAPI === 'function') {
+                    // 关闭自身时优先使用 kernelAPI.call（跳过调用栈校验，避免 VM 中运行导致 PID 校验失败）
+                    if (pid === this.pid && this._kernelAPI && typeof this._kernelAPI.call === 'function') {
+                        await this._kernelAPI.call('Process.requestSelfTermination', []);
+                    } else if (typeof ProcessMgr.callKernelAPI === 'function') {
                         await ProcessMgr.callKernelAPI(pid, 'Process.requestSelfTermination', []);
                     } else if (typeof ProcessMgr.requestSelfTermination === 'function') {
                         await ProcessMgr.requestSelfTermination(pid);
@@ -118,12 +122,10 @@
                         await ProcessMgr.killProgram(pid, true);
                     }
                 } catch (error) {
-                    if (typeof ProcessMgr.killProgram === 'function') {
+                    if (ProcessMgr && typeof ProcessMgr.killProgram === 'function') {
                         try {
                             await ProcessMgr.killProgram(pid, true);
-                        } catch (forceError) {
-                            // 忽略强制关闭失败
-                        }
+                        } catch (forceError) {}
                     }
                 }
             }
@@ -134,10 +136,11 @@
      * VimEditor 类 - vim编辑器核心实现
      */
     class VimEditor {
-        constructor(pid, terminal, cwd) {
+        constructor(pid, terminal, cwd, kernelAPI = null) {
             this.pid = pid;
             this.terminal = terminal;
             this.cwd = cwd;
+            this._kernelAPI = kernelAPI || null;
 
             // 编辑器状态
             this.mode = 'NORMAL'; // NORMAL, INSERT, COMMAND, VISUAL
@@ -1307,9 +1310,12 @@
                 }
             }
 
-            if (ProcessMgr) {
+            if (ProcessMgr || this._kernelAPI) {
                 try {
-                    if (typeof ProcessMgr.callKernelAPI === 'function') {
+                    // 关闭自身时优先使用 kernelAPI.call（跳过调用栈校验，避免 VM 中运行导致 PID 校验失败）
+                    if (targetPid === this.pid && this._kernelAPI && typeof this._kernelAPI.call === 'function') {
+                        await this._kernelAPI.call('Process.requestSelfTermination', []);
+                    } else if (typeof ProcessMgr.callKernelAPI === 'function') {
                         await ProcessMgr.callKernelAPI(targetPid, 'Process.requestSelfTermination', []);
                     } else if (typeof ProcessMgr.requestSelfTermination === 'function') {
                         await ProcessMgr.requestSelfTermination(targetPid);
@@ -1317,12 +1323,10 @@
                         await ProcessMgr.killProgram(targetPid, true);
                     }
                 } catch (error) {
-                    if (typeof ProcessMgr.killProgram === 'function') {
+                    if (ProcessMgr && typeof ProcessMgr.killProgram === 'function') {
                         try {
                             await ProcessMgr.killProgram(targetPid, true);
-                        } catch (forceError) {
-                            // 忽略强制关闭失败
-                        }
+                        } catch (forceError) {}
                     }
                 }
             }

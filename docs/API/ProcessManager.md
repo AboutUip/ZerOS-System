@@ -45,6 +45,7 @@ ProcessManager.EXPLOIT_PID = 10000;  // Exploit 程序固定 PID
   - `cliProgramName` (string): 关联的 CLI 程序名称（内部使用）
   - `cliProgramPid` (number): 关联的 CLI 程序 PID（内部使用）
   - `disableTabs` (boolean): 禁用标签页功能（内部使用）
+  - `runInBackground` (boolean): 是否以后台进程方式启动；为 `true` 时进程信息中 `isBackground` 为 `true`，可供任务管理器等区分展示
 
 **说明**：内核在调用 `__init__(pid, initArgs)` 时会在 `initArgs` 中注入 `kernelAPI`（见下方「进程绑定 API」），程序可保存为 `this.kernelAPI` 后使用 `this.kernelAPI.call(apiName, args)` 调用内核 API，无需传 pid，可防 PID 伪造（CVS_ZEROS_009 方案三）。
 
@@ -108,7 +109,7 @@ const pid = await ProcessManager.startProgram('vim', {
 
 #### `killProgram(pid, force)`
 
-终止程序。
+终止程序。**前台与后台进程均会被强制终止**，不做区分。kill 命令、任务管理器的「关闭程序」/「强制退出」均走此逻辑。
 
 **参数**:
 - `pid` (number): 进程 ID
@@ -128,15 +129,110 @@ await ProcessManager.killProgram(pid, true);
 **程序终止流程**:
 1. 调用程序的 `__exit__` 方法
 2. 如果是 CLI 程序，关闭关联的终端
-3. 清理 GUI 元素
-4. 清理上下文菜单
-5. 清理桌面组件
-6. 清理通知（仅依赖类型）
-7. 释放内存
-8. 清理 DOM 元素
-9. 停止 DOM 观察器
-10. 更新进程状态为 `exited`
-11. 更新任务栏
+3. 清理 GUI 元素（后台进程同样按此流程清理）
+
+### 后台进程
+
+#### `getBackgroundProcesses()`
+
+获取所有运行中的后台进程（`status === 'running'` 且 `isBackground === true`）。
+
+**返回值**: `Array<Object>` - 后台进程信息数组（与 `getRunningProcesses()` 元素结构一致，每项含 `isBackground: true`）
+
+**示例**:
+```javascript
+const background = ProcessManager.getBackgroundProcesses();
+```
+
+**说明**：进程信息中的 `isBackground` 由 `startProgram(..., { runInBackground: true })` 设置；旧数据或未传该参数时默认为 `false`，兼容已有行为。
+
+#### 前端转后台 / 后台转前台
+
+##### `setProcessBackground(pid, isBackground)`
+
+设置指定进程的前台/后台状态（供内核 API 或直接调用）。
+
+**参数**:
+- `pid` (number): 进程 ID
+- `isBackground` (boolean): 是否为后台（`true` = 后台，`false` = 前台）
+
+**返回值**: `boolean` - 是否设置成功（进程不存在或非 `running` 时返回 `false`）
+
+**示例**:
+```javascript
+ProcessManager.setProcessBackground(pid, true);   // 转为后台
+ProcessManager.setProcessBackground(pid, false);  // 转为前台
+```
+
+##### 内核 API：`Process.requestBackground` / `Process.requestForeground`
+
+程序通过 `kernelAPI.call` 将**自身**由前台转为后台或由后台转为前台（不清理进程资源，仅改变前后台状态）。
+
+| API | 参数 | 权限 | 说明 |
+|-----|------|------|------|
+| `Process.requestBackground` | 无 | **`PROCESS_BACKGROUND`（普通权限）** | 当前进程申请由前台转为后台（从任务栏、多任务选择器中隐藏，仍在运行） |
+| `Process.requestForeground` | 无 | 不需权限 | 当前进程转为前台（重新在任务栏、多任务选择器中显示） |
+
+**示例**（在程序内部）:
+```javascript
+// 申请由前台转后台（如“最小化到后台”），需 PROCESS_BACKGROUND 权限
+await this.kernelAPI.call('Process.requestBackground', []);
+
+// 后台转前台（不需权限）
+await this.kernelAPI.call('Process.requestForeground', []);
+```
+
+##### 内核 API：后台进程托盘事件回调（`Process.registerBackgroundTrayClick` / `Process.registerBackgroundTrayContextMenu`）
+
+系统托盘（后台进程容器）中每个后台进程项支持**单击**与**右键**事件，程序可为自身注册回调（需 `PROCESS_BACKGROUND` 普通权限）。
+
+| API | 参数 | 权限 | 说明 |
+|-----|------|------|------|
+| `Process.registerBackgroundTrayClick` | `callback`（无参函数） | **`PROCESS_BACKGROUND`** | 注册单击回调：用户单击该进程项时调用；未注册时默认行为为「转为前台」并关闭面板 |
+| `Process.registerBackgroundTrayContextMenu` | `getItems`（函数，返回 `Array<{ label: string, onClick: function }>`） | **`PROCESS_BACKGROUND`** | 注册右键菜单项提供者：用户右键该进程项时展示菜单，先显示程序返回的菜单项，系统**自动追加「退出程序」项**（结束进程） |
+
+**说明**：
+- 右击后台进程图标**始终**会弹出右键菜单；菜单中**必须**包含系统自动添加的「退出程序」项，程序可通过 `getItems` 在该菜单中增加自定义项（如「打开」「设置」等）。
+- 程序可在转为后台前或转为后台后通过 `kernelAPI.call('Process.registerBackgroundTrayClick', [callback])` 和 `kernelAPI.call('Process.registerBackgroundTrayContextMenu', [getItems])` 注册回调；仅对**当前进程**生效（由内核按调用者 PID 绑定），进程退出时自动清理。
+
+**示例**（在程序内部，转为后台前或转为后台后调用）:
+```javascript
+// 注册单击：点击托盘项时执行自定义逻辑（如打开主窗口）
+await this.kernelAPI.call('Process.registerBackgroundTrayClick', [() => {
+    this.showMainWindow(); // 程序内部方法
+}]);
+
+// 注册右键菜单：增加「打开」「设置」等项，系统会自动追加「退出程序」
+await this.kernelAPI.call('Process.registerBackgroundTrayContextMenu', [() => [
+    { label: '打开', onClick: () => this.showMainWindow() },
+    { label: '设置', onClick: () => this.openSettings() }
+]]);
+```
+
+### 进程管理内核 API（供任务管理器等调用）
+
+以下 API 通过 `kernelAPI.call(apiName, args)` 调用，**均需 `PROCESS_MANAGE` 权限**（危险权限，仅管理员可授予），除下表注明“不需权限”的 API 外：
+
+| API | 参数 | 说明 |
+|-----|------|------|
+| `Process.getRunningProcesses` | 无 | 返回所有运行中进程（含 `isBackground` 等字段） |
+| `Process.getBackgroundProcesses` | 无 | 返回所有运行中的后台进程 |
+| `Process.getProcessInfo` | `targetPid`（可选，数字或省略） | 省略时返回所有进程信息；传 PID 时返回该进程信息（含 `memoryInfo`） |
+| `Process.manage` | `targetPid`, `force`（可选，默认 false） | 终止指定进程，等同 `ProcessManager.killProgram(targetPid, force)`；**前台与后台进程均会被强制终止** |
+| `Process.requestBackground` | 无 | 当前进程转为后台（需 **`PROCESS_BACKGROUND` 普通权限**，仅自身） |
+| `Process.requestForeground` | 无 | 当前进程转为前台（不需权限，仅自身） |
+| `Process.registerBackgroundTrayClick` | `callback` | 注册后台托盘单击回调（需 **`PROCESS_BACKGROUND`**，仅自身） |
+| `Process.registerBackgroundTrayContextMenu` | `getItems` | 注册后台托盘右键菜单项（需 **`PROCESS_BACKGROUND`**，仅自身；系统自动追加「退出程序」） |
+
+**示例**（在已获得 PROCESS_MANAGE 权限的程序中）:
+```javascript
+const running = await this.kernelAPI.call('Process.getRunningProcesses', []);
+const background = await this.kernelAPI.call('Process.getBackgroundProcesses', []);
+const info = await this.kernelAPI.call('Process.getProcessInfo', [pid]);
+await this.kernelAPI.call('Process.manage', [targetPid, true]);
+```
+
+`Process.manage` 的终止流程与上方 `killProgram` 一致。
 
 ### 内存管理
 
@@ -209,6 +305,7 @@ ProcessManager.freeMemoryRef(this.pid, 'myData');
     exitTime: number | null,
     memoryInfo: Object,  // 内存信息（如果 pid 不为 null）
     isCLI: boolean,
+    isBackground: boolean,  // 是否为后台进程（前台转后台后为 true，供任务管理器等区分）
     terminalPid: number | null,
     launchedFromTerminal: boolean,
     isCLITerminal: boolean,
@@ -440,6 +537,8 @@ async __init__(pid, initArgs) {
 
 **与 `callKernelAPI(pid, apiName, args)` 的关系**：两者都会做权限检查与执行；绑定 API 跳过「调用栈 vs pid」校验，仅能通过内核注入的令牌调用，不可伪造。现有 `callKernelAPI(this.pid, ...)` 用法仍可使用，无需强制迁移。
 
+**自终止与 VM/CLI 程序**：在 VM 或沙箱中运行的程序（如从终端启动的 bin 下 CLI 程序 ps、netport、vim 等）调用 `callKernelAPI(this.pid, 'Process.requestSelfTermination', [])` 时，内核会根据调用栈校验调用者 PID；VM 栈无法匹配 `bin/xxx.js` 等路径，会导致「API调用拒绝(PID校验)」。此类程序应优先使用 `initArgs.kernelAPI.call('Process.requestSelfTermination', [])` 进行自终止，绑定 API 会跳过调用栈校验。
+
 #### `callKernelAPI(pid, apiName, args)`
 
 调用内核 API。所有内核 API 调用都会自动进行权限检查。
@@ -494,6 +593,10 @@ async __init__(pid, initArgs) {
 - `Desktop.setAutoArrange` - 设置自动排列（需要 `DESKTOP_MANAGE` 权限）
 - `Desktop.refresh` - 刷新桌面（需要 `DESKTOP_MANAGE` 权限）
 - `Process.manage` - 管理进程（需要 `PROCESS_MANAGE` 权限）
+- `Process.requestBackground` - 申请由前台转后台（需要 `PROCESS_BACKGROUND` 普通权限，仅自身）
+- `Process.registerBackgroundTrayClick` - 注册后台托盘单击回调（需要 `PROCESS_BACKGROUND`，仅自身）
+- `Process.registerBackgroundTrayContextMenu` - 注册后台托盘右键菜单项（需要 `PROCESS_BACKGROUND`，仅自身；系统自动追加「关闭」）
+- `Process.requestSelfTermination` - 当前进程请求自终止（不需权限，仅自身；推荐使用 `kernelAPI.call` 避免 VM 中 PID 校验失败）
 - `Drag.createSession` - 创建拖拽会话（需要 `DRAG_ELEMENT` 权限）
 - `Drag.enable` - 启用拖拽（需要 `DRAG_ELEMENT` 权限）
 - `Drag.disable` - 禁用拖拽（需要 `DRAG_ELEMENT` 权限）
@@ -765,6 +868,7 @@ ProcessManager 会自动跟踪程序创建的 DOM 元素：
 5. **DOM 清理**: 程序退出时会自动清理所有标记的 DOM 元素
 6. **CLI 终端**: CLI 程序从 GUI 启动时会自动创建终端，无需手动处理
 7. **CVS-ZEROS-009 已修复**: ProcessManager 内核 API 调用已增加调用栈与 PID 一致性校验、Exploit PID 使用严格校验，并提供进程绑定 API（`initArgs.kernelAPI.call`）。禁止应用层传入伪造或他人 PID 提权；推荐敏感/多实例程序使用 `initArgs.kernelAPI.call(apiName, args)`。详见 [VULN/CVS_ZEROS_009.md](../../VULN/CVS_ZEROS_009.md)
+8. **任务管理器**：任务管理器（taskmanager）支持后台进程的识别与管理：进程列表按「运行模式」筛选（全部/前台/后台）、运行中后台进程显示「后台」徽章、进程详情中展示「运行模式」并提供「转为前台」「转为后台」操作；右键菜单中也可对后台/前台进程执行「转为前台」「转为后台」。
 
 ## 相关文档
 
