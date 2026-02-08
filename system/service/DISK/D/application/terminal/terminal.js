@@ -2594,11 +2594,24 @@ function escapeHtml(s){
                                 // 按字母顺序排序
                                 candidates.sort();
                             }else{
-                                // 异步从 PHP 服务获取目录列表
-                                const idx = token.lastIndexOf('/');
-                                dirPart = idx >= 0 ? token.slice(0, idx + 1) : '';
-                                const namePrefix = idx >= 0 ? token.slice(idx + 1) : token;
-                                const dirToList = resolvePath(this.env.cwd, dirPart || '.');
+                                // 二级/多级补全：debug <action> [args...]
+                                const parts = before.trim().split(/\s+/).filter(Boolean);
+                                const cmd = parts[0];
+                                const second = parts[1];
+                                if (cmd === 'debug' && parts.length === 1) {
+                                    const debugActions = ['exception', 'geography', 'weather', 'translate', 'services'];
+                                    candidates = debugActions.filter(c => c.indexOf(token) === 0).slice();
+                                    candidates.sort();
+                                } else if (cmd === 'debug' && second === 'exception' && parts.length === 2) {
+                                    const levels = ['kernel', 'system', 'program', 'service'];
+                                    candidates = levels.filter(c => c.indexOf(token) === 0).slice();
+                                    candidates.sort();
+                                } else {
+                                    // 异步从 PHP 服务获取目录列表
+                                    const idx = token.lastIndexOf('/');
+                                    dirPart = idx >= 0 ? token.slice(0, idx + 1) : '';
+                                    const namePrefix = idx >= 0 ? token.slice(idx + 1) : token;
+                                    const dirToList = resolvePath(this.env.cwd, dirPart || '.');
                                 
                                 // 确保路径格式正确
                                 let phpPath = dirToList;
@@ -2628,6 +2641,7 @@ function escapeHtml(s){
                                     }
                                 } catch (e) {
                                     candidates = [];
+                                }
                                 }
                             }
                         }catch(e){ candidates = []; }
@@ -2938,6 +2952,19 @@ function escapeHtml(s){
                                     // 按字母顺序排序
                                     candidates.sort();
                                 }else{
+                                    // 二级/多级补全：debug <action> [args...]
+                                    const parts = before.trim().split(/\s+/).filter(Boolean);
+                                    const cmd = parts[0];
+                                    const second = parts[1];
+                                    if (cmd === 'debug' && parts.length === 1) {
+                                        const debugActions = ['exception', 'geography', 'weather', 'translate', 'services'];
+                                        candidates = debugActions.filter(c => c.indexOf(token) === 0).slice();
+                                        candidates.sort();
+                                    } else if (cmd === 'debug' && second === 'exception' && parts.length === 2) {
+                                        const levels = ['kernel', 'system', 'program', 'service'];
+                                        candidates = levels.filter(c => c.indexOf(token) === 0).slice();
+                                        candidates.sort();
+                                    } else {
                                     // 文件路径补全（简化版，使用 FileSystem.list）
                                     const idx = token.lastIndexOf('/');
                                     const dirPart = idx >= 0 ? token.slice(0, idx + 1) : '';
@@ -2970,6 +2997,7 @@ function escapeHtml(s){
                                         }
                                     } catch (e) {
                                         candidates = [];
+                                    }
                                     }
                                 }
                             }catch(e){ candidates = []; }
@@ -3723,6 +3751,10 @@ function escapeHtml(s){
                     this.cmdEl.classList.remove('disabled');
                     this._updatePrompt();
                     this.focus();
+                    // 输入行重新显示后输出区高度会变小，滚到底部避免提示符遮挡最后几行输出
+                    requestAnimationFrame(() => {
+                        this._scrollToBottom();
+                    });
                 } else {
                     // 非活动标签页保持隐藏，但更新状态
                     if (this.inputLineEl) {
@@ -3900,6 +3932,7 @@ function escapeHtml(s){
         }
 
         _scrollToBottom(){
+            if (!this.outputEl) return;
             this.outputEl.scrollTop = this.outputEl.scrollHeight;
         }
 
@@ -4174,6 +4207,8 @@ function escapeHtml(s){
             this.outputEl.appendChild(line);
             requestAnimationFrame(() => line.classList.add('visible'));
             this._scrollToBottom();
+            // 内容过多时，布局更新后再滚到底部，避免连续 write 后仍停留在上方
+            requestAnimationFrame(() => this._scrollToBottom());
         }
 
         clear(){
@@ -7468,12 +7503,20 @@ function escapeHtml(s){
                             payload.write('    message: 可选的异常消息（默认使用测试消息）');
                             payload.write('  geography [--clear] [--high]  - 地理位置调试（--clear 清除缓存后重新获取，--high 启用高精度定位）');
                             payload.write('  weather [--city 城市] [--raw]  - 天气调试（--city 指定城市，否则用定位；--raw 输出原始 JSON）');
+                            payload.write('  translate [--status]  - 翻译服务调试：显示 POOL > SERVER Translate 状态与统计');
+                            payload.write('  translate --simple "文本" <to_lang>  - 测试普通机器翻译（需翻译服务已启动）');
+                            payload.write('  translate --ai "文本" <to_lang>  - 测试 AI 智能翻译（需翻译服务已启动）');
+                            payload.write('  services [--status [id]]  - D/server 服务列表；--status 显示各服务状态，可指定 id 查看单服务');
                             payload.write('');
                             payload.write('Examples:');
                             payload.write('  debug exception service "测试服务异常"');
                             payload.write('  debug geography');
                             payload.write('  debug weather');
                             payload.write('  debug weather --city 兴县 --raw');
+                            payload.write('  debug translate --status');
+                            payload.write('  debug translate --simple "明天" en');
+                            payload.write('  debug translate --ai "明天" en');
+                            payload.write('  debug services --status');
                             return;
                         }
                         
@@ -7699,6 +7742,146 @@ function escapeHtml(s){
                                     KernelLogger.debug('Terminal', 'debug weather 失败', err);
                                 }
                             }
+                        } else if (action === 'translate') {
+                            const hasStatus = payload.args.includes('--status');
+                            const simpleIdx = payload.args.indexOf('--simple');
+                            const aiIdx = payload.args.indexOf('--ai');
+                            const hasSimple = simpleIdx >= 0 && payload.args.length > simpleIdx + 2;
+                            const hasAi = aiIdx >= 0 && payload.args.length > aiIdx + 2;
+                            try {
+                                if (hasSimple) {
+                                    const textArg = payload.args[simpleIdx + 1];
+                                    const toLang = payload.args[simpleIdx + 2] || 'en';
+                                    const text = (textArg && textArg.startsWith('"') && textArg.endsWith('"')) ? textArg.slice(1, -1) : textArg;
+                                    if (typeof POOL === 'undefined' || !POOL.__HAS__('SERVER', 'Translate')) {
+                                        payload.write('debug translate: POOL > SERVER Translate 不可用，请先启动翻译服务（如服务管理器中启用 translate）');
+                                        return;
+                                    }
+                                    const T = POOL.__GET__('SERVER', 'Translate');
+                                    if (!T || typeof T.translateSimple !== 'function') {
+                                        payload.write('debug translate: Translate.translateSimple 不可用');
+                                        return;
+                                    }
+                                    payload.write(`普通机器翻译: "${text}" -> ${toLang}`);
+                                    payload.write('请求中...');
+                                    const result = await T.translateSimple(text, toLang);
+                                    payload.write(`原文: ${result.text}`);
+                                    payload.write(`译文: ${result.translate}`);
+                                    payload.write('完成');
+                                } else if (hasAi) {
+                                    const textArg = payload.args[aiIdx + 1];
+                                    const toLang = payload.args[aiIdx + 2] || 'en';
+                                    const text = (textArg && textArg.startsWith('"') && textArg.endsWith('"')) ? textArg.slice(1, -1) : textArg;
+                                    if (typeof POOL === 'undefined' || !POOL.__HAS__('SERVER', 'Translate')) {
+                                        payload.write('debug translate: POOL > SERVER Translate 不可用，请先启动翻译服务（如服务管理器中启用 translate）');
+                                        return;
+                                    }
+                                    const T = POOL.__GET__('SERVER', 'Translate');
+                                    if (!T || typeof T.translate !== 'function') {
+                                        payload.write('debug translate: Translate.translate（AI 智能翻译）不可用');
+                                        return;
+                                    }
+                                    payload.write(`AI 智能翻译: "${text}" -> ${toLang}`);
+                                    payload.write('请求中...');
+                                    const result = await T.translate(text, toLang);
+                                    if (result && result.is_batch === false && result.data) {
+                                        const d = result.data;
+                                        payload.write(`原文: ${d.original_text || text}`);
+                                        payload.write(`译文: ${d.translated_text || ''}`);
+                                        if (d.detected_lang) payload.write(`检测语言: ${d.detected_lang}`);
+                                        if (result.performance && typeof result.performance === 'object' && result.performance.duration_ms != null) {
+                                            payload.write(`耗时: ${result.performance.duration_ms} ms`);
+                                        }
+                                    } else {
+                                        payload.write(JSON.stringify(result));
+                                    }
+                                    payload.write('完成');
+                                } else {
+                                    payload.write('Translate 调试');
+                                    payload.write('---');
+                                    if (typeof POOL === 'undefined') {
+                                        payload.write('POOL 不可用');
+                                        payload.write('---');
+                                        return;
+                                    }
+                                    if (!POOL.__HAS__('SERVER', 'Translate')) {
+                                        payload.write('POOL > SERVER Translate: 未注册（翻译服务未启动）');
+                                        payload.write('  启动方式: 在服务管理器中启用 translate 服务');
+                                        payload.write('---');
+                                        return;
+                                    }
+                                    const T = POOL.__GET__('SERVER', 'Translate');
+                                    if (!T) {
+                                        payload.write('POOL.__GET__("SERVER", "Translate") 返回空');
+                                        payload.write('---');
+                                        return;
+                                    }
+                                    payload.write('POOL > SERVER Translate: 已注册');
+                                    payload.write(`  translateSimple(text, toLang): 普通机器翻译`);
+                                    payload.write(`  translate(textOrTexts, options): AI 智能翻译`);
+                                    if (typeof ServerExpansion !== 'undefined' && ServerExpansion.status) {
+                                        const st = await ServerExpansion.status('translate');
+                                        if (st) {
+                                            payload.write('---');
+                                            payload.write(`服务: ${st.serviceName} v${st.version} | 运行: ${st.running ? '是' : '否'}`);
+                                            payload.write(`简单接口: ${st.simpleApi || '(无)'}`);
+                                            payload.write(`AI 接口: ${st.aiApi || '(无)'}`);
+                                            if (st.stats) {
+                                                payload.write(`统计: 请求 ${st.stats.requestCount} | 成功 ${st.stats.successCount} | 失败 ${st.stats.errorCount}`);
+                                                if (st.stats.lastError) payload.write(`最后错误: ${st.stats.lastError}`);
+                                            }
+                                        }
+                                    }
+                                    payload.write('---');
+                                    payload.write('完成');
+                                }
+                            } catch (err) {
+                                payload.write(`debug translate: 错误: ${err.message}`);
+                                if (typeof KernelLogger !== 'undefined') {
+                                    KernelLogger.debug('Terminal', 'debug translate 失败', err);
+                                }
+                            }
+                        } else if (action === 'services') {
+                            try {
+                                payload.write('D/server 服务调试');
+                                payload.write('---');
+                                if (typeof ServerExpansion === 'undefined') {
+                                    payload.write('ServerExpansion 不可用');
+                                    payload.write('---');
+                                    return;
+                                }
+                                const list = ServerExpansion.listServices ? ServerExpansion.listServices() : [];
+                                payload.write(`已加载服务数: ${list.length}`);
+                                if (list.length === 0) {
+                                    payload.write('  (无)');
+                                    payload.write('---');
+                                    return;
+                                }
+                                const wantStatus = payload.args.includes('--status');
+                                const statusIdIdx = payload.args.indexOf('--status');
+                                const filterId = statusIdIdx >= 0 && payload.args[statusIdIdx + 1] && !payload.args[statusIdIdx + 1].startsWith('-')
+                                    ? payload.args[statusIdIdx + 1] : null;
+                                const ids = filterId ? (list.includes(filterId) ? [filterId] : []) : list;
+                                for (let i = 0; i < ids.length; i++) {
+                                    const id = ids[i];
+                                    payload.write(`  ${id}`);
+                                    if (wantStatus && ServerExpansion.status) {
+                                        const st = await ServerExpansion.status(id);
+                                        if (st) {
+                                            if (st.running != null) payload.write(`    运行: ${st.running ? '是' : '否'}`);
+                                            if (st.serviceName) payload.write(`    名称: ${st.serviceName}`);
+                                            if (st.version) payload.write(`    版本: ${st.version}`);
+                                        }
+                                    }
+                                }
+                                payload.write('---');
+                                payload.write('完成');
+                            } catch (err) {
+                                payload.write(`debug services: 错误: ${err.message}`);
+                                if (typeof KernelLogger !== 'undefined') {
+                                    KernelLogger.debug('Terminal', 'debug services 失败', err);
+                                }
+                            }
                         } else {
                             payload.write(`debug: 未知的操作 '${action}'`);
                             payload.write('  使用 "debug" 查看帮助信息');
@@ -7750,7 +7933,7 @@ function escapeHtml(s){
                 payload.write(' - getenv <name>          : 获取环境变量值');
                 payload.write(' - demo, toggleview       : 演示脚本 / 切换视图');
                 payload.write(' - power <action>         : 系统电源管理（reboot/shutdown/help）');
-                payload.write(' - debug <action> [args]   : 调试工具，支持触发异常测试（debug exception <level> [message]）');
+                payload.write(' - debug <action> [args]   : 调试工具。exception/geography/weather/translate/services（debug 查看帮助）');
                 payload.write('Notes: 路径格式以盘符开头如 C:/path，或相对于当前工作目录使用 ../ 和 ./ 。');
                 break;
             case 'diskmanger':

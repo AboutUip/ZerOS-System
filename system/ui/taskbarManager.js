@@ -13292,6 +13292,9 @@ class TaskbarManager {
         if (typeof pid !== 'number') {
             return 0;
         }
+        if (typeof ProcessManager !== 'undefined' && typeof ProcessManager.recordKernelModuleCall === 'function') {
+            ProcessManager.recordKernelModuleCall(pid, 'Taskbar.cleanupCustomIconsByPid', {});
+        }
         
         let cleanedCount = 0;
         const iconsToRemove = [];

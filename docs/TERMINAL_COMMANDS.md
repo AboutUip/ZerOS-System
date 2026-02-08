@@ -319,9 +319,9 @@ power shutdown       # 关闭系统
 power help           # 显示帮助
 ```
 
-### `debug <action> [args...]`
+### `debug <action> [args...]` {#debug-action-args}
 
-调试工具，支持触发异常测试（用于测试异常处理机制）。
+调试工具，支持异常测试、地理位置、天气、翻译服务与 D/server 服务列表等。
 
 **权限要求**: ⚠️ **需要管理员权限**
 
@@ -334,14 +334,28 @@ power help           # 显示帮助
       - `program`: 程序异常（将终止当前程序）
       - `service`: 服务异常（仅记录日志）
     - `message` (可选): 异常消息，默认为测试消息
+  - `geography [--clear] [--high]`: 地理位置调试（--clear 清除缓存后重新获取，--high 启用高精度定位）
+  - `weather [--city 城市] [--raw]`: 天气调试（--city 指定城市，否则用定位；--raw 输出原始 JSON）
+  - `translate [--status]`: 翻译服务调试，显示 POOL > SERVER Translate 状态与统计
+  - `translate --simple "文本" <to_lang>`: 测试普通机器翻译（需翻译服务已启动）
+  - `services [--status [id]]`: D/server 服务列表；--status 显示各服务状态，可指定 id 查看单服务（如 translate）
 
 **示例**:
 ```bash
+debug                                   # 显示帮助信息（列出所有 action）
 debug exception service "测试服务异常"    # 触发服务异常（仅记录日志）
 debug exception program                  # 触发程序异常（终止当前程序）
 debug exception system "系统资源耗尽"    # 触发系统异常（蓝屏并重启）
 debug exception kernel "内核模块错误"    # 触发内核异常（进入BIOS安全模式）
-debug                                   # 显示帮助信息
+debug geography                          # 地理位置调试
+debug geography --clear --high           # 清除缓存并高精度定位
+debug weather                            # 天气调试（使用定位城市）
+debug weather --city 兴县 --raw          # 指定城市并输出原始 JSON
+debug translate --status                 # 翻译服务状态与统计
+debug translate --simple "明天" en       # 测试普通机器翻译
+debug services                           # 列出已加载的 D/server 服务
+debug services --status                  # 列出服务并显示各服务状态
+debug services --status translate        # 仅显示 translate 服务状态
 ```
 
 **警告**:
@@ -350,7 +364,7 @@ debug                                   # 显示帮助信息
 - ⚠️ **程序异常 (program)**: 将导致当前程序（终端）被终止
 - ✓ **服务异常 (service)**: 仅记录日志，不影响系统运行
 
-**注意**: 此命令主要用于测试异常处理机制，请谨慎使用。
+**注意**: `exception` 主要用于测试异常处理机制，请谨慎使用。翻译服务详见 [翻译服务 (ServerTranslate)](../SERVER/ServerTranslate.md)。
 
 ### `exit`
 

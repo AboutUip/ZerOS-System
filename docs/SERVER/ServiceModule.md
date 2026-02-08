@@ -111,11 +111,13 @@ const pid = (typeof ProcessManager !== 'undefined' && ProcessManager.SERVER_SERV
 ## 内置服务示例
 
 - **notice**：`D/server/server-notice.js`，系统公告通知获取（轮询 API、按等级弹通知）。详见 [通知服务（ServerNotice）](./ServerNotice.md)。
+- **translate**：`D/server/server-translate.js`，AI 智能翻译 + 普通机器翻译。启用后在 POOL > SERVER 中暴露 `Translate`：`translateSimple(text, toLang)` 普通机器翻译（POST `/api/v1/translate/text`，请求体 `{ text }`，响应 `{ text, translate }`）；`translate(textOrTexts, options)` AI 智能翻译（单条/批量、风格、上下文等）。详见 [翻译服务（ServerTranslate）](./ServerTranslate.md)。
 
 ## 相关文档
 
 - [ServerExpansion API](../API/ServerExpansion.md) - 服务扩展 API 说明
 - [通知服务（ServerNotice）](./ServerNotice.md) - 内置通知服务说明与 ZerOS API 使用
+- [翻译服务（ServerTranslate）](./ServerTranslate.md) - 内置翻译服务说明与 POOL API 使用
 - [浏览器代理（BrowserProxy）](../API/BrowserProxy.md) - 浏览器网页代理服务（PHP 后端）
 - [扩展与插件索引](../PLUGINS/README.md) - 语言包、服务模块等扩展文档
 - [文档中心](../README.md)

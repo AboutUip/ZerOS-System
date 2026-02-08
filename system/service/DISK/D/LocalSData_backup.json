@@ -1,9 +1,8 @@
 {
   "system": {
     "permissionManager.permissions": {
-      "hellogui": [
+      "about": [
         "GUI_WINDOW_CREATE",
-        "PROCESS_BACKGROUND",
         "EVENT_LISTENER"
       ]
     },
@@ -26,6 +25,15 @@
         "description": "WebViewer",
         "position": null,
         "createdAt": 1770525751934
+      },
+      {
+        "id": 11,
+        "programName": "about",
+        "name": "关于ZerOS",
+        "icon": "D:/application/about/about.svg",
+        "description": "关于ZerOS",
+        "position": null,
+        "createdAt": 1770563819339
       }
     ],
     "musicplayer.settings": {
@@ -220,14 +228,14 @@
         "password": "61b249bf6d604d14120821f43625e84e",
         "avatar": "avatar_root_1766272534753.jpg",
         "createdAt": 1766271155991,
-        "lastLogin": 1770539110299
+        "lastLogin": 1770570816002
       },
       "TestUser": {
         "level": "USER",
         "password": null,
         "avatar": null,
         "createdAt": 1766271155991,
-        "lastLogin": 1770364258362
+        "lastLogin": 1770565306940
       }
     },
     "userControl.currentUser": "root",

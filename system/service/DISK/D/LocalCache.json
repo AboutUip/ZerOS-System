@@ -1,11 +1,11 @@
 {
   "system": {
     "system.dailyQuote": {
-      "value": "谁都有权利幸福，困难的是享受；谁都有权利幸福，困难的是履行；谁都有权利幸福，困难的是妥协。",
+      "value": "旅行的意义在于找到自己，而非浏览他人。",
       "expiresAt": 0,
-      "createdAt": 1770539106297,
-      "updatedAt": 1770539106297,
-      "size": 137
+      "createdAt": 1770570812981,
+      "updatedAt": 1770570812981,
+      "size": 59
     }
   },
   "programs": {
@@ -109,6 +109,92 @@
         "createdAt": 1770530662834,
         "updatedAt": 1770530662834,
         "size": 1407
+      },
+      "weather:晋城": {
+        "value": {
+          "code": 200,
+          "data": {
+            "city": "山西省 晋城市",
+            "today": {
+              "current_temp": "-1℃",
+              "current_cond": "阴",
+              "low": "-6℃",
+              "quality": "--"
+            },
+            "low_temperature": -6,
+            "tips": "建议穿羽绒服、棉裤，做好全面防寒",
+            "seven_day": [
+              {
+                "date": "2026-02-08",
+                "cond": "晴",
+                "high": "6℃",
+                "low": "-6℃"
+              },
+              {
+                "date": "2026-02-09",
+                "cond": "多云",
+                "high": "5℃",
+                "low": "-5℃"
+              },
+              {
+                "date": "2026-02-10",
+                "cond": "晴",
+                "high": "7℃",
+                "low": "-3℃"
+              }
+            ],
+            "life_indices": {
+              "clothing": {
+                "level": "严寒",
+                "brief": "极冷",
+                "advice": "建议穿羽绒服、棉裤，做好全面防寒"
+              },
+              "uv": {
+                "level": "中等",
+                "brief": "中等",
+                "advice": "紫外线中等，建议涂抹SPF15+防晒霜，戴帽子"
+              },
+              "car_wash": {
+                "level": "非常适宜",
+                "brief": "极佳",
+                "advice": "天气晴好，非常适合洗车，洗后能保持较长时间"
+              },
+              "drying": {
+                "level": "适宜",
+                "brief": "较好",
+                "advice": "天气较好，适合晾晒"
+              },
+              "air_conditioner": {
+                "level": "建议制热",
+                "brief": "寒冷",
+                "advice": "建议开启空调制热或使用其他取暖设备"
+              },
+              "cold_risk": {
+                "level": "较低",
+                "brief": "较少发",
+                "advice": "感冒风险较低，注意适当增减衣物"
+              },
+              "exercise": {
+                "level": "适宜",
+                "brief": "较好",
+                "advice": "天气适合运动，建议适当进行户外锻炼"
+              },
+              "comfort": {
+                "level": "极冷",
+                "brief": "寒冷",
+                "advice": "体感寒冷，注意保暖防寒"
+              }
+            },
+            "feels_like": -4,
+            "wind_direction": "西北风",
+            "wind_power": "1",
+            "humidity": 44
+          }
+        },
+        "expiresAt": 1770609524700,
+        "createdAt": 1770566324700,
+        "updatedAt": 1770566324700,
+        "size": 1372
       }
     }
   }

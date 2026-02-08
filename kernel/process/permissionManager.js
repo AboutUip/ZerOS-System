@@ -792,6 +792,9 @@ class PermissionManager {
      * @returns {Promise<boolean>} 是否获得权限
      */
     static async checkAndRequestPermission(pid, permission) {
+        if (pid != null && typeof ProcessManager !== 'undefined' && typeof ProcessManager.recordKernelModuleCall === 'function') {
+            ProcessManager.recordKernelModuleCall(pid, 'Permission.checkAndRequest', { permission });
+        }
         // 确保已初始化
         await PermissionManager._ensureInitialized();
         
@@ -1004,6 +1007,9 @@ class PermissionManager {
      * @param {string} permission 权限名称
      */
     static _grantPermission(pid, permission, reason = 'auto') {
+        if (pid != null && typeof ProcessManager !== 'undefined' && typeof ProcessManager.recordKernelModuleCall === 'function') {
+            ProcessManager.recordKernelModuleCall(pid, 'Permission.grant', { permission, reason });
+        }
         // 安全检查：不允许授予权限给不存在的进程
         if (typeof ProcessManager !== 'undefined') {
             const processInfo = ProcessManager.PROCESS_TABLE.get(pid);
@@ -1571,6 +1577,9 @@ class PermissionManager {
      * @param {string} permission 权限名称
      */
     static revokePermission(pid, permission) {
+        if (pid != null && typeof ProcessManager !== 'undefined' && typeof ProcessManager.recordKernelModuleCall === 'function') {
+            ProcessManager.recordKernelModuleCall(pid, 'Permission.revoke', { permission });
+        }
         const permissions = PermissionManager._permissions.get(pid);
         if (permissions && permissions.has(permission)) {
             permissions.delete(permission);

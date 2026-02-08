@@ -1304,6 +1304,9 @@ class NotificationManager {
             duration = 0,
             onClose = null
         } = options;
+        if (pid != null && typeof pid === 'number' && typeof ProcessManager !== 'undefined' && typeof ProcessManager.recordKernelModuleCall === 'function') {
+            ProcessManager.recordKernelModuleCall(pid, 'Notification.create', { type, title: title || '' });
+        }
         
         // 权限检查 - 根据通知类型决定处理方式
         if (typeof PermissionManager !== 'undefined') {
@@ -1655,6 +1658,9 @@ class NotificationManager {
      * @param {boolean} onlyDependent - 是否只清理依赖类型的通知（默认true，快照类型保留）
      */
     static cleanupProgramNotifications(pid, triggerCallbacks = false, onlyDependent = true) {
+        if (pid != null && typeof ProcessManager !== 'undefined' && typeof ProcessManager.recordKernelModuleCall === 'function') {
+            ProcessManager.recordKernelModuleCall(pid, 'Notification.cleanupProgramNotifications', { onlyDependent });
+        }
         const notificationIds = NotificationManager.getNotificationsByPid(pid);
         if (notificationIds.length === 0) {
             return;

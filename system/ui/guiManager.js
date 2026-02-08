@@ -164,6 +164,9 @@ class GUIManager {
             KernelLogger.warn("GUIManager", "注册窗口失败：参数不完整");
             return null;
         }
+        if (typeof ProcessManager !== 'undefined' && typeof ProcessManager.recordKernelModuleCall === 'function') {
+            ProcessManager.recordKernelModuleCall(pid, 'GUIManager.registerWindow', { title: options.title || '' });
+        }
         
         // 生成或使用提供的窗口ID
         const windowId = options.windowId || GUIManager._generateWindowId(pid);
@@ -648,6 +651,9 @@ class GUIManager {
      * @param {number} pid 进程ID
      */
     static closeMainWindowAndChildren(pid) {
+        if (pid != null && typeof ProcessManager !== 'undefined' && typeof ProcessManager.recordKernelModuleCall === 'function') {
+            ProcessManager.recordKernelModuleCall(pid, 'GUIManager.closeMainWindowAndChildren', {});
+        }
         const mainWindow = GUIManager.getMainWindow(pid);
         if (!mainWindow) {
             return;
@@ -854,6 +860,9 @@ class GUIManager {
         } else if (typeof windowIdOrPid === 'number') {
             // 是PID，注销该PID的所有窗口
             pid = windowIdOrPid;
+            if (typeof ProcessManager !== 'undefined' && typeof ProcessManager.recordKernelModuleCall === 'function') {
+                ProcessManager.recordKernelModuleCall(pid, 'GUIManager.unregisterWindow', { allForPid: true });
+            }
             const windowIds = GUIManager._pidToWindows.get(pid);
             if (windowIds && windowIds.size > 0) {
                 // 复制Set以避免迭代时修改
@@ -873,6 +882,9 @@ class GUIManager {
         }
         
         const windowInfo = GUIManager._windows.get(windowId);
+        if (windowInfo && windowInfo.pid != null && typeof ProcessManager !== 'undefined' && typeof ProcessManager.recordKernelModuleCall === 'function') {
+            ProcessManager.recordKernelModuleCall(windowInfo.pid, 'GUIManager.unregisterWindow', { windowId });
+        }
         
         // 先调用onClose回调（如果存在），让窗口有机会清理资源
         // 注意：在移除窗口信息之前调用，确保回调可以访问窗口信息
@@ -1518,6 +1530,9 @@ class GUIManager {
      * @param {number} pid 进程 ID
      */
     static showWindowsForPid(pid) {
+        if (pid != null && typeof ProcessManager !== 'undefined' && typeof ProcessManager.recordKernelModuleCall === 'function') {
+            ProcessManager.recordKernelModuleCall(pid, 'GUIManager.showWindowsForPid', {});
+        }
         const windows = GUIManager.getWindowsByPid(pid);
         if (!windows || windows.length === 0) return;
         for (const winInfo of windows) {
@@ -1555,6 +1570,9 @@ class GUIManager {
         }
         
         const windowInfo = GUIManager._windows.get(windowId);
+        if (windowInfo.pid != null && typeof ProcessManager !== 'undefined' && typeof ProcessManager.recordKernelModuleCall === 'function') {
+            ProcessManager.recordKernelModuleCall(windowInfo.pid, 'GUIManager.focusWindow', { windowId });
+        }
         
         // 如果窗口已最小化，先恢复（但不自动获得焦点，避免循环调用）
         if (windowInfo.isMinimized) {
@@ -2256,6 +2274,9 @@ class GUIManager {
             windowId = windowIdOrPid;
         } else if (typeof windowIdOrPid === 'number') {
             // 是PID，最小化该PID的所有窗口
+            if (typeof ProcessManager !== 'undefined' && typeof ProcessManager.recordKernelModuleCall === 'function') {
+                ProcessManager.recordKernelModuleCall(windowIdOrPid, 'GUIManager.minimizeWindow', { allForPid: true });
+            }
             const windows = GUIManager.getWindowsByPid(windowIdOrPid);
             for (const winInfo of windows) {
                 GUIManager.minimizeWindow(winInfo.windowId);
@@ -2270,6 +2291,9 @@ class GUIManager {
         }
         
         const windowInfo = GUIManager._windows.get(windowId);
+        if (windowInfo.pid != null && typeof ProcessManager !== 'undefined' && typeof ProcessManager.recordKernelModuleCall === 'function') {
+            ProcessManager.recordKernelModuleCall(windowInfo.pid, 'GUIManager.minimizeWindow', { windowId });
+        }
         
         if (windowInfo.isMinimized) {
             return;
@@ -2406,6 +2430,9 @@ class GUIManager {
             windowId = windowIdOrPid;
         } else if (typeof windowIdOrPid === 'number') {
             // 是PID，恢复该PID的所有窗口
+            if (typeof ProcessManager !== 'undefined' && typeof ProcessManager.recordKernelModuleCall === 'function') {
+                ProcessManager.recordKernelModuleCall(windowIdOrPid, 'GUIManager.restoreWindow', { allForPid: true });
+            }
             const windows = GUIManager.getWindowsByPid(windowIdOrPid);
             for (const winInfo of windows) {
                 GUIManager.restoreWindow(winInfo.windowId, autoFocus);
@@ -2420,6 +2447,9 @@ class GUIManager {
         }
         
         const windowInfo = GUIManager._windows.get(windowId);
+        if (windowInfo.pid != null && typeof ProcessManager !== 'undefined' && typeof ProcessManager.recordKernelModuleCall === 'function') {
+            ProcessManager.recordKernelModuleCall(windowInfo.pid, 'GUIManager.restoreWindow', { windowId });
+        }
         
         if (!windowInfo.isMinimized) {
             return;
@@ -2593,6 +2623,9 @@ class GUIManager {
         }
         
         const windowInfo = GUIManager._windows.get(windowId);
+        if (windowInfo.pid != null && typeof ProcessManager !== 'undefined' && typeof ProcessManager.recordKernelModuleCall === 'function') {
+            ProcessManager.recordKernelModuleCall(windowInfo.pid, 'GUIManager.toggleMaximize', { windowId });
+        }
         
         if (windowInfo.isMaximized) {
             GUIManager.restoreMaximize(windowId);

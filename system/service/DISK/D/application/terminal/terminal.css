@@ -315,6 +315,7 @@
 
 #output {
   flex: 1 1 auto;
+  min-height: 0;
   overflow: auto;
   white-space: pre-wrap;
   word-break: break-word;
@@ -590,8 +591,10 @@ html {
   display: flex;
 }
 
+/* min-height: 0 使 flex 子项可收缩，内容过多时出现滚动条而非撑开容器 */
 .terminal-instance .output {
   flex: 1 1 auto;
+  min-height: 0;
   overflow: auto;
   white-space: pre-wrap;
   word-break: break-word;

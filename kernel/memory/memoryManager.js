@@ -1,4 +1,4 @@
-﻿// 内存管理器:对于一个pid应用程序的内存管理(目前实现有堆内存Heap)
+// 内存管理器:对于一个pid应用程序的内存管理(目前实现有堆内存Heap)
 KernelLogger.info("MemoryManager", "模块初始化");
 class MemoryManager {
     // 日志级别: 使用 LogLevel.LEVEL 枚举
@@ -339,6 +339,9 @@ class MemoryManager {
      * @returns {Object} { heapId: number, shedId: number, heap: Heap|null, shed: Shed|null }
      */
     static allocateMemory(pid, heapSize = -1, shedSize = -1, heapId = null, shedId = null) {
+        if (pid != null && typeof ProcessManager !== 'undefined' && typeof ProcessManager.recordKernelModuleCall === 'function') {
+            ProcessManager.recordKernelModuleCall(pid, 'Memory.allocateMemory', { heapSize, shedSize });
+        }
         try {
             MemoryManager._log(2, `为应用程序 ${pid} 分配内存 heapSize=${heapSize} shedSize=${shedSize}`);
 
@@ -423,6 +426,9 @@ class MemoryManager {
 
     // 统一为准备运行的应用程序释放Heap和Shed
     static freeMemory(pid) {
+        if (pid != null && typeof ProcessManager !== 'undefined' && typeof ProcessManager.recordKernelModuleCall === 'function') {
+            ProcessManager.recordKernelModuleCall(pid, 'Memory.freeMemory', {});
+        }
         try {
             MemoryManager._log(2, `为应用程序 ${pid} 释放内存`);
 
@@ -470,6 +476,9 @@ class MemoryManager {
     // 检查内存(完整获得所有程序所占用的空间,也可以传入某pid来获得特定的程序空间占用)
     static checkMemory(pid = -1) {
         MemoryManager._log(2, `检查内存 pid=${pid === -1 ? '全部' : pid}`);
+        if (pid !== -1 && pid != null && typeof ProcessManager !== 'undefined' && typeof ProcessManager.recordKernelModuleCall === 'function') {
+            ProcessManager.recordKernelModuleCall(pid, 'Memory.checkMemory', {});
+        }
 
         const result = {
             totalPrograms: 0,

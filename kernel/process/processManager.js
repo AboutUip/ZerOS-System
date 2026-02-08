@@ -2091,6 +2091,7 @@ class ProcessManager {
      */
     static async killProgram(pid, force = false) {
         ProcessManager._log(2, `终止程序 PID: ${pid}`, { force });
+        ProcessManager.recordKernelModuleCall(pid, 'Process.killProgram', { force });
 
         // 前台与后台进程均会被强制终止，不做区分（kill 命令、任务管理器「关闭/强制退出」均走此逻辑）
         const processInfo = ProcessManager.PROCESS_TABLE.get(pid);
@@ -2470,6 +2471,7 @@ class ProcessManager {
      */
     static async requestSelfTermination(pid) {
         ProcessManager._log(2, `程序 PID ${pid} 请求自终止`);
+        ProcessManager.recordKernelModuleCall(pid, 'Process.requestSelfTermination', {});
 
         const processInfo = ProcessManager.PROCESS_TABLE.get(pid);
         if (!processInfo) {
@@ -2821,6 +2823,7 @@ class ProcessManager {
      * @returns {boolean} 是否设置成功
      */
     static setProcessBackground(pid, isBackground) {
+        ProcessManager.recordKernelModuleCall(pid, 'Process.setBackground', { isBackground });
         const processInfo = ProcessManager.PROCESS_TABLE.get(pid);
         if (!processInfo) {
             ProcessManager._log(1, `程序 PID ${pid} 不存在`);
@@ -2850,6 +2853,7 @@ class ProcessManager {
      * @param {Function} callback 单击时调用，无参数
      */
     static registerBackgroundTrayClick(pid, callback) {
+        ProcessManager.recordKernelModuleCall(pid, 'Process.registerBackgroundTrayClick', {});
         if (typeof callback !== 'function') {
             ProcessManager._log(1, 'registerBackgroundTrayClick: callback 必须为函数');
             return;
@@ -2864,6 +2868,7 @@ class ProcessManager {
      * @param {Function} getItems 返回菜单项数组 () => Array<{ label: string, onClick: function }>
      */
     static registerBackgroundTrayContextMenu(pid, getItems) {
+        ProcessManager.recordKernelModuleCall(pid, 'Process.registerBackgroundTrayContextMenu', {});
         if (typeof getItems !== 'function') {
             ProcessManager._log(1, 'registerBackgroundTrayContextMenu: getItems 必须为函数');
             return;
@@ -2908,13 +2913,16 @@ class ProcessManager {
     }
 
     /**
-     * 记录程序行为
+     * 记录程序行为（程序日志 = 该进程每次调用内核 API 的记录，非程序主动发送的日志）
+     * 任务管理器「API 调用记录」展示的即此 actions 数组；每次 callKernelAPI / _internalCallKernelAPI 均会在此记录一条。
      * @param {number} pid 进程ID
-     * @param {string} action 行为名称
-     * @param {Object} details 详细信息
+     * @param {string} action 行为名称（如 'callKernelAPI'、'allocateMemory'、'kill' 等）
+     * @param {Object} details 详细信息（如 { apiName, args }）
      */
     static _logProgramAction(pid, action, details = {}) {
-        const processInfo = ProcessManager.PROCESS_TABLE.get(pid);
+        // 必须操作原始进程表并持久化，否则任务管理器等读取时可能因缓存失效而从 KernelMemory 重新加载，拿到的是未包含本次 actions 的旧数据
+        const rawTable = ProcessManager._processTableCache || ProcessManager._getProcessTable();
+        const processInfo = rawTable.get(pid);
         if (!processInfo) {
             return;
         }
@@ -2932,6 +2940,28 @@ class ProcessManager {
             timestamp: Date.now(),
             details: details
         });
+
+        // 持久化到 Exploit 内存，否则下次缓存失效后任务管理器会从内存加载到不含本次 API 调用记录的旧表
+        ProcessManager._saveProcessTable(rawTable);
+    }
+
+    /**
+     * 供内核模块直接调用的记录接口：当程序不通过 callKernelAPI 而直接调用内核模块时，由该模块在入口处调用此方法以写入程序日志。
+     * 已接入：GUIManager(registerWindow/unregisterWindow/focusWindow/minimizeWindow/restoreWindow/toggleMaximize/closeMainWindowAndChildren/showWindowsForPid)、
+     * NotificationManager(createNotification/cleanupProgramNotifications)、MemoryManager(checkMemory/allocateMemory/freeMemory)、
+     * EventManager(registerEventHandler/unregisterAllHandlersForPid/registerElementEvent)、PermissionManager(checkAndRequestPermission/_grantPermission/revokePermission)、
+     * DesktopManager(createComponent/cleanupProgramComponents)、ContextMenuManager(registerContextMenu/updateContextMenu/unregisterContextMenu)、
+     * TaskbarManager(cleanupCustomIconsByPid)。Process 直接 API(killProgram/setProcessBackground/requestSelfTermination/registerBackgroundTrayClick/registerBackgroundTrayContextMenu) 在 ProcessManager 内记录。
+     * 说明：NodeTree、Disk、FileFramework、LStorage 等 kernel 层模块仅由 _executeKernelAPI 在处理 callKernelAPI 时内部调用（如 FileSystem.read/write/list、LocalStorage.get/set 等），
+     * 程序通过 callKernelAPI(pid, 'FileSystem.xxx'|'LocalStorage.xxx', ...) 访问，_callKernelAPICore 已统一记录为 callKernelAPI(apiName)，故这些 kernel 模块无需再接入 recordKernelModuleCall。
+     * 新增可直接被程序调用的内核模块时，应在入口处调用 recordKernelModuleCall(pid, '模块.方法', details)。
+     * @param {number} pid 进程 ID（无效或系统调用时可不记录）
+     * @param {string} moduleMethod 模块.方法名，如 'GUIManager.registerWindow'、'Notification.create'
+     * @param {Object} [details={}] 可选详情
+     */
+    static recordKernelModuleCall(pid, moduleMethod, details = {}) {
+        if (pid == null || typeof pid !== 'number' || pid < 0) return;
+        ProcessManager._logProgramAction(pid, moduleMethod, details);
     }
 
     /**
@@ -3085,6 +3115,8 @@ class ProcessManager {
                 throw err;
             }
             ProcessManager._log(3, `Exploit程序 ${pid} 直接调用内核API: ${apiName}`);
+            // 所有内核模块均支持记录：Exploit 的 API 调用也写入程序日志（任务管理器「API 调用记录」）
+            ProcessManager._logProgramAction(pid, 'callKernelAPI', { apiName, args });
             return await ProcessManager._executeKernelAPI(apiName, args);
         }
 
@@ -3152,7 +3184,7 @@ class ProcessManager {
             ProcessManager._log(2, `警告: 权限管理器未加载，跳过权限检查: ${apiName}`);
         }
 
-        // 记录程序行为
+        // 记录程序行为：程序日志 = 该进程每次调用内核 API 的记录（非程序主动发送的日志），任务管理器「API 调用记录」据此展示
         ProcessManager._logProgramAction(pid, 'callKernelAPI', { apiName, args });
 
         ProcessManager._log(2, `进程 ${pid} 调用内核API: ${apiName}`);
@@ -3397,7 +3429,8 @@ class ProcessManager {
         if (!Array.isArray(args)) {
             throw new Error('_executeKernelAPI: args 必须是数组');
         }
-        // 定义可用的内核API
+        // 定义可用的内核 API：所有在此注册的 API 在被程序调用时均会记录（记录在 _callKernelAPICore 中统一完成，包括 Exploit）
+        // 新增内核模块只需在此 kernelAPIs 中注册即可，无需单独添加记录逻辑
         const kernelAPIs = {
             // 文件系统API
             'FileSystem.read': async (path) => {

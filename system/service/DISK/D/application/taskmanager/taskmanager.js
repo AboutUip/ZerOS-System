@@ -620,7 +620,7 @@
             const tabProcess = this._createTab(this._getText('TASKMANAGER_TAB_PROCESS', '进程详情'), true);
             const tabResources = this._createTab(this._getText('TASKMANAGER_TAB_RESOURCES', '资源监控'), false);
             const tabSystem = this._createTab(this._getText('TASKMANAGER_TAB_SYSTEM', '系统信息'), false);
-            const tabLogs = this._createTab(this._getText('TASKMANAGER_TAB_LOGS', '程序日志'), false);
+            const tabLogs = this._createTab(this._getText('TASKMANAGER_TAB_LOGS', 'API 调用记录'), false);
             
             tabs.appendChild(tabProcess);
             tabs.appendChild(tabResources);
@@ -650,7 +650,7 @@
             const systemInfo = this._createSystemInfo();
             content.appendChild(systemInfo);
             
-            // 程序日志面板
+            // 内核 API 调用记录面板（该进程每次调用内核 API 均会记录，非程序主动发送的日志）
             const processLogs = this._createProcessLogs();
             content.appendChild(processLogs);
             
@@ -1214,7 +1214,7 @@
                         this._setSelectedPid(null);
                         this._updateProcessDetail(null);
                         if (this.logsContent) {
-                            this.logsContent.innerHTML = '<div style="text-align: center; color: #aab2c0; padding: 40px;">' + this._getText('TASKMANAGER_SELECT_PROCESS_LOG', '请选择一个进程查看日志') + '</div>';
+                            this.logsContent.innerHTML = '<div style="text-align: center; color: #aab2c0; padding: 40px;">' + this._getText('TASKMANAGER_SELECT_PROCESS_LOG', '请选择进程以查看其内核 API 调用记录') + '</div>';
                         }
                     }
                     
@@ -1685,9 +1685,9 @@
             ]);
             detail.appendChild(otherInfo);
             
-            // 程序行为记录详细显示
+            // 内核 API 调用记录（该进程每次调用内核 API 均会记录）
             if (process.actions && process.actions.length > 0) {
-                const actionsSection = this._createActionsSection(this._getText('TASKMANAGER_SECTION_ACTIONS', '行为记录'), process.actions);
+                const actionsSection = this._createActionsSection(this._getText('TASKMANAGER_SECTION_ACTIONS', '内核 API 调用记录'), process.actions);
                 detail.appendChild(actionsSection);
             }
             
@@ -2088,6 +2088,8 @@
                     margin-bottom: 4px;
                 `;
                 
+                row.appendChild(actionName);
+                row.appendChild(actionTime);
                 if (action.details && typeof action.details === 'object') {
                     const details = document.createElement('div');
                     details.style.cssText = `
@@ -2104,9 +2106,6 @@
                     details.textContent = JSON.stringify(action.details, null, 2);
                     row.appendChild(details);
                 }
-                
-                row.appendChild(actionName);
-                row.appendChild(actionTime);
                 list.appendChild(row);
             });
             
@@ -3019,6 +3018,12 @@
             toolbar.appendChild(clearBtn);
             panel.appendChild(toolbar);
             
+            // 说明：本列表为该进程每次调用内核 API 的记录（非程序主动发送的日志）
+            const logsDesc = document.createElement('div');
+            logsDesc.style.cssText = `padding: 6px 16px; font-size: 11px; color: #8a92a0; border-bottom: 1px solid rgba(108, 142, 255, 0.15);`;
+            logsDesc.textContent = this._getText('TASKMANAGER_LOG_DESC', '以下为该进程每次调用内核 API 的记录（非程序主动发送的日志）');
+            panel.appendChild(logsDesc);
+            
             // 日志内容区域
             const logsContent = document.createElement('div');
             logsContent.className = 'taskmanager-logs-content';
@@ -3043,7 +3048,7 @@
         _updateProcessLogs: function(pid) {
             if (!this.logsContent || !pid) {
                 if (this.logsContent) {
-                    this.logsContent.innerHTML = '<div style="text-align: center; color: #aab2c0; padding: 40px;">' + this._getText('TASKMANAGER_SELECT_PROCESS_LOG', '请选择一个进程查看日志') + '</div>';
+                    this.logsContent.innerHTML = '<div style="text-align: center; color: #aab2c0; padding: 40px;">' + this._getText('TASKMANAGER_SELECT_PROCESS_LOG', '请选择进程以查看其内核 API 调用记录') + '</div>';
                 }
                 return;
             }
@@ -3089,7 +3094,7 @@
             }
             
             if (actions.length === 0) {
-                this.logsContent.innerHTML = '<div style="text-align: center; color: #aab2c0; padding: 40px;">' + this._getText('TASKMANAGER_NO_ACTIONS', '该进程没有行为记录') + '</div>';
+                this.logsContent.innerHTML = '<div style="text-align: center; color: #aab2c0; padding: 40px;">' + this._getText('TASKMANAGER_NO_ACTIONS', '该进程尚未产生内核 API 调用记录') + '</div>';
                 return;
             }
             
@@ -3111,7 +3116,7 @@
             }
             
             if (filteredActions.length === 0) {
-                this.logsContent.innerHTML = '<div style="text-align: center; color: #aab2c0; padding: 40px;">' + this._getText('TASKMANAGER_NO_LOG_MATCH', '没有符合条件的日志记录') + '</div>';
+                this.logsContent.innerHTML = '<div style="text-align: center; color: #aab2c0; padding: 40px;">' + this._getText('TASKMANAGER_NO_LOG_MATCH', '没有符合当前过滤条件的 API 调用记录') + '</div>';
                 return;
             }
             
@@ -3193,9 +3198,13 @@
             if (wasAtBottom) {
                 this.logsContent.scrollTop = this.logsContent.scrollHeight;
             } else {
-                // 尝试保持相对位置
-                const scrollRatio = oldScrollTop / (this.logsContent.scrollHeight - this.logsContent.clientHeight);
-                this.logsContent.scrollTop = (this.logsContent.scrollHeight - this.logsContent.clientHeight) * scrollRatio;
+                const maxScroll = this.logsContent.scrollHeight - this.logsContent.clientHeight;
+                if (maxScroll > 0) {
+                    const scrollRatio = oldScrollTop / maxScroll;
+                    this.logsContent.scrollTop = maxScroll * scrollRatio;
+                } else {
+                    this.logsContent.scrollTop = 0;
+                }
             }
         },
         

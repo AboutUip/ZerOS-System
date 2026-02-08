@@ -3262,6 +3262,9 @@ class DesktopManager {
      * @returns {string} 组件ID
      */
     static createComponent(pid, options = {}) {
+        if (pid != null && typeof ProcessManager !== 'undefined' && typeof ProcessManager.recordKernelModuleCall === 'function') {
+            ProcessManager.recordKernelModuleCall(pid, 'Desktop.createComponent', { type: options?.type });
+        }
         if (!DesktopManager._componentsContainer) {
             DesktopManager._createComponentsContainer();
             if (!DesktopManager._componentsContainer) {
@@ -3855,6 +3858,9 @@ class DesktopManager {
      * @param {number} pid - 程序PID
      */
     static cleanupProgramComponents(pid) {
+        if (pid != null && typeof ProcessManager !== 'undefined' && typeof ProcessManager.recordKernelModuleCall === 'function') {
+            ProcessManager.recordKernelModuleCall(pid, 'Desktop.cleanupProgramComponents', {});
+        }
         const componentIds = DesktopManager.getComponentsByPid(pid);
         if (componentIds.length === 0) {
             return;

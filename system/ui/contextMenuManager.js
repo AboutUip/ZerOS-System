@@ -2753,6 +2753,9 @@ class ContextMenuManager {
             KernelLogger.warn("ContextMenuManager", "registerContextMenu: pid 无效");
             return null;
         }
+        if (typeof ProcessManager !== 'undefined' && typeof ProcessManager.recordKernelModuleCall === 'function') {
+            ProcessManager.recordKernelModuleCall(pid, 'ContextMenu.registerContextMenu', { context: options?.context });
+        }
         
         if (!options || (!options.items || (!Array.isArray(options.items) && typeof options.items !== 'function'))) {
             KernelLogger.warn("ContextMenuManager", "registerContextMenu: 菜单项无效（必须是数组或函数）");
@@ -2806,6 +2809,9 @@ class ContextMenuManager {
             KernelLogger.warn("ContextMenuManager", "updateContextMenu: 参数无效");
             return false;
         }
+        if (typeof ProcessManager !== 'undefined' && typeof ProcessManager.recordKernelModuleCall === 'function') {
+            ProcessManager.recordKernelModuleCall(pid, 'ContextMenu.updateContextMenu', { menuId });
+        }
         
         const programMenus = ContextMenuManager._programMenus.get(pid);
         if (!programMenus || !programMenus.has(menuId)) {
@@ -2847,6 +2853,9 @@ class ContextMenuManager {
         if (!pid || typeof pid !== 'number') {
             KernelLogger.warn("ContextMenuManager", "unregisterContextMenu: pid 无效");
             return false;
+        }
+        if (typeof ProcessManager !== 'undefined' && typeof ProcessManager.recordKernelModuleCall === 'function') {
+            ProcessManager.recordKernelModuleCall(pid, 'ContextMenu.unregisterContextMenu', { menuId: menuId ?? 'all' });
         }
         
         const programMenus = ContextMenuManager._programMenus.get(pid);

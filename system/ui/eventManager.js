@@ -1,4 +1,4 @@
-﻿// 事件管理器：统一管理所有事件处理，支持多程序注册、优先级和事件传播控制
+// 事件管理器：统一管理所有事件处理，支持多程序注册、优先级和事件传播控制
 // 提供统一的事件处理API，支持事件传播优先级和打断事件传播
 
 KernelLogger.info("EventManager", "模块初始化");
@@ -304,6 +304,9 @@ class EventManager {
             KernelLogger.warn("EventManager", `注册事件处理程序失败：无效的 PID: ${pid}`);
             return null;
         }
+        if (typeof ProcessManager !== 'undefined' && typeof ProcessManager.recordKernelModuleCall === 'function') {
+            ProcessManager.recordKernelModuleCall(pid, 'Event.register', { eventType });
+        }
         
         if (!eventType || typeof eventType !== 'string' || eventType.trim() === '') {
             KernelLogger.warn("EventManager", `注册事件处理程序失败：无效的事件类型: ${eventType}`);
@@ -451,6 +454,9 @@ class EventManager {
             KernelLogger.warn("EventManager", `注销所有事件处理程序失败：无效的 PID: ${pid}`);
             return;
         }
+        if (typeof ProcessManager !== 'undefined' && typeof ProcessManager.recordKernelModuleCall === 'function') {
+            ProcessManager.recordKernelModuleCall(pid, 'Event.unregisterAll', {});
+        }
         
         if (!EventManager._pidToHandlers.has(pid)) {
             KernelLogger.debug("EventManager", `程序 ${pid} 没有注册的事件处理程序`);
@@ -493,6 +499,9 @@ class EventManager {
         if (!pid || typeof pid !== 'number' || pid <= 0) {
             KernelLogger.warn("EventManager", `注册元素事件失败：无效的 PID: ${pid}`);
             return null;
+        }
+        if (typeof ProcessManager !== 'undefined' && typeof ProcessManager.recordKernelModuleCall === 'function') {
+            ProcessManager.recordKernelModuleCall(pid, 'Event.registerElement', { eventType });
         }
         
         if (!element || !(element instanceof Element)) {
@@ -965,6 +974,9 @@ class EventManager {
         if (!pid || typeof pid !== 'number' || pid <= 0) {
             KernelLogger.warn("EventManager", `注册元素事件失败：无效的 PID: ${pid}`);
             return null;
+        }
+        if (typeof ProcessManager !== 'undefined' && typeof ProcessManager.recordKernelModuleCall === 'function') {
+            ProcessManager.recordKernelModuleCall(pid, 'Event.registerElement', { eventType });
         }
         
         if (!element || !(element instanceof Element)) {
