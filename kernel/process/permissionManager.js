@@ -110,7 +110,10 @@ class PermissionManager {
 
         // 语言包权限
         LANGUAGES_READ: 'LANGUAGES_READ',                    // 读取语言包、按常量名获取文本、列出语言包
-        LANGUAGES_WRITE: 'LANGUAGES_WRITE'                  // 加载语言包、设置当前语言
+        LANGUAGES_WRITE: 'LANGUAGES_WRITE',                 // 加载语言包、设置当前语言
+
+        // 服务扩展权限（最高等级，仅进程管理器暴露的 Server.* API 需要）
+        SERVER_SERVICE_MANAGE: 'SERVER_SERVICE_MANAGE'       // 启动/停止/查询 D/server 服务（危险权限）
     };
     
     /**
@@ -214,6 +217,9 @@ class PermissionManager {
         // 语言包权限（普通权限，自动授予）
         [PermissionManager.PERMISSION.LANGUAGES_READ]: PermissionManager.PERMISSION_LEVEL.NORMAL,
         [PermissionManager.PERMISSION.LANGUAGES_WRITE]: PermissionManager.PERMISSION_LEVEL.NORMAL,
+
+        // 服务扩展权限（最高等级）
+        [PermissionManager.PERMISSION.SERVER_SERVICE_MANAGE]: PermissionManager.PERMISSION_LEVEL.DANGEROUS,
     };
     
     // ==================== 内部状态 ====================
@@ -559,7 +565,7 @@ class PermissionManager {
                 // 遍历所有PID的权限，按程序名称分组
                 for (const [pid, permissions] of PermissionManager._permissions) {
                     if (permissions && permissions.size > 0) {
-                        // 从ProcessManager获取程序名称
+                        // 从ProcessManager获取程序名称（进程可能已退出，如 D/bin/service 命令）
                         let programName = null;
                         if (typeof ProcessManager !== 'undefined') {
                             try {
@@ -568,32 +574,37 @@ class PermissionManager {
                                     programName = processInfo.programName;
                                 }
                             } catch (e) {
-                                // 忽略获取进程信息时的错误（可能是进程已被删除）
                                 KernelLogger.debug("PermissionManager", `获取PID ${pid} 的进程信息失败: ${e.message}`);
                             }
                         }
                         
-                        // 如果无法获取程序名称，跳过（Exploit程序不需要保存权限）
                         if (!programName) {
-                            // Exploit程序（PID 10000）不需要保存权限
                             if (typeof ProcessManager !== 'undefined' && pid === ProcessManager.EXPLOIT_PID) {
                                 continue;
                             }
-                            // 如果进程不存在或已被删除，静默跳过（不输出警告）
-                            // 这通常发生在进程关闭后权限清理时
                             if (typeof ProcessManager !== 'undefined') {
                                 const processInfo = ProcessManager.PROCESS_TABLE.get(pid);
                                 if (!processInfo) {
-                                    // 进程已被删除，静默跳过
                                     continue;
                                 }
                             }
-                            // 只有在进程存在但无法获取程序名称时才输出警告
                             KernelLogger.debug("PermissionManager", `无法获取PID ${pid} 对应的程序名称，跳过权限保存（进程可能正在初始化）`);
                             continue;
                         }
                         
-                        // 合并同一程序的所有权限（如果有多个实例）
+                        if (!programPermissionMap.has(programName)) {
+                            programPermissionMap.set(programName, new Set());
+                        }
+                        const programPermissions = programPermissionMap.get(programName);
+                        for (const perm of permissions) {
+                            programPermissions.add(perm);
+                        }
+                    }
+                }
+                
+                // 合并 _savedPermissionsByProgramName（授予时已同步写入，避免短生命周期进程在异步保存前退出导致丢失）
+                for (const [programName, permissions] of PermissionManager._savedPermissionsByProgramName) {
+                    if (permissions && permissions.size > 0) {
                         if (!programPermissionMap.has(programName)) {
                             programPermissionMap.set(programName, new Set());
                         }
@@ -1023,6 +1034,16 @@ class PermissionManager {
             PermissionManager._permissions.set(pid, new Set());
         }
         PermissionManager._permissions.get(pid).add(permission);
+        
+        // 同步按程序名称记录，避免短生命周期进程（如 D/bin/service）在异步保存前退出导致无法从 processInfo 取 programName 而丢失持久化
+        const processInfo = typeof ProcessManager !== 'undefined' ? ProcessManager.PROCESS_TABLE.get(pid) : null;
+        const programName = processInfo && processInfo.programName;
+        if (programName) {
+            if (!PermissionManager._savedPermissionsByProgramName.has(programName)) {
+                PermissionManager._savedPermissionsByProgramName.set(programName, new Set());
+            }
+            PermissionManager._savedPermissionsByProgramName.get(programName).add(permission);
+        }
         
         // 清除相关缓存
         const cacheKey = `${pid}_${permission}`;

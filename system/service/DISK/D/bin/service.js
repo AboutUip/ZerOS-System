@@ -8,22 +8,12 @@
 (function(window) {
     'use strict';
 
-    function getServerExpansion() {
-        if (typeof POOL !== 'undefined' && typeof POOL.__GET__ === 'function') {
-            try {
-                const se = POOL.__GET__('KERNEL_GLOBAL_POOL', 'ServerExpansion');
-                if (se && typeof se.listServices === 'function') return se;
-            } catch (e) {}
-        }
-        if (typeof window !== 'undefined' && window.ServerExpansion) return window.ServerExpansion;
-        if (typeof globalThis !== 'undefined' && globalThis.ServerExpansion) return globalThis.ServerExpansion;
-        return null;
-    }
-
     const SERVICE = {
         pid: null,
         terminal: null,
         _closing: false,
+        /** 进程管理器注入的 kernelAPI（通过 Server.* 调用，需 SERVER_SERVICE_MANAGE 权限） */
+        _kernelAPI: null,
 
         __info__: function() {
             return {
@@ -34,7 +24,8 @@
                 author: 'ZerOS Team',
                 copyright: '© 2025 ZerOS',
                 permissions: typeof PermissionManager !== 'undefined' ? [
-                    PermissionManager.PERMISSION.EVENT_LISTENER
+                    PermissionManager.PERMISSION.EVENT_LISTENER,
+                    PermissionManager.PERMISSION.SERVER_SERVICE_MANAGE
                 ] : [],
                 metadata: {
                     autoStart: false,
@@ -47,6 +38,7 @@
         __init__: async function(pid, initArgs = {}) {
             this.pid = pid;
             this.terminal = initArgs.terminal;
+            this._kernelAPI = (initArgs && initArgs.kernelAPI) || null;
 
             if (!this.terminal) {
                 throw new Error('Service 程序需要终端环境');
@@ -62,9 +54,8 @@
                         return;
                     }
 
-                    const ServerExpansion = getServerExpansion();
-                    if (!ServerExpansion) {
-                        this.terminal.write('service: ServerExpansion 不可用，请确认内核服务扩展已加载\n');
+                    if (!this._kernelAPI || typeof this._kernelAPI.call !== 'function') {
+                        this.terminal.write('service: 内核 API 不可用或缺少 SERVER_SERVICE_MANAGE 权限\n');
                         setTimeout(() => this._selfClose(), 300);
                         return;
                     }
@@ -73,37 +64,37 @@
                     const id = args[1];
 
                     if (sub === 'list') {
-                        await this._cmdList(ServerExpansion);
+                        await this._cmdList();
                     } else if (sub === 'start') {
                         if (!id) {
                             this.terminal.write('service: start 需要指定服务 id\n');
                             this._showUsage();
                         } else {
-                            await this._cmdStart(ServerExpansion, id);
+                            await this._cmdStart(id);
                         }
                     } else if (sub === 'stop') {
                         if (!id) {
                             this.terminal.write('service: stop 需要指定服务 id\n');
                             this._showUsage();
                         } else {
-                            await this._cmdStop(ServerExpansion, id);
+                            await this._cmdStop(id);
                         }
                     } else if (sub === 'status') {
                         if (!id) {
                             this.terminal.write('service: status 需要指定服务 id\n');
                             this._showUsage();
                         } else {
-                            await this._cmdStatus(ServerExpansion, id);
+                            await this._cmdStatus(id);
                         }
                     } else if (sub === 'info') {
                         if (!id) {
                             this.terminal.write('service: info 需要指定服务 id\n');
                             this._showUsage();
                         } else {
-                            await this._cmdInfo(ServerExpansion, id);
+                            await this._cmdInfo(id);
                         }
                     } else if (sub === 'reload') {
-                        await this._cmdReload(ServerExpansion);
+                        await this._cmdReload();
                     } else {
                         this.terminal.write(`service: 未知子命令 '${args[0]}'\n`);
                         this._showUsage();
@@ -140,24 +131,24 @@
             this.terminal.write('  service status notice\n');
         },
 
-        _cmdList: async function(SE) {
-            const ids = SE.listServices();
+        _cmdList: async function() {
+            const ids = await this._kernelAPI.call('Server.listServices', []) || [];
             this.terminal.write('已加载的服务:\n');
             if (ids.length === 0) {
                 this.terminal.write('  (无)\n');
                 return;
             }
             for (const id of ids) {
-                const inited = SE.isInited && SE.isInited(id) ? '已初始化' : '-';
-                const started = SE.isStarted && SE.isStarted(id) ? '运行中' : '已停止';
-                this.terminal.write(`  ${id}  [${inited}] [${started}]\n`);
+                const inited = await this._kernelAPI.call('Server.isInited', [id]);
+                const started = await this._kernelAPI.call('Server.isStarted', [id]);
+                this.terminal.write(`  ${id}  [${inited ? '已初始化' : '-'}] [${started ? '运行中' : '已停止'}]\n`);
             }
         },
 
-        _cmdStart: async function(SE, id) {
+        _cmdStart: async function(id) {
             this.terminal.write(`正在启动服务: ${id} ...\n`);
             try {
-                const ok = await SE.start(id);
+                const ok = await this._kernelAPI.call('Server.start', [id]);
                 if (ok) {
                     this.terminal.write(`服务 ${id} 已启动\n`);
                 } else {
@@ -168,10 +159,10 @@
             }
         },
 
-        _cmdStop: async function(SE, id) {
+        _cmdStop: async function(id) {
             this.terminal.write(`正在停止服务: ${id} ...\n`);
             try {
-                const ok = await SE.stop(id);
+                const ok = await this._kernelAPI.call('Server.stop', [id]);
                 if (ok) {
                     this.terminal.write(`服务 ${id} 已停止\n`);
                 } else {
@@ -182,23 +173,20 @@
             }
         },
 
-        _cmdStatus: async function(SE, id) {
+        _cmdStatus: async function(id) {
             try {
-                const st = await SE.status(id);
+                const st = await this._kernelAPI.call('Server.status', [id]);
                 this.terminal.write(`服务 ${id} 状态: ${st !== undefined ? JSON.stringify(st) : '(未加载或无 __status__)'}\n`);
-                if (SE.isStarted && SE.isStarted(id)) {
-                    this.terminal.write('  运行中: 是\n');
-                } else {
-                    this.terminal.write('  运行中: 否\n');
-                }
+                const started = await this._kernelAPI.call('Server.isStarted', [id]);
+                this.terminal.write(started ? '  运行中: 是\n' : '  运行中: 否\n');
             } catch (e) {
                 this.terminal.write(`service status: ${e.message || e}\n`);
             }
         },
 
-        _cmdInfo: async function(SE, id) {
+        _cmdInfo: async function(id) {
             try {
-                const info = await SE.info(id);
+                const info = await this._kernelAPI.call('Server.info', [id]);
                 if (info === undefined) {
                     this.terminal.write(`服务 ${id}: 未加载或无 __info__\n`);
                     return;
@@ -210,10 +198,10 @@
             }
         },
 
-        _cmdReload: async function(SE) {
+        _cmdReload: async function() {
             this.terminal.write('正在重新扫描 D/server 并加载服务模块 ...\n');
             try {
-                const ids = await (SE.loadAll ? SE.loadAll() : SE.init());
+                const ids = await this._kernelAPI.call('Server.loadAll', []) || [];
                 this.terminal.write(`已加载 ${ids && ids.length ? ids.length : 0} 个服务: ${ids && ids.length ? ids.join(', ') : '(无)'}\n`);
             } catch (e) {
                 this.terminal.write(`service reload: ${e.message || e}\n`);

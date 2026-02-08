@@ -786,27 +786,36 @@ class ScheduleTaskManager {
                     throw new Error("ServerExpansion 未加载或不可用");
                 }
 
+                const token = typeof ProcessManager !== 'undefined' ? ProcessManager._serverExpansionToken : null;
+                if (token != null && typeof ServerExpansion.setKernelToken === 'function') {
+                    ServerExpansion.setKernelToken(token);
+                }
+
                 if (action === ScheduleTaskManager.SERVICE_ACTION.START) {
                     let started = false;
                     try {
-                        started = await ServerExpansion.start(serviceId);
+                        started = token != null
+                            ? await ServerExpansion.start(serviceId, token)
+                            : await ServerExpansion.start(serviceId);
                     } catch (startErr) {
                         const msg = (startErr && startErr.message) ? String(startErr.message) : '';
                         if (typeof ServerExpansion.loadAll === 'function' && /未知服务|未加载|not found/i.test(msg)) {
                             KernelLogger.info("ScheduleTaskManager", `服务 ${serviceId} 尚未加载，loadAll 后重试: ${msg}`);
-                            await ServerExpansion.loadAll();
-                            started = await ServerExpansion.start(serviceId);
+                            await (token != null ? ServerExpansion.loadAll(token) : ServerExpansion.loadAll());
+                            started = token != null
+                                ? await ServerExpansion.start(serviceId, token)
+                                : await ServerExpansion.start(serviceId);
                         } else {
                             throw startErr;
                         }
                     }
                     if (started === false && typeof ServerExpansion.loadAll === 'function') {
                         KernelLogger.info("ScheduleTaskManager", `服务 ${serviceId} 启动返回 false，loadAll 后重试`);
-                        await ServerExpansion.loadAll();
-                        await ServerExpansion.start(serviceId);
+                        await (token != null ? ServerExpansion.loadAll(token) : ServerExpansion.loadAll());
+                        await (token != null ? ServerExpansion.start(serviceId, token) : ServerExpansion.start(serviceId));
                     }
                 } else {
-                    await ServerExpansion.stop(serviceId);
+                    await (token != null ? ServerExpansion.stop(serviceId, token) : ServerExpansion.stop(serviceId));
                 }
             } else {
                 throw new Error(`未知的任务类型: ${taskType}`);

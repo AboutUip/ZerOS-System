@@ -1,0 +1,245 @@
+/* ZerOS 内存编辑器 - 结构化布局与响应式 */
+
+/* ========== 窗口根布局 ========== */
+.memoryediter-window {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    min-width:  min(640px, 100%);
+    min-height: 400px;
+    max-width: 100%;
+    max-height: 100%;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Consolas", "Monaco", monospace;
+    -webkit-font-smoothing: antialiased;
+    color: var(--theme-text, #d7e0dd);
+    background: var(--theme-background-elevated, rgba(15, 20, 30, 0.95));
+    box-sizing: border-box;
+}
+
+/* ========== 工具栏：固定高度（不随内容增高） ========== */
+.memoryediter-toolbar {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 0.5rem 1rem;
+    padding: 0 0.875rem;
+    height: 44px;
+    min-height: 44px;
+    max-height: 44px;
+    background: var(--theme-background-elevated, rgba(30, 30, 46, 0.6));
+    border-bottom: 1px solid var(--theme-border, rgba(108, 142, 255, 0.2));
+    flex-shrink: 0;
+    box-sizing: border-box;
+    overflow-x: auto;
+    overflow-y: hidden;
+}
+
+.memoryediter-toolbar label {
+    color: var(--theme-text, #d7e0dd);
+    font-size: clamp(12px, 2.5vw, 13px);
+    white-space: nowrap;
+}
+
+.memoryediter-toolbar select,
+.memoryediter-toolbar input {
+    font-size: clamp(12px, 2.5vw, 13px);
+    outline: none;
+    min-width: 0;
+    box-sizing: border-box;
+}
+
+.memoryediter-toolbar .memoryediter-process-select {
+    min-width: 8rem;
+    max-width: 14rem;
+    width: 100%;
+}
+
+.memoryediter-toolbar .memoryediter-heap-select {
+    min-width: 6rem;
+    max-width: 12rem;
+    width: 100%;
+}
+
+.memoryediter-toolbar .memoryediter-goto {
+    width: 5rem;
+    max-width: 6rem;
+}
+
+.memoryediter-toolbar select:focus,
+.memoryediter-toolbar input:focus {
+    border-color: var(--theme-primary, #8b5cf6);
+    box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.2);
+}
+
+.memoryediter-toolbar button {
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+.memoryediter-toolbar button:hover {
+    opacity: 0.9;
+    transform: translateY(-1px);
+}
+
+/* 小屏时工具栏仍固定高度，横向滚动 */
+@media (max-width: 520px) {
+    .memoryediter-toolbar {
+        min-height: 44px;
+        height: 44px;
+        max-height: 44px;
+        padding: 0 0.5rem;
+    }
+}
+
+/* ========== 状态栏 ========== */
+.memoryediter-statusbar {
+    flex-shrink: 0;
+    min-height: 22px;
+    max-height: 22px;
+    padding: 0 0.75rem;
+    font-size: clamp(11px, 1.2vw + 6px, 12px);
+    color: var(--theme-text-muted, #888);
+    background: var(--theme-background-elevated, rgba(20, 25, 35, 0.9));
+    border-top: 1px solid var(--theme-border, rgba(108, 142, 255, 0.2));
+    display: flex;
+    align-items: center;
+    box-sizing: border-box;
+}
+
+.memoryediter-stack-summary {
+    text-align: left;
+    padding: 1rem 1.25rem;
+}
+
+.memoryediter-stack-summary > div {
+    margin-bottom: 0.25rem;
+}
+
+/* ========== 主内容区：占满剩余空间并可滚动 ========== */
+.memoryediter-body {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    padding: 0.75rem 1rem;
+    font-family: "Consolas", "Monaco", "Courier New", monospace;
+    font-size: clamp(12px, 1.5vw + 8px, 14px);
+    box-sizing: border-box;
+    border: 1px solid var(--theme-border, rgba(108, 142, 255, 0.2));
+    border-radius: 6px;
+    background: var(--theme-background, rgba(10, 14, 22, 0.6));
+}
+
+/* ========== 十六进制区域：内存数据与解析数据用边框明确区分 ========== */
+.memoryediter-hex-container {
+    display: flex;
+    flex-direction: column;
+    min-width: min-content;
+    width: 100%;
+    line-height: 1.5;
+    font-variant-numeric: tabular-nums;
+    border: 1px solid var(--theme-border, rgba(108, 142, 255, 0.25));
+    border-radius: 6px;
+    background: var(--theme-background-elevated, rgba(20, 25, 35, 0.8));
+    overflow: hidden;
+    padding: 0.5rem;
+}
+
+/* 表头：地址 | 十六进制（内存数据）| ASCII（解析数据），列间用边框明确区分 */
+.memoryediter-hex-header {
+    display: grid;
+    grid-template-columns: minmax(5rem, 90px) 1fr minmax(8rem, 200px);
+    gap: 0;
+    padding: 0.35rem 0;
+    color: var(--theme-text-muted, #888);
+    font-size: clamp(11px, 1.2vw + 8px, 12px);
+    margin-bottom: 0.25rem;
+    border-bottom: 1px solid var(--theme-border, rgba(108, 142, 255, 0.25));
+    flex-shrink: 0;
+}
+
+.memoryediter-hex-header .memoryediter-header-addr,
+.memoryediter-hex-header .memoryediter-header-hex,
+.memoryediter-hex-header .memoryediter-header-ascii {
+    padding: 0 0.5rem;
+    border-right: 1px solid var(--theme-border, rgba(108, 142, 255, 0.25));
+}
+
+.memoryediter-hex-header .memoryediter-header-ascii {
+    border-right: none;
+}
+
+/* 数据行：地址 | 十六进制 | ASCII，列间边框与表头对齐 */
+.memoryediter-hex-row {
+    display: grid;
+    grid-template-columns: minmax(5rem, 90px) 1fr minmax(8rem, 200px);
+    gap: 0;
+    padding: 0.125rem 0;
+    align-items: center;
+    min-width: 0;
+    border-bottom: 1px solid var(--theme-border, rgba(108, 142, 255, 0.08));
+}
+
+.memoryediter-hex-row:hover {
+    background: rgba(108, 142, 255, 0.06);
+    border-radius: 0;
+}
+
+.memoryediter-addr {
+    color: var(--theme-primary, #8b5cf6);
+    flex-shrink: 0;
+    min-width: 5rem;
+    padding: 0 0.5rem;
+    border-right: 1px solid var(--theme-border, rgba(108, 142, 255, 0.2));
+}
+
+.memoryediter-hex-bytes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.125rem 0.5rem;
+    min-width: 0;
+    overflow-x: auto;
+    padding: 0 0.5rem;
+    border-right: 1px solid var(--theme-border, rgba(108, 142, 255, 0.2));
+}
+
+.memoryediter-ascii {
+    word-break: keep-all;
+    min-width: 8rem;
+    max-width: 200px;
+    padding: 0 0.5rem;
+    color: var(--theme-text-muted, #a0aec0);
+    border-right: none;
+}
+
+.memoryediter-byte {
+    cursor: pointer;
+    padding: 0.125rem 0.25rem;
+    border-radius: 3px;
+    min-width: 1.25rem;
+    text-align: center;
+    transition: background 0.15s, color 0.15s;
+    flex-shrink: 0;
+}
+
+.memoryediter-byte:hover {
+    background: rgba(108, 142, 255, 0.25);
+    color: #fff;
+}
+
+.memoryediter-placeholder {
+    text-align: center;
+    color: var(--theme-text-muted, #888);
+    padding: 2.5rem 1.25rem;
+    font-size: clamp(13px, 1.5vw + 8px, 14px);
+}
+
+/* 窄屏时 hex 行改为更紧凑 */
+@media (max-width: 640px) {
+    .memoryediter-hex-header,
+    .memoryediter-hex-row {
+        grid-template-columns: 4rem 1fr 6rem;
+        gap: 0.25rem 0.5rem;
+    }
+    .memoryediter-addr { min-width: 4rem; }
+    .memoryediter-ascii { min-width: 6rem; max-width: 6rem; }
+}

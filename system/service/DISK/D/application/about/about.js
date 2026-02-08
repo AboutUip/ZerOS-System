@@ -8,11 +8,8 @@
     const ABOUT = {
         pid: null,
         window: null,
-        
-        // 内存管理引用
-        _heap: null,
-        _shed: null,
-        
+        /** 内存由内核在进程启动时分配、退出时释放，本程序不直接访问 MemoryManager/APPLICATION_SOP */
+
         /**
          * 多语言文案：优先使用 LanguagesExpansion，否则返回 fallback
          * @param {string} key 语言包常量名
@@ -29,10 +26,7 @@
         
         __init__: async function(pid, initArgs) {
             this.pid = pid;
-            
-            // 初始化内存管理
-            this._initMemory(pid);
-            
+
             // 获取 GUI 容器
             const guiContainer = initArgs.guiContainer || document.getElementById('gui-container');
             
@@ -85,32 +79,6 @@
             
             // 添加到容器
             guiContainer.appendChild(this.window);
-        },
-        
-        _initMemory: function(pid) {
-            if (typeof MemoryManager !== 'undefined') {
-                try {
-                    // 使用 MemoryUtils.getAppMemory 获取内存，如果不可用则直接从 APPLICATION_SOP 获取
-                    if (typeof MemoryUtils !== 'undefined' && typeof MemoryUtils.getAppMemory === 'function') {
-                        const memory = MemoryUtils.getAppMemory(pid);
-                        if (memory) {
-                            this._heap = memory.heap;
-                            this._shed = memory.shed;
-                        }
-                    } else {
-                        // 降级方案：直接从 APPLICATION_SOP 获取
-                        const appSpace = MemoryManager.APPLICATION_SOP.get(pid);
-                        if (appSpace) {
-                            this._heap = appSpace.heaps.get(1) || null;
-                            this._shed = appSpace.sheds.get(1) || null;
-                        }
-                    }
-                } catch (e) {
-                    if (typeof KernelLogger !== 'undefined') {
-                        KernelLogger.warn('About', '内存初始化失败', e);
-                    }
-                }
-            }
         },
         
         _createContent: function() {
@@ -666,30 +634,9 @@
         },
         
         __exit__: function() {
-            // 清理资源
+            // 清理窗口；进程内存由内核在进程退出时统一释放（MemoryManager.freeMemory），本程序不直接操作堆/栈
             if (this.window && this.window.parentElement) {
                 this.window.remove();
-            }
-            
-            // 清理内存
-            if (this._heap) {
-                try {
-                    this._heap.clear();
-                } catch (e) {
-                    if (typeof KernelLogger !== 'undefined') {
-                        KernelLogger.warn('About', '清理堆内存失败', e);
-                    }
-                }
-            }
-            
-            if (this._shed) {
-                try {
-                    this._shed.clear();
-                } catch (e) {
-                    if (typeof KernelLogger !== 'undefined') {
-                        KernelLogger.warn('About', '清理栈内存失败', e);
-                    }
-                }
             }
         }
     };

@@ -35,6 +35,10 @@ PermissionManager.PERMISSION.SYSTEM_STORAGE_WRITE_PERMISSION_CONTROL   // 写入
 PermissionManager.PERMISSION.SYSTEM_STORAGE_WRITE_DESKTOP              // 写入桌面相关存储（desktop.*）
 
 PermissionManager.PERMISSION.PROCESS_MANAGE           // 管理其他进程（启动/终止）
+
+// 服务扩展权限（最高等级，DANGEROUS）
+PermissionManager.PERMISSION.SERVER_SERVICE_MANAGE    // 启动/停止/查询 D/server 服务（Server.* API）
+
 PermissionManager.PERMISSION.THEME_READ               // 读取系统主题配置
 PermissionManager.PERMISSION.THEME_WRITE              // 更改系统主题配置
 PermissionManager.PERMISSION.DESKTOP_MANAGE           // 管理桌面快捷方式和背景

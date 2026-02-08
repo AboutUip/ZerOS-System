@@ -414,6 +414,25 @@ const APPLICATION_ASSETS = {
         }
     },
     
+    // 内存编辑器 - 选择任意进程，以十六进制查看并编辑堆内存
+    // 注意：路径是 D: 盘下的真实路径
+    "memoryediter": {
+        script: "D:/application/memoryediter/memoryediter.js",
+        styles: ["D:/application/memoryediter/memoryediter.css"],
+        icon: "D:/application/memoryediter/memoryediter.svg",
+        metadata: {
+            autoStart: false,
+            priority: 5,
+            description: "内存编辑器",
+            version: "1.0.0",
+            type: "GUI",
+            alwaysShowInTaskbar: false,
+            allowMultipleInstances: true,
+            supportsPreview: true,
+            category: "utility"  // 工具类
+        }
+    },
+    
     // 运行程序
     // 注意：路径是 D: 盘下的真实路径
     "run": {

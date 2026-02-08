@@ -152,6 +152,12 @@
     box-shadow: 0 0 0 3px rgba(108, 142, 255, 0.1);
 }
 
+/* 下拉选项：浅底深字，避免与系统浅色下拉背景对比不足导致无法看清 */
+.taskmanager-window select option {
+    background: #ffffff;
+    color: #1a1f2e;
+}
+
 /* 复选框 */
 .taskmanager-process-list input[type="checkbox"] {
     width: 18px;

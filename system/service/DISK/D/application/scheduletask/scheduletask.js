@@ -35,6 +35,7 @@
          */
         __init__: async function(pid, initArgs) {
             this.pid = pid;
+            this._kernelAPI = (initArgs && initArgs.kernelAPI) || null;
             
             if (typeof KernelLogger !== 'undefined') {
                 KernelLogger.info('SCHEDULETASK', '计划任务管理程序初始化');
@@ -179,7 +180,8 @@
                     PermissionManager.PERMISSION.SCHEDULE_TASK_CREATE,
                     PermissionManager.PERMISSION.SCHEDULE_TASK_MANAGE,
                     PermissionManager.PERMISSION.SCHEDULE_TASK_STARTUP,
-                    PermissionManager.PERMISSION.SYSTEM_NOTIFICATION
+                    PermissionManager.PERMISSION.SYSTEM_NOTIFICATION,
+                    PermissionManager.PERMISSION.SERVER_SERVICE_MANAGE
                 ] : [],
                 metadata: {
                     allowMultipleInstances: false
@@ -1768,29 +1770,20 @@
          * @returns {Promise<string[]>}
          */
         _getServiceIdsAsync: function() {
+            var self = this;
             return new Promise(function (resolve, reject) {
                 try {
-                    if (typeof POOL === 'undefined' || typeof POOL.__GET__ !== 'function') {
+                    if (!self._kernelAPI || typeof self._kernelAPI.call !== 'function') {
                         resolve([]);
                         return;
                     }
-                    var ServerExpansion = POOL.__GET__('KERNEL_GLOBAL_POOL', 'ServerExpansion');
-                    if (!ServerExpansion || typeof ServerExpansion.listServices !== 'function') {
-                        resolve([]);
-                        return;
-                    }
-                    // 始终调用 loadAll() 重新扫描 D/server，因 init() 可能在 D 盘未就绪时执行导致 _modules 为空
-                    var loadPromise = typeof ServerExpansion.loadAll === 'function' ? ServerExpansion.loadAll() : Promise.resolve([]);
-                    if (loadPromise && typeof loadPromise.then === 'function') {
-                        loadPromise.then(function () {
-                            var ids = ServerExpansion.listServices();
-                            resolve(Array.isArray(ids) ? ids : []);
-                        }).catch(function (e) {
-                            reject(e);
-                        });
-                    } else {
-                        resolve(ServerExpansion.listServices() || []);
-                    }
+                    self._kernelAPI.call('Server.loadAll', []).then(function () {
+                        return self._kernelAPI.call('Server.listServices', []);
+                    }).then(function (ids) {
+                        resolve(Array.isArray(ids) ? ids : []);
+                    }).catch(function (e) {
+                        reject(e);
+                    });
                 } catch (e) {
                     reject(e);
                 }

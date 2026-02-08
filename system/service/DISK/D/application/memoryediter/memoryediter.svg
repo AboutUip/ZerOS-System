@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="memoryediterGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0ea5e9"/>
+      <stop offset="100%" stop-color="#06b6d4"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="12" fill="#0f172a" opacity="0.9"/>
+  <rect x="8" y="8" width="48" height="48" rx="8" fill="#1e293b" stroke="url(#memoryediterGrad)" stroke-width="2"/>
+  <!-- 地址列示意：竖条 -->
+  <rect x="12" y="14" width="6" height="4" rx="1" fill="url(#memoryediterGrad)" opacity="0.9"/>
+  <rect x="12" y="20" width="6" height="4" rx="1" fill="url(#memoryediterGrad)" opacity="0.9"/>
+  <rect x="12" y="26" width="6" height="4" rx="1" fill="url(#memoryediterGrad)" opacity="0.9"/>
+  <!-- 十六进制字节网格：4x4 小格 -->
+  <rect x="24" y="14" width="6" height="5" rx="1" fill="#64748b"/>
+  <rect x="32" y="14" width="6" height="5" rx="1" fill="#94a3b8"/>
+  <rect x="40" y="14" width="6" height="5" rx="1" fill="#94a3b8"/>
+  <rect x="48" y="14" width="6" height="5" rx="1" fill="#94a3b8"/>
+  <rect x="24" y="21" width="6" height="5" rx="1" fill="#94a3b8"/>
+  <rect x="32" y="21" width="6" height="5" rx="1" fill="#94a3b8"/>
+  <rect x="40" y="21" width="6" height="5" rx="1" fill="#94a3b8"/>
+  <rect x="48" y="21" width="6" height="5" rx="1" fill="#64748b"/>
+  <rect x="24" y="28" width="6" height="5" rx="1" fill="#94a3b8"/>
+  <rect x="32" y="28" width="6" height="5" rx="1" fill="#94a3b8"/>
+  <rect x="40" y="28" width="6" height="5" rx="1" fill="#94a3b8"/>
+  <rect x="48" y="28" width="6" height="5" rx="1" fill="#94a3b8"/>
+  <!-- ASCII 列示意：右侧竖条 -->
+  <rect x="56" y="14" width="4" height="5" rx="0.5" fill="#475569"/>
+  <rect x="56" y="21" width="4" height="5" rx="0.5" fill="#475569"/>
+  <rect x="56" y="28" width="4" height="5" rx="0.5" fill="#475569"/>
+</svg>

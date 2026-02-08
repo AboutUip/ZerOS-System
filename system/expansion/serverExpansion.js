@@ -3,6 +3,10 @@
 // 合规模块需包含 __init__, __start__, __stop__, __status__, __info__ 方法（均为函数）
 // 加载时不调用任何方法；仅当明确启用某服务时依次调用 init、start；再次启动不调用 init
 //
+// 权限管控：本模块相关 API 由进程管理器以 Server.* 形式暴露（Server.start/stop/listServices/loadAll/status/info/isInited/isStarted），
+// 所需权限为 SERVER_SERVICE_MANAGE（权限等级最高，DANGEROUS）。程序应通过 kernelAPI.call('Server.xxx', args) 调用并声明该权限。
+// 防绕过：start/stop/listServices/loadAll/status/info/isInited/isStarted 均需内核令牌，直接调用（无令牌）将抛错，避免程序通过 window.ServerExpansion 或 POOL 绕过权限。
+//
 // 服务模块约定：脚本加载后需调用 window.__ZerOS_ServerExpansion_Register__(api) 上报导出对象，
 // 其中 api 必须包含上述五个方法，否则视为不合规、不会加入已加载列表。
 
@@ -78,6 +82,8 @@
     var _modules = new Map();
     /** 已加载过的脚本 URL 集合，避免重复加载 */
     var _loadedUrls = new Set();
+    /** 内核专用令牌，仅由进程管理器设置；未设置或令牌不匹配时拒绝执行，防止绕过权限直接调用 */
+    var _kernelOnlyToken = null;
 
     /**
      * 通过 script 标签加载单个服务脚本，并等待其通过全局注册函数上报导出
@@ -202,72 +208,116 @@
         return seq.then(function () { return ids; });
     }
 
+    /**
+     * 校验内核令牌，非进程管理器调用则抛错（防止绕过权限直接调用 ServerExpansion）
+     * @param {*} token 调用方传入的令牌
+     */
+    function requireKernelToken(token) {
+        if (token !== _kernelOnlyToken) {
+            throw new Error('ServerExpansion 仅允许通过进程管理器 kernelAPI（Server.*）调用，需 SERVER_SERVICE_MANAGE 权限。禁止直接调用。');
+        }
+    }
+
     var ServerExpansion = {
         /**
-         * 获取所有已加载的合规服务 id
-         * @returns {string[]}
+         * 由进程管理器在首次调用 Server.* 时调用一次，设置内核专用令牌（不对外暴露，防止程序伪造）
+         * @param {*} token 内核持有的 Symbol 或私密值
          */
-        listServices: function () {
-            return Array.from(_modules.keys());
-        },
-
-        /**
-         * 扫描并加载 D/server 下所有合规服务（不调用 init/start）
-         * @returns {Promise<string[]>} 合规服务 id 列表
-         */
-        loadAll: function () {
-            return discoverAndLoad();
-        },
-
-        /**
-         * 启动服务：首次会先 __init__ 再 __start__，之后仅 __start__
-         * @param {string} id 服务 id（如 server-xxx.js 中的 xxx）
-         * @returns {Promise<boolean>} 是否成功
-         */
-        start: function (id) {
-            var entry = _modules.get(id);
-            if (!entry) {
-                if (typeof KernelLogger !== 'undefined') {
-                    KernelLogger.warn("ServerExpansion", "start: 未知服务 " + id);
-                }
-                // 抛出以便计划任务等调用方可走 loadAll 后重试（若仅 return false 则不会触发重试）
-                return Promise.reject(new Error("未知服务 " + id));
+        setKernelToken: function (token) {
+            if (_kernelOnlyToken === null && token != null) {
+                _kernelOnlyToken = token;
             }
-            var api = entry.api;
-            return Promise.resolve().then(function () {
-                if (!entry.inited) {
-                    try {
-                        if (typeof api.__init__ === 'function') api.__init__();
-                        entry.inited = true;
-                    } catch (e) {
-                        if (typeof KernelLogger !== 'undefined') {
-                            KernelLogger.warn("ServerExpansion", "start: __init__ 失败 " + id + ", " + (e && e.message));
-                        }
-                        return false;
-                    }
-                }
-                try {
-                    if (typeof api.__start__ === 'function') api.__start__();
-                    entry.started = true;
-                    if (typeof KernelLogger !== 'undefined') {
-                        KernelLogger.info("ServerExpansion", "服务已启动: " + id);
-                    }
-                    return true;
-                } catch (e) {
-                    if (typeof KernelLogger !== 'undefined') {
-                        KernelLogger.warn("ServerExpansion", "start: __start__ 失败 " + id + ", " + (e && e.message));
-                    }
-                    return false;
-                }
+        },
+
+        /**
+         * 获取所有已加载的合规服务 id（会先等待 init 完成，确保服务列表已自动加载）
+         * @param {*} token 内核令牌（由 ProcessManager 传入）
+         * @returns {Promise<string[]>}
+         */
+        listServices: function (token) {
+            requireKernelToken(token);
+            return Promise.resolve(ServerExpansion._ready).then(function () {
+                return Array.from(_modules.keys());
             });
         },
 
         /**
-         * 停止服务
-         * @param {string} id 服务 id
+         * 扫描并加载 D/server 下所有合规服务（不调用 init/start）；会先等待 init 完成
+         * @param {*} token 内核令牌
+         * @returns {Promise<string[]>} 合规服务 id 列表
+         */
+        loadAll: function (token) {
+            requireKernelToken(token);
+            return Promise.resolve(ServerExpansion._ready).then(function () {
+                return discoverAndLoad();
+            });
+        },
+
+        /**
+         * 启动服务：首次会先 __init__ 再 __start__，之后仅 __start__；会先等待服务列表自动加载完成
+         * @param {string} id 服务 id（如 server-xxx.js 中的 xxx）
+         * @param {*} token 内核令牌（由 ProcessManager 传入）
          * @returns {Promise<boolean>} 是否成功
          */
-        stop: function (id) {
+        start: function (id, token) {
+            requireKernelToken(token);
+            function doStart(entry) {
+                var api = entry.api;
+                return Promise.resolve().then(function () {
+                    if (!entry.inited) {
+                        try {
+                            if (typeof api.__init__ === 'function') api.__init__();
+                            entry.inited = true;
+                        } catch (e) {
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.warn("ServerExpansion", "start: __init__ 失败 " + id + ", " + (e && e.message));
+                            }
+                            return false;
+                        }
+                    }
+                    try {
+                        if (typeof api.__start__ === 'function') api.__start__();
+                        entry.started = true;
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.info("ServerExpansion", "服务已启动: " + id);
+                        }
+                        return true;
+                    } catch (e) {
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn("ServerExpansion", "start: __start__ 失败 " + id + ", " + (e && e.message));
+                        }
+                        return false;
+                    }
+                });
+            }
+            return Promise.resolve(ServerExpansion._ready).then(function () {
+                var entry = _modules.get(id);
+                if (entry) return doStart(entry);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.info("ServerExpansion", "start: 服务 " + id + " 未在列表中，重新扫描 D/server 后重试");
+                }
+                return discoverAndLoad().then(function () {
+                    entry = _modules.get(id);
+                    if (!entry) {
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn("ServerExpansion", "start: 未知服务 " + id);
+                        }
+                        return Promise.reject(new Error("未知服务 " + id));
+                    }
+                    return doStart(entry);
+                });
+            });
+        },
+
+        /**
+         * 停止服务（会先等待服务列表自动加载完成）
+         * @param {string} id 服务 id
+         * @param {*} token 内核令牌
+         * @returns {Promise<boolean>} 是否成功
+         */
+        stop: function (id, token) {
+            requireKernelToken(token);
+            return Promise.resolve(ServerExpansion._ready).then(function () {
             var entry = _modules.get(id);
             if (!entry) {
                 if (typeof KernelLogger !== 'undefined') {
@@ -288,68 +338,83 @@
                 }
                 return Promise.resolve(false);
             }
+            });
         },
 
         /**
-         * 查询服务状态（调用模块 __status__）
+         * 查询服务状态（调用模块 __status__）；会先等待服务列表自动加载完成
          * @param {string} id 服务 id
+         * @param {*} token 内核令牌
          * @returns {Promise<*>} __status__ 返回值，未加载或失败则返回 undefined
          */
-        status: function (id) {
-            var entry = _modules.get(id);
-            if (!entry || typeof entry.api.__status__ !== 'function') {
-                return Promise.resolve(undefined);
-            }
-            try {
-                var result = entry.api.__status__();
-                return Promise.resolve(result);
-            } catch (e) {
-                if (typeof KernelLogger !== 'undefined') {
-                    KernelLogger.warn("ServerExpansion", "status: " + id + ", " + (e && e.message));
+        status: function (id, token) {
+            requireKernelToken(token);
+            return Promise.resolve(ServerExpansion._ready).then(function () {
+                var entry = _modules.get(id);
+                if (!entry || typeof entry.api.__status__ !== 'function') {
+                    return undefined;
                 }
-                return Promise.resolve(undefined);
-            }
+                try {
+                    return entry.api.__status__();
+                } catch (e) {
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.warn("ServerExpansion", "status: " + id + ", " + (e && e.message));
+                    }
+                    return undefined;
+                }
+            });
         },
 
         /**
-         * 获取服务信息（调用模块 __info__）
+         * 获取服务信息（调用模块 __info__）；会先等待服务列表自动加载完成
          * @param {string} id 服务 id
+         * @param {*} token 内核令牌
          * @returns {Promise<*>} __info__ 返回值，未加载或失败则返回 undefined
          */
-        info: function (id) {
-            var entry = _modules.get(id);
-            if (!entry || typeof entry.api.__info__ !== 'function') {
-                return Promise.resolve(undefined);
-            }
-            try {
-                var result = entry.api.__info__();
-                return Promise.resolve(result);
-            } catch (e) {
-                if (typeof KernelLogger !== 'undefined') {
-                    KernelLogger.warn("ServerExpansion", "info: " + id + ", " + (e && e.message));
+        info: function (id, token) {
+            requireKernelToken(token);
+            return Promise.resolve(ServerExpansion._ready).then(function () {
+                var entry = _modules.get(id);
+                if (!entry || typeof entry.api.__info__ !== 'function') {
+                    return undefined;
                 }
-                return Promise.resolve(undefined);
-            }
+                try {
+                    return entry.api.__info__();
+                } catch (e) {
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.warn("ServerExpansion", "info: " + id + ", " + (e && e.message));
+                    }
+                    return undefined;
+                }
+            });
         },
 
         /**
-         * 判断服务是否已初始化（已调用过 __init__）
+         * 判断服务是否已初始化（已调用过 __init__）；会先等待服务列表自动加载完成
          * @param {string} id 服务 id
-         * @returns {boolean}
+         * @param {*} token 内核令牌
+         * @returns {Promise<boolean>}
          */
-        isInited: function (id) {
-            var entry = _modules.get(id);
-            return !!(entry && entry.inited);
+        isInited: function (id, token) {
+            requireKernelToken(token);
+            return Promise.resolve(ServerExpansion._ready).then(function () {
+                var entry = _modules.get(id);
+                return !!(entry && entry.inited);
+            });
         },
 
         /**
-         * 判断服务是否已启动（已调用 __start__ 且未 __stop__）
+         * 判断服务是否已启动（已调用 __start__ 且未 __stop__）；会先等待服务列表自动加载完成
          * @param {string} id 服务 id
-         * @returns {boolean}
+         * @param {*} token 内核令牌
+         * @returns {Promise<boolean>}
          */
-        isStarted: function (id) {
-            var entry = _modules.get(id);
-            return !!(entry && entry.started);
+        isStarted: function (id, token) {
+            requireKernelToken(token);
+            return Promise.resolve(ServerExpansion._ready).then(function () {
+                var entry = _modules.get(id);
+                return !!(entry && entry.started);
+            });
         },
 
         /**

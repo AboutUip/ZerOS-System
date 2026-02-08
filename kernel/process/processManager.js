@@ -12,6 +12,9 @@ class ProcessManager {
     /** 进程绑定 API 的合法令牌（仅内核在 __init__ 注入时使用，不可伪造，方案三） */
     static _boundCallSymbol = Symbol('ProcessManager.boundCallKernelAPI');
 
+    /** ServerExpansion 内核专用令牌，仅进程管理器持有；传入 ServerExpansion 以拒绝直接调用、防止绕过权限 */
+    static _serverExpansionToken = Symbol('ServerExpansion.kernel');
+
     // 日志级别
     static logLevel = (typeof LogLevel !== 'undefined' && LogLevel.LEVEL.DEBUG) ? LogLevel.LEVEL.DEBUG : 3;
 
@@ -3408,6 +3411,16 @@ class ProcessManager {
             'Languages.listPacks': PermissionManager.PERMISSION.LANGUAGES_READ,
             'Languages.getCurrentLocale': PermissionManager.PERMISSION.LANGUAGES_READ,
             'Languages.getLoadedLocales': PermissionManager.PERMISSION.LANGUAGES_READ,
+
+            // 服务扩展API（内核服务模块，权限等级最高）
+            'Server.start': PermissionManager.PERMISSION.SERVER_SERVICE_MANAGE,
+            'Server.stop': PermissionManager.PERMISSION.SERVER_SERVICE_MANAGE,
+            'Server.listServices': PermissionManager.PERMISSION.SERVER_SERVICE_MANAGE,
+            'Server.loadAll': PermissionManager.PERMISSION.SERVER_SERVICE_MANAGE,
+            'Server.status': PermissionManager.PERMISSION.SERVER_SERVICE_MANAGE,
+            'Server.info': PermissionManager.PERMISSION.SERVER_SERVICE_MANAGE,
+            'Server.isInited': PermissionManager.PERMISSION.SERVER_SERVICE_MANAGE,
+            'Server.isStarted': PermissionManager.PERMISSION.SERVER_SERVICE_MANAGE,
         };
 
         return apiPermissionMap[apiName] || null;
@@ -4883,6 +4896,7 @@ class ProcessManager {
             'Memory.free': async (pid, refId) => {
                 return ProcessManager.freeMemoryRef(pid, refId);
             },
+            // 注意：进程堆内存读写（getProcessMemoryInfo / readProcessHeap / writeProcessHeap）由 D/server 的 ProcessMemory 服务在 POOL > SERVER 动态提供，进程管理器不包含也不委托这些危险 API；内存编辑器等应直接使用 POOL.__GET__('SERVER', 'ProcessMemory') 获取服务 API。
 
             // 日志API
             'Logger.log': async (level, subsystem, message, meta) => {
@@ -6171,6 +6185,88 @@ class ProcessManager {
                     throw new Error('Languages.getLoadedLocales: LanguagesExpansion 未加载');
                 }
                 return LanguagesExpansion.getLoadedLocales();
+            },
+
+            // 服务扩展API（委托 ServerExpansion，需 SERVER_SERVICE_MANAGE 权限；传内核令牌防绕过）
+            'Server.start': async (id) => {
+                if (typeof ServerExpansion === 'undefined') {
+                    throw new Error('Server.start: ServerExpansion 未加载');
+                }
+                const token = ProcessManager._serverExpansionToken;
+                if (typeof ServerExpansion.setKernelToken === 'function') {
+                    ServerExpansion.setKernelToken(token);
+                }
+                return await ServerExpansion.start(id, token);
+            },
+            'Server.stop': async (id) => {
+                if (typeof ServerExpansion === 'undefined') {
+                    throw new Error('Server.stop: ServerExpansion 未加载');
+                }
+                const token = ProcessManager._serverExpansionToken;
+                if (typeof ServerExpansion.setKernelToken === 'function') {
+                    ServerExpansion.setKernelToken(token);
+                }
+                return await ServerExpansion.stop(id, token);
+            },
+            'Server.listServices': async () => {
+                if (typeof ServerExpansion === 'undefined') {
+                    throw new Error('Server.listServices: ServerExpansion 未加载');
+                }
+                const token = ProcessManager._serverExpansionToken;
+                if (typeof ServerExpansion.setKernelToken === 'function') {
+                    ServerExpansion.setKernelToken(token);
+                }
+                return await ServerExpansion.listServices(token);
+            },
+            'Server.loadAll': async () => {
+                if (typeof ServerExpansion === 'undefined') {
+                    throw new Error('Server.loadAll: ServerExpansion 未加载');
+                }
+                const token = ProcessManager._serverExpansionToken;
+                if (typeof ServerExpansion.setKernelToken === 'function') {
+                    ServerExpansion.setKernelToken(token);
+                }
+                return await ServerExpansion.loadAll(token);
+            },
+            'Server.status': async (id) => {
+                if (typeof ServerExpansion === 'undefined') {
+                    throw new Error('Server.status: ServerExpansion 未加载');
+                }
+                const token = ProcessManager._serverExpansionToken;
+                if (typeof ServerExpansion.setKernelToken === 'function') {
+                    ServerExpansion.setKernelToken(token);
+                }
+                return await ServerExpansion.status(id, token);
+            },
+            'Server.info': async (id) => {
+                if (typeof ServerExpansion === 'undefined') {
+                    throw new Error('Server.info: ServerExpansion 未加载');
+                }
+                const token = ProcessManager._serverExpansionToken;
+                if (typeof ServerExpansion.setKernelToken === 'function') {
+                    ServerExpansion.setKernelToken(token);
+                }
+                return await ServerExpansion.info(id, token);
+            },
+            'Server.isInited': async (id) => {
+                if (typeof ServerExpansion === 'undefined') {
+                    throw new Error('Server.isInited: ServerExpansion 未加载');
+                }
+                const token = ProcessManager._serverExpansionToken;
+                if (typeof ServerExpansion.setKernelToken === 'function') {
+                    ServerExpansion.setKernelToken(token);
+                }
+                return await ServerExpansion.isInited(id, token);
+            },
+            'Server.isStarted': async (id) => {
+                if (typeof ServerExpansion === 'undefined') {
+                    throw new Error('Server.isStarted: ServerExpansion 未加载');
+                }
+                const token = ProcessManager._serverExpansionToken;
+                if (typeof ServerExpansion.setKernelToken === 'function') {
+                    ServerExpansion.setKernelToken(token);
+                }
+                return await ServerExpansion.isStarted(id, token);
             },
 
             // 其他API可以在这里添加

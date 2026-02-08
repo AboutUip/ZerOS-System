@@ -7819,8 +7819,8 @@ function escapeHtml(s){
                                     payload.write('POOL > SERVER Translate: 已注册');
                                     payload.write(`  translateSimple(text, toLang): 普通机器翻译`);
                                     payload.write(`  translate(textOrTexts, options): AI 智能翻译`);
-                                    if (typeof ServerExpansion !== 'undefined' && ServerExpansion.status) {
-                                        const st = await ServerExpansion.status('translate');
+                                    if (typeof TERMINAL !== 'undefined' && TERMINAL._kernelAPI && typeof TERMINAL._kernelAPI.call === 'function') {
+                                        const st = await TERMINAL._kernelAPI.call('Server.status', ['translate']);
                                         if (st) {
                                             payload.write('---');
                                             payload.write(`服务: ${st.serviceName} v${st.version} | 运行: ${st.running ? '是' : '否'}`);
@@ -7845,12 +7845,12 @@ function escapeHtml(s){
                             try {
                                 payload.write('D/server 服务调试');
                                 payload.write('---');
-                                if (typeof ServerExpansion === 'undefined') {
-                                    payload.write('ServerExpansion 不可用');
+                                if (typeof TERMINAL === 'undefined' || !TERMINAL._kernelAPI || typeof TERMINAL._kernelAPI.call !== 'function') {
+                                    payload.write('Server.* API 不可用或缺少 SERVER_SERVICE_MANAGE 权限');
                                     payload.write('---');
                                     return;
                                 }
-                                const list = ServerExpansion.listServices ? ServerExpansion.listServices() : [];
+                                const list = await TERMINAL._kernelAPI.call('Server.listServices', []) || [];
                                 payload.write(`已加载服务数: ${list.length}`);
                                 if (list.length === 0) {
                                     payload.write('  (无)');
@@ -7865,8 +7865,8 @@ function escapeHtml(s){
                                 for (let i = 0; i < ids.length; i++) {
                                     const id = ids[i];
                                     payload.write(`  ${id}`);
-                                    if (wantStatus && ServerExpansion.status) {
-                                        const st = await ServerExpansion.status(id);
+                                    if (wantStatus) {
+                                        const st = await TERMINAL._kernelAPI.call('Server.status', [id]);
                                         if (st) {
                                             if (st.running != null) payload.write(`    运行: ${st.running ? '是' : '否'}`);
                                             if (st.serviceName) payload.write(`    名称: ${st.serviceName}`);
@@ -9202,7 +9202,8 @@ function escapeHtml(s){
                     PermissionManager.PERMISSION.KERNEL_DISK_LIST,
                     PermissionManager.PERMISSION.PROCESS_MANAGE,
                     PermissionManager.PERMISSION.EVENT_LISTENER,
-                    PermissionManager.PERMISSION.ENVIRONMENT_READ  // 读取环境变量（用于命令别名查找）
+                    PermissionManager.PERMISSION.ENVIRONMENT_READ,  // 读取环境变量（用于命令别名查找）
+                    PermissionManager.PERMISSION.SERVER_SERVICE_MANAGE  // debug services/translate 需查询 Server.*
                 ] : [],
                 metadata: {
                     autoStart: true,  // 终端作为系统内置程序，自动启动
@@ -9220,6 +9221,10 @@ function escapeHtml(s){
             // 将 initArgs 临时存储到 window，以便 TabManager 可以访问
             if (typeof window !== 'undefined') {
                 window._currentInitArgs = initArgs;
+            }
+            // 供 debug services/translate 等使用 Server.* API（需 SERVER_SERVICE_MANAGE 权限）
+            if (typeof TERMINAL !== 'undefined' && initArgs && initArgs.kernelAPI) {
+                TERMINAL._kernelAPI = initArgs.kernelAPI;
             }
             
             // 如果是CLI程序专用终端，设置窗口标题

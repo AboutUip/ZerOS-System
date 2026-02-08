@@ -8,7 +8,7 @@ class SystemInformation {
     static SYSTEM_VERSION = '0.6.5';
     
     // 内核版本
-    static KERNEL_VERSION = '0.6.4';
+    static KERNEL_VERSION = '0.6.5';
     
     // 构建日期
     static BUILD_DATE = new Date('2025-11-28');

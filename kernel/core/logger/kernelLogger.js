@@ -27,7 +27,7 @@
         // whether to include source file name in logs
         static includeSourceFile = true;
         // limit meta JSON length for readability
-        static maxMetaLength = 2000;
+        static maxMetaLength = 3000;
         
         // 错误抑制机制：防止无限循环报错
         static _errorCount = 0;
