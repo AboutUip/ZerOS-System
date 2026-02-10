@@ -92,6 +92,10 @@
         _victoryGestureHistory: [],  // 比耶手势历史记录（用于稳定性检查）
         _victoryGestureStabilityFrames: 5,  // 需要连续检测到比耶手势多少帧才确认
         _lastVictoryGestureTime: 0,  // 上次比耶手势时间（防抖）
+        // 手势操控 ZerOS：悬停点击与捏合拖动（提高成功率）
+        _dwellTimeMs: 680,       // 悬停多少毫秒触发点击
+        _dwellRadiusPx: 22,      // 悬停允许移动半径（像素）
+        _pinchDistanceNorm: 0.09, // 拇指与食指距离小于此值视为捏合（归一化）
         
         __init__: async function(pid, initArgs) {
             this.pid = pid;
@@ -256,6 +260,13 @@
             modeButtonContainer.appendChild(cubeModeBtn);
             modeButtonContainer.appendChild(circleModeBtn);
             toolbar.appendChild(modeButtonContainer);
+            
+            // 手势操作说明（圆形跟随模式下操控 ZerOS）
+            const gestureHint = document.createElement('div');
+            gestureHint.className = 'handtracker-gesture-hint';
+            gestureHint.style.cssText = 'margin-left:10px;font-size:11px;color:rgba(215,224,221,0.85);max-width:420px;line-height:1.4;';
+            gestureHint.innerHTML = '圆形跟随时：<strong>食指</strong>移动=光标；<strong>保持不动约0.7秒</strong>=点击；<strong>拇指+食指捏合</strong>后移动=拖动。';
+            toolbar.appendChild(gestureHint);
             
             // 状态显示
             this.statusDisplay = document.createElement('div');
@@ -532,31 +543,31 @@
                 const wasmPath = '/kernel/dynamicModule/libs/mediapipe/wasm';
                 const filesetResolver = await FilesetResolver.forVisionTasks(wasmPath);
                 
-                // 创建 HandLandmarker（优化配置以支持双手识别）
+                // 创建 HandLandmarker（平衡检测率与稳定：0.5 便于识别，又减少误检）
                 this.handLandmarker = await HandLandmarker.createFromOptions(filesetResolver, {
                     baseOptions: {
                         modelAssetPath: '/kernel/dynamicModule/libs/mediapipe/models/hand_landmarker.task',
                         delegate: 'GPU'  // 使用GPU加速
                     },
                     numHands: 2,  // 支持最多2只手
-                    minHandDetectionConfidence: 0.3,  // 降低检测阈值以提高双手识别率
-                    minHandPresenceConfidence: 0.3,   // 降低存在阈值
-                    minTrackingConfidence: 0.3        // 降低跟踪阈值
+                    minHandDetectionConfidence: 0.5,
+                    minHandPresenceConfidence: 0.5,
+                    minTrackingConfidence: 0.5
                 });
                 
-                // 创建 GestureRecognizer（手势识别器，优化配置）
+                // 创建 GestureRecognizer（与手部检测一致，便于食指/捏合稳定识别）
                 this.gestureRecognizer = await GestureRecognizer.createFromOptions(filesetResolver, {
                     baseOptions: {
                         modelAssetPath: '/kernel/dynamicModule/libs/mediapipe/models/gesture_recognizer.task',
                         delegate: 'GPU'  // 使用GPU加速
                     },
-                    numHands: 2,  // 支持最多2只手
-                    minHandDetectionConfidence: 0.3,  // 降低检测阈值
-                    minHandPresenceConfidence: 0.3,   // 降低存在阈值
-                    minTrackingConfidence: 0.3        // 降低跟踪阈值
+                    numHands: 2,
+                    minHandDetectionConfidence: 0.5,
+                    minHandPresenceConfidence: 0.5,
+                    minTrackingConfidence: 0.5
                 });
                 
-                // 创建 FaceLandmarker（面部识别器）
+                // 创建 FaceLandmarker（面部识别器，提高置信度以提升跟踪准确度）
                 // 注意：使用 IMAGE 模式，因为 VIDEO 模式需要时间戳管理，而我们的实时处理更适合 IMAGE 模式
                 this.faceLandmarker = await FaceLandmarker.createFromOptions(filesetResolver, {
                     baseOptions: {
@@ -566,9 +577,9 @@
                     outputFaceBlendshapes: false,  // 不输出面部混合形状（提高性能）
                     runningMode: 'IMAGE',  // 图像模式（每帧独立处理）
                     numFaces: 1,  // 最多检测1张脸（可根据需要调整）
-                    minFaceDetectionConfidence: 0.5,
-                    minFacePresenceConfidence: 0.5,
-                    minTrackingConfidence: 0.5
+                    minFaceDetectionConfidence: 0.6,   // 提高以提升面部识别准确度
+                    minFacePresenceConfidence: 0.6,
+                    minTrackingConfidence: 0.6
                 });
                 
                 if (typeof KernelLogger !== 'undefined') {
@@ -4265,7 +4276,10 @@
             if (!this.canvas) return;
             
             const canvas = this.canvas;
-            const rect = canvas.getBoundingClientRect();
+            // 映射到全视口，使手势可操作到系统边缘（原为 canvas.getBoundingClientRect() 仅限窗口内）
+            const viewportW = window.innerWidth || document.documentElement.clientWidth || 1920;
+            const viewportH = window.innerHeight || document.documentElement.clientHeight || 1080;
+            const rect = { left: 0, top: 0, width: viewportW, height: viewportH };
             
             // 获取圆形容器
             let circleContainer = document.getElementById('handtracker-circle-container');
@@ -4286,21 +4300,17 @@
                 }
             }
             
-            // 收集所有手指的指尖位置（按手和手指索引组织）
+            // 手势操控 ZerOS：仅用第一只手的食指作为光标，提高成功率、避免多指误触
             const fingerTips = [];
-            for (let handIdx = 0; handIdx < results.landmarks.length; handIdx++) {
-                const landmarks = results.landmarks[handIdx];
-                if (!landmarks || landmarks.length < 21) continue;
-                
-                // 获取五个手指的指尖位置（拇指、食指、中指、无名指、小指）
-                const fingerTipIndices = [4, 8, 12, 16, 20];
-                for (let fingerIdx = 0; fingerIdx < fingerTipIndices.length; fingerIdx++) {
-                    const tipIdx = fingerTipIndices[fingerIdx];
+            if (results.landmarks.length > 0) {
+                const landmarks = results.landmarks[0];
+                if (landmarks && landmarks.length >= 21) {
                     fingerTips.push({
-                        landmark: landmarks[tipIdx],
-                        handIndex: handIdx,
-                        fingerIndex: fingerIdx,
-                        uniqueId: `${handIdx}-${fingerIdx}`  // 唯一标识符
+                        landmark: landmarks[8],  // 食指指尖
+                        handIndex: 0,
+                        fingerIndex: 1,
+                        uniqueId: '0-1',
+                        handLandmarks: landmarks  // 用于捏合检测
                     });
                 }
             }
@@ -4318,16 +4328,16 @@
                 }
             }
             
-            // 初始化手指状态数组
+            // 初始化手指状态数组（含悬停点击与捏合拖动状态）
             while (this._fingerTipStates.length < fingerTips.length) {
                 this._fingerTipStates.push({
-                    isPressed: false,
-                    isDragging: false,
                     lastX: 0,
                     lastY: 0,
-                    pressStartTime: 0,
-                    pressStartX: 0,
-                    pressStartY: 0
+                    dwellStartTime: 0,
+                    dwellStartX: 0,
+                    dwellStartY: 0,
+                    dwellTriggered: false,
+                    isPinchDrag: false
                 });
             }
             while (this._fingerTipStates.length > fingerTips.length) {
@@ -4341,13 +4351,16 @@
                 const state = this._fingerTipStates[i];
                 if (!circle || !tip || !state) continue;
                 
-                // 将MediaPipe的归一化坐标转换为屏幕像素坐标
-                // 注意：canvas是镜像的，所以需要镜像X坐标
-                const x = (1 - tip.landmark.x) * rect.width + rect.left;  // 镜像X轴
-                const y = tip.landmark.y * rect.height + rect.top;
+                // 将MediaPipe的归一化坐标(0-1)转换为全视口像素坐标，便于操作到屏幕边缘
+                // 小幅扩展映射范围，使摄像头边缘的手势也能触及视口边缘
+                const margin = 0.04;
+                const nx = Math.max(0, Math.min(1, (1 - tip.landmark.x) * (1 + margin * 2) - margin));
+                const ny = Math.max(0, Math.min(1, tip.landmark.y * (1 + margin * 2) - margin));
+                const x = nx * rect.width + rect.left;
+                const y = ny * rect.height + rect.top;
                 
-                // 更新圆形位置（平滑跟随）
-                const lerpFactor = 0.6;  // 快速跟随
+                // 更新圆形位置（平滑跟随，略提高跟随速度以增强灵敏感）
+                const lerpFactor = 0.72;
                 const currentX = parseFloat(circle.style.left) || x;
                 const currentY = parseFloat(circle.style.top) || y;
                 const newX = currentX + (x - currentX) * lerpFactor;
@@ -4356,7 +4369,7 @@
                 circle.style.left = newX + 'px';
                 circle.style.top = newY + 'px';
                 
-                // 检测手势（点击和拖动）
+                // 检测手势：悬停点击 + 捏合拖动（仅对食指光标）
                 this._handleFingerGesture(i, newX, newY, state, tip);
             }
         },
@@ -4389,74 +4402,65 @@
         },
         
         /**
-         * 处理手指手势（点击和拖动）
+         * 处理手指手势：仅用食指。点击=悬停约0.7秒，拖动=拇指+食指捏合（成功率更高、不依赖深度）
          */
         _handleFingerGesture: function(index, x, y, state, tip) {
             if (!this._isGestureMode) return;
             
-            const currentTime = Date.now();
-            const moveThreshold = 5;  // 移动阈值（像素）
-            const clickTimeThreshold = 300;  // 点击时间阈值（毫秒）
+            const now = Date.now();
+            const handLandmarks = tip.handLandmarks;
+            const dwellMs = this._dwellTimeMs;
+            const dwellRadius = this._dwellRadiusPx;
             
-            // 计算移动距离
-            const deltaX = x - state.lastX;
-            const deltaY = y - state.lastY;
-            const moveDistance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
-            
-            // 检测手指是否按下（Z坐标小于阈值表示手指靠近屏幕）
-            const isFingerDown = (tip.landmark.z || 0) < -0.05;  // Z坐标负值表示靠近
-            
-            if (isFingerDown && !state.isPressed) {
-                // 手指按下
-                state.isPressed = true;
-                state.isDragging = false;
-                state.pressStartTime = currentTime;
-                state.pressStartX = x;
-                state.pressStartY = y;
-                state.lastX = x;
-                state.lastY = y;
-                
-                // 模拟鼠标按下事件
-                this._simulateMouseEvent('mousedown', x, y, 0);
-                
-            } else if (isFingerDown && state.isPressed) {
-                // 手指持续按下，检查是否拖动
-                if (moveDistance > moveThreshold) {
-                    if (!state.isDragging) {
-                        state.isDragging = true;
-                    }
-                    // 模拟鼠标移动事件（拖动）
-                    this._simulateMouseEvent('mousemove', x, y, 0);
-                }
-                state.lastX = x;
-                state.lastY = y;
-                
-            } else if (!isFingerDown && state.isPressed) {
-                // 手指抬起
-                const pressDuration = currentTime - state.pressStartTime;
-                const totalMove = Math.sqrt(
-                    Math.pow(x - state.pressStartX, 2) + 
-                    Math.pow(y - state.pressStartY, 2)
-                );
-                
-                if (state.isDragging || totalMove > moveThreshold) {
-                    // 拖动结束
-                    this._simulateMouseEvent('mouseup', x, y, 0);
-                } else if (pressDuration < clickTimeThreshold) {
-                    // 点击事件
-                    this._simulateMouseEvent('mouseup', x, y, 0);
-                    // 延迟触发点击事件，确保mouseup先触发
-                    setTimeout(() => {
-                        this._simulateMouseEvent('click', x, y, 0);
-                    }, 10);
-                } else {
-                    // 长按后释放
-                    this._simulateMouseEvent('mouseup', x, y, 0);
-                }
-                
-                state.isPressed = false;
-                state.isDragging = false;
+            // 捏合检测：拇指(4)与食指(8)距离
+            let isPinch = false;
+            if (handLandmarks && handLandmarks.length >= 9) {
+                const t = handLandmarks[4];
+                const i = handLandmarks[8];
+                const d = Math.sqrt(Math.pow(t.x - i.x, 2) + Math.pow(t.y - i.y, 2) + Math.pow((t.z || 0) - (i.z || 0), 2));
+                isPinch = d < this._pinchDistanceNorm;
             }
+            
+            // 捏合 = 拖动：按下/移动/释放
+            if (isPinch) {
+                if (!state.isPinchDrag) {
+                    state.isPinchDrag = true;
+                    this._simulateMouseEvent('mousedown', x, y, 0);
+                }
+                this._simulateMouseEvent('mousemove', x, y, 0);
+                state.dwellStartTime = 0;
+                state.dwellTriggered = false;
+            } else {
+                if (state.isPinchDrag) {
+                    this._simulateMouseEvent('mouseup', x, y, 0);
+                    state.isPinchDrag = false;
+                }
+            }
+            
+            // 非捏合时：悬停点击（保持不动约 0.7 秒 = 点击）
+            if (!isPinch && !state.isPinchDrag) {
+                const dx = x - state.lastX;
+                const dy = y - state.lastY;
+                const moveDist = Math.sqrt(dx * dx + dy * dy);
+                const toDwellStart = Math.sqrt(Math.pow(x - state.dwellStartX, 2) + Math.pow(y - state.dwellStartY, 2));
+                
+                if (state.dwellStartTime === 0 || moveDist > dwellRadius) {
+                    state.dwellStartTime = now;
+                    state.dwellStartX = x;
+                    state.dwellStartY = y;
+                    state.dwellTriggered = false;
+                } else if (toDwellStart <= dwellRadius && (now - state.dwellStartTime) >= dwellMs && !state.dwellTriggered) {
+                    state.dwellTriggered = true;
+                    this._simulateMouseEvent('mousedown', x, y, 0);
+                    setTimeout(() => {
+                        this._simulateMouseEvent('mouseup', x, y, 0);
+                        this._simulateMouseEvent('click', x, y, 0);
+                    }, 50);
+                }
+            }
+            
+            state.lastX = x;
+            state.lastY = y;
         },
         
         /**

@@ -3,12 +3,13 @@
 // 合规模块需包含 __init__, __start__, __stop__, __status__, __info__ 方法（均为函数）
 // 加载时不调用任何方法；仅当明确启用某服务时依次调用 init、start；再次启动不调用 init
 //
-// 权限管控：本模块相关 API 由进程管理器以 Server.* 形式暴露（Server.start/stop/listServices/loadAll/status/info/isInited/isStarted），
+// 权限管控：本模块相关 API 由进程管理器以 Server.* 形式暴露（Server.start/stop/listServices/loadAll/status/info/isInited/isStarted/listConfig/setConfig），
 // 所需权限为 SERVER_SERVICE_MANAGE（权限等级最高，DANGEROUS）。程序应通过 kernelAPI.call('Server.xxx', args) 调用并声明该权限。
-// 防绕过：start/stop/listServices/loadAll/status/info/isInited/isStarted 均需内核令牌，直接调用（无令牌）将抛错，避免程序通过 window.ServerExpansion 或 POOL 绕过权限。
+// 防绕过：start/stop/listServices/loadAll/status/info/isInited/isStarted/listConfig/setConfig 均需内核令牌，直接调用（无令牌）将抛错，避免程序通过 window.ServerExpansion 或 POOL 绕过权限。
 //
 // 服务模块约定：脚本加载后需调用 window.__ZerOS_ServerExpansion_Register__(api) 上报导出对象，
 // 其中 api 必须包含上述五个方法，否则视为不合规、不会加入已加载列表。
+// 可选：__set__ 与 __list__ 成对实现——若存在 __set__ 则必须存在 __list__，供系统服务程序渲染配置项并调用 set 持久化。
 
 (function () {
     'use strict';
@@ -66,6 +67,7 @@
 
     /**
      * 检查模块导出是否合规（所有必需方法存在且为函数）
+     * 可选：__set__ 与 __list__ 成对存在——若存在 __set__ 则必须存在 __list__，供系统服务程序渲染配置项并调用 set 持久化
      * @param {*} api 模块导出对象
      * @returns {boolean}
      */
@@ -75,6 +77,7 @@
             var key = REQUIRED_METHODS[i];
             if (typeof api[key] !== 'function') return false;
         }
+        if (typeof api.__set__ === 'function' && typeof api.__list__ !== 'function') return false;
         return true;
     }
 
@@ -414,6 +417,54 @@
             return Promise.resolve(ServerExpansion._ready).then(function () {
                 var entry = _modules.get(id);
                 return !!(entry && entry.started);
+            });
+        },
+
+        /**
+         * 列出服务可配置项（调用模块 __list__）；仅当服务实现 __list__ 时返回非空；供系统服务程序渲染输入框/开关
+         * @param {string} id 服务 id
+         * @param {*} token 内核令牌
+         * @returns {Promise<Array<{ key: string, label: string, type: 'text'|'number'|'boolean', value: * }>>}
+         */
+        listConfig: function (id, token) {
+            requireKernelToken(token);
+            return Promise.resolve(ServerExpansion._ready).then(function () {
+                var entry = _modules.get(id);
+                if (!entry || typeof entry.api.__list__ !== 'function') return [];
+                try {
+                    var list = entry.api.__list__();
+                    return Array.isArray(list) ? list : [];
+                } catch (e) {
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.warn("ServerExpansion", "listConfig: " + id + ", " + (e && e.message));
+                    }
+                    return [];
+                }
+            });
+        },
+
+        /**
+         * 设置服务配置并持久化（调用模块 __set__）；服务应在 __set__ 内完成保存（如写入 LStorage）
+         * @param {string} id 服务 id
+         * @param {Object} config 配置对象 { key: value, ... }
+         * @param {*} token 内核令牌
+         * @returns {Promise<void>}
+         */
+        setConfig: function (id, config, token) {
+            requireKernelToken(token);
+            return Promise.resolve(ServerExpansion._ready).then(function () {
+                var entry = _modules.get(id);
+                if (!entry || typeof entry.api.__set__ !== 'function') {
+                    return Promise.reject(new Error("服务 " + id + " 不支持配置"));
+                }
+                try {
+                    entry.api.__set__(config || {});
+                } catch (e) {
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.warn("ServerExpansion", "setConfig: " + id + ", " + (e && e.message));
+                    }
+                    return Promise.reject(e);
+                }
             });
         },
 

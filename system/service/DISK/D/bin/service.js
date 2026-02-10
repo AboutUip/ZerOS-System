@@ -1,7 +1,7 @@
 /* Service 命令实现
  * 功能：
  * - 系统服务相关处理，依赖内核服务扩展模块 ServerExpansion
- * - 支持 list / start / stop / status / info / reload
+ * - 支持 list / start / stop / status / info / config / reload
  * - 程序执行完成后自动关闭
  */
 
@@ -93,6 +93,13 @@
                         } else {
                             await this._cmdInfo(id);
                         }
+                    } else if (sub === 'config') {
+                        if (!id) {
+                            this.terminal.write('service: config 需要指定服务 id\n');
+                            this._showUsage();
+                        } else {
+                            await this._cmdConfig(id, args.slice(2));
+                        }
                     } else if (sub === 'reload') {
                         await this._cmdReload();
                     } else {
@@ -119,6 +126,7 @@
             this.terminal.write('  stop      停止服务\n');
             this.terminal.write('  status    查询服务状态\n');
             this.terminal.write('  info      查看服务信息\n');
+            this.terminal.write('  config    列出可配置项（config <id>）或设置配置（config <id> set key=value [key2=value2...]）\n');
             this.terminal.write('  reload    重新扫描 D/server 并加载服务模块\n');
             this.terminal.write('\n');
             this.terminal.write('选项: -h, --help  显示此帮助\n');
@@ -129,6 +137,8 @@
             this.terminal.write('  service start notice\n');
             this.terminal.write('  service stop notice\n');
             this.terminal.write('  service status notice\n');
+            this.terminal.write('  service config notice\n');
+            this.terminal.write('  service config notice set apiUrl=https://example.com enabled=true\n');
         },
 
         _cmdList: async function() {
@@ -195,6 +205,47 @@
                 this.terminal.write(JSON.stringify(info, null, 2) + '\n');
             } catch (e) {
                 this.terminal.write(`service info: ${e.message || e}\n`);
+            }
+        },
+
+        _cmdConfig: async function(id, rest) {
+            try {
+                const items = await this._kernelAPI.call('Server.listConfig', [id]) || [];
+                if (items.length === 0 && (!rest || rest.length === 0)) {
+                    this.terminal.write(`服务 ${id}: 无可配置项\n`);
+                    return;
+                }
+                if (rest && rest[0] === 'set' && rest.length > 1) {
+                    const config = {};
+                    for (let i = 1; i < rest.length; i++) {
+                        const s = rest[i];
+                        const eq = s.indexOf('=');
+                        if (eq > 0) {
+                            const k = s.substring(0, eq).trim();
+                            let v = s.substring(eq + 1).trim();
+                            if (v === 'true' || v === '1') v = true;
+                            else if (v === 'false' || v === '0') v = false;
+                            else if (/^-?\d+(\.\d+)?$/.test(v)) v = parseFloat(v, 10);
+                            config[k] = v;
+                        }
+                    }
+                    if (Object.keys(config).length === 0) {
+                        this.terminal.write('service config set: 请提供 key=value 对，如 apiUrl=https://example.com\n');
+                        return;
+                    }
+                    await this._kernelAPI.call('Server.setConfig', [id, config]);
+                    this.terminal.write(`服务 ${id} 配置已保存\n`);
+                } else {
+                    this.terminal.write(`服务 ${id} 可配置项:\n`);
+                    for (const item of items) {
+                        const type = item.type || 'text';
+                        const val = item.value;
+                        const valStr = type === 'boolean' ? (val ? 'true' : 'false') : String(val != null ? val : '');
+                        this.terminal.write(`  ${item.key} (${item.label || '-'}) [${type}]: ${valStr}\n`);
+                    }
+                }
+            } catch (e) {
+                this.terminal.write(`service config: ${e.message || e}\n`);
             }
         },
 

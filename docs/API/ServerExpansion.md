@@ -52,6 +52,10 @@
 | `Server.info` | 查询服务信息 | `[id]` | `Promise<*>` |
 | `Server.isInited` | 是否已初始化 | `[id]` | `Promise<boolean>` |
 | `Server.isStarted` | 是否已启动 | `[id]` | `Promise<boolean>` |
+| `Server.listConfig` | 列出服务可配置项（调用 `__list__`，供系统服务程序渲染） | `[id]` | `Promise<Array>` |
+| `Server.setConfig` | 设置并持久化配置（调用 `__set__`，服务自行保存） | `[id, config]` | `Promise<void>` |
+
+服务若实现 `__set__` 则必须同时实现 `__list__`；系统服务程序通过 `listConfig` 获取可配置项、渲染输入框/开关，保存时调用 `setConfig`。
 
 **示例**（在程序的 `__init__` 中保存 `initArgs.kernelAPI` 后使用）：
 

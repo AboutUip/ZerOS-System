@@ -291,3 +291,35 @@
     max-height: 120px;
     overflow-y: auto;
 }
+
+.servicemanager-config-row {
+    margin-bottom: 10px;
+}
+
+.servicemanager-config-row label {
+    display: block;
+    font-size: 13px;
+    color: var(--theme-text-muted, #94a3b8);
+    margin-bottom: 4px;
+}
+
+.servicemanager-config-row input[type="text"],
+.servicemanager-config-row input[type="number"] {
+    width: 100%;
+    max-width: 320px;
+    box-sizing: border-box;
+    padding: 6px 10px;
+    font-size: 14px;
+    border: 1px solid var(--theme-border, rgba(139, 92, 246, 0.25));
+    border-radius: 4px;
+    background: var(--theme-background-secondary, #1a1f28);
+    color: var(--theme-text, #e8ecf0);
+}
+
+.servicemanager-config-row input[type="checkbox"] {
+    margin-right: 8px;
+}
+
+.servicemanager-btn-save {
+    margin-top: 12px;
+}

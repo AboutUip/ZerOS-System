@@ -97,7 +97,8 @@ class SystemInformation {
         AUDIO_PROXY: 'audio-proxy',
         MODULE_PROXY: 'module-proxy',
         BROWSER_PROXY: 'BrowserProxy',
-        DISKMANAGER: 'DISKMANAGER'
+        DISKMANAGER: 'DISKMANAGER',
+        SPARK_AI_PROXY: 'spark-ai-proxy'
     };
     
     // 服务基础路径

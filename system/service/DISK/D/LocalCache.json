@@ -1,11 +1,11 @@
 {
   "system": {
     "system.dailyQuote": {
-      "value": "纵然如斯，亦候永世。",
+      "value": "看吧，他再怎样表现得冷漠，到最后都会像那样充满善意。",
       "expiresAt": 0,
-      "createdAt": 1770591899181,
-      "updatedAt": 1770591899181,
-      "size": 32
+      "createdAt": 1770703386684,
+      "updatedAt": 1770703386684,
+      "size": 80
     }
   },
   "programs": {
@@ -24,37 +24,37 @@
       }
     },
     "TaskbarManager": {
-      "weather:晋城": {
+      "weather:兴县": {
         "value": {
           "code": 200,
           "data": {
-            "city": "山西省 晋城市",
+            "city": "山西省 吕梁市",
             "today": {
-              "current_temp": "-1℃",
-              "current_cond": "阴",
-              "low": "-6℃",
+              "current_temp": "2℃",
+              "current_cond": "晴",
+              "low": "-9℃",
               "quality": "--"
             },
-            "low_temperature": -6,
+            "low_temperature": -9,
             "tips": "建议穿羽绒服、棉裤，做好全面防寒",
             "seven_day": [
               {
-                "date": "2026-02-08",
-                "cond": "晴",
-                "high": "6℃",
-                "low": "-6℃"
-              },
-              {
-                "date": "2026-02-09",
-                "cond": "多云",
-                "high": "5℃",
-                "low": "-5℃"
-              },
-              {
                 "date": "2026-02-10",
                 "cond": "晴",
-                "high": "7℃",
-                "low": "-3℃"
+                "high": "3℃",
+                "low": "-9℃"
+              },
+              {
+                "date": "2026-02-11",
+                "cond": "晴",
+                "high": "8℃",
+                "low": "-8℃"
+              },
+              {
+                "date": "2026-02-12",
+                "cond": "晴",
+                "high": "8℃",
+                "low": "-4℃"
               }
             ],
             "life_indices": {
@@ -74,95 +74,9 @@
                 "advice": "天气晴好，非常适合洗车，洗后能保持较长时间"
               },
               "drying": {
-                "level": "适宜",
-                "brief": "较好",
-                "advice": "天气较好，适合晾晒"
-              },
-              "air_conditioner": {
-                "level": "建议制热",
-                "brief": "寒冷",
-                "advice": "建议开启空调制热或使用其他取暖设备"
-              },
-              "cold_risk": {
-                "level": "较低",
-                "brief": "较少发",
-                "advice": "感冒风险较低，注意适当增减衣物"
-              },
-              "exercise": {
-                "level": "适宜",
-                "brief": "较好",
-                "advice": "天气适合运动，建议适当进行户外锻炼"
-              },
-              "comfort": {
-                "level": "极冷",
-                "brief": "寒冷",
-                "advice": "体感寒冷，注意保暖防寒"
-              }
-            },
-            "feels_like": -4,
-            "wind_direction": "西北风",
-            "wind_power": "1",
-            "humidity": 44
-          }
-        },
-        "expiresAt": 1770609524700,
-        "createdAt": 1770566324700,
-        "updatedAt": 1770566324700,
-        "size": 1372
-      },
-      "weather:兴县": {
-        "value": {
-          "code": 200,
-          "data": {
-            "city": "山西省 吕梁市",
-            "today": {
-              "current_temp": "-4℃",
-              "current_cond": "阴",
-              "low": "-6℃",
-              "quality": "--"
-            },
-            "low_temperature": -6,
-            "tips": "建议穿羽绒服、棉裤，做好全面防寒",
-            "seven_day": [
-              {
-                "date": "2026-02-09",
-                "cond": "多云",
-                "high": "7℃",
-                "low": "-6℃"
-              },
-              {
-                "date": "2026-02-10",
-                "cond": "晴",
-                "high": "3℃",
-                "low": "-8℃"
-              },
-              {
-                "date": "2026-02-11",
-                "cond": "晴",
-                "high": "10℃",
-                "low": "-6℃"
-              }
-            ],
-            "life_indices": {
-              "clothing": {
-                "level": "严寒",
-                "brief": "极冷",
-                "advice": "建议穿羽绒服、棉裤，做好全面防寒"
-              },
-              "uv": {
-                "level": "低",
-                "brief": "弱",
-                "advice": "紫外线较弱，无需特别防护，可正常户外活动"
-              },
-              "car_wash": {
                 "level": "非常适宜",
                 "brief": "极佳",
-                "advice": "天气晴好，非常适合洗车，洗后能保持较长时间"
-              },
-              "drying": {
-                "level": "适宜",
-                "brief": "较好",
-                "advice": "天气较好，适合晾晒"
+                "advice": "天气晴好干燥，非常适合晾晒衣物和被褥"
               },
               "air_conditioner": {
                 "level": "建议制热",
@@ -175,9 +89,9 @@
                 "advice": "感冒风险较低，注意适当增减衣物"
               },
               "exercise": {
-                "level": "适宜",
-                "brief": "较好",
-                "advice": "天气适合运动，建议适当进行户外锻炼"
+                "level": "非常适宜",
+                "brief": "极佳",
+                "advice": "天气非常适合户外运动，尽情享受吧"
               },
               "comfort": {
                 "level": "极冷",
@@ -185,16 +99,25 @@
                 "advice": "体感寒冷，注意保暖防寒"
               }
             },
-            "feels_like": -9,
-            "wind_direction": "无持续风向",
-            "wind_power": "0",
-            "humidity": 37
+            "feels_like": -5,
+            "wind_direction": "西南风",
+            "wind_power": "2",
+            "humidity": 27
           }
         },
-        "expiresAt": 1770628843606,
-        "createdAt": 1770585643606,
-        "updatedAt": 1770585643606,
-        "size": 1376
+        "expiresAt": 1770744446983,
+        "createdAt": 1770701246983,
+        "updatedAt": 1770701246983,
+        "size": 1404
+      }
+    },
+    "exploit": {
+      "system.dailyQuote": {
+        "value": "当时总觉得再过两三年，自己就会变成一个很厉害的人物呢。",
+        "expiresAt": 0,
+        "createdAt": 1770741930733,
+        "updatedAt": 1770741930733,
+        "size": 83
       }
     }
   }

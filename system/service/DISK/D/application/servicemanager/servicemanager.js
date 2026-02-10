@@ -267,6 +267,8 @@
                             self._startService(self._selectedId);
                         } else if (btn.dataset.action === 'stop') {
                             self._stopService(self._selectedId);
+                        } else if (btn.dataset.action === 'save-config') {
+                            self._saveServiceConfig(self._selectedId);
                         }
                     });
                     this.eventHandlers.push(detailClickId);
@@ -498,19 +500,22 @@
             var api = this._kernelAPI;
             var infoPromise = api.call('Server.info', [id]);
             var statusPromise = api.call('Server.status', [id]);
+            var listConfigPromise = api.call('Server.listConfig', [id]).catch(function () { return []; });
             detailEl.innerHTML = '<div class="servicemanager-detail-loading">' + (this._getText('SERVICEMANAGER_LOADING', '加载中...')) + '</div>';
 
             var self = this;
-            Promise.all([infoPromise, statusPromise]).then(function (results) {
+            Promise.all([infoPromise, statusPromise, listConfigPromise]).then(function (results) {
                 var info = results[0];
                 var status = results[1];
+                var configItems = Array.isArray(results[2]) ? results[2] : [];
                 return api.call('Server.isStarted', [id]).then(function (started) {
-                    return { info: info, status: status, started: started };
+                    return { info: info, status: status, started: started, configItems: configItems };
                 });
             }).then(function (data) {
                 var info = data.info;
                 var status = data.status;
                 var started = data.started;
+                var configItems = data.configItems || [];
                 var autoStart = !!self._autoStartMap[id];
                 var runningText = started ? (self._getText('SERVICEMANAGER_RUNNING', '运行中')) : (self._getText('SERVICEMANAGER_STOPPED', '已停止'));
                 var badgeClass = started ? 'servicemanager-badge-running' : 'servicemanager-badge-stopped';
@@ -525,6 +530,27 @@
                 html += '<button type="button" class="servicemanager-btn servicemanager-btn-start" data-action="start"' + (started ? ' disabled' : '') + '>' + (self._getText('SERVICEMANAGER_START', '启动')) + '</button>';
                 html += '<button type="button" class="servicemanager-btn servicemanager-btn-stop" data-action="stop"' + (!started ? ' disabled' : '') + '>' + (self._getText('SERVICEMANAGER_STOP', '停止')) + '</button>';
                 html += '</div></div></div>';
+                if (configItems.length > 0) {
+                    html += '<div class="servicemanager-detail-card servicemanager-detail-card-config" data-role="config-card">';
+                    html += '<div class="servicemanager-detail-card-title">' + (self._getText('SERVICEMANAGER_CONFIG', '配置')) + '</div>';
+                    html += '<div class="servicemanager-detail-card-body">';
+                    for (var c = 0; c < configItems.length; c++) {
+                        var item = configItems[c];
+                        var k = (item.key || '').replace(/"/g, '&quot;');
+                        var lab = self._escapeHtml(item.label || item.key || '');
+                        var typ = (item.type || 'text');
+                        var val = item.value;
+                        if (typ === 'boolean') {
+                            html += '<div class="servicemanager-config-row"><label><input type="checkbox" data-config-key="' + k + '" data-config-type="boolean"' + (val ? ' checked' : '') + '>' + lab + '</label></div>';
+                        } else if (typ === 'number') {
+                            html += '<div class="servicemanager-config-row"><label>' + lab + '</label><input type="number" data-config-key="' + k + '" data-config-type="number" value="' + self._escapeHtml(String(val != null ? val : '')) + '"></div>';
+                        } else {
+                            html += '<div class="servicemanager-config-row"><label>' + lab + '</label><input type="text" data-config-key="' + k + '" data-config-type="text" value="' + self._escapeHtml(String(val != null ? val : '')) + '"></div>';
+                        }
+                    }
+                    html += '<button type="button" class="servicemanager-btn servicemanager-btn-save" data-action="save-config">' + (self._getText('SERVICEMANAGER_SAVE_CONFIG', '保存配置')) + '</button>';
+                    html += '</div></div>';
+                }
                 html += '<div class="servicemanager-detail-card">';
                 html += '<div class="servicemanager-detail-card-title">' + (self._getText('SERVICEMANAGER_AUTOSTART', '自启')) + '</div>';
                 html += '<div class="servicemanager-detail-card-body">';
@@ -639,6 +665,40 @@
             }).catch(function (e) {
                 if (typeof KernelLogger !== 'undefined') KernelLogger.warn('SERVICEMANAGER', '停止服务失败: ' + id, e);
                 self._refreshServiceList();
+            });
+        },
+
+        _saveServiceConfig: function (id) {
+            if (!this._hasServerAPI() || !id) return;
+            var detailEl = this.window && this.window.querySelector('[data-role="detail"]');
+            var configCard = detailEl && detailEl.querySelector('[data-role="config-card"]');
+            if (!configCard) return;
+            var inputs = configCard.querySelectorAll('[data-config-key]');
+            var config = {};
+            for (var i = 0; i < inputs.length; i++) {
+                var inp = inputs[i];
+                var key = inp.dataset.configKey;
+                var typ = inp.dataset.configType || 'text';
+                if (!key) continue;
+                if (typ === 'boolean') {
+                    config[key] = inp.checked;
+                } else if (typ === 'number') {
+                    var n = parseFloat(inp.value, 10);
+                    config[key] = isNaN(n) ? 0 : n;
+                } else {
+                    config[key] = inp.value || '';
+                }
+            }
+            var self = this;
+            this._kernelAPI.call('Server.setConfig', [id, config]).then(function () {
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.info('SERVICEMANAGER', '已保存服务配置: ' + id);
+                }
+                self._showMessage(self._getText('SERVICEMANAGER_CONFIG_SAVED', '配置已保存'));
+            }).catch(function (e) {
+                var msg = e && (e.message || String(e)) || self._getText('SERVICEMANAGER_OPERATION_FAIL', '操作失败');
+                if (typeof KernelLogger !== 'undefined') KernelLogger.warn('SERVICEMANAGER', '保存配置失败: ' + id, e);
+                self._showMessage(msg);
             });
         }
     };

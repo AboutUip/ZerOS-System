@@ -21,6 +21,15 @@
 | `__status__` | 返回当前状态（任意值） | `Server.status(id)` |
 | `__info__` | 返回服务信息（任意值） | `Server.info(id)` |
 
+**可选方法**（成对实现，仅当提供 `__set__` 时必须同时提供 `__list__`）：
+
+| 方法 | 说明 | 调用时机 |
+|------|------|----------|
+| `__list__` | 返回可配置项列表，供系统服务程序渲染输入框/开关 | `Server.listConfig(id)` |
+| `__set__` | 接收配置对象并持久化（服务自行保存，如写入 LStorage） | `Server.setConfig(id, config)` |
+
+`__list__` 应返回数组，每项形如 `{ key: string, label: string, type: 'text'|'number'|'boolean', value: any }`。`type` 为 `text`/`number` 时渲染为输入框，`boolean` 时渲染为开关。
+
 模块加载后必须通过**全局注册函数**上报上述导出对象，否则视为不合规，不会被加入已加载列表。
 
 ## 注册方式
@@ -97,6 +106,8 @@ if (typeof window !== 'undefined' && typeof window.__ZerOS_ServerExpansion_Regis
 | 停止服务 | `Server.stop` | `['serviceId']` |
 | 查询状态/信息 | `Server.status` / `Server.info` | `['serviceId']` |
 | 是否已初始化/已启动 | `Server.isInited` / `Server.isStarted` | `['serviceId']` |
+| 列出可配置项 | `Server.listConfig` | `['serviceId']` |
+| 设置并保存配置 | `Server.setConfig` | `['serviceId', config]` |
 
 示例：`await this._kernelAPI.call('Server.start', ['processmemory']);`
 
@@ -122,6 +133,7 @@ const pid = (typeof ProcessManager !== 'undefined' && ProcessManager.SERVER_SERV
 - **notice**：`D/server/server-notice.js`，系统公告通知获取（轮询 API、按等级弹通知）。详见 [通知服务（ServerNotice）](./ServerNotice.md)。
 - **translate**：`D/server/server-translate.js`，AI 智能翻译 + 普通机器翻译。启用后在 POOL > SERVER 中暴露 `Translate`：`translateSimple(text, toLang)` 普通机器翻译（POST `/api/v1/translate/text`，请求体 `{ text }`，响应 `{ text, translate }`）；`translate(textOrTexts, options)` AI 智能翻译（单条/批量、风格、上下文等）。详见 [翻译服务（ServerTranslate）](./ServerTranslate.md)。
 - **processmemory**：`D/server/server-processmemory.js`，进程堆内存读写。启用后在 POOL > SERVER 中暴露 `ProcessMemory`：`getProcessMemoryInfo(targetPid)`、`readProcessHeap(targetPid, heapId, start, length)`、`writeProcessHeap(targetPid, heapId, offset, data)`，供内存编辑器等工具使用。详见 [进程堆内存服务（ServerProcessMemory）](./ServerProcessMemory.md)。
+- **aiassistant**：`D/server/server-aiassistant.js`，语音唤醒式 AI 助手。识别唤醒词（你好小A、小A小A 等）后进入处理模式，可打开/关闭程序、调节亮度、闲聊。唤醒音效使用同目录下的 `start.mp3`。详见 [AI 助手服务（ServerAIAssistant）](./ServerAIAssistant.md)。
 
 ## 相关文档
 

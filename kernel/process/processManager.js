@@ -3120,7 +3120,8 @@ class ProcessManager {
             ProcessManager._log(3, `Exploit程序 ${pid} 直接调用内核API: ${apiName}`);
             // 所有内核模块均支持记录：Exploit 的 API 调用也写入程序日志（任务管理器「API 调用记录」）
             ProcessManager._logProgramAction(pid, 'callKernelAPI', { apiName, args });
-            return await ProcessManager._executeKernelAPI(apiName, args);
+            // 必须传入 pid，否则依赖进程 ID 的 API（如 Speech.createSession）会报「无法获取进程 ID」
+            return await ProcessManager._executeKernelAPI(apiName, args, pid);
         }
 
         // 调用栈与传入 PID 一致性校验（CVS_ZEROS_009；skipCallerCheck 时跳过）
@@ -3301,6 +3302,9 @@ class ProcessManager {
             'Taskbar.getCustomIcons': null, // 读取操作不需要权限
             'Taskbar.getCustomIconsByPid': null, // 读取操作不需要权限
 
+            // 显示API
+            'Display.setBrightness': PermissionManager.PERMISSION.DESKTOP_MANAGE,
+
             // 事件API
             'Event.register': PermissionManager.PERMISSION.EVENT_LISTENER,
             'Event.unregister': PermissionManager.PERMISSION.EVENT_LISTENER,
@@ -3421,6 +3425,8 @@ class ProcessManager {
             'Server.info': PermissionManager.PERMISSION.SERVER_SERVICE_MANAGE,
             'Server.isInited': PermissionManager.PERMISSION.SERVER_SERVICE_MANAGE,
             'Server.isStarted': PermissionManager.PERMISSION.SERVER_SERVICE_MANAGE,
+            'Server.listConfig': PermissionManager.PERMISSION.SERVER_SERVICE_MANAGE,
+            'Server.setConfig': PermissionManager.PERMISSION.SERVER_SERVICE_MANAGE,
         };
 
         return apiPermissionMap[apiName] || null;
@@ -5370,6 +5376,19 @@ class ProcessManager {
                 }
                 return await TaskbarManager.setPinnedPrograms(programNames);
             },
+            'Display.setBrightness': async (value) => {
+                const b = Math.max(70, Math.min(100, parseInt(value, 10) || 70));
+                if (typeof TaskbarManager !== 'undefined' && typeof TaskbarManager._applyBrightnessToDOM === 'function') {
+                    TaskbarManager._applyBrightnessToDOM(b);
+                }
+                if (typeof LStorage !== 'undefined') {
+                    const registry = await LStorage.getSystemStorage('registry');
+                    const merged = (registry && typeof registry === 'object') ? { ...registry } : {};
+                    merged.brightness = b;
+                    await LStorage.setSystemStorage('registry', merged);
+                }
+                return true;
+            },
             'Taskbar.addIcon': async (options, pid) => {
                 if (typeof TaskbarManager === 'undefined') {
                     throw new Error('TaskbarManager 未加载');
@@ -6267,6 +6286,26 @@ class ProcessManager {
                     ServerExpansion.setKernelToken(token);
                 }
                 return await ServerExpansion.isStarted(id, token);
+            },
+            'Server.listConfig': async (id) => {
+                if (typeof ServerExpansion === 'undefined') {
+                    throw new Error('Server.listConfig: ServerExpansion 未加载');
+                }
+                const token = ProcessManager._serverExpansionToken;
+                if (typeof ServerExpansion.setKernelToken === 'function') {
+                    ServerExpansion.setKernelToken(token);
+                }
+                return await ServerExpansion.listConfig(id, token);
+            },
+            'Server.setConfig': async (id, config) => {
+                if (typeof ServerExpansion === 'undefined') {
+                    throw new Error('Server.setConfig: ServerExpansion 未加载');
+                }
+                const token = ProcessManager._serverExpansionToken;
+                if (typeof ServerExpansion.setKernelToken === 'function') {
+                    ServerExpansion.setKernelToken(token);
+                }
+                return await ServerExpansion.setConfig(id, config || {}, token);
             },
 
             // 其他API可以在这里添加
