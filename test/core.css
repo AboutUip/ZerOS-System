@@ -1123,6 +1123,10 @@ html, body {
     z-index: 1000;
 }
 
+.zos-gui-window:not(.zos-window-maximized) {
+    max-height: calc(100vh - 60px);
+}
+
 /* Terminal窗口使用GUIManager统一样式时的特殊处理 */
 /* 保留终端窗口的基本样式，但使用GUIManager的统一样式 */
 /* 确保位置和z-index由GUIManager管理 */
@@ -1137,6 +1141,24 @@ html, body {
 .bash-window.zos-gui-window:not(.zos-window-focused) {
     /* 移除终端自己的未焦点样式，使用GUIManager的 */
     z-index: inherit !important; /* 使用GUIManager设置的z-index */
+}
+
+/* 无边框窗口（GUIManager 原生支持：registerWindow(pid, el, { borderless: true })）— 真正无边框，仅阴影 */
+.zos-gui-window.zos-window-borderless {
+    border: none !important;
+    outline: none !important;
+    border-radius: var(--style-window-borderless-radius, 10px) !important;
+    box-shadow: var(--style-window-borderless-shadow, 0 16px 48px rgba(0, 0, 0, 0.55)) !important;
+}
+.zos-gui-window.zos-window-borderless.zos-window-focused {
+    box-shadow: var(--style-window-borderless-shadow-focused, 0 20px 56px rgba(0, 0, 0, 0.6)) !important;
+}
+.zos-gui-window.zos-window-borderless:not(.zos-window-focused) {
+    box-shadow: var(--style-window-borderless-shadow-unfocused, 0 8px 28px rgba(0, 0, 0, 0.45)) !important;
+}
+.zos-gui-window.zos-window-borderless.zos-window-maximized {
+    border-radius: 0 !important;
+    box-shadow: none !important;
 }
 
 /* 焦点窗口样式 - 使用主题和风格变量 */
@@ -1229,8 +1251,8 @@ html, body {
     transition: all 0.1s ease;
 }
 
-/* 窗口内容区域 */
-.zos-gui-window > *:not(.zos-window-titlebar):not(.tabs-container) {
+/* 窗口内容区域（排除标题栏、标签栏、以及需固定高度的 .zos-fixed-height） */
+.zos-gui-window > *:not(.zos-window-titlebar):not(.tabs-container):not(.zos-fixed-height) {
     flex: 1;
     overflow: auto;
 }

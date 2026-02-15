@@ -36,6 +36,11 @@ GUIManager.init();
   - `onMinimize` (Function): 最小化回调（可选）`() => {}`
   - `onMaximize` (Function): 最大化回调（可选）`(isMaximized: boolean) => {}`。参数 `isMaximized` 表示窗口是否最大化（`true` 为最大化，`false` 为还原）
   - `windowId` (string): 窗口 ID（可选，如果不提供则自动生成）
+  - `noTitleBar` (boolean): 是否不使用系统标题栏；为 `true` 时由应用自行绘制标题栏，需同时提供 `dragHandle` 以支持拖拽
+  - `dragHandle` (HTMLElement): 当 `noTitleBar` 为 `true` 时，用于拖拽窗口的 DOM 元素（如自定义标题栏容器）
+  - `borderless` (boolean): 是否使用无边框样式（无可见边框、默认无阴影，仅焦点时极轻阴影；最大化时无阴影）
+  - `titleBarHeight` (number): 系统标题栏高度（像素），仅在不使用 `noTitleBar` 时生效，默认 40
+  - `titleBarPadding` (string): 系统标题栏内边距（CSS 值），仅在不使用 `noTitleBar` 时生效，默认 `'0 16px'`
 
 **返回值**: `Object|null` - 窗口信息对象
 ```javascript
@@ -73,6 +78,21 @@ GUIManager.registerWindow(pid, windowElement, {
     }
 });
 ```
+
+**无边框 + 自定义标题栏示例**（如磁盘管理程序）:
+```javascript
+var titleBar = windowElement.querySelector('.my-custom-titlebar');
+GUIManager.registerWindow(pid, windowElement, {
+    title: '磁盘管理',
+    noTitleBar: true,
+    dragHandle: titleBar,
+    borderless: true,
+    onClose: () => {},
+    onMinimize: () => { /* 自定义最小化 */ },
+    onMaximize: (isMaximized) => { /* 自定义最大化/还原 */ }
+});
+```
+此时窗口会添加类 `zos-window-borderless`，无系统标题栏，拖拽由 `dragHandle` 提供。
 
 #### `unregisterWindow(windowIdOrPid)`
 

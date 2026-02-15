@@ -1,10 +1,8 @@
 {
   "system": {
     "permissionManager.permissions": {
-      "servicemanager": [
-        "GUI_WINDOW_CREATE",
-        "EVENT_LISTENER",
-        "SERVER_SERVICE_MANAGE"
+      "filemanager": [
+        "SYSTEM_STORAGE_WRITE_DESKTOP"
       ]
     },
     "system.style": "macos",
@@ -243,7 +241,7 @@
     "system.animationPreset": "elegant",
     "desktop.autoArrange": true,
     "desktop.arrangement": "list",
-    "system.theme": "glass",
+    "system.theme": "default",
     "browser.bookmarks": [
       {
         "name": "必应",
@@ -277,7 +275,7 @@
         "password": "61b249bf6d604d14120821f43625e84e",
         "avatar": "avatar_root_1766272534753.jpg",
         "createdAt": 1766271155991,
-        "lastLogin": 1770741933005
+        "lastLogin": 1771145828238
       },
       "TestUser": {
         "level": "USER",

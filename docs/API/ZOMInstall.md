@@ -4,6 +4,57 @@
 
 ZOM (ZerOS Object Module) 是 ZerOS 系统的程序安装包格式，实际上是 ZIP 压缩包的另一种扩展名（`.zom`）。ZOM 安装包用于分发和安装 ZerOS 应用程序，包含程序的所有资源文件、配置信息和安装脚本。
 
+## ZOMPack 打包程序
+
+`zompkg` 是 ZerOS 系统的 CLI 程序打包工具，位于 `D:/bin/zompkg.js`。该程序将目录打包为 `.zom` 程序安装包（ZIP 格式）。支持源目录已有 `application.json`，或通过 **手动提供数据** 自动创建 `application.json`。
+
+**本地开发打包**：在项目内可使用 PowerShell 脚本 `dev/toolkit/zompkg.ps1` 在 Windows 下本地打包，行为与 zompkg 一致。用法示例见 `dev/toolkit/README.md` 与 `dev/zom-sources/README.md`。
+
+### 使用方法
+
+```bash
+# 打包：源目录已有 application.json → 默认输出 <源目录>.zom
+zompkg <源目录路径>
+
+# 指定输出路径（未以 .zom 结尾时自动追加）
+zompkg <源目录路径> [输出路径]
+
+# 手动提供 application.json 数据（自动创建 application.json）
+zompkg <源目录路径> [输出路径] --name <程序名> [--version 1.0.0] [--script main.js] ...
+zompkg <源目录路径> [输出路径] --config <JSON 配置文件路径>
+
+# 查看帮助
+zompkg -h
+```
+
+### 手动提供数据（自动创建 application.json）
+
+当源目录**没有** `application.json` 时，可通过以下两种方式之一提供数据，由 zompkg 自动生成并注入到包内：
+
+1. **`--config <路径>`**：从已有 JSON 文件读取完整配置，该 JSON 需包含 `name` 字段，格式与 `application.json` 一致。
+2. **`--name` 等参数**：通过命令行参数构建配置，`--name` 为必填，其余为可选：
+   - `--name <名称>`：程序名（必填）
+   - `--version <版本>`：默认 `1.0.0`
+   - `--script <路径>`：主脚本，默认 `<name>.js`
+   - `--description <描述>`
+   - `--type GUI|CLI`：默认 `GUI`
+   - `--icon <路径>`
+   - `--styles <路径,...>`：逗号分隔
+   - `--assets <路径,...>`：逗号分隔
+   - `--category system|utility|game|other`
+
+若同时提供 `--config` 或 `--name` 与源目录内已有 `application.json`，则以手动提供的内容为准（会覆盖包内同名文件）。
+
+### 打包流程
+
+1. **校验/生成**：若未手动提供数据，则检查源目录下是否存在 `application.json` 并校验 `name`；若提供了 `--config` 或 `--name`，则生成 `application.json` 内容。
+2. **压缩**：调用 CompressionDirve 的 `compress_zip`，将源目录打包为 ZIP；若生成了 `application.json`，则通过 `extraFiles` 注入到包根目录。
+3. **输出**：生成 `.zom` 文件（即 ZIP，扩展名为 `.zom`）。
+
+源目录内文件在 ZIP 中位于根目录（无父目录包裹），符合 ZOM 安装包结构要求。
+
+---
+
 ## ZOMInstall 安装程序
 
 `zominstall` 是 ZerOS 系统的 CLI 程序安装工具，位于 `D:/bin/zominstall.js`。该程序负责解压、安装和注册 ZOM 程序包。

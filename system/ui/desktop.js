@@ -1,4 +1,4 @@
-// 桌面管理器
+﻿// 桌面管理器
 // 负责沙盒环境的桌面实现，包括快捷方式、桌面图标排列、右键菜单等
 // 依赖：GUIManager, ThemeManager, ApplicationAssetManager, ContextMenuManager, ProcessManager
 
@@ -947,7 +947,7 @@ class DesktopManager {
                                 programExists = programInfo !== null && programInfo !== undefined;
                                 
                                 if (!programExists) {
-                                    KernelLogger.warn("DesktopManager", `程序 ${iconData.programName} 不存在，跳过桌面图标: ${iconData.name} (ID: ${iconData.id})`);
+                                    KernelLogger.debug("DesktopManager", `程序 ${iconData.programName} 不存在，跳过桌面图标: ${iconData.name} (ID: ${iconData.id})`);
                                     skippedCount++;
                                     // 记录需要删除的图标ID
                                     iconsToRemove.push(iconData.id);
@@ -962,7 +962,7 @@ class DesktopManager {
                                     iconData.description = programInfo.metadata.description;
                                 }
                             } catch (e) {
-                                KernelLogger.warn("DesktopManager", `检查程序 ${iconData.programName} 是否存在时出错: ${e.message}`);
+                                KernelLogger.debug("DesktopManager", `检查程序 ${iconData.programName} 是否存在时出错: ${e.message}`);
                                 // 如果检查失败，仍然尝试创建图标（降级处理）
                             }
                         } else {

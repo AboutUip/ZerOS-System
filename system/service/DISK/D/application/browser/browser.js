@@ -17,6 +17,8 @@
         backBtn: null,
         forwardBtn: null,
         bookmarks: [], // 书签列表
+        _navToken: 0,
+        _navTimeoutId: null,
         
         __init__: async function(pid, initArgs) {
             this.pid = pid;
@@ -253,6 +255,19 @@
             return proxyBase + '?url=' + encodeURIComponent(targetUrl);
         },
         
+        _getProxyBaseUrl: function() {
+            let proxyPath = (typeof SystemInformation !== 'undefined' && SystemInformation.getBrowserProxyPath)
+                ? SystemInformation.getBrowserProxyPath()
+                : '/system/service/BrowserProxy.php';
+            if (!proxyPath.endsWith('.php')) {
+                proxyPath = '/system/service/BrowserProxy.php';
+            }
+            const origin = (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin)
+                ? SystemInformation.getOrigin()
+                : (window.location.origin || '');
+            return origin + proxyPath + '?url=';
+        },
+        
         /**
          * 判断是否应使用代理加载（外部 http/https 经代理以绕过 CORS 与 iframe 限制）
          */
@@ -321,12 +336,39 @@
             this._showLoading(true);
             
             // 使用 x-frame-bypass 或 PHP 代理绕过 X-Frame-Options、CSP frame-ancestors 等 iframe 限制
-            const useBypass = this._supportsXFrameBypass() && this._shouldUseProxy(url);
-            const iframeSrc = useBypass ? url : (this._shouldUseProxy(url) ? this._buildProxyUrl(url) : url);
-            this.iframe.src = iframeSrc;
+            const shouldProxy = this._shouldUseProxy(url);
+            const useBypass = shouldProxy && this._supportsXFrameBypass() && typeof this.iframe.load === 'function';
+            const iframeSrc = shouldProxy ? this._buildProxyUrl(url) : url;
+            if (this._navTimeoutId) {
+                clearTimeout(this._navTimeoutId);
+                this._navTimeoutId = null;
+            }
+            const navToken = (this._navToken || 0) + 1;
+            this._navToken = navToken;
+            if (useBypass) {
+                try {
+                    const proxyBase = this._getProxyBaseUrl();
+                    this.iframe.load(url, { proxies: [proxyBase] });
+                } catch (e) {
+                    this.iframe.src = iframeSrc;
+                }
+            } else {
+                this.iframe.src = iframeSrc;
+            }
+            if (useBypass) {
+                this._navTimeoutId = setTimeout(() => {
+                    if (this._navToken === navToken) {
+                        this._forceProxyLoad(url);
+                    }
+                }, 12000);
+            }
             
             // 监听加载完成
             this.iframe.onload = () => {
+                if (this._navTimeoutId) {
+                    clearTimeout(this._navTimeoutId);
+                    this._navTimeoutId = null;
+                }
                 this.iframe.classList.remove('loading');
                 this._showLoading(false);
                 
@@ -358,10 +400,26 @@
             };
             
             this.iframe.onerror = () => {
+                if (this._navTimeoutId) {
+                    clearTimeout(this._navTimeoutId);
+                    this._navTimeoutId = null;
+                }
+                if (useBypass && this._navToken === navToken) {
+                    this._forceProxyLoad(url);
+                    return;
+                }
                 this.iframe.classList.remove('loading');
                 this._showLoading(false);
                 this._showError('加载失败: ' + url);
             };
+        },
+
+        _forceProxyLoad: function(url) {
+            if (!this.iframe || !this._shouldUseProxy(url)) return;
+            const proxyUrl = this._buildProxyUrl(url);
+            this.iframe.classList.add('loading');
+            this._showLoading(true);
+            this.iframe.src = proxyUrl;
         },
         
         /**

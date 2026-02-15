@@ -12,6 +12,12 @@
         selectedPath: null,
         storageData: null,
         refreshTimer: null,
+        _refreshInFlight: false,
+        _autoRefreshIntervalMs: 5000,
+        _lastAutoRefreshDataRef: null,
+        _lastAutoRefreshStorageType: null,
+        _lastAutoRefreshStamp: 0,
+        _applicationTableCache: null,
         childWindows: [], // 子窗口列表
         currentStorageType: 'localSData', // 当前编辑的存储类型：'localSData'、'localCache' 或 'applicationTable'
         _selectedValue: null, // 当前选中的值 { parentPath, key, row }
@@ -127,6 +133,17 @@
             `;
             this.treeContainer = document.createElement('div');
             this.treeContainer.className = 'regedit-tree';
+            this.treeContainer.addEventListener('click', (e) => {
+                const item = e.target.closest('.regedit-tree-item');
+                if (!item) return;
+                const path = (item.dataset.path !== undefined) ? item.dataset.path : '';
+                const hasChildren = item.dataset.hasChildren === 'true';
+                if (hasChildren) {
+                    item.dataset.expanded = item.dataset.expanded === 'true' ? 'false' : 'true';
+                    requestAnimationFrame(() => { this._renderTree(); });
+                }
+                this._selectPath(path);
+            });
             leftPanel.appendChild(this.treeContainer);
             content.appendChild(leftPanel);
             
@@ -198,10 +215,10 @@
             // 注册键盘快捷键（Delete 删除选中值）
             this._registerKeyboardShortcuts();
             
-            // 启动定时刷新（每2秒刷新一次）
+            // 启动定时刷新
             this.refreshTimer = setInterval(() => {
-                this._refreshData();
-            }, 2000);
+                this._refreshData({ auto: true });
+            }, this._autoRefreshIntervalMs);
             
             // 语言变更时刷新界面文案
             const LanguagesExpansion = (typeof POOL !== 'undefined' && POOL && typeof POOL.__GET__ === 'function')
@@ -258,7 +275,7 @@
                 const btn = this._createMenuButton(type.label, async () => {
                     if (self.currentStorageType !== type.value) {
                         self.currentStorageType = type.value;
-                        await self._loadRegistryData();
+                        await self._loadRegistryData({ forceReload: false });
                         self._renderTree();
                         self._selectPath('');
                         // 更新按钮状态
@@ -294,7 +311,7 @@
             
             // 刷新按钮
             const refreshBtn = this._createMenuButton(this._getText('KEY_REFRESH', '刷新'), async () => {
-                await self._refreshData();
+                await self._refreshData({ forceReload: true });
                 self._renderTree();
                 self._renderValues(self.selectedPath);
             });
@@ -340,8 +357,9 @@
         /**
          * 加载注册表数据
          */
-        _loadRegistryData: async function() {
+        _loadRegistryData: async function(options) {
             try {
+                const forceReload = !!(options && options.forceReload);
                 if (this.currentStorageType === 'localCache') {
                     // 加载 LocalCache.json（CacheDrive 的元数据）
                     if (typeof ProcessManager === 'undefined') {
@@ -357,8 +375,11 @@
                         await CacheDrive.init();
                     }
                     
-                    // 重新加载缓存元数据（清除缓存）
-                    await CacheDrive._loadCacheMetadata(true);
+                    if (forceReload) {
+                        await CacheDrive._loadCacheMetadata(true);
+                    } else if (!CacheDrive._cacheMetadata) {
+                        await CacheDrive._loadCacheMetadata(false);
+                    }
                     
                     // 直接访问_cacheMetadata（注册表编辑器需要访问完整数据）
                     this.storageData = CacheDrive._cacheMetadata;
@@ -394,13 +415,13 @@
                         await LStorage.init();
                     }
                     
-                    // 清除 LStorage 的读取缓存，确保获取最新数据
-                    if (typeof LStorage !== 'undefined' && typeof LStorage.clearCache === 'function') {
-                        LStorage.clearCache();
+                    let applicationTable = null;
+                    if (forceReload || !this._applicationTableCache) {
+                        applicationTable = await LStorage.getSystemStorage('applicationTable');
+                        this._applicationTableCache = applicationTable || {};
+                    } else {
+                        applicationTable = this._applicationTableCache;
                     }
-                    
-                    // 从 ApplicationTable.json 读取数据
-                    const applicationTable = await LStorage.getSystemStorage('applicationTable');
                     
                     // ApplicationTable 是一个对象，键是程序名，值是程序资源对象
                     // 为了统一显示，我们将其包装为 { applications: {...} } 格式
@@ -421,14 +442,13 @@
                 if (!LStorage._initialized) {
                     await LStorage.init();
                 }
-                
-                // 清除 LStorage 的读取缓存，确保获取最新数据
-                if (typeof LStorage !== 'undefined' && typeof LStorage.clearCache === 'function') {
-                    LStorage.clearCache();
+
+                if (forceReload) {
+                    if (typeof LStorage !== 'undefined' && typeof LStorage.clearCache === 'function') {
+                        LStorage.clearCache();
+                    }
+                    await LStorage._loadStorageData(false);
                 }
-                
-                // 重新加载数据（清除缓存）
-                await LStorage._loadStorageData(false);
                 
                 // 直接访问_storageData（注册表编辑器需要访问完整数据）
                 this.storageData = LStorage._storageData;
@@ -474,16 +494,45 @@
         /**
          * 刷新数据
          */
-        _refreshData: async function() {
+        _refreshData: async function(options) {
             try {
-                await this._loadRegistryData();
-                if (this.selectedPath) {
+                if (this._refreshInFlight) return;
+                if (!this.window || !this.window.isConnected) return;
+                if (options && options.auto && typeof document !== 'undefined' && document.hidden) return;
+                if (options && options.auto && this.currentStorageType === 'applicationTable') return;
+
+                this._refreshInFlight = true;
+                const prevDataRef = this.storageData;
+                const prevStorageType = this.currentStorageType;
+                await this._loadRegistryData(options);
+
+                const dataRefChanged = this.storageData !== prevDataRef || this.currentStorageType !== prevStorageType;
+                if (options && options.auto && !dataRefChanged) {
+                    let currentStamp = 0;
+                    if (this.currentStorageType === 'localSData' && typeof LStorage !== 'undefined' && LStorage._requestCache) {
+                        currentStamp = LStorage._requestCache.readCacheTime || 0;
+                    } else if (this.currentStorageType === 'localCache' && typeof CacheDrive !== 'undefined' && CacheDrive._requestCache) {
+                        currentStamp = CacheDrive._requestCache.timestamp || 0;
+                    }
+                    if (this._lastAutoRefreshDataRef === this.storageData &&
+                        this._lastAutoRefreshStorageType === this.currentStorageType &&
+                        this._lastAutoRefreshStamp === currentStamp) {
+                        return;
+                    }
+                    this._lastAutoRefreshStamp = currentStamp;
+                }
+                this._lastAutoRefreshDataRef = this.storageData;
+                this._lastAutoRefreshStorageType = this.currentStorageType;
+
+                if (this.selectedPath !== undefined && this.selectedPath !== null) {
                     this._renderValues(this.selectedPath);
                 }
             } catch (error) {
                 if (typeof KernelLogger !== 'undefined') {
                     KernelLogger.error('RegEdit', '刷新数据失败', error);
                 }
+            } finally {
+                this._refreshInFlight = false;
             }
         },
         
@@ -524,22 +573,7 @@
                 rootLabel = this._getText('REGEDIT_LOCAL_SDATA', 'LocalSData');
             }
             root.innerHTML = `<span style="margin-right: 5px;">📁</span>${rootLabel}`;
-            // 使用 EventManager 注册点击事件（如果可用且有权限）
-            if (typeof EventManager !== 'undefined' && this.pid) {
-                const clickId = EventManager.registerElementEvent(this.pid, root, 'click', () => {
-                    this._selectPath('');
-                });
-                // 如果权限不足，使用降级方案
-                if (clickId === null) {
-            root.addEventListener('click', () => {
-                this._selectPath('');
-            });
-                }
-            } else {
-                root.addEventListener('click', () => {
-                    this._selectPath('');
-                });
-            }
+            root.dataset.hasChildren = 'false';
             this.treeContainer.appendChild(root);
             
             if (this.currentStorageType === 'applicationTable') {
@@ -584,13 +618,9 @@
             
             Object.keys(data).forEach(childKey => {
                 const childValue = data[childKey];
-                // 对于system和programs的直接子项，路径就是键名本身（如 'system.style'）
-                // 对于嵌套项，路径是 'parent.child' 格式
                 const childPath = parentPath ? `${parentPath}.${childKey}` : childKey;
                 const childNode = this._createTreeNode(childPath, childKey, childValue, expandedPaths, level);
                 this.treeContainer.appendChild(childNode);
-                
-                // 递归渲染子节点的子节点
                 if (typeof childValue === 'object' && childValue !== null && !Array.isArray(childValue)) {
                     this._renderTreeChildren(childPath, childValue, expandedPaths, level + 1);
                 }
@@ -611,6 +641,7 @@
             
             const isExpanded = expandedPaths.has(key);
             const hasChildren = typeof data === 'object' && data !== null && !Array.isArray(data) && Object.keys(data).length > 0;
+            node.dataset.hasChildren = hasChildren ? 'true' : 'false';
             
             if (isExpanded) {
                 node.dataset.expanded = 'true';
@@ -635,84 +666,7 @@
                 node.style.background = 'rgba(108, 142, 255, 0.2)';
             }
             
-            // 使用 EventManager 注册鼠标事件（如果可用且有权限）
-            let useEventManager = false;
-            if (typeof EventManager !== 'undefined' && this.pid) {
-                // 尝试注册事件，检查返回值以确认是否有权限
-                const mouseenterId = EventManager.registerElementEvent(this.pid, node, 'mouseenter', () => {
-                    if (this.selectedPath !== key) {
-                        node.style.background = 'rgba(108, 142, 255, 0.1)';
-                    }
-                });
-                
-                const mouseleaveId = EventManager.registerElementEvent(this.pid, node, 'mouseleave', () => {
-                    if (this.selectedPath !== key) {
-                        node.style.background = 'transparent';
-                    }
-                });
-                
-                const clickId = EventManager.registerElementEvent(this.pid, node, 'click', (e) => {
-                    e.stopPropagation();
-                    this._selectPath(key);
-                    
-                    // 如果是对象且有子节点，展开/折叠
-                    if (hasChildren) {
-                        const wasExpanded = node.dataset.expanded === 'true';
-                        if (wasExpanded) {
-                            expandedPaths.delete(key);
-                            node.dataset.expanded = 'false';
-                        } else {
-                            expandedPaths.add(key);
-                            node.dataset.expanded = 'true';
-                        }
-                        this._renderTree(); // 重新渲染以更新展开状态
-                    } else {
-                        // 没有子节点，只选择路径
-                        this._selectPath(key);
-                    }
-                });
-                
-                // 如果所有事件都成功注册（返回值不为 null），则使用 EventManager
-                useEventManager = mouseenterId !== null && mouseleaveId !== null && clickId !== null;
-            }
-            
-            // 如果 EventManager 不可用或权限不足，使用降级方案
-            if (!useEventManager) {
-            node.addEventListener('mouseenter', () => {
-                if (this.selectedPath !== key) {
-                    node.style.background = 'rgba(108, 142, 255, 0.1)';
-                }
-            });
-            
-            node.addEventListener('mouseleave', () => {
-                if (this.selectedPath !== key) {
-                    node.style.background = 'transparent';
-                }
-            });
-            
-            node.addEventListener('click', (e) => {
-                e.stopPropagation();
-                this._selectPath(key);
-                
-                // 如果是对象且有子节点，展开/折叠
-                if (hasChildren) {
-                    const wasExpanded = node.dataset.expanded === 'true';
-                    if (wasExpanded) {
-                        expandedPaths.delete(key);
-                        node.dataset.expanded = 'false';
-                    } else {
-                        expandedPaths.add(key);
-                        node.dataset.expanded = 'true';
-                    }
-                    this._renderTree(); // 重新渲染以更新展开状态
-                } else {
-                    // 没有子节点，只选择路径
-                    this._selectPath(key);
-                }
-            });
-            }
-            
-            // 注意：子节点的创建在_renderTree中处理，这里只返回当前节点
+            // 点击事件由 treeContainer 上的委托处理，悬停由 CSS .regedit-tree-item:hover 处理
             
             return node;
         },
@@ -762,11 +716,6 @@
             // 使用统一的路径解析方法
             let data = this._resolvePath(path);
             
-            // 调试信息
-            if (typeof KernelLogger !== 'undefined') {
-                KernelLogger.debug('RegEdit', `_renderValues: path="${path}", data=${data ? (typeof data === 'object' ? `object(${Object.keys(data).length} keys)` : String(data)) : 'null'}`);
-            }
-            
             if (data === null || data === undefined) {
                 this.valueContainer.innerHTML = '<div style="padding: 20px; color: rgba(215, 224, 221, 0.5);">' + this._getText('REGEDIT_NO_DATA', '无数据') + '</div>';
                 return;
@@ -813,17 +762,23 @@
             
             // 如果是数组，显示数组项
             if (Array.isArray(data)) {
-                data.forEach((item, index) => {
-                    const row = this._createValueRow(String(index), item, path);
-                    this.valueContainer.appendChild(row);
-                });
+                const frag = document.createDocumentFragment();
+                for (let index = 0; index < data.length; index++) {
+                    const row = this._createValueRow(String(index), data[index], path);
+                    frag.appendChild(row);
+                }
+                this.valueContainer.appendChild(frag);
             } else {
                 // 显示对象键值对
-                Object.keys(data).forEach(key => {
+                const frag = document.createDocumentFragment();
+                const keys = Object.keys(data);
+                for (let i = 0; i < keys.length; i++) {
+                    const key = keys[i];
                     const value = data[key];
                     const row = this._createValueRow(key, value, path);
-                    this.valueContainer.appendChild(row);
-                });
+                    frag.appendChild(row);
+                }
+                this.valueContainer.appendChild(frag);
             }
         },
         
@@ -1488,7 +1443,7 @@
                     if (typeof KernelLogger !== 'undefined') {
                         KernelLogger.error('RegEdit', 'storageData 未正确加载，尝试重新加载');
                     }
-                    await this._loadRegistryData();
+                    await this._loadRegistryData({ forceReload: true });
                     if (!this.storageData || typeof this.storageData !== 'object') {
                         throw new Error('无法加载存储数据，操作已取消');
                     }
@@ -1540,6 +1495,7 @@
                         if (parentPath === 'applications') {
                             // 直接保存整个 ApplicationTable
                             const applicationTable = this.storageData.applications || {};
+                            this._applicationTableCache = applicationTable;
                             await LStorage.setSystemStorage('applicationTable', applicationTable);
                             // 刷新 ApplicationAssetManager
                             if (typeof ApplicationAssetManager !== 'undefined' && typeof ApplicationAssetManager.refresh === 'function') {
@@ -1548,6 +1504,7 @@
                         } else {
                             // 其他路径的设置，需要保存整个 ApplicationTable
                             const applicationTable = this.storageData.applications || {};
+                            this._applicationTableCache = applicationTable;
                             await LStorage.setSystemStorage('applicationTable', applicationTable);
                             // 刷新 ApplicationAssetManager
                             if (typeof ApplicationAssetManager !== 'undefined' && typeof ApplicationAssetManager.refresh === 'function') {
@@ -1580,7 +1537,7 @@
                         KernelLogger.error('RegEdit', '保存失败，尝试恢复数据', saveError);
                     }
                     // 重新加载数据以恢复
-                    await this._loadRegistryData();
+                    await this._loadRegistryData({ forceReload: true });
                     throw new Error(`保存失败: ${saveError.message}`);
                 }
                 
@@ -2326,7 +2283,7 @@
                     if (typeof KernelLogger !== 'undefined') {
                         KernelLogger.error('RegEdit', 'storageData 未正确加载，尝试重新加载');
                     }
-                    await this._loadRegistryData();
+                    await this._loadRegistryData({ forceReload: true });
                     if (!this.storageData || typeof this.storageData !== 'object') {
                         throw new Error('无法加载存储数据，操作已取消');
                     }
@@ -2379,6 +2336,7 @@
                             // 从 applications 对象中删除程序
                             const applicationTable = this.storageData.applications || {};
                             delete applicationTable[key];
+                            this._applicationTableCache = applicationTable;
                             // 保存到 ApplicationTable.json
                             await LStorage.setSystemStorage('applicationTable', applicationTable);
                             // 刷新 ApplicationAssetManager
@@ -2388,6 +2346,7 @@
                         } else {
                             // 其他路径的删除，需要保存整个 ApplicationTable
                             const applicationTable = this.storageData.applications || {};
+                            this._applicationTableCache = applicationTable;
                             await LStorage.setSystemStorage('applicationTable', applicationTable);
                             // 刷新 ApplicationAssetManager
                             if (typeof ApplicationAssetManager !== 'undefined' && typeof ApplicationAssetManager.refresh === 'function') {
@@ -2420,7 +2379,7 @@
                         KernelLogger.error('RegEdit', '保存失败，尝试恢复数据', saveError);
                     }
                     // 重新加载数据以恢复
-                    await this._loadRegistryData();
+                    await this._loadRegistryData({ forceReload: true });
                     throw new Error(`保存失败: ${saveError.message}`);
                 }
                 

@@ -5,7 +5,7 @@ KernelLogger.info("SystemInformation", "模块初始化");
 
 class SystemInformation {
     // 系统版本
-    static SYSTEM_VERSION = '0.6.5';
+    static SYSTEM_VERSION = '0.6.7';
     
     // 内核版本
     static KERNEL_VERSION = '0.6.5';
@@ -98,7 +98,8 @@ class SystemInformation {
         MODULE_PROXY: 'module-proxy',
         BROWSER_PROXY: 'BrowserProxy',
         DISKMANAGER: 'DISKMANAGER',
-        SPARK_AI_PROXY: 'spark-ai-proxy'
+        SPARK_AI_PROXY: 'spark-ai-proxy',
+        DASHSCOPE_AI_PROXY: 'dashscope-ai-proxy'
     };
     
     // 服务基础路径

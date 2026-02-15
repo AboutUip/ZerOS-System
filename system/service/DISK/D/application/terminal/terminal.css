@@ -42,8 +42,8 @@
   display: flex;
   flex-direction: column;
   height: 78vh;
-  width: min(1100px, 96vw);
-  max-width: 1100px;
+  width: 96vw;
+  max-width: none;
   min-width: 480px;
   min-height: 320px;
   /* 不透明背景，确保窗口清晰可见 */

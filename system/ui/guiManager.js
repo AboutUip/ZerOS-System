@@ -336,15 +336,27 @@ class GUIManager {
         
         // 添加统一的窗口类
         windowElement.classList.add('zos-gui-window');
-        
-        // 创建统一的标题栏（如果还没有）
-        if (!windowElement.querySelector('.zos-window-titlebar')) {
-            GUIManager._createTitleBar(windowElement, windowInfo, options);
+        if (options && options.borderless === true) {
+            windowElement.classList.add('zos-window-borderless');
         }
         
-        // 保护标题栏：使用 MutationObserver 监听窗口内容变化
-        // 如果标题栏被意外删除，自动重新创建
-        GUIManager._protectTitleBar(windowElement, windowInfo, options);
+        const noTitleBar = options && options.noTitleBar === true;
+        const dragHandle = noTitleBar ? (options.dragHandle || null) : null;
+        
+        // 创建统一的标题栏（如果还没有），或使用应用提供的拖拽区域（noTitleBar 时）
+        if (!noTitleBar && !windowElement.querySelector('.zos-window-titlebar')) {
+            const titleBar = GUIManager._createTitleBar(windowElement, windowInfo, options);
+            if (titleBar) {
+                GUIManager._setupWindowDragAndResize(windowInfo.windowId, windowElement, titleBar, windowInfo);
+            }
+        } else if (noTitleBar && dragHandle && dragHandle.nodeType === 1) {
+            GUIManager._setupWindowDragAndResize(windowInfo.windowId, windowElement, dragHandle, windowInfo);
+        }
+        
+        // 保护标题栏：仅在有系统标题栏时监听（noTitleBar 时不创建/不保护）
+        if (!noTitleBar) {
+            GUIManager._protectTitleBar(windowElement, windowInfo, options);
+        }
         
         // 注册窗口（使用windowId作为key）
         GUIManager._windows.set(windowId, windowInfo);
@@ -1069,8 +1081,15 @@ class GUIManager {
         const backdropFilter = isGlassStyle ? 'blur(60px) saturate(180%)' : 'none';
         const borderColor = currentTheme && currentTheme.colors ? (currentTheme.colors.borderLight || currentTheme.colors.border || 'rgba(108, 142, 255, 0.1)') : 'rgba(108, 142, 255, 0.1)';
         
+        // 支持 options.titleBarHeight / titleBarPadding，便于应用使用紧凑标题栏（如 28px）
+        const titleBarHeightPx = (options && options.titleBarHeight != null && options.titleBarHeight > 0) ? Number(options.titleBarHeight) : 40;
+        const titleBarPadding = (options && options.titleBarPadding != null) ? String(options.titleBarPadding) : '0 16px';
+        
         // 使用 setProperty 并设置 important 标志，确保样式优先级高于CSS
-        titleBar.style.setProperty('height', '40px', 'important');
+        titleBar.style.setProperty('height', titleBarHeightPx + 'px', 'important');
+        titleBar.style.setProperty('min-height', titleBarHeightPx + 'px', 'important');
+        titleBar.style.setProperty('max-height', titleBarHeightPx + 'px', 'important');
+        titleBar.style.setProperty('flex', '0 0 auto', 'important');
         titleBar.style.setProperty('background', titleBarBg, 'important');
         titleBar.style.setProperty('background-color', titleBarBg, 'important');
         titleBar.style.setProperty('border-bottom', `1px solid ${borderColor}`, 'important');
@@ -1078,10 +1097,9 @@ class GUIManager {
         titleBar.style.setProperty('-webkit-backdrop-filter', backdropFilter, 'important');
         titleBar.style.setProperty('display', 'flex', 'important');
         titleBar.style.setProperty('align-items', 'center', 'important');
-        titleBar.style.setProperty('padding', '0 16px', 'important');
+        titleBar.style.setProperty('padding', titleBarPadding, 'important');
         titleBar.style.setProperty('cursor', 'move', 'important');
         titleBar.style.setProperty('user-select', 'none', 'important');
-        titleBar.style.setProperty('flex-shrink', '0', 'important');
         
         // 左侧：图标和标题
         const leftSection = document.createElement('div');
@@ -1277,9 +1295,7 @@ class GUIManager {
             return existingTitleBar;
         }
         
-        // 自动设置拖动和拉伸功能
-        GUIManager._setupWindowDragAndResize(windowInfo.windowId, windowElement, titleBar, windowInfo);
-        
+        // 拖动和拉伸由 registerWindow 统一设置
         return titleBar;
     }
     
@@ -2301,10 +2317,14 @@ class GUIManager {
         
         // 保存窗口状态
         const rect = windowInfo.window.getBoundingClientRect();
-        windowInfo.windowState.savedLeft = windowInfo.window.style.left;
-        windowInfo.windowState.savedTop = windowInfo.window.style.top;
-        windowInfo.windowState.savedWidth = windowInfo.window.style.width;
-        windowInfo.windowState.savedHeight = windowInfo.window.style.height;
+        const savedLeft = windowInfo.window.style.left;
+        const savedTop = windowInfo.window.style.top;
+        const savedWidth = windowInfo.window.style.width;
+        const savedHeight = windowInfo.window.style.height;
+        windowInfo.windowState.savedLeft = savedLeft && savedLeft.trim() ? savedLeft : (rect.left + 'px');
+        windowInfo.windowState.savedTop = savedTop && savedTop.trim() ? savedTop : (rect.top + 'px');
+        windowInfo.windowState.savedWidth = savedWidth && savedWidth.trim() ? savedWidth : (rect.width + 'px');
+        windowInfo.windowState.savedHeight = savedHeight && savedHeight.trim() ? savedHeight : (rect.height + 'px');
         windowInfo.windowState.savedTransform = windowInfo.window.style.transform;
         
         // 添加最小化动画（使用 AnimateManager，根据任务栏位置调整方向）
@@ -2668,10 +2688,14 @@ class GUIManager {
         
         // 保存窗口状态
         const rect = windowInfo.window.getBoundingClientRect();
-        windowInfo.windowState.savedLeft = windowInfo.window.style.left;
-        windowInfo.windowState.savedTop = windowInfo.window.style.top;
-        windowInfo.windowState.savedWidth = windowInfo.window.style.width;
-        windowInfo.windowState.savedHeight = windowInfo.window.style.height;
+        const savedLeft = windowInfo.window.style.left;
+        const savedTop = windowInfo.window.style.top;
+        const savedWidth = windowInfo.window.style.width;
+        const savedHeight = windowInfo.window.style.height;
+        windowInfo.windowState.savedLeft = savedLeft && savedLeft.trim() ? savedLeft : (rect.left + 'px');
+        windowInfo.windowState.savedTop = savedTop && savedTop.trim() ? savedTop : (rect.top + 'px');
+        windowInfo.windowState.savedWidth = savedWidth && savedWidth.trim() ? savedWidth : (rect.width + 'px');
+        windowInfo.windowState.savedHeight = savedHeight && savedHeight.trim() ? savedHeight : (rect.height + 'px');
         windowInfo.windowState.savedTransform = windowInfo.window.style.transform;
         
         // 添加最大化动画（使用 AnimateManager）
@@ -3061,7 +3085,7 @@ class GUIManager {
             }
             
             // 检查是否点击在排除的元素上
-            const excludeSelectors = ['.zos-window-btn', 'button', '.zos-window-resizer', '.videoplayer-controls-bar', '.videoplayer-progress-bar', '.videoplayer-progress-container', '.videoplayer-controls', 'video'];
+            const excludeSelectors = ['.zos-window-btn', 'button', '.diskmanager-titlebar-btn', '.zos-window-resizer', '.videoplayer-controls-bar', '.videoplayer-progress-bar', '.videoplayer-progress-container', '.videoplayer-controls', 'video'];
             if (excludeSelectors.some(selector => e.target.closest && e.target.closest(selector))) {
                 return;
             }

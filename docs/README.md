@@ -7,7 +7,7 @@
 一个完整的虚拟操作系统开发文档集合
 
 [![Documentation](https://img.shields.io/badge/docs-complete-brightgreen.svg)](./README.md)
-[![API](https://img.shields.io/badge/API-30+-blue.svg)](./API/README.md)
+[![API](https://img.shields.io/badge/API-40+-blue.svg)](./API/README.md)
 [![Guide](https://img.shields.io/badge/guide-complete-yellow.svg)](./DEVELOPER_GUIDE.md)
 
 </div>
@@ -80,6 +80,7 @@
 | [GUIManager](./API/GUIManager.md) | GUI 窗口管理 | ⚠️ **必读** |
 | [PermissionManager](./API/PermissionManager.md) | 权限管理、审计、统计 | ⚠️ **必读** |
 | [KernelLogger](./API/KernelLogger.md) | 统一的日志记录 | ⚠️ **必读** |
+| [ExceptionHandler](./API/ExceptionHandler.md) | 异常处理管理器（结构化异常处理 SEH） | ✅ |
 
 #### 💾 存储与内存 API
 
@@ -99,6 +100,7 @@
 | [SystemInformation](./API/SystemInformation.md) | 系统信息和后端服务管理 | ✅ |
 | [Disk](./API/Disk.md) | 虚拟磁盘管理 | ✅ |
 | [NodeTree](./API/NodeTree.md) | 内存文件系统结构 | ✅ |
+| [DISKMANAGER](./API/DISKMANAGER.md) | 磁盘分区管理服务（创建、检查、删除、合并等） | ✅ |
 
 #### 🎨 用户界面 API
 
@@ -136,6 +138,7 @@
 | [DependencyConfig](./API/DependencyConfig.md) | 模块依赖管理 | ✅ |
 | [Starter](./API/Starter.md) | 系统启动和初始化 | ✅ |
 | [UserControl](./API/UserControl.md) | 用户控制系统（多用户管理、权限控制） | ✅ |
+| [ZOMInstall](./API/ZOMInstall.md) | ZOM 程序包格式、zompkg 打包、zominstall 安装 | ✅ |
 
 #### 🚀 高级驱动 API
 
@@ -147,6 +150,8 @@
 | [GeographyDrive](./API/GeographyDrive.md) | 地理位置相关功能 | ✅ |
 | [SpeechDrive](./API/SpeechDrive.md) | 语音识别驱动（基于 Web Speech API） | ✅ |
 | [MultithreadingDrive](./API/MultithreadingDrive.md) | 并发处理 | ✅ |
+| [ScheduleTaskManager](./API/ScheduleTaskManager.md) | 计划任务管理器 | ✅ |
+| [BrowserProxy](./API/BrowserProxy.md) | 浏览器网页代理服务（绕过 iframe 限制） | ✅ |
 
 #### 🔌 系统扩展 API
 
@@ -172,6 +177,7 @@
 |---------|---------|
 | **GUI 程序开发** | [GUIManager](./API/GUIManager.md) + [EventManager](./API/EventManager.md) |
 | **文件操作** | [FileFramework](./API/FileFramework.md) + [FSDirve](./API/FSDirve.md) + [SystemInformation](./API/SystemInformation.md) |
+| **程序打包与安装** | [ZOMInstall](./API/ZOMInstall.md)（zompkg 打包、zominstall 安装；本地开发可用 dev/toolkit/zompkg.ps1） |
 | **数据存储** | [LStorage](./API/LStorage.md) + [CacheDrive](./API/CacheDrive.md) |
 | **权限管理** | [PermissionManager](./API/PermissionManager.md) |
 | **扩展/插件** | [扩展与插件索引](./PLUGINS/README.md)（语言包、服务模块编写） |

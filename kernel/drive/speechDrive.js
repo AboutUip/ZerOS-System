@@ -224,10 +224,12 @@ class SpeechDrive {
             // 设置错误事件
             recognition.onerror = (event) => {
                 let errorMessage = '识别出错：';
+                let isNoSpeech = false;
                 
                 switch (event.error) {
                     case 'no-speech':
                         errorMessage = '未检测到语音';
+                        isNoSpeech = true;
                         break;
                     case 'audio-capture':
                         errorMessage = '无法访问麦克风';
@@ -245,11 +247,16 @@ class SpeechDrive {
                         errorMessage += event.error;
                 }
                 
-                KernelLogger.error("SpeechDrive", `识别错误 (PID ${pid}): ${errorMessage}`);
-                session.status = SpeechDrive.STATUS.ERROR;
-                
-                if (onError) {
-                    onError(new Error(errorMessage));
+                // "未检测到语音"是正常情况（用户未说话），使用 DEBUG 级别
+                if (isNoSpeech) {
+                    KernelLogger.debug("SpeechDrive", `识别信息 (PID ${pid}): ${errorMessage}`);
+                } else {
+                    KernelLogger.error("SpeechDrive", `识别错误 (PID ${pid}): ${errorMessage}`);
+                    session.status = SpeechDrive.STATUS.ERROR;
+                    
+                    if (onError) {
+                        onError(new Error(errorMessage));
+                    }
                 }
             };
             

@@ -2449,10 +2449,10 @@ KernelLogger.info("LockScreen", "模块初始化");
                 
                 // 首次按键，显示登录界面
                 if (!LockScreen._keyPressed) {
-                    // 忽略功能键和修饰键
-                    if (e.key === 'Shift' || e.key === 'Control' || e.key === 'Alt' || 
+                    // 忽略功能键和修饰键（Edge 等浏览器在部分 IME 场景下 e.key 可能为 undefined）
+                    if (!e.key || e.key === 'Shift' || e.key === 'Control' || e.key === 'Alt' || 
                         e.key === 'Meta' || e.key === 'Tab' || e.key === 'CapsLock' ||
-                        e.key.startsWith('F') && e.key.length <= 3) {
+                        (typeof e.key === 'string' && e.key.startsWith('F') && e.key.length <= 3)) {
                         return;
                     }
                     

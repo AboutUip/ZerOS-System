@@ -89,7 +89,16 @@
             guiContainer.appendChild(this.window);
 
             this._registerEventHandlers();
-            this._refreshServiceList();
+            // 延迟首次刷新，避免进程仍处于 loading 状态时触发内核校验告警
+            setTimeout(() => {
+                try {
+                    this._refreshServiceList();
+                } catch (e) {
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.debug('SERVICEMANAGER', '首次刷新服务列表延迟调用失败: ' + (e && e.message));
+                    }
+                }
+            }, 300);
             this._startStatusRefreshTimer();
 
             var LanguagesExpansion = (typeof POOL !== 'undefined' && POOL && typeof POOL.__GET__ === 'function')
@@ -394,8 +403,20 @@
             try {
                 await api.call('Server.loadAll', []);
             } catch (e) {
-                if (typeof KernelLogger !== 'undefined') {
-                    KernelLogger.warn('SERVICEMANAGER', 'Server.loadAll 失败: ' + (e && e.message));
+                var msg = e && (e.message || String(e));
+                if (msg && (/not running/i.test(msg) || /status:\s*loading/i.test(msg))) {
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.debug('SERVICEMANAGER', 'Server.loadAll 跳过（进程仍在加载中），稍后重试: ' + msg);
+                    }
+                    setTimeout(() => {
+                        this._refreshServiceList();
+                    }, 400);
+                    this._refreshingServiceList = false;
+                    return;
+                } else {
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.warn('SERVICEMANAGER', 'Server.loadAll 失败: ' + msg);
+                    }
                 }
             }
 
@@ -498,6 +519,20 @@
             }
 
             var api = this._kernelAPI;
+            var preservedConfig = {};
+            var configCard = detailEl.querySelector('[data-role="config-card"]');
+            if (configCard) {
+                var inputs = configCard.querySelectorAll('[data-config-key]');
+                for (var i = 0; i < inputs.length; i++) {
+                    var inp = inputs[i];
+                    var key = inp.dataset.configKey;
+                    var typ = inp.dataset.configType || 'text';
+                    if (!key) continue;
+                    if (typ === 'boolean') preservedConfig[key] = inp.checked;
+                    else if (typ === 'number') preservedConfig[key] = inp.value;
+                    else preservedConfig[key] = inp.value;
+                }
+            }
             var infoPromise = api.call('Server.info', [id]);
             var statusPromise = api.call('Server.status', [id]);
             var listConfigPromise = api.call('Server.listConfig', [id]).catch(function () { return []; });
@@ -539,13 +574,23 @@
                         var k = (item.key || '').replace(/"/g, '&quot;');
                         var lab = self._escapeHtml(item.label || item.key || '');
                         var typ = (item.type || 'text');
-                        var val = item.value;
+                        var val = preservedConfig.hasOwnProperty(item.key) ? preservedConfig[item.key] : item.value;
+                        var strVal = String(val != null ? val : '');
                         if (typ === 'boolean') {
                             html += '<div class="servicemanager-config-row"><label><input type="checkbox" data-config-key="' + k + '" data-config-type="boolean"' + (val ? ' checked' : '') + '>' + lab + '</label></div>';
                         } else if (typ === 'number') {
-                            html += '<div class="servicemanager-config-row"><label>' + lab + '</label><input type="number" data-config-key="' + k + '" data-config-type="number" value="' + self._escapeHtml(String(val != null ? val : '')) + '"></div>';
+                            html += '<div class="servicemanager-config-row"><label>' + lab + '</label><input type="number" data-config-key="' + k + '" data-config-type="number" value="' + self._escapeHtml(strVal) + '"></div>';
+                        } else if (Array.isArray(item.options) && item.options.length > 0) {
+                            html += '<div class="servicemanager-config-row"><label>' + lab + '</label><select data-config-key="' + k + '" data-config-type="text">';
+                            for (var o = 0; o < item.options.length; o++) {
+                                var opt = item.options[o];
+                                var optVal = (typeof opt === 'object' && opt !== null && opt.value !== undefined) ? String(opt.value) : String(opt);
+                                var optLab = (typeof opt === 'object' && opt !== null && opt.label !== undefined) ? self._escapeHtml(String(opt.label)) : self._escapeHtml(optVal);
+                                html += '<option value="' + self._escapeHtml(optVal) + '"' + (optVal === strVal ? ' selected' : '') + '>' + optLab + '</option>';
+                            }
+                            html += '</select></div>';
                         } else {
-                            html += '<div class="servicemanager-config-row"><label>' + lab + '</label><input type="text" data-config-key="' + k + '" data-config-type="text" value="' + self._escapeHtml(String(val != null ? val : '')) + '"></div>';
+                            html += '<div class="servicemanager-config-row"><label>' + lab + '</label><input type="text" data-config-key="' + k + '" data-config-type="text" value="' + self._escapeHtml(strVal) + '"></div>';
                         }
                     }
                     html += '<button type="button" class="servicemanager-btn servicemanager-btn-save" data-action="save-config">' + (self._getText('SERVICEMANAGER_SAVE_CONFIG', '保存配置')) + '</button>';

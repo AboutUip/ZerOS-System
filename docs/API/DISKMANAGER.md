@@ -787,6 +787,18 @@ console.log('分区信息:', checkResult.data);
 - [Disk.md](./Disk.md) - 虚拟磁盘管理接口（前端 JavaScript API）
 - [FSDirve.md](./FSDirve.md) - 文件系统驱动服务（文件操作 API）
 - [SystemInformation.md](./SystemInformation.md) - 系统信息和后端服务管理
+- [GUIManager.md](./GUIManager.md) - GUI 窗口管理（无边框、自定义标题栏等）
+
+---
+
+## 相关程序
+
+**磁盘管理 GUI 程序（diskmanager）**：调用本 API 的 ZerOS 图形界面程序。
+
+- **源码目录:** `dev/zom-sources/diskmanager/`
+- **打包产物:** `diskmanager.zom`（使用 `dev/toolkit/zompkg.ps1` 打包）
+- **当前版本:** 1.0.6
+- **功能:** 分区列表与详情、新建/删除/合并分区、格式化/调整大小；无边框窗口、自定义标题栏、深色简约主题。详见 `dev/zom-sources/README.md`。
 
 ---
 

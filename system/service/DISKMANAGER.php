@@ -112,6 +112,24 @@ function checkPartition($partitionName) {
 }
 
 /**
+ * 读取 DiskData 配置（仅返回数组，不发送响应）
+ * @return array ['totalSize' => int, 'partitions' => array]
+ */
+function getDiskDataForCheck() {
+    $default = ['totalSize' => 3221225472, 'partitionCount' => 0, 'partitions' => []];
+    $diskDataFile = getDiskDataFilePath();
+    if (!file_exists($diskDataFile)) {
+        return $default;
+    }
+    $content = file_get_contents($diskDataFile);
+    if ($content === false) {
+        return $default;
+    }
+    $data = json_decode($content, true);
+    return $data ? $data : $default;
+}
+
+/**
  * 创建分区
  * @param string $partitionName 分区名称（如 "C:"）
  */
@@ -130,6 +148,21 @@ function createPartition($partitionName) {
             'partition' => $partitionName,
             'path' => $partitionPath
         ], 409);
+    }
+    
+    // 校验：分区总容量不能超过磁盘总大小（如 3GB）
+    $diskData = getDiskDataForCheck();
+    $totalSize = isset($diskData['totalSize']) ? (int)$diskData['totalSize'] : 3221225472;
+    $partitions = isset($diskData['partitions']) && is_array($diskData['partitions']) ? $diskData['partitions'] : [];
+    $currentSum = 0;
+    foreach ($partitions as $p => $size) {
+        $currentSum += (int)$size;
+    }
+    $newPartitionSize = ($diskLetter === 'D') ? 2147483648 : 1073741824; // D: 2GB，其它 1GB
+    if ($currentSum + $newPartitionSize > $totalSize) {
+        $totalGB = round($totalSize / 1024 / 1024 / 1024, 1);
+        $usedGB = round($currentSum / 1024 / 1024 / 1024, 1);
+        sendResponse(false, '分区总容量不能超过磁盘总大小（总大小 ' . $totalGB . ' GB，已分配 ' . $usedGB . ' GB，新分区需要 ' . round($newPartitionSize / 1024 / 1024 / 1024, 1) . ' GB）', null, 400);
     }
     
     // 确保DISK基础目录存在
@@ -214,17 +247,27 @@ function syncDiskDataToFile($partitionName, $size = null) {
             ? $partitionName 
             : $partitionName . ':';
         
+        $totalSize = isset($data['totalSize']) ? (int)$data['totalSize'] : 3221225472;
+        $currentSum = 0;
+        foreach ($data['partitions'] as $p => $s) {
+            $currentSum += (int)$s;
+        }
+        
         if ($size !== null) {
             // 如果分区已存在于配置中，保留原有大小（不覆盖）
             if (!isset($data['partitions'][$partitionKey])) {
-                // 只有分区不存在时才设置新的大小
+                if ($currentSum + $size > $totalSize) {
+                    return; // 超过总大小，不写入新分区配置
+                }
                 $data['partitions'][$partitionKey] = $size;
             }
-            // 如果分区已存在，保留原有大小，不覆盖
         } else if (!isset($data['partitions'][$partitionKey])) {
-            // 如果没有指定大小，使用默认值
             $letter = str_replace(':', '', $partitionKey);
-            $data['partitions'][$partitionKey] = ($letter === 'C') ? 1073741824 : (($letter === 'D') ? 2147483648 : 1073741824);
+            $newSize = ($letter === 'C') ? 1073741824 : (($letter === 'D') ? 2147483648 : 1073741824);
+            if ($currentSum + $newSize > $totalSize) {
+                return; // 超过总大小，不写入新分区配置
+            }
+            $data['partitions'][$partitionKey] = $newSize;
         }
         
         // 更新分区数量
@@ -612,7 +655,8 @@ function syncDiskData() {
             }
         }
         
-        // 扫描物理目录，确保配置中包含所有存在的分区
+        // 扫描物理目录，确保配置中包含所有存在的分区（且不超过总大小）
+        $totalSize = isset($data['totalSize']) ? (int)$data['totalSize'] : 3221225472;
         if (is_dir(DISK_BASE_PATH)) {
             $items = scandir(DISK_BASE_PATH);
             foreach ($items as $item) {
@@ -624,10 +668,13 @@ function syncDiskData() {
                 if (is_dir($itemPath) && preg_match('/^[A-Z]$/', $item)) {
                     $partitionName = $item . ':';
                     if (!isset($data['partitions'][$partitionName])) {
-                        // 如果物理目录存在但配置中没有，使用默认大小
                         $letter = $item;
                         $defaultSize = ($letter === 'C') ? 1073741824 : (($letter === 'D') ? 2147483648 : 1073741824);
-                        $data['partitions'][$partitionName] = $defaultSize;
+                        $currentSum = array_sum(array_map('intval', $data['partitions']));
+                        if ($currentSum + $defaultSize <= $totalSize) {
+                            $data['partitions'][$partitionName] = $defaultSize;
+                        }
+                        // 超过总大小时不加入配置，避免配置中分区之和超过 totalSize
                     }
                 }
             }

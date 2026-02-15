@@ -153,6 +153,7 @@
 
 ## 其他文档
 
+- [ZOMInstall.md](./ZOMInstall.md) - ZOM 程序包格式、zompkg 打包、zominstall 安装（本地开发可用 dev/toolkit/zompkg.ps1）
 - [PLUGINS/README.md](../PLUGINS/README.md) - 扩展与插件索引（语言包等）
 - [PLUGINS/LanguagePack.md](../PLUGINS/LanguagePack.md) - 语言包格式说明（存放位置与 JSON 格式）
 - [SERVER/README.md](../SERVER/README.md) - 服务文档索引（D/server 服务模块与各服务说明）

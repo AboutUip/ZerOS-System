@@ -234,7 +234,12 @@ function compressZip($sourcePath, $targetPath, $options = []) {
     }
     
     // 获取选项
-    $exclude = $options['exclude'] ?? [];
+    $exclude = isset($options['exclude']) && is_array($options['exclude']) ? $options['exclude'] : [];
+    $extraFiles = isset($options['extraFiles']) && is_array($options['extraFiles']) ? $options['extraFiles'] : [];
+    // 若有内存注入文件，排除源目录中同名文件，避免重复
+    foreach (array_keys($extraFiles) as $ef) {
+        $exclude[] = $ef;
+    }
     $compressionLevel = isset($options['compressionLevel']) ? intval($options['compressionLevel']) : 6;
     $compressionLevel = max(0, min(9, $compressionLevel)); // 限制在 0-9 之间
     
@@ -293,6 +298,19 @@ function compressZip($sourcePath, $targetPath, $options = []) {
                         $zip->addFile($filePath, $zipPath);
                     }
                 }
+            }
+        }
+        
+        // 添加内存中的额外文件（如 zompkg 注入的 application.json）
+        foreach ($extraFiles as $entryName => $content) {
+            $entryName = str_replace('\\', '/', trim($entryName));
+            if ($entryName === '' || strpos($entryName, '..') !== false) {
+                continue;
+            }
+            if (!$zip->addFromString($entryName, $content)) {
+                $zip->close();
+                @unlink($targetRealPath);
+                sendResponse(false, 'ZIP 添加内存文件失败: ' . $entryName, null, 500);
             }
         }
         
@@ -707,13 +725,16 @@ try {
             $rawInput = file_get_contents('php://input');
             $postData = json_decode($rawInput, true);
             if ($postData) {
+                if (isset($postData['targetPath']) && $postData['targetPath'] !== '') {
+                    $targetPath = $postData['targetPath'];
+                }
                 // 支持 sourcePaths（数组）或 sourcePath（单个）
                 if (isset($postData['sourcePaths']) && is_array($postData['sourcePaths'])) {
                     $sourcePaths = $postData['sourcePaths'];
                 } else if (isset($postData['sourcePath'])) {
                     $sourcePath = $postData['sourcePath'];
                 }
-                if (isset($postData['options'])) {
+                if (isset($postData['options']) && is_array($postData['options'])) {
                     $options = $postData['options'];
                 }
             }

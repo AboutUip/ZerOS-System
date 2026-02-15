@@ -11,6 +11,7 @@ desktop.ini
 # 编辑器文件
 .vscode/
 .idea/
+.cursor/
 *.swp
 *.swo
 *~
@@ -27,6 +28,9 @@ logs/
 *.temp
 *.bak
 *.backup
+
+# zompkg 打包时的临时 ZIP（dev/zom-sources/.zompkg_*.zip）
+.zompkg_*.zip
 
 # 依赖文件（如果有）
 node_modules/

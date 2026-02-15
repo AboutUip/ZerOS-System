@@ -300,8 +300,8 @@
                 }
 
                 // 步骤 5: 执行 setup.js（如果存在）
-                // setup.js 是可选的，不存在时静默跳过
-                const setupExecuted = await this._executeSetup(tempDir);
+                // setup.js 是可选的，不存在时静默跳过（先检查解压列表，避免无谓的 404 请求）
+                const setupExecuted = await this._executeSetup(tempDir, extractedFiles);
                 if (setupExecuted) {
                     this.terminal.write('步骤 5/6: 安装脚本执行完成\n');
                 }
@@ -1325,9 +1325,20 @@
 
         /**
          * 执行 setup.js（作为 ZerOS 程序启动）
+         * @param {string} tempDir 临时目录路径
+         * @param {string[]} [extractedFiles=[]] 解压后的文件列表，用于判断 setup.js 是否存在，避免无谓的 404 请求
          */
-        _executeSetup: async function(tempDir) {
-            const setupPath = `${tempDir}/setup.js`;
+        _executeSetup: async function(tempDir, extractedFiles = []) {
+            const setupFileName = 'setup.js';
+            const hasSetupJs = extractedFiles.some(function (f) {
+                const n = (f || '').replace(/\\/g, '/');
+                return n === setupFileName || n.toLowerCase().endsWith('/' + setupFileName);
+            });
+            if (!hasSetupJs) {
+                return false;
+            }
+
+            const setupPath = `${tempDir}/${setupFileName}`;
 
             // 检查文件是否存在（静默检查，不输出到控制台）
             try {

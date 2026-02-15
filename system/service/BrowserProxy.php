@@ -10,6 +10,7 @@
 // 错误报告（开发环境）
 error_reporting(E_ALL);
 ini_set('display_errors', 0);
+session_start();
 
 // 允许 GET 和 POST 请求
 $requestMethod = $_SERVER['REQUEST_METHOD'];
@@ -79,6 +80,13 @@ try {
         throw new Exception('Failed to initialize cURL');
     }
     
+    $cookieDir = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'zeros_browserproxy_cookies';
+    if (!is_dir($cookieDir)) {
+        @mkdir($cookieDir, 0700, true);
+    }
+    $sessionId = session_id();
+    $cookieFile = $cookieDir . DIRECTORY_SEPARATOR . 'cookie_' . preg_replace('#[^a-zA-Z0-9_-]#', '', $sessionId) . '.txt';
+    
     curl_setopt($ch, CURLOPT_URL, $targetUrl);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
@@ -87,8 +95,11 @@ try {
     curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
     curl_setopt($ch, CURLOPT_TIMEOUT, 30);
     curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
+    curl_setopt($ch, CURLOPT_REFERER, $targetUrl);
+    curl_setopt($ch, CURLOPT_COOKIEJAR, $cookieFile);
+    curl_setopt($ch, CURLOPT_COOKIEFILE, $cookieFile);
     curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
-    curl_setopt($ch, CURLOPT_HEADER, true);
+    curl_setopt($ch, CURLOPT_HEADER, false);
     curl_setopt($ch, CURLOPT_ENCODING, '');  // 支持 gzip 等
     
     $headers = [
@@ -123,28 +134,27 @@ try {
     
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     $contentType = curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
-    $headerSize = curl_getinfo($ch, CURLINFO_HEADER_SIZE);
+    $effectiveUrl = curl_getinfo($ch, CURLINFO_EFFECTIVE_URL);
     curl_close($ch);
     
-    if ($headerSize > 0 && strlen($response) > $headerSize) {
-        $rawHeaders = substr($response, 0, $headerSize);
-        $body = substr($response, $headerSize);
-    } else {
-        $rawHeaders = '';
-        $body = $response;
-    }
+    $body = $response;
     
+    $resolvedTargetUrl = !empty($effectiveUrl) ? $effectiveUrl : $targetUrl;
     // 解析目标 URL 用于重写相对路径
-    $baseUrl = rtrim($targetUrl, '/');
-    $parsedTarget = parse_url($targetUrl);
+    $baseUrl = rtrim($resolvedTargetUrl, '/');
+    $parsedTarget = parse_url($resolvedTargetUrl);
     $targetOrigin = ($parsedTarget['scheme'] ?? 'https') . '://' . ($parsedTarget['host'] ?? '');
     $targetPath = isset($parsedTarget['path']) ? preg_replace('#/[^/]*$#', '/', $parsedTarget['path']) : '/';
     $targetBase = $targetOrigin . $targetPath;
     
     // 检测是否为 HTML 内容
     $isHtml = false;
+    $isCss = false;
     if ($contentType && (stripos($contentType, 'text/html') !== false || stripos($contentType, 'application/xhtml') !== false)) {
         $isHtml = true;
+    }
+    if ($contentType && stripos($contentType, 'text/css') !== false) {
+        $isCss = true;
     }
     
     // 对于 HTML，重写其中的 URL 使其通过代理加载
@@ -152,7 +162,21 @@ try {
         $requestScheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
         $requestHost = $_SERVER['HTTP_HOST'] ?? 'localhost';
         $proxyBaseUrl = $requestScheme . '://' . $requestHost . $proxyBasePath;
-        $body = rewriteHtmlUrls($body, $targetUrl, $targetBase, $targetOrigin, $proxyBaseUrl);
+        $body = rewriteHtmlUrls($body, $resolvedTargetUrl, $targetBase, $targetOrigin, $proxyBaseUrl);
+    } elseif ($isCss && !empty($body)) {
+        $requestScheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+        $requestHost = $_SERVER['HTTP_HOST'] ?? 'localhost';
+        $proxyBaseUrl = $requestScheme . '://' . $requestHost . $proxyBasePath;
+        $body = rewriteCssUrls($body, $resolvedTargetUrl, $proxyBaseUrl);
+    }
+    
+    if ($httpCode >= 400 && empty($body)) {
+        http_response_code($httpCode);
+        header('Content-Type: text/html; charset=utf-8');
+        echo '<!DOCTYPE html><html><head><meta charset="utf-8"><title>加载失败</title></head><body>';
+        echo '<h2>页面加载失败</h2><p>HTTP ' . intval($httpCode) . '</p>';
+        echo '<p>URL: ' . htmlspecialchars($resolvedTargetUrl) . '</p></body></html>';
+        exit;
     }
     
     // 设置响应头 - 关键：不包含 X-Frame-Options、CSP frame-ancestors 等限制 iframe 的头
@@ -253,6 +277,45 @@ function rewriteHtmlUrls($html, $pageUrl, $baseUrl, $targetOrigin, $proxyBaseUrl
     }
     
     return $html;
+}
+
+function rewriteCssUrls($css, $baseUrl, $proxyBaseUrl) {
+    $css = preg_replace_callback(
+        '#url\s*\(\s*([\'"]?)([^\'")\s]+)\1\s*\)#i',
+        function($match) use ($baseUrl, $proxyBaseUrl) {
+            $url = trim($match[2]);
+            if (preg_match('#^(data|javascript|mailto|tel|blob|#)#i', $url)) {
+                return $match[0];
+            }
+            $absoluteUrl = resolveUrl($url, $baseUrl);
+            if (!$absoluteUrl) {
+                return $match[0];
+            }
+            $proxyUrl = $proxyBaseUrl . '?url=' . rawurlencode($absoluteUrl);
+            return 'url("' . $proxyUrl . '")';
+        },
+        $css
+    );
+
+    $css = preg_replace_callback(
+        '#@import\s+(?:url\()?\s*([\'"]?)([^\'")\s]+)\1\s*\)?([^;]*);#i',
+        function($match) use ($baseUrl, $proxyBaseUrl) {
+            $url = trim($match[2]);
+            if (preg_match('#^(data|javascript|mailto|tel|blob|#)#i', $url)) {
+                return $match[0];
+            }
+            $absoluteUrl = resolveUrl($url, $baseUrl);
+            if (!$absoluteUrl) {
+                return $match[0];
+            }
+            $proxyUrl = $proxyBaseUrl . '?url=' . rawurlencode($absoluteUrl);
+            $media = trim($match[3] ?? '');
+            return '@import url("' . $proxyUrl . '")' . ($media ? ' ' . $media : '') . ';';
+        },
+        $css
+    );
+
+    return $css;
 }
 
 /**

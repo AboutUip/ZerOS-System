@@ -96,13 +96,27 @@ class LStorage {
             }
 
             // 如果都不可用，使用默认的 D:（向后兼容）
-            KernelLogger.warn("LStorage", "无法检测分区，使用默认分区: D:");
+            const canWarn = (typeof Disk !== 'undefined' && Disk.canUsed) ||
+                (typeof POOL !== 'undefined' && typeof POOL.__GET__ === 'function');
+            if (canWarn && !LStorage._partitionDetectWarned) {
+                LStorage._partitionDetectWarned = true;
+                KernelLogger.warn("LStorage", "无法检测分区，使用默认分区: D:");
+            } else {
+                KernelLogger.debug("LStorage", "无法检测分区，使用默认分区: D:");
+            }
             LStorage._storagePartition = 'D:';
             LStorage.STORAGE_FILE_PATH = 'D:/';
             LStorage.APPLICATION_TABLE_FILE_PATH = 'D:/';
             return 'D:';
         } catch (error) {
-            KernelLogger.warn("LStorage", `检测分区失败: ${error.message}，使用默认分区: D:`);
+            const canWarn = (typeof Disk !== 'undefined' && Disk.canUsed) ||
+                (typeof POOL !== 'undefined' && typeof POOL.__GET__ === 'function');
+            if (canWarn && !LStorage._partitionDetectWarned) {
+                LStorage._partitionDetectWarned = true;
+                KernelLogger.warn("LStorage", `检测分区失败: ${error.message}，使用默认分区: D:`);
+            } else {
+                KernelLogger.debug("LStorage", `检测分区失败: ${error.message}，使用默认分区: D:`);
+            }
             LStorage._storagePartition = 'D:';
             LStorage.STORAGE_FILE_PATH = 'D:/';
             LStorage.APPLICATION_TABLE_FILE_PATH = 'D:/';
@@ -135,6 +149,8 @@ class LStorage {
         readCacheTime: 0,
         cacheTTL: 1000 // 1秒缓存
     };
+    
+    static _partitionDetectWarned = false;
 
     /** 初始化完成时间戳（用于关键键空值时延迟重载） */
     static _initTime = 0;
@@ -2944,54 +2960,50 @@ class LStorage {
             const appDirPath = pathParts.slice(0, -1).join('/');
             const uninstallPath = `${appDirPath}/uninstall.js`;
 
-            // 检查文件是否存在并读取
+            // 先通过 fetch 检查并读取 uninstall.js，避免无谓调用 FileSystem.read 产生 404 错误日志
             let uninstallContent = null;
+            try {
+                const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject)
+                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                    : new URL(LStorage.PHP_SERVICE_URL, (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin)
+                        ? SystemInformation.getOrigin()
+                        : window.location.origin);
+                url.searchParams.set('action', 'read_file');
+                url.searchParams.set('path', appDirPath);
+                url.searchParams.set('fileName', 'uninstall.js');
 
-            // 尝试通过 ProcessManager 读取文件
-            if (typeof ProcessManager !== 'undefined' && typeof ProcessManager._executeKernelAPI === 'function') {
+                const response = await fetch(url.toString());
+                if (response.status === 404) {
+                    KernelLogger.debug("LStorage", `uninstall.js 不存在，跳过执行: ${uninstallPath}`);
+                    return true;
+                }
+                if (response.ok) {
+                    const result = await response.json();
+                    if (result.status === 'success' && result.data && result.data.content) {
+                        uninstallContent = result.data.content;
+                    } else if (result.status === 'error' && result.message &&
+                        (result.message.includes('文件不存在') || result.message.includes('not found'))) {
+                        KernelLogger.debug("LStorage", `uninstall.js 不存在，跳过执行: ${uninstallPath}`);
+                        return true;
+                    }
+                }
+            } catch (e) {
+                KernelLogger.debug("LStorage", `fetch uninstall.js 失败，尝试内核 API: ${e.message}`);
+            }
+
+            // 若 fetch 未拿到内容，再尝试 ProcessManager（例如无 SystemInformation 时）
+            if (!uninstallContent && typeof ProcessManager !== 'undefined' && typeof ProcessManager._executeKernelAPI === 'function') {
                 try {
                     const result = await ProcessManager._executeKernelAPI('FileSystem.read', [uninstallPath], null);
                     if (result && result.content) {
                         uninstallContent = result.content;
                     }
                 } catch (e) {
-                    // 文件不存在或其他错误
                     if (e.message && (e.message.includes('文件不存在') || e.message.includes('not found') || e.message.includes('404'))) {
                         KernelLogger.debug("LStorage", `uninstall.js 不存在，跳过执行: ${uninstallPath}`);
-                        return true; // 文件不存在，返回 true（表示成功，因为没有需要执行的）
+                        return true;
                     }
                     KernelLogger.warn("LStorage", `读取 uninstall.js 失败: ${e.message}`);
-                }
-            }
-
-            // 如果 ProcessManager 读取失败，尝试直接使用 fetch
-            if (!uninstallContent) {
-                try {
-                    const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject)
-                        ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
-                        : new URL(LStorage.PHP_SERVICE_URL, (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin)
-                            ? SystemInformation.getOrigin()
-                            : window.location.origin);
-                    url.searchParams.set('action', 'read_file');
-                    url.searchParams.set('path', appDirPath);
-                    url.searchParams.set('fileName', 'uninstall.js');
-
-                    const response = await fetch(url.toString());
-                    if (response.ok) {
-                        const result = await response.json();
-                        if (result.status === 'success' && result.data && result.data.content) {
-                            uninstallContent = result.data.content;
-                        } else if (result.status === 'error' && result.message &&
-                            (result.message.includes('文件不存在') || result.message.includes('not found'))) {
-                            KernelLogger.debug("LStorage", `uninstall.js 不存在，跳过执行: ${uninstallPath}`);
-                            return true; // 文件不存在，返回 true
-                        }
-                    } else if (response.status === 404) {
-                        KernelLogger.debug("LStorage", `uninstall.js 不存在，跳过执行: ${uninstallPath}`);
-                        return true; // 文件不存在，返回 true
-                    }
-                } catch (e) {
-                    KernelLogger.warn("LStorage", `通过 fetch 读取 uninstall.js 失败: ${e.message}`);
                 }
             }
 
