@@ -284,7 +284,7 @@
         "password": "61b249bf6d604d14120821f43625e84e",
         "avatar": "avatar_root_1766272534753.jpg",
         "createdAt": 1766271155991,
-        "lastLogin": 1771426847265
+        "lastLogin": 1771433889133
       },
       "TestUser": {
         "level": "USER",
@@ -330,7 +330,9 @@
     "system.taskbarWeatherEnabled": true,
     "scheduleTaskManager.tasks": [],
     "registry": {
-      "environment": {},
+      "environment": {
+        "ZEROS_SERVER_AIA_CONFIG": "{\"enableVoiceReply\":false,\"enableWakeSound\":true,\"wakeWords\":\"你好,你好小A,小A小A\",\"goodbyeWords\":\"再见,拜拜\",\"debug\":false,\"aiModel\":\"spark\",\"sparkAppId\":\"6e64b5fe\",\"sparkApiPassword\":\"pieePLKJXdbyqKXVPrUw:LrlWnnpGrYLgBZaUCixS\",\"dashscopeApiKey\":\"sk-779df8e5a9f6461e80fd209f851cf7b0\"}"
+      },
       "brightness": 100
     },
     "applicationTable": {},

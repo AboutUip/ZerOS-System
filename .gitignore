@@ -10,6 +10,7 @@ desktop.ini
 
 # 编辑器文件
 .vscode/
+.trae/
 .idea/
 .cursor/
 *.swp
