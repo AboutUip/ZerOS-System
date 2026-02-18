@@ -12,6 +12,20 @@
 - `GUIManager` - GUI 管理器（用于窗口管理）
 - `AnimateManager` - 动画管理器（用于水滴动画效果）
 
+## 获取实例
+
+NotificationManager 注册在 POOL 和 window 中，可以通过以下方式获取：
+
+```javascript
+// 方式 1：从 POOL 获取
+const NotificationManager = POOL.__GET__("KERNEL_GLOBAL_POOL", "NotificationManager");
+
+// 方式 2：从 window 获取
+const NotificationManager = window.NotificationManager;
+```
+
+**注意**：在内核初始化完成后，NotificationManager 已加载，可以直接使用。
+
 ## 初始化
 
 通知管理器在系统启动时自动初始化，无需手动调用。

@@ -9,6 +9,20 @@
 - `LStorage` - 本地存储（用于持久化后端配置）
 - `KernelLogger` - 内核日志系统
 
+## 获取实例
+
+SystemInformation 注册在 POOL 和 window 中，可以通过以下方式获取：
+
+```javascript
+// 方式 1：从 POOL 获取
+const SystemInformation = POOL.__GET__("KERNEL_GLOBAL_POOL", "SystemInformation");
+
+// 方式 2：从 window 获取
+const SystemInformation = window.SystemInformation;
+```
+
+**注意**：在内核初始化完成后，SystemInformation 已加载，可以直接使用。
+
 ## 后端服务支持
 
 ZerOS 支持两种后端服务实现：
@@ -306,22 +320,30 @@ const url = SystemInformation.buildServiceUrl('FSDirve', {
 console.log(url); // 'http://localhost:8089/system/service/FSDirve.php?action=read_file&path=D%3A%2F&fileName=test.txt'
 ```
 
-#### `buildServiceUrlObject(serviceName)`
+#### `buildServiceUrlObject(serviceName, options)`
 
 构建URL对象（用于需要修改查询参数的场景）。
 
 **参数**:
 - `serviceName` (string): 服务名称（如 `'FSDirve'`）或完整路径
+- `options` (Object, 可选): 可选配置
+  - `upid` (number|string): 用户进程 ID，用于 User JWT 鉴权。当应用/CLI 程序调用需要 UserToken 的后端（如 FSDirve、CompressionDirve、DISKMANAGER）时，必须在 GET 参数中携带 `upid`，否则后端会拒绝请求。
 
 **返回值**: `URL` - URL对象
 
 **示例**:
 ```javascript
+// 基本用法（内核/系统上下文，使用 SystemToken，无需 upid）
 const url = SystemInformation.buildServiceUrlObject('FSDirve');
 url.searchParams.set('action', 'read_file');
 url.searchParams.set('path', 'D:/');
 url.searchParams.set('fileName', 'test.txt');
-console.log(url.toString()); // 'http://localhost:8089/system/service/FSDirve.php?action=read_file&path=D%3A%2F&fileName=test.txt'
+
+// 应用/CLI 程序上下文，必须传入 upid
+const url2 = SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE, { upid: this._upid });
+url2.searchParams.set('action', 'read_file');
+url2.searchParams.set('path', 'D:/');
+url2.searchParams.set('fileName', 'test.txt');
 ```
 
 ## 服务名称常量
@@ -335,7 +357,10 @@ SystemInformation.SERVICE_NAMES = {
     IMAGE_PROXY: 'ImageProxy',        // 图片代理
     AUDIO_PROXY: 'audio-proxy',      // 音频代理
     MODULE_PROXY: 'module-proxy',    // 模块代理
-    BROWSER_PROXY: 'BrowserProxy'    // 浏览器网页代理
+    BROWSER_PROXY: 'BrowserProxy',   // 浏览器网页代理
+    DISKMANAGER: 'DISKMANAGER',      // 磁盘管理服务
+    SPARK_AI_PROXY: 'spark-ai-proxy',        // 星火 AI 代理
+    DASHSCOPE_AI_PROXY: 'dashscope-ai-proxy' // 通义千问（DashScope）代理
 };
 ```
 
@@ -384,11 +409,11 @@ url.searchParams.set('fileName', 'test.txt');
 const response = await fetch(url.toString());
 ```
 
-### 示例 3：使用 buildServiceUrlObject
+### 示例 3：使用 buildServiceUrlObject（应用需传 upid）
 
 ```javascript
-// 构建URL对象
-const url = SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE);
+// 应用/CLI 程序调用后端时，必须传入 upid（initArgs.upid）
+const url = SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE, { upid: this._upid });
 
 // 添加查询参数
 url.searchParams.set('action', 'write_file');
@@ -415,10 +440,11 @@ const response = await fetch(url.toString(), {
 3. **URL 参数优先级**：URL 参数 `?backend=PHP` 或 `?backend=SPRINGBOOT` 的优先级高于 `LStorage` 中的配置
 4. **服务路径自动处理**：使用 `SystemInformation` 的方法构建服务路径时，会自动根据后端类型添加或省略 `.php` 后缀
 5. **降级方案**：如果 `SystemInformation` 不可用，代码应提供降级方案，使用 `window.location.origin` 和硬编码路径
+6. **User JWT 与 upid**：应用和 bin 程序在调用 FSDirve、CompressionDirve、DISKMANAGER 等使用 UserToken 的后端时，必须在 `buildServiceUrlObject` 中传入 `{ upid: initArgs.upid }`，或在手动构建 URL 时通过 `url.searchParams.set('upid', upid)` 添加 GET 参数，否则后端会拒绝请求
 
 ## 相关文档
 
-- [FSDirve API](./FSDirve.md) - 文件系统驱动服务
-- [CompressionDrive API](./CompressionDrive.md) - 压缩驱动服务
+- [FSDirve 后端接口](../INTERFACE/FSDirve.md) - 文件系统驱动服务
+- [CompressionDrive 后端接口](../INTERFACE/CompressionDrive.md) - 压缩驱动服务
 - [LStorage API](./LStorage.md) - 本地存储API
 

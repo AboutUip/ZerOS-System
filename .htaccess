@@ -13,6 +13,11 @@
 <IfModule mod_headers.c>
     Header set Access-Control-Allow-Origin "*"
     Header set Access-Control-Allow-Methods "GET, POST, OPTIONS"
-    Header set Access-Control-Allow-Headers "Content-Type"
+    Header set Access-Control-Allow-Headers "Content-Type, Authorization, X-Auth-Token, X-JWT"
+</IfModule>
+
+# 将 Authorization 传递给 PHP（Apache 默认会剥离，需显式设置）
+<IfModule mod_setenvif.c>
+    SetEnvIf Authorization "(.*)" HTTP_AUTHORIZATION=$1
 </IfModule>
 

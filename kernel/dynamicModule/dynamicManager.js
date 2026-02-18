@@ -215,6 +215,48 @@ const DYNAMIC_MODULES = {
             autoLoad: false, // 按需加载
             dependencies: [] // 无依赖
         }
+    },
+
+    // JSZip - ZIP 容器读写（自研文档格式可用）
+    "jszip": {
+        script: "../kernel/dynamicModule/libs/office/jszip/jszip.min.js",
+        metadata: {
+            name: "jszip",
+            version: "3.10.1",
+            description: "JSZip - 生成与读取 ZIP 文件的 JavaScript 库",
+            globalName: "JSZip",
+            autoLoad: false,
+            dependencies: []
+        }
+    },
+
+    // Math.js - 公式与数学运算库（自研表格公式引擎可用）
+    "mathjs": {
+        script: "../kernel/dynamicModule/libs/office/mathjs/math.min.js",
+        metadata: {
+            name: "mathjs",
+            version: "custom",
+            description: "Math.js - 数学运算与表达式计算库",
+            globalName: "math",
+            autoLoad: false,
+            dependencies: []
+        }
+    },
+
+    // Quill - 富文本编辑器（自研文档编辑器可用）
+    "quill": {
+        script: "../kernel/dynamicModule/libs/office/quill/quill.min.js",
+        styles: [
+            "../kernel/dynamicModule/libs/office/quill/quill.snow.min.css"
+        ],
+        metadata: {
+            name: "quill",
+            version: "1.3.7",
+            description: "Quill - 富文本编辑器",
+            globalName: "Quill",
+            autoLoad: false,
+            dependencies: []
+        }
     }
     
     // 纯 CSS 模块示例

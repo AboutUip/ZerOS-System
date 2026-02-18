@@ -71,6 +71,7 @@
          * 初始化程序
          */
         __init__: async function(pid, initArgs) {
+            this._upid = initArgs && initArgs.upid;
             this.pid = pid;
             
             if (typeof KernelLogger !== 'undefined') {
@@ -2371,10 +2372,11 @@
                 (async () => {
                     try {
                         const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
-                            ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
-                            : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                            ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE, { upid: this._upid })
+                                : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin)
                                 ? SystemInformation.getOrigin()
                                 : window.location.origin);
+                        if (this._upid != null) url.searchParams.set('upid', this._upid);
                         url.searchParams.set('action', 'read_file');
                         url.searchParams.set('path', 'D:/cache/');
                         url.searchParams.set('fileName', avatarFileName);
@@ -2629,10 +2631,11 @@
                             
                             // 读取文件内容（图片文件会自动使用base64编码）
                             const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
-                            ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                            ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE, { upid: this._upid })
                             : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
                                 ? SystemInformation.getOrigin()
                                 : window.location.origin);
+                            if (this._upid != null) url.searchParams.set('upid', this._upid);
                             url.searchParams.set('action', 'read_file');
                             
                             // 解析文件路径
@@ -2694,10 +2697,11 @@
                             
                             // 保存到cache目录
                             const saveUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
-                                ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                                ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE, { upid: this._upid })
                                 : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
                                 ? SystemInformation.getOrigin()
                                 : window.location.origin);
+                            if (this._upid != null) saveUrl.searchParams.set('upid', this._upid);
                             saveUrl.searchParams.set('action', 'write_file');
                             saveUrl.searchParams.set('path', 'D:/cache/');
                             saveUrl.searchParams.set('fileName', newFileName);

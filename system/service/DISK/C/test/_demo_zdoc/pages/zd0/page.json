@@ -1,0 +1,56 @@
+﻿{
+    "structure": [
+        {
+            "header": {
+                "id": "header",
+                "type": "container",
+                "child": {
+                    "hTitle": {
+                        "id": "hTitle",
+                        "type": "text"
+                    },
+                    "hSub": {
+                        "id": "hSub",
+                        "type": "text"
+                    }
+                },
+                "order": [
+                    "hTitle",
+                    "hSub"
+                ]
+            }
+        },
+        {
+            "content": {
+                "id": "content",
+                "type": "container",
+                "child": {
+                    "cTitle": { "id": "cTitle", "type": "text" },
+                    "cPara": { "id": "cPara", "type": "text" },
+                    "card": {
+                        "id": "card",
+                        "type": "container",
+                        "child": {
+                            "img1": { "id": "img1", "type": "image" },
+                            "cardText": { "id": "cardText", "type": "text" }
+                        },
+                        "order": ["img1", "cardText"]
+                    },
+                    "link1": { "id": "link1", "type": "url" },
+                    "att1": { "id": "att1", "type": "asset" }
+                },
+                "order": ["cTitle", "cPara", "card", "link1", "att1"]
+            }
+        },
+        {
+            "footer": {
+                "id": "footer",
+                "type": "container",
+                "child": {
+                    "f1": { "id": "f1", "type": "text" }
+                },
+                "order": ["f1"]
+            }
+        }
+    ]
+}

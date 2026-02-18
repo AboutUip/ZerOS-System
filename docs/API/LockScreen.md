@@ -6,12 +6,27 @@
 
 ## 依赖
 
-- `UserControl` - 用户控制系统（用于用户认证）
+- `UserControl` - 用户控制系统（用于用户认证、获取 userLevel 与 getGrantablePermissions）
+- `RandomSecurity` - 安全模块（登录成功后生成 UserToken JWT）
 - `LStorage` - 本地存储（用于保存用户数据和锁屏设置）
 - `TaskbarManager` - 任务栏管理器（登录后初始化）
 - `NotificationManager` - 通知管理器（登录后初始化）
 - `CacheDrive` - 缓存驱动（用于每日一言缓存管理）
 - `ProcessManager` - 进程管理器（用于调用内核API）
+
+## 获取实例
+
+LockScreen 注册在 POOL 和 window 中，可以通过以下方式获取：
+
+```javascript
+// 方式 1：从 POOL 获取
+const LockScreen = POOL.__GET__("KERNEL_GLOBAL_POOL", "LockScreen");
+
+// 方式 2：从 window 获取
+const LockScreen = window.LockScreen;
+```
+
+**注意**：在内核初始化完成后，LockScreen 已加载，可以直接使用。
 
 ## 初始化
 
@@ -339,13 +354,15 @@ TaskbarManager._lockScreen();
 3. **用户头像**: 用户头像通过 `UserControl.getAvatarPath()` 获取，存储在 `D:/cache/` 目录
 4. **密码验证**: 密码验证通过 `UserControl.login()` 进行，使用 MD5 加密
 5. **登录后初始化**: 登录成功后会初始化 `TaskbarManager` 和 `NotificationManager`
-6. **每日一言缓存**: 使用 `CacheDrive` 进行缓存管理，缓存键为 `system.dailyQuote`
-7. **组件显示控制**: 时间组件和每日一言组件的显示状态通过 LStorage 设置控制
-8. **背景路径转换**: 所有本地文件路径（如 `D:/cache/...`）在显示前会自动转换为 PHP 服务路径（`/system/service/DISK/D/cache/...`）
+6. **UserToken 生成**: 登录成功后立即调用 `RandomSecurity.generateUserToken(userLevel, permissions)` 生成 UserToken JWT，供应用网络请求自动注入
+7. **每日一言缓存**: 使用 `CacheDrive` 进行缓存管理，缓存键为 `system.dailyQuote`
+8. **组件显示控制**: 时间组件和每日一言组件的显示状态通过 LStorage 设置控制
+9. **背景路径转换**: 所有本地文件路径（如 `D:/cache/...`）在显示前会自动转换为 PHP 服务路径（`/system/service/DISK/D/cache/...`）
 
 ## 相关文档
 
 - [UserControl.md](./UserControl.md) - 用户控制系统 API
+- [RandomSecurity.md](./RandomSecurity.md) - 安全模块（登录时生成 UserToken）
 - [TaskbarManager.md](./TaskbarManager.md) - 任务栏管理器 API
 - [LStorage.md](./LStorage.md) - 本地存储 API
 - [CacheDrive.md](./CacheDrive.md) - 缓存驱动 API（用于每日一言缓存）

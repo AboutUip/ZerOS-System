@@ -28,6 +28,23 @@
         imageContainer: null,
         imageElement: null,
         infoBar: null,
+
+        /**
+         * 获取当前语言下的本地化文本
+         */
+        _getText: function(key, fallback) {
+            if (!key) return (fallback != null ? fallback : '');
+            try {
+                const LanguagesExpansion = (typeof POOL !== 'undefined' && POOL && typeof POOL.__GET__ === 'function')
+                    ? POOL.__GET__('KERNEL_GLOBAL_POOL', 'LanguagesExpansion')
+                    : (typeof window !== 'undefined' ? window.LanguagesExpansion : null);
+                if (LanguagesExpansion && typeof LanguagesExpansion.getText === 'function') {
+                    const value = LanguagesExpansion.getText(key);
+                    if (value && value !== key) return value;
+                }
+            } catch (e) {}
+            return (fallback != null ? fallback : '');
+        },
         
         /**
          * 初始化方法
@@ -76,7 +93,7 @@
                     
                     // 保存窗口ID，用于后续清理
                     const windowInfo = GUIManager.registerWindow(pid, this.window, {
-                        title: '图片查看器',
+                        title: this._getText('IMAGEVIEWER_TITLE', '图片查看器'),
                         icon: icon,
                         onClose: () => {
                             // onClose 回调只做清理工作，不调用 _closeWindow 或 unregisterWindow
@@ -268,7 +285,7 @@
             `;
             
             this.infoText = document.createElement('span');
-            this.infoText.textContent = '未加载图片';
+            this.infoText.textContent = this._getText('IMAGEVIEWER_NO_IMAGE', '未加载图片');
             this.infoText.style.cssText = `
                 overflow: hidden;
                 text-overflow: ellipsis;
@@ -292,7 +309,7 @@
             
             // 重置按钮
             const resetBtn = document.createElement('button');
-            resetBtn.textContent = '重置';
+            resetBtn.textContent = this._getText('IMAGEVIEWER_RESET', '重置');
             resetBtn.style.cssText = `
                 padding: 4px 12px;
                 height: 24px;
@@ -732,7 +749,8 @@
                 
                 // 更新信息栏
                 const fileName = imagePath.split('/').pop() || imagePath;
-                this.infoText.textContent = `加载中: ${fileName}`;
+                const loadingText = this._getText('IMAGEVIEWER_LOADING', '加载中: {0}');
+                this.infoText.textContent = loadingText.replace('{0}', fileName);
                 
                 // 重置视图状态
                 this.scale = 1.0;
@@ -821,7 +839,7 @@
          * 图片加载错误
          */
         _onImageError: function() {
-            this.infoText.textContent = '图片加载失败';
+            this.infoText.textContent = this._getText('IMAGEVIEWER_LOAD_FAILED', '图片加载失败');
             this.imageElement.src = '';
         },
         

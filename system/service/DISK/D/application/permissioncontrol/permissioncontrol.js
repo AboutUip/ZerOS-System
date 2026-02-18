@@ -34,6 +34,7 @@
                 KernelLogger.debug('PermissionControl', `__init__ 被调用, PID: ${pid}`);
             }
             this.pid = pid;
+            this._upid = initArgs && initArgs.upid;
 
             // 获取 GUI 容器
             const guiContainer =
@@ -1391,8 +1392,9 @@
                 if (!taskManagerContent) {
                     try {
                         const url = typeof SystemInformation !== 'undefined' && typeof SystemInformation.buildServiceUrlObject === 'function'
-                            ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                            ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE, { upid: this._upid })
                             : new URL('/system/service/FSDirve.php', window.location.origin);
+                        if (this._upid != null) url.searchParams.set('upid', this._upid);
                         url.searchParams.set('action', 'read_file');
                         url.searchParams.set('path', 'D:/application/taskmanager');
                         url.searchParams.set('fileName', 'taskmanager.js');

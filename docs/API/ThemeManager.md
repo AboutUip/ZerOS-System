@@ -8,6 +8,17 @@
 
 - `LStorage` - 本地存储（用于保存主题设置）
 
+## 获取实例
+
+ThemeManager 注册在 POOL 中，可以通过以下方式获取：
+
+```javascript
+// 从 POOL 获取
+const ThemeManager = POOL.__GET__("KERNEL_GLOBAL_POOL", "ThemeManager");
+```
+
+**注意**：在内核初始化完成后，ThemeManager 已加载，可以直接使用。
+
 ## 初始化
 
 主题管理器在系统启动时自动初始化：

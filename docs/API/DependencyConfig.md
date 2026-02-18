@@ -8,13 +8,25 @@
 
 - `KernelLogger` - 内核日志系统（用于日志输出）
 
-## 初始化
+## 获取实例
 
-依赖管理器通过构造函数创建实例：
+DependencyConfig 有两种使用方式：
+
+### 方式 1：从 POOL 获取全局实例（推荐）
 
 ```javascript
+// ✅ 推荐：使用全局实例，状态与其他模块共享
+const Dependency = POOL.__GET__("KERNEL_GLOBAL_POOL", "DependencyConfig");
+```
+
+### 方式 2：创建新实例（仅在需要独立依赖管理时使用）
+
+```javascript
+// ⚠️ 谨慎使用：每次创建都是独立实例，状态不共享
 const Dependency = new DependencyConfig();
 ```
+
+**注意**：每次 `new DependencyConfig()` 都会创建一个**新的实例**，拥有独立的依赖状态。建议大多数情况下使用从 POOL 获取的全局实例。
 
 ## API 方法
 
@@ -29,7 +41,9 @@ const Dependency = new DependencyConfig();
 
 **示例**:
 ```javascript
-const Dependency = new DependencyConfig();
+// 从 POOL 获取全局实例
+const Dependency = POOL.__GET__("KERNEL_GLOBAL_POOL", "DependencyConfig");
+
 Dependency.addDependency("../kernel/process/processManager.js");
 Dependency.addDependency("../kernel/memory/memoryManager.js");
 ```
@@ -40,7 +54,9 @@ Dependency.addDependency("../kernel/memory/memoryManager.js");
 
 **示例**:
 ```javascript
-const Dependency = new DependencyConfig();
+// 从 POOL 获取全局实例
+const Dependency = POOL.__GET__("KERNEL_GLOBAL_POOL", "DependencyConfig");
+
 Dependency.addDependency("../kernel/process/processManager.js");
 Dependency.addDependency("../kernel/memory/memoryManager.js");
 Dependency.linkerAll(); // 开始加载所有依赖项
@@ -62,7 +78,9 @@ Dependency.linkerAll(); // 开始加载所有依赖项
 
 **示例**:
 ```javascript
-const Dependency = new DependencyConfig();
+// 从 POOL 获取全局实例
+const Dependency = POOL.__GET__("KERNEL_GLOBAL_POOL", "DependencyConfig");
+
 await Dependency.waitLoaded("../kernel/process/processManager.js", {
     interval: 50,
     timeout: 5000
@@ -83,7 +101,9 @@ await Dependency.waitLoaded("../kernel/process/processManager.js", {
 
 **示例**:
 ```javascript
-const Dependency = new DependencyConfig();
+// 从 POOL 获取全局实例
+const Dependency = POOL.__GET__("KERNEL_GLOBAL_POOL", "DependencyConfig");
+
 const loaded = Dependency.waitLoadedSync("../kernel/process/processManager.js");
 if (loaded) {
     console.log("依赖已加载");
@@ -120,7 +140,9 @@ DependencyConfig.publishSignal("../kernel/process/processManager.js");
 
 **示例**:
 ```javascript
-const Dependency = new DependencyConfig();
+// 从 POOL 获取全局实例
+const Dependency = POOL.__GET__("KERNEL_GLOBAL_POOL", "DependencyConfig");
+
 if (Dependency.checkDependency("../kernel/process/processManager.js")) {
     console.log("依赖已加载");
 }
@@ -131,8 +153,8 @@ if (Dependency.checkDependency("../kernel/process/processManager.js")) {
 ### 示例 1: 基本依赖管理
 
 ```javascript
-// 创建依赖管理器实例
-const Dependency = new DependencyConfig();
+// 从 POOL 获取全局实例
+const Dependency = POOL.__GET__("KERNEL_GLOBAL_POOL", "DependencyConfig");
 
 // 添加依赖
 Dependency.addDependency("../kernel/process/processManager.js");
@@ -148,7 +170,8 @@ await Dependency.waitLoaded("../kernel/process/processManager.js");
 ### 示例 2: 等待多个依赖
 
 ```javascript
-const Dependency = new DependencyConfig();
+// 从 POOL 获取全局实例
+const Dependency = POOL.__GET__("KERNEL_GLOBAL_POOL", "DependencyConfig");
 
 // 添加并加载依赖
 Dependency.addDependency("../kernel/process/processManager.js");
@@ -175,8 +198,10 @@ DependencyConfig.publishSignal("../kernel/process/processManager.js");
 ### 示例 4: 同步等待（关键模块）
 
 ```javascript
+// 从 POOL 获取全局实例
+const Dependency = POOL.__GET__("KERNEL_GLOBAL_POOL", "DependencyConfig");
+
 // 同步等待关键模块（会阻塞主线程）
-const Dependency = new DependencyConfig();
 const loaded = Dependency.waitLoadedSync("../kernel/process/processManager.js", {
     interval: 10,
     timeout: 5000

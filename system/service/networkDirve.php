@@ -47,13 +47,16 @@ set_exception_handler(function($exception) {
 header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type');
+header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Auth-Token, X-JWT');
 
 // 处理 OPTIONS 预检请求
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(200);
     exit;
 }
+
+require_once __DIR__ . '/jwtVerify.php';
+requireJWTVerify();
 
 // 基础路径配置
 define('DISK_BASE_PATH', __DIR__ . '/DISK');

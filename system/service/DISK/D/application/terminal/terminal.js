@@ -2621,10 +2621,11 @@ function escapeHtml(s){
                                 
                                 // 从 PHP 服务获取目录列表
                                 const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
-                                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
-                                    : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE, { upid: typeof TERMINAL !== 'undefined' ? TERMINAL._upid : undefined })
+                                        : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
                                         ? SystemInformation.getOrigin()
                                         : window.location.origin);
+                                if (typeof TERMINAL !== 'undefined' && TERMINAL._upid != null) url.searchParams.set('upid', TERMINAL._upid);
                                 url.searchParams.set('action', 'list_dir');
                                 url.searchParams.set('path', phpPath);
                                 
@@ -2977,12 +2978,13 @@ function escapeHtml(s){
                                     }
                                     
                                     const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
-                                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
-                                    : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE, { upid: typeof TERMINAL !== 'undefined' ? TERMINAL._upid : undefined })
+                                        : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
                                         ? SystemInformation.getOrigin()
                                         : window.location.origin);
-                                    url.searchParams.set('action', 'list_dir');
-                                    url.searchParams.set('path', phpPath);
+                                if (typeof TERMINAL !== 'undefined' && TERMINAL._upid != null) url.searchParams.set('upid', TERMINAL._upid);
+                                url.searchParams.set('action', 'list_dir');
+                                url.searchParams.set('path', phpPath);
                                     
                                     try {
                                         const response = await fetch(url.toString());
@@ -4929,10 +4931,11 @@ function escapeHtml(s){
                 // 降级方案：使用 PHP 服务
                 if (binPrograms.length === 0) {
                     const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
-                        ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
-                        : new URL('/system/service/FSDirve.php', (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
-                            ? SystemInformation.getOrigin()
-                            : window.location.origin);
+                        ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE, { upid: typeof TERMINAL !== 'undefined' ? TERMINAL._upid : undefined })
+                                    : new URL('/system/service/FSDirve.php', (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                                        ? SystemInformation.getOrigin()
+                                        : window.location.origin);
+                    if (typeof TERMINAL !== 'undefined' && TERMINAL._upid != null) url.searchParams.set('upid', TERMINAL._upid);
                     
                     url.searchParams.set('action', 'list_dir');
                     url.searchParams.set('path', 'D:/bin');
@@ -5714,11 +5717,12 @@ function escapeHtml(s){
                             
                             // 从 PHP 服务检查目录是否存在
                             const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
-                                ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
-                                : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
-                                    ? SystemInformation.getOrigin()
-                                    : window.location.origin);
-                            url.searchParams.set('action', 'exists');
+                                ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE, { upid: typeof TERMINAL !== 'undefined' ? TERMINAL._upid : undefined })
+                                    : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                                        ? SystemInformation.getOrigin()
+                                        : window.location.origin);
+                                if (typeof TERMINAL !== 'undefined' && TERMINAL._upid != null) url.searchParams.set('upid', TERMINAL._upid);
+                                url.searchParams.set('action', 'exists');
                             url.searchParams.set('path', phpPath);
                             
                             const response = await fetch(url.toString());
@@ -5887,12 +5891,13 @@ function escapeHtml(s){
                                 phpPath = phpPath + '/';
                             }
                             const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
-                                ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
-                                : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
-                                    ? SystemInformation.getOrigin()
-                                    : window.location.origin);
-                            url.searchParams.set('action', 'list_dir');
-                            url.searchParams.set('path', phpPath);
+                                ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE, { upid: typeof TERMINAL !== 'undefined' ? TERMINAL._upid : undefined })
+                                        : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                                        ? SystemInformation.getOrigin()
+                                        : window.location.origin);
+                                if (typeof TERMINAL !== 'undefined' && TERMINAL._upid != null) url.searchParams.set('upid', TERMINAL._upid);
+                                url.searchParams.set('action', 'list_dir');
+                                url.searchParams.set('path', phpPath);
                             
                             const response = await fetch(url.toString());
                             if (!response.ok) {
@@ -6065,10 +6070,11 @@ function escapeHtml(s){
                         
                         // 从 PHP 服务读取文件
                         const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
-                            ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
-                            : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
-                                ? SystemInformation.getOrigin()
-                                : window.location.origin);
+                            ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE, { upid: typeof TERMINAL !== 'undefined' ? TERMINAL._upid : undefined })
+                        : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                            ? SystemInformation.getOrigin()
+                            : window.location.origin);
+                        if (typeof TERMINAL !== 'undefined' && TERMINAL._upid != null) url.searchParams.set('upid', TERMINAL._upid);
                         url.searchParams.set('action', 'read_file');
                         url.searchParams.set('path', phpPath);
                         url.searchParams.set('fileName', fname);
@@ -6617,10 +6623,11 @@ function escapeHtml(s){
                                     phpPath = phpPath + '/';
                                 }
                                 const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
-                                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
-                                    : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE, { upid: typeof TERMINAL !== 'undefined' ? TERMINAL._upid : undefined })
+                                        : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
                                         ? SystemInformation.getOrigin()
                                         : window.location.origin);
+                                if (typeof TERMINAL !== 'undefined' && TERMINAL._upid != null) url.searchParams.set('upid', TERMINAL._upid);
                                 url.searchParams.set('action', 'list_dir');
                                 url.searchParams.set('path', phpPath);
                                 
@@ -8015,10 +8022,11 @@ function escapeHtml(s){
                                 const disk = diskName.replace(':', ''); // 移除冒号，得到 C 或 D
                                 try {
                                     const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
-                                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE, { upid: typeof TERMINAL !== 'undefined' ? TERMINAL._upid : undefined })
                                     : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
                                         ? SystemInformation.getOrigin()
                                         : window.location.origin);
+                                    if (typeof TERMINAL !== 'undefined' && TERMINAL._upid != null) url.searchParams.set('upid', TERMINAL._upid);
                                     url.searchParams.set('action', 'get_disk_info');
                                     url.searchParams.set('disk', disk);
                                     
@@ -8065,10 +8073,11 @@ function escapeHtml(s){
                             if (partitions.length === 0) {
                                 try {
                                     const listUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
-                                        ? SystemInformation.buildServiceUrlObject('/system/service/DISKMANAGER.php')
+                                        ? SystemInformation.buildServiceUrlObject('/system/service/DISKMANAGER.php', { upid: typeof TERMINAL !== 'undefined' ? TERMINAL._upid : undefined })
                                         : new URL('/system/service/DISKMANAGER.php', (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
-                                            ? SystemInformation.getOrigin()
-                                            : window.location.origin);
+                                        ? SystemInformation.getOrigin()
+                                        : window.location.origin);
+                                    if (typeof TERMINAL !== 'undefined' && TERMINAL._upid != null) listUrl.searchParams.set('upid', TERMINAL._upid);
                                     listUrl.searchParams.set('action', 'list');
                                     
                                     const listResponse = await fetch(listUrl.toString());
@@ -8107,10 +8116,11 @@ function escapeHtml(s){
                             if (disksToShow.length === 0 && !targetDisk) {
                                 try {
                                     const listUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
-                                        ? SystemInformation.buildServiceUrlObject('/system/service/DISKMANAGER.php')
+                                        ? SystemInformation.buildServiceUrlObject('/system/service/DISKMANAGER.php', { upid: typeof TERMINAL !== 'undefined' ? TERMINAL._upid : undefined })
                                         : new URL('/system/service/DISKMANAGER.php', (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
-                                            ? SystemInformation.getOrigin()
-                                            : window.location.origin);
+                                        ? SystemInformation.getOrigin()
+                                        : window.location.origin);
+                                    if (typeof TERMINAL !== 'undefined' && TERMINAL._upid != null) listUrl.searchParams.set('upid', TERMINAL._upid);
                                     listUrl.searchParams.set('action', 'list');
                                     
                                     const listResponse = await fetch(listUrl.toString());
@@ -8146,12 +8156,13 @@ function escapeHtml(s){
                                 
                                 try {
                                     const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
-                                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
-                                    : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE, { upid: typeof TERMINAL !== 'undefined' ? TERMINAL._upid : undefined })
+                                        : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
                                         ? SystemInformation.getOrigin()
                                         : window.location.origin);
-                                    url.searchParams.set('action', 'list_dir');
-                                    url.searchParams.set('path', phpPath);
+                                if (typeof TERMINAL !== 'undefined' && TERMINAL._upid != null) url.searchParams.set('upid', TERMINAL._upid);
+                                url.searchParams.set('action', 'list_dir');
+                                url.searchParams.set('path', phpPath);
                                     
                                     const response = await fetch(url);
                                     if (!response.ok) {
@@ -8190,12 +8201,13 @@ function escapeHtml(s){
                                 
                                 try {
                                     const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
-                                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
-                                    : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE, { upid: typeof TERMINAL !== 'undefined' ? TERMINAL._upid : undefined })
+                                        : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
                                         ? SystemInformation.getOrigin()
                                         : window.location.origin);
-                                    url.searchParams.set('action', 'list_dir');
-                                    url.searchParams.set('path', phpPath);
+                                if (typeof TERMINAL !== 'undefined' && TERMINAL._upid != null) url.searchParams.set('upid', TERMINAL._upid);
+                                url.searchParams.set('action', 'list_dir');
+                                url.searchParams.set('path', phpPath);
                                     
                                     const response = await fetch(url);
                                     if (!response.ok) {
@@ -8244,10 +8256,11 @@ function escapeHtml(s){
                                 
                                 try {
                                     const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
-                                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE, { upid: typeof TERMINAL !== 'undefined' ? TERMINAL._upid : undefined })
                                     : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
                                         ? SystemInformation.getOrigin()
                                         : window.location.origin);
+                                    if (typeof TERMINAL !== 'undefined' && TERMINAL._upid != null) url.searchParams.set('upid', TERMINAL._upid);
                                     url.searchParams.set('action', 'get_disk_info');
                                     url.searchParams.set('disk', disk);
                                     
@@ -8615,7 +8628,7 @@ function escapeHtml(s){
                                 // 构建 FSDirve 服务 URL
                                 let url = null;
                                 if (SystemInfo.buildServiceUrlObject && SystemInfo.SERVICE_NAMES) {
-                                    url = SystemInfo.buildServiceUrlObject(SystemInfo.SERVICE_NAMES.FSDIRVE);
+                                    url = SystemInfo.buildServiceUrlObject(SystemInfo.SERVICE_NAMES.FSDIRVE, { upid: typeof TERMINAL !== 'undefined' ? TERMINAL._upid : undefined });
                                 } else if (SystemInfo.getFSDirvePath && SystemInfo.getOrigin) {
                                     url = new URL(SystemInfo.getFSDirvePath(), SystemInfo.getOrigin());
                                 } else {
@@ -8623,6 +8636,7 @@ function escapeHtml(s){
                                     const origin = window.location.origin || 'http://localhost:8089';
                                     url = new URL('/system/service/FSDirve.php', origin);
                                 }
+                                if (typeof TERMINAL !== 'undefined' && TERMINAL._upid != null) url.searchParams.set('upid', TERMINAL._upid);
                                 url.searchParams.set('action', 'read_file');
                                 url.searchParams.set('path', 'D:/bin');
                                 // 确保 cmd 是有效字符串，避免 undefined.js
@@ -8870,7 +8884,7 @@ function escapeHtml(s){
                                             // 构建 FSDirve 服务 URL
                                             let url = null;
                                             if (SystemInfo.buildServiceUrlObject && SystemInfo.SERVICE_NAMES) {
-                                                url = SystemInfo.buildServiceUrlObject(SystemInfo.SERVICE_NAMES.FSDIRVE);
+                                                url = SystemInfo.buildServiceUrlObject(SystemInfo.SERVICE_NAMES.FSDIRVE, { upid: typeof TERMINAL !== 'undefined' ? TERMINAL._upid : undefined });
                                             } else if (SystemInfo.getFSDirvePath && SystemInfo.getOrigin) {
                                                 url = new URL(SystemInfo.getFSDirvePath(), SystemInfo.getOrigin());
                                             } else {
@@ -8878,6 +8892,7 @@ function escapeHtml(s){
                                                 const origin = window.location.origin || 'http://localhost:8089';
                                                 url = new URL('/system/service/FSDirve.php', origin);
                                             }
+                                            if (typeof TERMINAL !== 'undefined' && TERMINAL._upid != null) url.searchParams.set('upid', TERMINAL._upid);
                                             url.searchParams.set('action', 'read_file');
                                             url.searchParams.set('path', parentPath);
                                             url.searchParams.set('fileName', fileName);
@@ -9217,6 +9232,7 @@ function escapeHtml(s){
         __init__(pid, initArgs = {}) {
             // 保存 pid 到实例，以便在回调中使用
             const currentPid = pid;
+            TERMINAL._upid = initArgs && initArgs.upid;
             
             // 将 initArgs 临时存储到 window，以便 TabManager 可以访问
             if (typeof window !== 'undefined') {

@@ -1,1 +1,21 @@
-{}
+{
+  "diskmanager": {
+    "script": "D:/application/diskmanager/diskmanager.js",
+    "styles": [
+      "D:/application/diskmanager/diskmanager.css"
+    ],
+    "icon": "D:/application/diskmanager/icon.svg",
+    "assets": [],
+    "metadata": {
+      "description": "磁盘分区管理",
+      "version": "1.0.6",
+      "type": "GUI",
+      "autoStart": false,
+      "priority": 5,
+      "alwaysShowInTaskbar": false,
+      "allowMultipleInstances": true,
+      "supportsPreview": true,
+      "category": "system"
+    }
+  }
+}

@@ -39,6 +39,23 @@
         progressUpdateTimer: null,
         controlsHideTimer: null,
         isControlsVisible: true,
+
+        /**
+         * 获取当前语言下的本地化文本
+         */
+        _getText: function(key, fallback) {
+            if (!key) return (fallback != null ? fallback : '');
+            try {
+                const LanguagesExpansion = (typeof POOL !== 'undefined' && POOL && typeof POOL.__GET__ === 'function')
+                    ? POOL.__GET__('KERNEL_GLOBAL_POOL', 'LanguagesExpansion')
+                    : (typeof window !== 'undefined' ? window.LanguagesExpansion : null);
+                if (LanguagesExpansion && typeof LanguagesExpansion.getText === 'function') {
+                    const value = LanguagesExpansion.getText(key);
+                    if (value && value !== key) return value;
+                }
+            } catch (e) {}
+            return (fallback != null ? fallback : '');
+        },
         
         /**
          * 初始化方法
@@ -87,7 +104,7 @@
                     }
                     
                     const windowInfo = GUIManager.registerWindow(pid, this.window, {
-                        title: '视频播放器',
+                        title: this._getText('VIDEO_TITLE', '视频播放器'),
                         icon: icon,
                         onClose: () => {
                             // onClose 回调只做清理工作，不调用 _closeWindow 或 unregisterWindow
@@ -201,7 +218,7 @@
                 z-index: 10;
                 pointer-events: none;
             `;
-            this.fileInfo.textContent = '未加载视频文件';
+            this.fileInfo.textContent = this._getText('VIDEO_NO_FILE', '未加载视频文件');
             content.appendChild(this.fileInfo);
             
             // 控制栏
@@ -913,7 +930,8 @@
                 
                 // 更新文件信息
                 if (this.fileInfo) {
-                    this.fileInfo.textContent = `加载中: ${fileName}`;
+                    const loadingText = this._getText('VIDEO_LOADING', '加载中: {0}');
+                    this.fileInfo.textContent = loadingText.replace('{0}', fileName);
                 }
                 
                 if (typeof KernelLogger !== 'undefined') {
@@ -976,7 +994,8 @@
             }
             
             if (this.fileInfo) {
-                this.fileInfo.textContent = `加载失败: ${errorMsg}`;
+                const failedText = this._getText('VIDEO_LOAD_FAILED', '加载失败: {0}');
+                this.fileInfo.textContent = failedText.replace('{0}', errorMsg);
             }
             
             this.duration = 0;

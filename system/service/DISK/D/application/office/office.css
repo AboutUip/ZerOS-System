@@ -1,0 +1,72 @@
+.office-window{display:flex;flex-direction:column;overflow:hidden;border-radius:16px;background:linear-gradient(180deg,rgba(26,31,46,.98) 0%,rgba(22,33,62,.98) 100%);border:1px solid rgba(108,142,255,.26);box-shadow:0 16px 60px rgba(0,0,0,.55);backdrop-filter:blur(40px) saturate(180%);-webkit-backdrop-filter:blur(40px) saturate(180%)}
+.zos-window-borderless .office-window{border-radius:16px}
+.office-toolbar{display:flex;gap:10px;align-items:center;height:48px;min-height:48px;max-height:48px;padding:0 12px;background:rgba(0,0,0,.18);border-bottom:1px solid rgba(108,142,255,.18);user-select:none;cursor:move;box-sizing:border-box}
+.office-title{font-weight:600;color:#fff;opacity:.95}
+.office-input{flex:1;min-width:0;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.16);border-radius:10px;color:#fff;padding:8px 10px;outline:none;height:32px;box-sizing:border-box}
+.office-btn{background:rgba(108,142,255,.18);border:1px solid rgba(108,142,255,.35);border-radius:10px;color:#fff;padding:8px 12px;cursor:pointer}
+.office-btn:hover{background:rgba(108,142,255,.28)}
+.office-btn-secondary{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.16)}
+.office-btn-secondary:hover{background:rgba(255,255,255,.10)}
+.office-status{color:rgba(255,255,255,.75);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px}
+.office-window-controls{display:flex;gap:6px;margin-left:6px}
+.office-winbtn{width:34px;height:28px;border-radius:10px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.16);color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;font-size:16px}
+.office-winbtn:hover{background:rgba(255,255,255,.10)}
+.office-winbtn-close:hover{background:rgba(255,80,100,.22);border-color:rgba(255,80,100,.38)}
+.office-start-controls{position:absolute;top:0;left:0;right:0;height:48px;display:flex;align-items:center;justify-content:space-between;padding:0 12px;box-sizing:border-box;pointer-events:none;z-index:10}
+.office-start-controls > *{pointer-events:auto}
+.office-start-title{font-weight:600;color:#fff;opacity:.95;font-size:14px}
+.office-start-win-controls{display:flex;gap:6px}
+.office-start-screen{flex:1;display:flex;flex-direction:column;padding:40px 60px;box-sizing:border-box}
+.office-start-header{padding-bottom:40px}
+.office-container{display:flex;flex-direction:column;height:100%;-webkit-app-region:drag}
+.office-start-drag-handle{height:48px;display:flex;align-items:center;padding:0 12px;box-sizing:border-box;cursor:default}
+.office-start-logo{display:flex;align-items:center;gap:16px}
+.office-start-icon{width:64px;height:64px;min-width:64px;min-height:64px;background:linear-gradient(135deg,rgba(108,142,255,.9) 0%,rgba(66,153,255,.9) 100%);border-radius:16px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:32px;font-weight:700}
+.office-start-title{font-size:28px;font-weight:600;color:#fff}
+.office-start-content{flex:1;display:flex;align-items:center;justify-content:center}
+.office-start-actions{display:flex;gap:24px;flex-wrap:wrap;justify-content:center;max-width:800px}
+.office-start-card{width:200px;padding:24px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:16px;cursor:pointer;transition:all .2s;text-align:center}
+.office-start-card:hover{background:rgba(108,142,255,.12);border-color:rgba(108,142,255,.35);transform:translateY(-4px)}
+.office-start-card-icon{color:rgba(108,142,255,.9);margin-bottom:16px}
+.office-start-card-title{font-size:16px;font-weight:600;color:#fff;margin-bottom:8px}
+.office-start-card-desc{font-size:13px;color:rgba(255,255,255,.6)}
+.office-start-footer{padding-top:30px;text-align:center}
+.office-start-version{font-size:12px;color:rgba(255,255,255,.4)}
+.office-body{flex:1;min-height:0}
+.office-split{height:100%;display:flex;gap:0;padding:12px;box-sizing:border-box}
+.office-nodes-panel{order:0;width:240px;min-width:240px;max-width:240px;border-radius:14px;overflow:hidden;background:rgba(0,0,0,.18);border:1px solid rgba(255,255,255,.10);display:flex;flex-direction:column}
+.office-resizer{width:6px;min-width:6px;max-width:6px;background:rgba(108,142,255,.15);cursor:col-resize;transition:background .2s}
+.office-resizer:hover{background:rgba(108,142,255,.4)}
+.office-resizer:active{background:rgba(108,142,255,.6)}
+.office-resizer-left{order:1;margin-left:6px;margin-right:6px}
+.office-resizer-right{order:3;margin-left:6px;margin-right:6px}
+.office-view{order:2;flex:1;min-width:0;border-radius:14px;overflow:hidden;background:rgba(0,0,0,.25);border:1px solid rgba(255,255,255,.10)}
+.office-iframe{width:100%;height:100%;border:0;background:#111}
+.office-editor{order:4;width:340px;min-width:340px;max-width:340px;border-radius:14px;overflow:hidden;background:rgba(0,0,0,.18);border:1px solid rgba(255,255,255,.10);display:flex;flex-direction:column}
+.office-editor-head{padding:12px 12px 8px 12px;border-bottom:1px solid rgba(255,255,255,.10)}
+.office-editor-title{color:#fff;font-weight:700;font-size:14px}
+.office-editor-sub{color:rgba(255,255,255,.70);font-size:12px;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.office-editor-section{padding:10px 12px;border-bottom:1px solid rgba(255,255,255,.08)}
+.office-field{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
+.office-label{color:rgba(255,255,255,.70);font-size:12px}
+.office-readonly{color:#fff;font-size:12px;opacity:.92;max-width:210px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.office-textarea{width:100%;min-height:90px;resize:vertical;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14);border-radius:10px;color:#fff;padding:10px 10px;outline:none;box-sizing:border-box;font-size:12px}
+.office-editor-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.office-input-mini{width:100%;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14);border-radius:10px;color:#fff;padding:8px 10px;outline:none;box-sizing:border-box;font-size:12px;height:32px}
+.office-select-mini{width:100%;background:#1a1f2e;border:1px solid rgba(255,255,255,.14);border-radius:10px;color:#fff;padding:6px 8px;outline:none;box-sizing:border-box;font-size:12px;height:32px}
+.office-select-mini option{background:#1a1f2e;color:#fff}
+.office-editor-foot{padding:10px 12px;display:flex;gap:10px;justify-content:flex-end}
+.office-nodes-header{padding:12px 12px;border-bottom:1px solid rgba(255,255,255,.10);color:#fff;font-weight:700;font-size:14px}
+.office-nodes-tree{flex:1;min-height:0;overflow:auto;padding:8px}
+.office-node-item{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;cursor:pointer;margin-bottom:2px}
+.office-node-item:hover{background:rgba(255,255,255,.08)}
+.office-node-item[data-node-id].office-node-selected{background:rgba(108,142,255,.22);border:1px solid rgba(108,142,255,.45)}
+.office-node-badge{width:18px;height:18px;min-width:18px;min-height:18px;border-radius:4px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:700}
+.office-node-name{color:#fff;font-size:12px;opacity:.92;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.office-node-menu{position:fixed;z-index:10000;background:rgba(30,35,50,.98);border:1px solid rgba(108,142,255,.35);border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,.5);min-width:160px;padding:6px}
+.office-node-menu-item{padding:10px 14px;border-radius:8px;color:#fff;font-size:13px;cursor:pointer}
+.office-node-menu-item:hover{background:rgba(255,255,255,.08)}
+.office-context-menu{position:fixed;z-index:10000;background:rgba(30,35,50,.98);border:1px solid rgba(108,142,255,.35);border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,.5);min-width:180px;padding:6px}
+.office-context-menu-item{padding:10px 14px;border-radius:8px;color:#fff;font-size:13px;cursor:pointer}
+.office-context-menu-item:hover{background:rgba(255,255,255,.08)}
+.office-context-menu-separator{height:1px;margin:4px 0;background:rgba(255,255,255,.12)}

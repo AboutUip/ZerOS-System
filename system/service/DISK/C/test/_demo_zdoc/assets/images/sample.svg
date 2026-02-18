@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="500" viewBox="0 0 800 500">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#6C8EFF"/>
+      <stop offset="1" stop-color="#B86CFF"/>
+    </linearGradient>
+  </defs>
+  <rect x="0" y="0" width="800" height="500" rx="28" fill="url(#g)"/>
+  <circle cx="640" cy="150" r="80" fill="rgba(255,255,255,0.25)"/>
+  <circle cx="520" cy="260" r="120" fill="rgba(255,255,255,0.18)"/>
+  <path d="M120 360 C 220 260, 320 420, 420 320 S 620 360, 700 300" fill="none" stroke="rgba(255,255,255,0.55)" stroke-width="14" stroke-linecap="round"/>
+  <text x="60" y="120" font-family="system-ui,Segoe UI,Arial" font-size="56" fill="#0B1020" font-weight="800">ZDOC</text>
+  <text x="60" y="180" font-family="system-ui,Segoe UI,Arial" font-size="28" fill="#0B1020" opacity="0.85">Sample SVG Asset</text>
+</svg>
+

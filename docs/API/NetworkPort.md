@@ -5,8 +5,24 @@
 ZerOS 提供了完整的 TCP 端口监听和管理功能，允许程序注册端口、监听连接、接收和发送数据。该功能由以下组件协同工作：
 
 - **前端模块**：`kernel/drive/networkManager.js` - 提供 JavaScript API
-- **后端服务**：`system/service/networkDirve.php` - 处理端口注册和管理
+- **后端服务**：`networkDirve.php` - 处理端口注册和管理，详见 [networkDirve 接口](../INTERFACE/networkDirve.md)
 - **守护进程**：`system/service/networkDirveDaemon.php` - 管理持久化套接字监听（可选）
+
+## 获取实例
+
+网络端口管理主要通过 NetworkManager 提供，可以通过以下方式获取：
+
+```javascript
+// 从 POOL 获取 NetworkManager
+const NetworkManager = POOL.__GET__("KERNEL_GLOBAL_POOL", "NetworkManager");
+
+// 然后通过 NetworkManager 调用端口管理 API
+await NetworkManager.registerPort(8080, this.pid, 'MyServer');
+```
+
+**注意**：
+- 详细 API 使用方式见「API 参考」章节
+- 端口管理需要 `NETWORK_ACCESS` 权限
 
 ## 架构说明
 
@@ -84,20 +100,24 @@ __info__() {
 
 **示例**:
 ```javascript
-const pid = ProcessManager.getCurrentPID();
-const result = await ProcessManager.callKernelAPI('Network.Port.register', [
-    8080,           // 端口号
-    pid,            // 进程 ID
-    'MyServer',     // 程序名称
-    {               // 选项
-        onData: (data) => {
-            console.log('收到数据:', data);
-        },
-        onConnection: (connection) => {
-            console.log('新连接:', connection);
+// 在程序内部使用 this.pid
+async __init__(pid, initArgs) {
+    this.pid = pid;
+    
+    const result = await ProcessManager.callKernelAPI(this.pid, 'Network.Port.register', [
+        8080,           // 端口号
+        this.pid,       // 进程 ID
+        'MyServer',     // 程序名称
+        {               // 选项
+            onData: (data) => {
+                console.log('收到数据:', data);
+            },
+            onConnection: (connection) => {
+                console.log('新连接:', connection);
+            }
         }
-    }
-]);
+    ]);
+}
 ```
 
 #### 2. 取消端口监听
@@ -316,13 +336,13 @@ networkManager.removePortConnectionListener(8080, listener);
 ### 简单的 TCP 服务器
 
 ```javascript
-async function startServer() {
-    const pid = ProcessManager.getCurrentPID();
+async __init__(pid, initArgs) {
+    this.pid = pid;
     
     // 注册端口
-    await ProcessManager.callKernelAPI('Network.Port.register', [
+    await ProcessManager.callKernelAPI(this.pid, 'Network.Port.register', [
         8080,
-        pid,
+        this.pid,
         'MyServer',
         {
             onData: (data) => {
@@ -337,20 +357,17 @@ async function startServer() {
     
     console.log('服务器已启动，监听端口 8080');
 }
-
-// 启动服务器
-startServer().catch(console.error);
 ```
 
 ### 使用 NetworkManager 直接管理
 
 ```javascript
-async function advancedServer() {
+async __init__(pid, initArgs) {
+    this.pid = pid;
     const networkManager = POOL.__GET__("KERNEL_GLOBAL_POOL", "NetworkManager");
-    const pid = ProcessManager.getCurrentPID();
     
     // 注册端口
-    await networkManager.registerPort(8080, pid, 'MyServer');
+    await networkManager.registerPort(8080, this.pid, 'MyServer');
     
     // 添加数据监听器
     networkManager.addPortDataListener(8080, (data) => {
@@ -370,18 +387,20 @@ async function advancedServer() {
     });
     
     // 定期检查端口状态
-    setInterval(async () => {
+    this.intervalId = setInterval(async () => {
         const status = await networkManager.getPortStatus(8080);
         console.log('端口状态:', status);
     }, 5000);
-    
-    // 程序退出时取消端口
-    window.addEventListener('beforeunload', async () => {
-        await networkManager.unregisterPort(8080);
-    });
 }
 
-advancedServer().catch(console.error);
+__exit__() {
+    // 程序退出时清理
+    if (this.intervalId) {
+        clearInterval(this.intervalId);
+    }
+    const networkManager = POOL.__GET__("KERNEL_GLOBAL_POOL", "NetworkManager");
+    networkManager.unregisterPort(8080).catch(console.error);
+}
 ```
 
 ## 错误处理

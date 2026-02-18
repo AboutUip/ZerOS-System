@@ -10,6 +10,18 @@
 - `Disk` - 虚拟磁盘管理器（用于检查磁盘空间）
 - `KernelLogger` - 内核日志系统（用于日志输出）
 
+## 获取实例
+
+FileFormwork 是一个**类**，需要通过 `new` 关键字创建实例：
+
+```javascript
+// ✅ 正确：创建实例
+const FileFormwork = POOL.__GET__("KERNEL_GLOBAL_POOL", "FileFormwork");
+const file = new FileFormwork(...);
+```
+
+**注意**：FileFormwork 不是单例，需要通过 `new` 创建对象实例。
+
 ## 构造函数
 
 #### `new FileFormwork(filetype, filename, filecontent, path, fileAttributes, linkTarget)`

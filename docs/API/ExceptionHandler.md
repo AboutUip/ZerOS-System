@@ -20,6 +20,20 @@
 - `ProcessManager` - 进程管理（用于终止异常程序）
 - `NotificationManager` - 通知管理（用于报告程序异常）
 
+## 获取实例
+
+ExceptionHandler 注册在 POOL 和 window 中，可以通过以下方式获取：
+
+```javascript
+// 方式 1：从 POOL 获取
+const ExceptionHandler = POOL.__GET__("KERNEL_GLOBAL_POOL", "ExceptionHandler");
+
+// 方式 2：从 window 获取
+const ExceptionHandler = window.ExceptionHandler;
+```
+
+**注意**：在内核初始化完成后，ExceptionHandler 已加载，可以直接使用。
+
 ## 异常等级
 
 ### ExceptionLevel 枚举

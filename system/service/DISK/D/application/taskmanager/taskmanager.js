@@ -51,6 +51,7 @@
         _sortBy: 'status',
         
         __init__: async function(pid, initArgs) {
+            this._upid = initArgs && initArgs.upid;
             this.pid = pid;
             
             // 检查是否是选择模式
@@ -2612,10 +2613,11 @@
             const disk = diskName.replace(':', ''); // 移除冒号，得到 C 或 D
             try {
                 const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
-                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
-                    : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE, { upid: this._upid })
+                    : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin)
                         ? SystemInformation.getOrigin()
                         : window.location.origin);
+                if (this._upid != null) url.searchParams.set('upid', this._upid);
                 url.searchParams.set('action', 'get_disk_info');
                 url.searchParams.set('disk', disk);
                 

@@ -58,6 +58,7 @@
          * 初始化
          */
         __init__: async function(pid, initArgs) {
+            this._upid = initArgs && initArgs.upid;
             this.pid = pid;
             
             try {
@@ -1344,10 +1345,11 @@
             path = this._normalizePath(path);
             
             const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
-                ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE, { upid: this._upid })
                 : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
                     ? SystemInformation.getOrigin()
                     : window.location.origin);
+            if (this._upid != null) url.searchParams.set('upid', this._upid);
             url.searchParams.set('action', 'list_dir'); // 注意：FSDirve.php 使用 'list_dir' 而不是 'list_directory'
             url.searchParams.set('path', path);
             
@@ -1892,10 +1894,11 @@
             }
             
             const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
-                ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE, { upid: this._upid })
                 : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
                     ? SystemInformation.getOrigin()
                     : window.location.origin);
+            if (this._upid != null) url.searchParams.set('upid', this._upid);
             url.searchParams.set('action', 'read_file');
             url.searchParams.set('path', phpPath);
             url.searchParams.set('fileName', fileName);
@@ -2133,10 +2136,11 @@
             }
             
             const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
-                ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE, { upid: this._upid })
                 : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
                     ? SystemInformation.getOrigin()
                     : window.location.origin);
+            if (this._upid != null) url.searchParams.set('upid', this._upid);
             url.searchParams.set('action', 'write_file');
             url.searchParams.set('path', phpPath);
             url.searchParams.set('fileName', fileName);
@@ -2984,10 +2988,11 @@
                 dirPath = this._normalizePath(dirPath);
                 
                 const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
-                ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE, { upid: this._upid })
                 : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
                     ? SystemInformation.getOrigin()
                     : window.location.origin);
+                if (this._upid != null) url.searchParams.set('upid', this._upid);
                 url.searchParams.set('action', 'create_file');
                 url.searchParams.set('path', dirPath);
                 url.searchParams.set('fileName', fileName);
@@ -3037,10 +3042,11 @@
                 dirPath = this._normalizePath(dirPath);
                 
                 const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
-                ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE, { upid: this._upid })
                 : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
                     ? SystemInformation.getOrigin()
                     : window.location.origin);
+                if (this._upid != null) url.searchParams.set('upid', this._upid);
                 url.searchParams.set('action', 'create_dir');
                 url.searchParams.set('path', dirPath);
                 url.searchParams.set('name', folderName);
@@ -3075,10 +3081,11 @@
                 itemPath = this._normalizePath(itemPath);
                 
                 const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
-                ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE, { upid: this._upid })
                 : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
                     ? SystemInformation.getOrigin()
                     : window.location.origin);
+                if (this._upid != null) url.searchParams.set('upid', this._upid);
                 
                 if (itemType === 'directory') {
                     url.searchParams.set('action', 'delete_dir');
@@ -3146,10 +3153,11 @@
                 }
                 
                 const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
-                ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE, { upid: this._upid })
                 : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
                     ? SystemInformation.getOrigin()
                     : window.location.origin);
+                if (this._upid != null) url.searchParams.set('upid', this._upid);
                 
                 if (itemType === 'directory') {
                     url.searchParams.set('action', 'rename_dir');

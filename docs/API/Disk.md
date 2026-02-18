@@ -9,6 +9,17 @@
 - `NodeTreeCollection` - 文件树集合（用于文件系统操作）
 - `KernelMemory` - 内核内存（用于存储磁盘元数据）
 
+## 获取实例
+
+Disk 注册在 POOL 中，可以通过以下方式获取：
+
+```javascript
+// 从 POOL 获取
+const Disk = POOL.__GET__("KERNEL_GLOBAL_POOL", "Disk");
+```
+
+**注意**：在内核初始化完成后，Disk 已加载，可以直接使用。
+
 ## 常量
 
 ```javascript

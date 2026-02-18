@@ -46,6 +46,7 @@
          */
         __init__: async function (pid, initArgs = {}) {
             this.pid = pid;
+            this._upid = initArgs && initArgs.upid;
             this.terminal = initArgs.terminal;
             this._kernelAPI = initArgs.kernelAPI || null;
 
@@ -58,7 +59,7 @@
             const cwd = initArgs.cwd || 'C:';
 
             // 创建VimEditor实例
-            const editor = new VimEditor(pid, this.terminal, cwd, this._kernelAPI);
+            const editor = new VimEditor(pid, this.terminal, cwd, this._kernelAPI, this._upid);
             this._instances.set(pid, editor);
 
             // 使用 setTimeout 延迟执行，确保进程状态已设置为 running
@@ -136,11 +137,12 @@
      * VimEditor 类 - vim编辑器核心实现
      */
     class VimEditor {
-        constructor(pid, terminal, cwd, kernelAPI = null) {
+        constructor(pid, terminal, cwd, kernelAPI = null, upid = null) {
             this.pid = pid;
             this.terminal = terminal;
             this.cwd = cwd;
             this._kernelAPI = kernelAPI || null;
+            this._upid = upid != null ? upid : null;
 
             // 编辑器状态
             this.mode = 'NORMAL'; // NORMAL, INSERT, COMMAND, VISUAL
@@ -455,13 +457,14 @@
         async _readFile(dirPath, fileName) {
                 try {
                     const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
-                        ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                        ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE, { upid: this._upid })
                     : new URL((typeof SystemInformation !== 'undefined' && SystemInformation.getFSDirvePath)
                         ? SystemInformation.getFSDirvePath()
                         : '/system/service/FSDirve.php',
                         (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin)
                             ? SystemInformation.getOrigin()
                             : window.location.origin);
+                    if (this._upid != null) url.searchParams.set('upid', this._upid);
 
                     url.searchParams.set('action', 'read_file');
                 url.searchParams.set('path', dirPath);
@@ -489,13 +492,14 @@
          */
         async _writeFile(dirPath, fileName, content) {
             const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject)
-                        ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                        ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE, { upid: this._upid })
                 : new URL((typeof SystemInformation !== 'undefined' && SystemInformation.getFSDirvePath)
                     ? SystemInformation.getFSDirvePath()
                     : '/system/service/FSDirve.php',
                     (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin)
                             ? SystemInformation.getOrigin()
                             : window.location.origin);
+            if (this._upid != null) url.searchParams.set('upid', this._upid);
 
             url.searchParams.set('action', 'write_file');
             url.searchParams.set('path', dirPath);

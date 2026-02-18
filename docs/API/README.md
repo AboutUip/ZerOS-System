@@ -18,6 +18,9 @@
 - [UserControl.md](./UserControl.md) - 用户控制系统 ✅
 - [UserGroup.md](./UserGroup.md) - 用户组管理系统 ✅
 
+### 安全与鉴权
+- [RandomSecurity.md](./RandomSecurity.md) - 安全模块（SystemToken/UserToken JWT、后端 jwtVerify） ✅
+
 ### 内存管理
 - [MemoryManager.md](./MemoryManager.md) - 统一内存管理器 ✅
 - [KernelMemory.md](./KernelMemory.md) - 内核动态数据存储（Exploit 程序内存管理） ✅
@@ -51,12 +54,10 @@
 - [MultithreadingDrive.md](./MultithreadingDrive.md) - 多线程驱动 ✅
 - [ScheduleTaskManager.md](./ScheduleTaskManager.md) - 计划任务管理器 ✅
 
-### 后端服务
-- [FSDirve.md](./FSDirve.md) - 文件系统驱动服务（支持 PHP 和 SpringBoot 后端） ✅
-- [CompressionDrive.md](./CompressionDrive.md) - 压缩驱动服务（ZIP/RAR 压缩解压缩，支持 PHP 和 SpringBoot 后端） ✅
-- [DISKMANAGER.md](./DISKMANAGER.md) - 磁盘分区管理服务（分区的创建、检查、删除、合并等） ✅
-- [BrowserProxy.md](./BrowserProxy.md) - 浏览器网页代理服务（绕过 iframe 限制） ✅
-- [SystemInformation.md](./SystemInformation.md) - 系统信息和后端服务管理 ✅
+### 后端服务管理
+- [SystemInformation.md](./SystemInformation.md) - 系统信息和后端服务 URL 构建 ✅
+
+**后端 HTTP 接口文档**（FSDirve、CompressionDirve、DISKMANAGER、BrowserProxy、ImageProxy）见 [docs/INTERFACE/](../INTERFACE/README.md)
 
 ### 信号系统
 - [Pool.md](./Pool.md) - 全局对象池 ✅
@@ -113,6 +114,9 @@
 - UserControl
 - UserGroup
 
+**安全与鉴权**
+- RandomSecurity（JWT 生成、后端 jwtVerify、NetworkManager JWT 注入规则、User JWT 必须携带 upid）
+
 **文件系统**
 - Disk
 - NodeTree
@@ -131,10 +135,8 @@
 - CryptDrive
 - MultithreadingDrive
 - ScheduleTaskManager
-- FSDirve (后端服务，支持 PHP 和 SpringBoot)
-- DISKMANAGER (磁盘分区管理服务)
-- BrowserProxy (浏览器网页代理服务)
 - SystemInformation (系统信息和后端服务管理)
+- 后端接口（含 JWT、文件、磁盘、代理、网络、权限等）→ [INTERFACE/](../INTERFACE/README.md)
 
 **基础设施**
 - Pool
@@ -149,7 +151,7 @@
 
 ## 文档状态
 
-- ✅ 所有 API 文档已创建完成
+- ✅ API 文档索引已覆盖当前 docs/API 目录内的模块；如发现断链或与实现不一致，请提交修订
 
 ## 其他文档
 
@@ -164,4 +166,5 @@
 
 - [ZEROS_KERNEL.md](../ZEROS_KERNEL.md) - 内核概述
 - [DEVELOPER_GUIDE.md](../DEVELOPER_GUIDE.md) - 开发者指南
+- [RandomSecurity.md](./RandomSecurity.md) - JWT 鉴权与注入规则
 

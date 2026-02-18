@@ -42,7 +42,8 @@ ZerOS/
 │   │   ├── exceptionHM/   # 异常处理
 │   │   │   └── exceptionHandler.js # 异常处理管理器（结构化异常处理SEH）
 │   │   ├── safemode/      # 安全模式
-│   │   │   └── safeModeManager.js # 安全模式管理器
+│   │   │   ├── safeModeManager.js # 安全模式管理器
+│   │   │   └── randomSecurity.js  # 安全模块（SystemToken/UserToken JWT 生成）
 │   │   └── usercontrol/  # 用户控制
 │   │       ├── userControl.js # 用户控制系统
 │   │       └── userGroup.js   # 用户组管理系统
@@ -122,11 +123,14 @@ ZerOS/
     ├── API/              # API 文档
     │   ├── README.md     # API 文档索引
     │   └── ...          # 各模块 API 文档
-    ├── PLUGINS/          # 扩展与插件（语言包、服务模块编写等）
-    │   ├── README.md     # 扩展与插件索引
-    │   ├── LanguagePack.md   # 语言包格式说明
+    ├── SERVER/           # 服务与服务模块说明
+    │   ├── README.md     # 服务索引
     │   └── ServiceModule.md  # 服务模块编写指南
+    ├── PLUGINS/          # 扩展与插件（语言包等）
+    │   ├── README.md     # 扩展与插件索引
+    │   └── LanguagePack.md   # 语言包格式说明
     ├── DEVELOPER_GUIDE.md # 开发者指南
+    ├── SYSTEM_FLOW.md    # 系统流程说明
     └── ZEROS_KERNEL.md   # 本文档
 ```
 
@@ -198,7 +202,7 @@ console.log('程序启动');
 - 存储剪贴板数据（copy/paste 命令）
 - 存储每个终端实例的环境变量、命令历史、补全状态
 - 存储内核模块的动态数据（通过 KernelMemory 接口）
-- 自动分配和管理 Heap 和 Shed 内存（1MB Heap，1000 Shed）
+- 自动分配和管理 Heap 和 Shed 内存（2MB Heap，1000 Shed）
 
 详细 API 文档请参考 [MemoryManager API](API/MemoryManager.md) 和 [KernelMemory API](API/KernelMemory.md)
 
@@ -437,7 +441,7 @@ ZerOS 提供了完整的 GUI 管理系统，包括：
 ZerOS 提供了多个系统级驱动，扩展内核功能：
 
 - **AnimateManager**：动画管理，统一管理 CSS 动画和 JavaScript 动画
-- **NetworkManager**：网络管理，统一的网络请求接口
+- **NetworkManager**：网络管理，统一的网络请求接口，拦截 fetch/XHR 并自动注入 JWT
 - **LStorage**：本地存储管理，系统级和程序级数据持久化
 - **DragDrive**：拖拽驱动，统一的拖拽事件管理
 - **GeographyDrive**：地理位置驱动，高精度和低精度定位支持
@@ -446,12 +450,24 @@ ZerOS 提供了多个系统级驱动，扩展内核功能：
 
 详细 API 文档请参考：
 - [AnimateManager API](API/AnimateManager.md)
-- [NetworkManager API](API/NetworkManager.md)
+- [NetworkManager API](API/NetworkManager.md)（含 JWT 自动注入规则）
 - [LStorage API](API/LStorage.md)
 - [DragDrive API](API/DragDrive.md)
 - [GeographyDrive API](API/GeographyDrive.md)
 - [SpeechDrive API](API/SpeechDrive.md)
 - [CryptDrive API](API/CryptDrive.md)
+
+### 6.1 安全模块 (RandomSecurity)
+
+JWT 鉴权管理，提供 SystemToken 与 UserToken 的生成与后端校验。
+
+**特性**：
+- **SystemToken**：引导阶段生成，供 kernel/、DISK/D/server/ 等使用
+- **UserToken**：登录成功后生成，包含 userLevel、permissions，供 DISK/D/application/、DISK/C/ 等使用
+- **JWT 自动注入**：NetworkManager 根据调用来源自动注入对应 JWT（无后备方案）
+- **安全文件**：`BootSecurityToken.json` 临时保存 JWT 记录，生命周期与 JWT 一致
+
+详细 API 文档请参考 [RandomSecurity API](API/RandomSecurity.md)
 
 ### 7. 用户控制系统 (UserControl)
 

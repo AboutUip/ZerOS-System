@@ -505,6 +505,23 @@ const APPLICATION_ASSETS = {
         }
     },
 
+    "store": {
+        script: "D:/application/store/store.js",
+        styles: ["D:/application/store/store.css"],
+        icon: "D:/application/store/store.svg",
+        metadata: {
+            autoStart: false,
+            priority: 3,
+            description: "ZerOS 应用商店",
+            version: "1.0.0",
+            type: "GUI",
+            alwaysShowInTaskbar: false,
+            allowMultipleInstances: true,
+            supportsPreview: true,
+            category: "utility"
+        }
+    },
+
     "servicemanager": {
         script: "D:/application/servicemanager/servicemanager.js",
         styles: ["D:/application/servicemanager/servicemanager.css"],
@@ -594,7 +611,7 @@ const APPLICATION_ASSETS = {
         }
     },
 
-    // Hello GUI - 支持后台的测试程序
+    // JWT/Upid 测试程序 - 支持后台
     "hellogui": {
         script: "D:/application/hellogui/hellogui.js",
         styles: ["D:/application/hellogui/hellogui.css"],
@@ -602,13 +619,31 @@ const APPLICATION_ASSETS = {
         metadata: {
             autoStart: false,
             priority: 5,
-            description: "Hello（支持后台的 GUI 测试）",
+            description: "JWT与upid权限校验测试",
             version: "1.0.0",
             type: "GUI",
             alwaysShowInTaskbar: false,
             allowMultipleInstances: true,
             supportsPreview: false,
             category: "system",
+            showOnDesktop: true
+        }
+    },
+
+    "office": {
+        script: "D:/application/office/office.js",
+        styles: ["D:/application/office/office.css"],
+        icon: "D:/application/office/office.svg",
+        metadata: {
+            autoStart: false,
+            priority: 5,
+            description: "ZerOS Office",
+            version: "1.0.0",
+            type: "GUI",
+            alwaysShowInTaskbar: false,
+            allowMultipleInstances: true,
+            supportsPreview: true,
+            category: "utility",
             showOnDesktop: true
         }
     }

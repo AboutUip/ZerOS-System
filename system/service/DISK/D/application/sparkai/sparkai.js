@@ -28,6 +28,23 @@
         
         // 事件处理器
         _eventHandlers: [],
+
+        /**
+         * 获取当前语言下的本地化文本
+         */
+        _getText: function(key, fallback) {
+            if (!key) return (fallback != null ? fallback : '');
+            try {
+                const LanguagesExpansion = (typeof POOL !== 'undefined' && POOL && typeof POOL.__GET__ === 'function')
+                    ? POOL.__GET__('KERNEL_GLOBAL_POOL', 'LanguagesExpansion')
+                    : (typeof window !== 'undefined' ? window.LanguagesExpansion : null);
+                if (LanguagesExpansion && typeof LanguagesExpansion.getText === 'function') {
+                    const value = LanguagesExpansion.getText(key);
+                    if (value && value !== key) return value;
+                }
+            } catch (e) {}
+            return (fallback != null ? fallback : '');
+        },
         
         /**
          * 初始化方法
@@ -74,7 +91,7 @@
                     }
                     
                     const windowInfo = GUIManager.registerWindow(pid, this.window, {
-                        title: '星火AI',
+                        title: this._getText('SPARKAI_TITLE', '星火AI'),
                         icon: icon,
                         onClose: () => {
                             // 窗口关闭由 GUIManager 统一处理
@@ -162,7 +179,7 @@
                 font-weight: 600;
                 color: var(--theme-text, #d7e0dd);
             `;
-            title.textContent = '星火AI';
+            title.textContent = this._getText('SPARKAI_TITLE', '星火AI');
             this.toolbar.appendChild(title);
             
             // 语音开关按钮
@@ -179,7 +196,7 @@
                 font-size: 12px;
                 transition: all 0.2s;
             `;
-            this.voiceToggleBtn.textContent = '语音回复: 开启';
+            this.voiceToggleBtn.textContent = this._getText('SPARKAI_VOICE_ON', '语音回复: 开启');
             this.voiceToggleBtn.dataset.enabled = 'true';
             this.toolbar.appendChild(this.voiceToggleBtn);
             
@@ -254,7 +271,7 @@
                 resize: none;
                 outline: none;
             `;
-            this.inputTextarea.placeholder = '输入消息或点击麦克风进行语音输入...';
+            this.inputTextarea.placeholder = this._getText('SPARKAI_INPUT_PLACEHOLDER', '输入消息或点击麦克风进行语音输入...');
             inputArea.appendChild(this.inputTextarea);
             
             // 发送按钮
@@ -326,7 +343,8 @@
             const voiceToggleHandler = () => {
                 const enabled = this.voiceToggleBtn.dataset.enabled === 'true';
                 this.voiceToggleBtn.dataset.enabled = enabled ? 'false' : 'true';
-                this.voiceToggleBtn.textContent = `语音回复: ${enabled ? '关闭' : '开启'}`;
+                const voiceText = enabled ? this._getText('SPARKAI_VOICE_OFF', '语音回复: 关闭') : this._getText('SPARKAI_VOICE_ON', '语音回复: 开启');
+                this.voiceToggleBtn.textContent = voiceText;
             };
             this.voiceToggleBtn.addEventListener('click', voiceToggleHandler);
             this._eventHandlers.push({ element: this.voiceToggleBtn, event: 'click', handler: voiceToggleHandler });
@@ -489,7 +507,7 @@
                 this.isListening = true;
                 this.voiceBtn.style.background = 'var(--theme-primary, #8b5cf6)';
                 this.voiceBtn.style.animation = 'pulse 1.5s ease-in-out infinite';
-                this.inputTextarea.placeholder = '正在聆听...';
+                this.inputTextarea.placeholder = this._getText('SPARKAI_LISTENING', '正在聆听...');
             } catch (error) {
                 if (typeof KernelLogger !== 'undefined') {
                     KernelLogger.error('SparkAI', `启动语音识别失败: ${error.message}`);
@@ -563,7 +581,7 @@
                 this.isListening = false;
                 this.voiceBtn.style.background = 'var(--theme-background-secondary, rgba(20, 25, 40, 0.5))';
                 this.voiceBtn.style.animation = 'none';
-                this.inputTextarea.placeholder = '输入消息或点击麦克风进行语音输入...';
+                this.inputTextarea.placeholder = this._getText('SPARKAI_INPUT_PLACEHOLDER', '输入消息或点击麦克风进行语音输入...');
             } catch (error) {
                 if (typeof KernelLogger !== 'undefined') {
                     KernelLogger.error('SparkAI', `停止语音识别失败: ${error.message}`);

@@ -2013,6 +2013,22 @@ KernelLogger.info("LockScreen", "模块初始化");
                 LockScreen._hideLoadingOverlay();
                 
                 if (success) {
+                    // 登录成功，立即将用户级别与可授权权限列表传递给安全模块生成 UserToken JWT（type 固定为 UserToken）
+                    if (typeof RandomSecurity !== 'undefined' && typeof RandomSecurity.generateUserToken === 'function') {
+                        const userLevel = typeof UserControl !== 'undefined' && typeof UserControl.getCurrentUserLevel === 'function'
+                            ? UserControl.getCurrentUserLevel() : null;
+                        const permissions = typeof UserControl !== 'undefined' && typeof UserControl.getGrantablePermissions === 'function'
+                            ? UserControl.getGrantablePermissions() : [];
+                        if (userLevel) {
+                            try {
+                                await RandomSecurity.generateUserToken(userLevel, permissions);
+                            } catch (e) {
+                                if (typeof KernelLogger !== 'undefined') {
+                                    KernelLogger.warn('LockScreen', `生成 UserToken 失败: ${e.message}`);
+                                }
+                            }
+                        }
+                    }
                     // 登录成功，显示成功动画
                     if (LockScreen.loginButton) {
                         LockScreen.loginButton.classList.add('success');

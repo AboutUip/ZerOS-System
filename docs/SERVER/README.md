@@ -11,6 +11,7 @@
 | [翻译服务 (ServerTranslate.md)](./ServerTranslate.md) | 内置翻译服务说明、POOL API（translateSimple/translate）与终端 debug |
 | [进程堆内存服务 (ServerProcessMemory.md)](./ServerProcessMemory.md) | 内置进程堆内存读写服务、POOL API（getProcessMemoryInfo/readProcessHeap/writeProcessHeap）与内存编辑器支持 |
 | [AI 助手服务 (ServerAIAssistant.md)](./ServerAIAssistant.md) | 语音唤醒式 AI 助手，唤醒词触发、打开/关闭程序、调节亮度、闲聊，唤醒音效为 D/server/start.mp3 |
+| [Office 服务 (ServerOffice.md)](./ServerOffice.md) | ZerOS Office 服务，v1 实现 ZDOC 预览渲染（POOL > SERVER 暴露 Office.previewZdoc/previewZdocBuffer） |
 
 ## 相关链接
 

@@ -123,6 +123,7 @@
         
         __init__: async function(pid, initArgs) {
             this.pid = pid;
+            this._upid = initArgs && initArgs.upid;
             
             // 检查用户级别，普通用户为只读模式
             if (typeof UserControl !== 'undefined') {
@@ -976,10 +977,11 @@
             if (disks.length === 0) {
                 try {
                     const listUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
-                        ? SystemInformation.buildServiceUrlObject('/system/service/DISKMANAGER.php')
+                        ? SystemInformation.buildServiceUrlObject('/system/service/DISKMANAGER.php', { upid: this._upid })
                         : new URL('/system/service/DISKMANAGER.php', (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
                             ? SystemInformation.getOrigin()
                             : window.location.origin);
+                    if (this._upid != null) listUrl.searchParams.set('upid', this._upid);
                     listUrl.searchParams.set('action', 'list');
                     
                     const listResponse = await fetch(listUrl.toString());
@@ -1915,10 +1917,11 @@ this.fileCountText.textContent = this._getText('FM_ITEMS_COUNT_FOUND', '找到 {
                     
                     try {
                         const listUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
-                            ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                            ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE, { upid: this._upid })
                             : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
                                 ? SystemInformation.getOrigin()
                                 : window.location.origin);
+                        if (this._upid != null) listUrl.searchParams.set('upid', this._upid);
                         listUrl.searchParams.set('action', 'list_dir');
                         listUrl.searchParams.set('path', phpPath);
                         
@@ -1992,10 +1995,11 @@ this.fileCountText.textContent = this._getText('FM_ITEMS_COUNT_FOUND', '找到 {
                 
                 // 使用 FSDirve.php 获取文件信息
                 const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
-                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE, { upid: this._upid })
                     : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
                         ? SystemInformation.getOrigin()
                         : window.location.origin);
+                if (this._upid != null) url.searchParams.set('upid', this._upid);
                 url.searchParams.set('action', 'get_file_info');
                 url.searchParams.set('path', dirPath);
                 url.searchParams.set('fileName', fileName); // 注意：PHP 期望的是 fileName，不是 name
@@ -2304,10 +2308,11 @@ this.fileCountText.textContent = this._getText('FM_ITEMS_COUNT_FOUND', '找到 {
                 
                 // 从 PHP 服务获取目录列表
                 const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
-                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE, { upid: this._upid })
                     : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
                         ? SystemInformation.getOrigin()
                         : window.location.origin);
+                if (this._upid != null) url.searchParams.set('upid', this._upid);
                 url.searchParams.set('action', 'list_dir');
                 url.searchParams.set('path', phpPath);
                 
@@ -2471,6 +2476,8 @@ this.fileCountText.textContent = this._getText('FM_ITEMS_COUNT_FOUND', '找到 {
             
             // ZOM 文件类型（ZerOS 程序安装包）
             if (ext === 'zom') return 'ZOM';
+
+            if (ext === 'zdoc') return 'ZDOC';
             
             if (textExts.includes(ext)) return 'TEXT';
             if (codeExts.includes(ext)) return 'CODE';
@@ -2657,6 +2664,9 @@ this.fileCountText.textContent = this._getText('FM_ITEMS_COUNT_FOUND', '找到 {
                     case 'ZOM':
                         // ZOM 文件图标（ZerOS 程序安装包专用图标）
                         iconUrl = 'D:/application/filemanager/assets/file-zom.svg';
+                        break;
+                    case 'ZDOC':
+                        iconUrl = 'D:/application/filemanager/assets/file-zdoc.svg';
                         break;
                     default:
                         iconUrl = 'D:/application/filemanager/assets/file.svg';
@@ -3214,6 +3224,9 @@ this.fileCountText.textContent = this._getText('FM_ITEMS_COUNT_FOUND', '找到 {
                 if (fileType === 'ZOM') {
                     await this._openFileWithZominstall(item);
                 }
+                else if (fileType === 'ZDOC' || extension === 'zdoc') {
+                    await this._openFileWithOffice(item);
+                }
                 // ZIP 压缩文件默认用 ziper 打开
                 else if (fileType === 'ZIP') {
                     await this._openFileWithZiper(item);
@@ -3257,6 +3270,34 @@ this.fileCountText.textContent = this._getText('FM_ITEMS_COUNT_FOUND', '找到 {
                             await this._openFileWithNotepad(item);
                         }
                     }
+                }
+            }
+        },
+
+        _openFileWithOffice: async function(item) {
+            try {
+                if (typeof ProcessManager === 'undefined') {
+                    if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                        try {
+                            await NotificationManager.createNotification(this.pid, {
+                                type: 'snapshot',
+                                title: this._getText('FM_TITLE', '文件管理器'),
+                                content: this._getText('FM_PM_UNAVAILABLE', 'ProcessManager 不可用'),
+                                duration: 3000
+                            });
+                        } catch (e) {}
+                    }
+                    return;
+                }
+                if (!item || !item.path) return;
+                const cwd = this._getCurrentPath() || 'D:';
+                await ProcessManager.startProgram('office', {
+                    args: [item.path],
+                    cwd: cwd
+                });
+            } catch (e) {
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.warn('FileManager', 'Office 打开失败', e);
                 }
             }
         },
@@ -3807,13 +3848,15 @@ this.fileCountText.textContent = this._getText('FM_ITEMS_COUNT_FOUND', '找到 {
                         // 构建 FSDirve 服务 URL
                         let url = null;
                         if (SystemInfo.buildServiceUrlObject && SystemInfo.SERVICE_NAMES) {
-                            url = SystemInfo.buildServiceUrlObject(SystemInfo.SERVICE_NAMES.FSDIRVE);
+                            url = SystemInfo.buildServiceUrlObject(SystemInfo.SERVICE_NAMES.FSDIRVE, { upid: this._upid });
                         } else if (SystemInfo.getFSDirvePath && SystemInfo.getOrigin) {
                             url = new URL(SystemInfo.getFSDirvePath(), SystemInfo.getOrigin());
+                            if (this._upid != null) url.searchParams.set('upid', this._upid);
                         } else {
                             // 降级方案：使用默认路径
                             const origin = window.location.origin || 'http://localhost:8089';
                             url = new URL('/system/service/FSDirve.php', origin);
+                            if (this._upid != null) url.searchParams.set('upid', this._upid);
                         }
                         url.searchParams.set('action', 'read_file');
                         // bin 仅存在于系统盘 D:，只从 D:/bin 读取 zominstall.js，不扫描其他分区
@@ -3897,10 +3940,11 @@ this.fileCountText.textContent = this._getText('FM_ITEMS_COUNT_FOUND', '找到 {
                 
                 // 从 PHP 服务读取文件
                 const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
-                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE, { upid: this._upid })
                     : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
                         ? SystemInformation.getOrigin()
                         : window.location.origin);
+                if (this._upid != null) url.searchParams.set('upid', this._upid);
                 url.searchParams.set('action', 'read_file');
                 url.searchParams.set('path', phpPath);
                 url.searchParams.set('fileName', fileName);
@@ -3988,10 +4032,11 @@ this.fileCountText.textContent = this._getText('FM_ITEMS_COUNT_FOUND', '找到 {
                 
                 // 使用 PHP 服务写入文件
                 const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
-                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE, { upid: this._upid })
                     : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
                         ? SystemInformation.getOrigin()
                         : window.location.origin);
+                if (this._upid != null) url.searchParams.set('upid', this._upid);
                 url.searchParams.set('action', 'write_file');
                 url.searchParams.set('path', phpPath);
                 url.searchParams.set('fileName', fileName);
@@ -4576,10 +4621,11 @@ this.fileCountText.textContent = this._getText('FM_ITEMS_COUNT_FOUND', '找到 {
                 
                 // 使用 PHP 服务创建文件
                 const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
-                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE, { upid: this._upid })
                     : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
                         ? SystemInformation.getOrigin()
                         : window.location.origin);
+                if (this._upid != null) url.searchParams.set('upid', this._upid);
                 url.searchParams.set('action', 'create_file');
                 url.searchParams.set('path', phpPath);
                 url.searchParams.set('fileName', fileName);
@@ -4724,10 +4770,11 @@ this.fileCountText.textContent = this._getText('FM_ITEMS_COUNT_FOUND', '找到 {
                 // 使用 PHP 服务创建目录
                 // 注意：FSDirve.php 需要参数 'name' 而不是 'dirName'
                 const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
-                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE, { upid: this._upid })
                     : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
                         ? SystemInformation.getOrigin()
                         : window.location.origin);
+                if (this._upid != null) url.searchParams.set('upid', this._upid);
                 url.searchParams.set('action', 'create_dir');
                 url.searchParams.set('path', phpPath);
                 url.searchParams.set('name', dirName);
@@ -5022,6 +5069,8 @@ this.fileCountText.textContent = this._getText('FM_ITEMS_COUNT_FOUND', '找到 {
                         return 'D:/application/filemanager/assets/file-video.svg';
                     case 'ZOM':
                         return 'D:/application/filemanager/assets/file-zom.svg';
+                    case 'ZDOC':
+                        return 'D:/application/filemanager/assets/file-zdoc.svg';
                     default:
                         return 'D:/application/filemanager/assets/file.svg';
                 }
@@ -5044,6 +5093,8 @@ this.fileCountText.textContent = this._getText('FM_ITEMS_COUNT_FOUND', '找到 {
                             return 'D:/application/filemanager/assets/file-video.svg';
                         case 'ZOM':
                             return 'D:/application/filemanager/assets/file-zom.svg';
+                        case 'ZDOC':
+                            return 'D:/application/filemanager/assets/file-zdoc.svg';
                         default:
                             return 'D:/application/filemanager/assets/file.svg';
                     }
@@ -5967,10 +6018,11 @@ this.fileCountText.textContent = this._getText('FM_ITEMS_COUNT_FOUND', '找到 {
                 
                 // 检查是文件还是目录（通过 PHP 服务）
                 const checkUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
-                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE, { upid: this._upid })
                     : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
                         ? SystemInformation.getOrigin()
                         : window.location.origin);
+                if (this._upid != null) checkUrl.searchParams.set('upid', this._upid);
                 checkUrl.searchParams.set('action', 'exists');
                 checkUrl.searchParams.set('path', oldPath);
                 
@@ -5990,10 +6042,11 @@ this.fileCountText.textContent = this._getText('FM_ITEMS_COUNT_FOUND', '找到 {
                 if (isDirectory) {
                     // 目录：使用 rename_dir
                     const renameUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
-                        ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                        ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE, { upid: this._upid })
                         : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
                         ? SystemInformation.getOrigin()
                         : window.location.origin);
+                    if (this._upid != null) renameUrl.searchParams.set('upid', this._upid);
                     renameUrl.searchParams.set('action', 'rename_dir');
                     renameUrl.searchParams.set('path', phpPath);
                     renameUrl.searchParams.set('oldName', oldName);
@@ -6012,10 +6065,11 @@ this.fileCountText.textContent = this._getText('FM_ITEMS_COUNT_FOUND', '找到 {
                 } else {
                     // 文件：使用 rename_file
                     const renameUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
-                        ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                        ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE, { upid: this._upid })
                         : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
                         ? SystemInformation.getOrigin()
                         : window.location.origin);
+                    if (this._upid != null) renameUrl.searchParams.set('upid', this._upid);
                     renameUrl.searchParams.set('action', 'rename_file');
                     renameUrl.searchParams.set('path', phpPath);
                     renameUrl.searchParams.set('oldFileName', oldName);
@@ -6099,10 +6153,11 @@ this.fileCountText.textContent = this._getText('FM_ITEMS_COUNT_FOUND', '找到 {
                 }
                 
                 const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
-                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE, { upid: this._upid })
                     : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
                         ? SystemInformation.getOrigin()
                         : window.location.origin);
+                if (this._upid != null) url.searchParams.set('upid', this._upid);
                 
                 if (itemType === 'directory') {
                     // 删除目录（使用递归删除，支持非空目录）
@@ -6361,10 +6416,11 @@ this.fileCountText.textContent = this._getText('FM_ITEMS_COUNT_FOUND', '找到 {
                         if (item.type === 'directory') {
                             // 复制目录
                             const copyUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
-                                ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                                ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE, { upid: this._upid })
                                 : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
                                 ? SystemInformation.getOrigin()
                                 : window.location.origin);
+                            if (this._upid != null) copyUrl.searchParams.set('upid', this._upid);
                             copyUrl.searchParams.set('action', 'copy_dir');
                             copyUrl.searchParams.set('sourcePath', item.path);
                             copyUrl.searchParams.set('targetPath', targetPath + '/' + sourceName);
@@ -6382,10 +6438,11 @@ this.fileCountText.textContent = this._getText('FM_ITEMS_COUNT_FOUND', '找到 {
                         } else {
                             // 复制文件
                             const copyUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
-                                ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                                ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE, { upid: this._upid })
                                 : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
                                 ? SystemInformation.getOrigin()
                                 : window.location.origin);
+                            if (this._upid != null) copyUrl.searchParams.set('upid', this._upid);
                             copyUrl.searchParams.set('action', 'copy_file');
                             copyUrl.searchParams.set('sourcePath', sourcePath);
                             copyUrl.searchParams.set('sourceFileName', sourceName);
@@ -6408,10 +6465,11 @@ this.fileCountText.textContent = this._getText('FM_ITEMS_COUNT_FOUND', '找到 {
                         if (item.type === 'directory') {
                             // 移动目录
                             const moveUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
-                                ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                                ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE, { upid: this._upid })
                                 : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
                                 ? SystemInformation.getOrigin()
                                 : window.location.origin);
+                            if (this._upid != null) moveUrl.searchParams.set('upid', this._upid);
                             moveUrl.searchParams.set('action', 'move_dir');
                             moveUrl.searchParams.set('sourcePath', item.path);
                             moveUrl.searchParams.set('targetPath', targetPath + '/' + sourceName);
@@ -6429,10 +6487,11 @@ this.fileCountText.textContent = this._getText('FM_ITEMS_COUNT_FOUND', '找到 {
                         } else {
                             // 移动文件
                             const moveUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
-                                ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                                ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE, { upid: this._upid })
                                 : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
                                 ? SystemInformation.getOrigin()
                                 : window.location.origin);
+                            if (this._upid != null) moveUrl.searchParams.set('upid', this._upid);
                             moveUrl.searchParams.set('action', 'move_file');
                             moveUrl.searchParams.set('sourcePath', sourcePath);
                             moveUrl.searchParams.set('sourceFileName', sourceName);
@@ -7041,10 +7100,11 @@ this.fileCountText.textContent = this._getText('FM_ITEMS_COUNT_FOUND', '找到 {
                 
                 // 从 PHP 服务读取文件
                 const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
-                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE, { upid: this._upid })
                     : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
                         ? SystemInformation.getOrigin()
                         : window.location.origin);
+                if (this._upid != null) url.searchParams.set('upid', this._upid);
                 url.searchParams.set('action', 'read_file');
                 url.searchParams.set('path', phpPath);
                 url.searchParams.set('fileName', fileName);

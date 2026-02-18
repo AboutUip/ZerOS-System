@@ -10,6 +10,17 @@
 - `Shed` - 栈内存实现
 - `KernelMemory` - 内核内存（用于存储内存管理数据）
 
+## 获取实例
+
+MemoryManager 注册在 POOL 中，可以通过以下方式获取：
+
+```javascript
+// 从 POOL 获取
+const MemoryManager = POOL.__GET__("KERNEL_GLOBAL_POOL", "MemoryManager");
+```
+
+**注意**：在内核初始化完成后，MemoryManager 已加载，可以直接使用。
+
 ## 内存类型
 
 ### 堆内存 (Heap)
@@ -248,6 +259,6 @@ __exit__: async function() {
 - [DEVELOPER_GUIDE.md](../DEVELOPER_GUIDE.md) - 开发者指南
 - [ProcessManager.md](./ProcessManager.md) - 进程管理器 API
 - [KernelMemory.md](./KernelMemory.md) - 内核内存 API
-- [Heap.md](./Heap.md) - 堆内存 API
-- [Shed.md](./Shed.md) - 栈内存 API
+- [堆内存 (Heap)](./MemoryManager.md#堆内存-heap) - 堆内存 API
+- [栈内存 (Shed)](./MemoryManager.md#栈内存-shed) - 栈内存 API
 

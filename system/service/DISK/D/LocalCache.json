@@ -30,43 +30,43 @@
           "data": {
             "city": "山西省 吕梁市",
             "today": {
-              "current_temp": "1℃",
-              "current_cond": "阴",
-              "low": "-9℃",
+              "current_temp": "7℃",
+              "current_cond": "多云",
+              "low": "-6℃",
               "quality": "--"
             },
-            "low_temperature": -9,
-            "tips": "建议穿羽绒服、棉裤，做好全面防寒",
+            "low_temperature": -6,
+            "tips": "建议穿棉服、羽绒服等厚实保暖衣物",
             "seven_day": [
               {
-                "date": "2026-02-15",
-                "cond": "多云",
-                "high": "2℃",
-                "low": "-9℃"
+                "date": "2026-02-18",
+                "cond": "晴",
+                "high": "9℃",
+                "low": "-6℃"
               },
               {
-                "date": "2026-02-16",
+                "date": "2026-02-19",
                 "cond": "晴",
-                "high": "3℃",
-                "low": "-7℃"
+                "high": "12℃",
+                "low": "-2℃"
               },
               {
-                "date": "2026-02-17",
+                "date": "2026-02-20",
                 "cond": "晴",
-                "high": "6℃",
-                "low": "-9℃"
+                "high": "16℃",
+                "low": "1℃"
               }
             ],
             "life_indices": {
               "clothing": {
-                "level": "严寒",
-                "brief": "极冷",
-                "advice": "建议穿羽绒服、棉裤，做好全面防寒"
+                "level": "寒冷",
+                "brief": "很冷",
+                "advice": "建议穿棉服、羽绒服等厚实保暖衣物"
               },
               "uv": {
-                "level": "低",
-                "brief": "弱",
-                "advice": "紫外线较弱，无需特别防护，可正常户外活动"
+                "level": "中等",
+                "brief": "中等",
+                "advice": "紫外线中等，建议涂抹SPF15+防晒霜，戴帽子"
               },
               "car_wash": {
                 "level": "非常适宜",
@@ -74,9 +74,9 @@
                 "advice": "天气晴好，非常适合洗车，洗后能保持较长时间"
               },
               "drying": {
-                "level": "适宜",
-                "brief": "较好",
-                "advice": "天气较好，适合晾晒"
+                "level": "非常适宜",
+                "brief": "极佳",
+                "advice": "天气晴好干燥，非常适合晾晒衣物和被褥"
               },
               "air_conditioner": {
                 "level": "建议制热",
@@ -84,40 +84,40 @@
                 "advice": "建议开启空调制热或使用其他取暖设备"
               },
               "cold_risk": {
-                "level": "中等",
-                "brief": "易发",
-                "advice": "感冒风险中等，注意保暖和作息规律"
+                "level": "较低",
+                "brief": "较少发",
+                "advice": "感冒风险较低，注意适当增减衣物"
               },
               "exercise": {
-                "level": "适宜",
-                "brief": "较好",
-                "advice": "天气适合运动，建议适当进行户外锻炼"
+                "level": "非常适宜",
+                "brief": "极佳",
+                "advice": "天气非常适合户外运动，尽情享受吧"
               },
               "comfort": {
-                "level": "极冷",
-                "brief": "寒冷",
-                "advice": "体感寒冷，注意保暖防寒"
+                "level": "冷",
+                "brief": "偏冷",
+                "advice": "体感偏冷，适当添加衣物"
               }
             },
-            "feels_like": -5,
-            "wind_direction": "西北风",
-            "wind_power": "2",
-            "humidity": 15
+            "feels_like": 3,
+            "wind_direction": "西南风",
+            "wind_power": "2级",
+            "humidity": 11
           }
         },
-        "expiresAt": 1771180001283,
-        "createdAt": 1771136801283,
-        "updatedAt": 1771136801283,
-        "size": 1368
+        "expiresAt": 1771446144957,
+        "createdAt": 1771402944957,
+        "updatedAt": 1771402944957,
+        "size": 1407
       }
     },
     "exploit": {
       "system.dailyQuote": {
-        "value": "随随便便的过来，随随便便的离去，但是，只要相互接触了一次，即使微弱得不被人注意，那也是能够支撑心灵的重要的邂逅。",
+        "value": "为那场初恋所流下的泪水 融进了温暖的大海中。",
         "expiresAt": 0,
-        "createdAt": 1771145825824,
-        "updatedAt": 1771145825824,
-        "size": 170
+        "createdAt": 1771426843387,
+        "updatedAt": 1771426843387,
+        "size": 66
       }
     }
   }

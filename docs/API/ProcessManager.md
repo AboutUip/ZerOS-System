@@ -13,13 +13,31 @@
 - `NotificationManager` - 通知管理器（用于清理通知）
 - `ContextMenuManager` - 上下文菜单管理器（用于清理上下文菜单）
 - `DesktopManager` - 桌面管理器（用于清理桌面组件）
+
+## 获取实例
+
+ProcessManager 注册在 POOL 中，可以通过以下方式获取：
+
+```javascript
+// 从 POOL 获取
+const ProcessManager = POOL.__GET__("KERNEL_GLOBAL_POOL", "ProcessManager");
+```
+
+**注意**：
+- 在内核初始化完成后，ProcessManager 已加载，可以直接使用
+- 进程内部可以通过 `this.pid` 获取当前进程 PID
+- 使用 `initArgs.kernelAPI` 可以安全调用内核 API，无需手动传 PID
+
+## 依赖
+
 - `TaskbarManager` - 任务栏管理器（用于更新任务栏）
 - `KernelMemory` - 内核内存（用于存储进程表）
 
 ## 常量
 
 ```javascript
-ProcessManager.EXPLOIT_PID = 10000;  // Exploit 程序固定 PID
+ProcessManager.EXPLOIT_PID = 10000;        // Exploit 程序固定 PID
+ProcessManager.SERVER_SERVICE_PID = 10000; // D/server 目录下服务调用内核 API 时使用的 PID
 ```
 
 ## API 方法

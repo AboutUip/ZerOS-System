@@ -9,6 +9,20 @@
 - `Disk` / `NodeTreeCollection` - 文件系统（用于读取 D/plugins 下语言包 JSON）
 - `LStorage` - 本地存储（用于持久化当前语言设置）
 
+## 获取实例
+
+LanguagesExpansion 注册在 POOL 中，可以通过以下方式获取：
+
+```javascript
+// 从 POOL 获取
+const LanguagesExpansion = POOL.__GET__("KERNEL_GLOBAL_POOL", "LanguagesExpansion");
+```
+
+**注意**：
+- LanguagesExpansion 主要通过 `ProcessManager.callKernelAPI('Languages.xxx', [...])` 调用
+- 文档中「内核 API」章节详细说明了这种方式
+- 程序中也可以直接获取实例使用
+
 ## 语言包存放位置
 
 - **路径**：`D/plugins`（或 `D:/plugins`，取决于分区名）

@@ -16,6 +16,25 @@
 - `FileFormwork` - 文件对象模板（用于创建文件对象）
 - `KernelLogger` - 内核日志系统（用于日志输出）
 
+## 获取实例
+
+NodeTreeCollection（NodeTree）不是通过 POOL 或 window 获取的单例，而是通过 Disk 获取文件系统实例后访问：
+
+```javascript
+// 从 Disk 获取文件系统实例
+const Disk = POOL.__GET__("KERNEL_GLOBAL_POOL", "Disk");
+
+// 获取 D: 盘的文件系统实例
+const nodeTree = Disk.diskSeparateMap.get("D:");
+
+// 或者获取 C: 盘
+const nodeTreeC = Disk.diskSeparateMap.get("C:");
+```
+
+**注意**：
+- 应用程序进行文件读写，应优先使用 `ProcessManager.callKernelAPI('FileSystem.*', [...])` 接口
+- NodeTreeCollection 更偏向内核内部/系统模块使用
+
 ## 类结构
 
 ### Node 类

@@ -48,7 +48,7 @@ zompkg -h
 ### 打包流程
 
 1. **校验/生成**：若未手动提供数据，则检查源目录下是否存在 `application.json` 并校验 `name`；若提供了 `--config` 或 `--name`，则生成 `application.json` 内容。
-2. **压缩**：调用 CompressionDirve 的 `compress_zip`，将源目录打包为 ZIP；若生成了 `application.json`，则通过 `extraFiles` 注入到包根目录。
+2. **压缩**：调用 CompressionDirve 的 `compress_zip`，将源目录打包为 ZIP；若生成了 `application.json`，则通过 `extraFiles` 注入到包根目录。zompkg 会自动将 `initArgs.upid` 传入后端请求（User JWT 鉴权所需）。
 3. **输出**：生成 `.zom` 文件（即 ZIP，扩展名为 `.zom`）。
 
 源目录内文件在 ZIP 中位于根目录（无父目录包裹），符合 ZOM 安装包结构要求。
@@ -74,7 +74,7 @@ zominstall -h
 ### 安装流程
 
 1. **解压文件**：将 `.zom` 文件解压到 `D:/cache/temp/` 临时目录
-2. **读取配置**：读取 `application.json` 获取程序信息
+2. **读取配置**：读取 `application.json` 获取程序信息。zominstall 会自动将 `initArgs.upid` 传入 FSDirve、CompressionDirve 等后端请求（User JWT 鉴权所需）
 3. **复制并注册**：复制所有文件（排除 `application.json` 和 `setup.js`）到 `D:/application/<程序名>/` 并注册程序
 4. **执行安装脚本**：如果存在 `setup.js`，自动执行
 5. **清理临时文件**：删除解压后的所有临时文件

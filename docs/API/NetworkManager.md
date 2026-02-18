@@ -7,15 +7,18 @@
 ## 依赖
 
 - `KernelLogger` - 内核日志系统（用于日志输出）
+- `RandomSecurity` - 安全模块（获取 System JWT / User JWT）
 
-## 初始化
+## 获取实例
 
-网络管理器在系统启动时自动初始化（通过构造函数）：
+NetworkManager 是单例，注册在 POOL 中，可以通过以下方式获取：
 
 ```javascript
-// 网络管理器是单例，通过 POOL 获取
-const networkManager = POOL.__GET__("KERNEL_GLOBAL_POOL", "NetworkManager");
+// 从 POOL 获取
+const NetworkManager = POOL.__GET__("KERNEL_GLOBAL_POOL", "NetworkManager");
 ```
+
+**注意**：在内核初始化完成后，NetworkManager 已加载，可以直接使用。
 
 ## API 方法
 
@@ -461,6 +464,18 @@ if (batteryInfo) {
 }
 ```
 
+## JWT 自动注入
+
+NetworkManager 拦截全局 `fetch` 和 `XMLHttpRequest`，对未携带 JWT 的 HTTP(S) 请求**自动注入**对应 JWT。规则按调用来源区分，严格遵守，无后备方案：
+
+| 调用来源 | 注入 JWT |
+|----------|----------|
+| **DISK/ 之外**（kernel/、bootloader/、system/ui/ 等） | System JWT |
+| **DISK/D/server/**（系统盘 D 的 server 子目录） | System JWT |
+| **其余**（DISK/D/application/、DISK/C/ 等） | User JWT |
+
+应用无需手动添加 `Authorization` 头，内核和应用请求会由拦截器按规则注入。详见 [RandomSecurity API](./RandomSecurity.md)。
+
 ## 注意事项
 
 1. **单例模式**: NetworkManager 是单例，通过 POOL 获取实例
@@ -469,9 +484,11 @@ if (batteryInfo) {
 4. **网络禁用**: 禁用网络后，所有请求都会被拒绝
 5. **缓存管理**: 请求缓存有 TTL（生存时间），过期后自动清除
 6. **电池信息**: 电池信息需要浏览器支持 Battery API（通常需要 HTTPS）
+7. **JWT 注入**: 根据调用栈判断来源并注入 JWT；已有 JWT 的请求直接放行
 
 ## 相关文档
 
+- [RandomSecurity.md](./RandomSecurity.md) - 安全模块（JWT 生成与注入规则）
 - [ZEROS_KERNEL.md](../ZEROS_KERNEL.md) - 内核概述
 - [DEVELOPER_GUIDE.md](../DEVELOPER_GUIDE.md) - 开发者指南
 - [Pool.md](./Pool.md) - 全局对象池 API

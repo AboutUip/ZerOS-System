@@ -9,6 +9,17 @@
 - `LStorage` - 本地存储（用于持久化用户数据）
 - `CryptDrive` - 加密驱动（用于密码 MD5 加密）
 
+## 获取实例
+
+UserControl 注册在 POOL 中，可以通过以下方式获取：
+
+```javascript
+// 从 POOL 获取
+const UserControl = POOL.__GET__("KERNEL_GLOBAL_POOL", "UserControl");
+```
+
+**注意**：在内核初始化完成后，UserControl 已加载，可以直接使用。
+
 ## 用户级别
 
 系统支持三种用户级别：
@@ -334,44 +345,51 @@ if (isHighRisk) {
 }
 ```
 
-#### `canGrantPermission(userLevel, permissionLevel)`
+#### `canGrantPermission(permission)`
 
-检查用户级别是否可以授权指定级别的权限。
+检查当前用户是否可以授权指定权限。
 
 **参数**:
-- `userLevel` (string): 用户级别
-- `permissionLevel` (string): 权限级别（`NORMAL`、`SPECIAL` 或 `DANGEROUS`）
+- `permission` (string): 权限名称（如 `CRYPT_GENERATE_KEY`、`PROCESS_MANAGE`）
 
 **返回值**: `boolean` - 是否可以授权
 
 **示例**:
 ```javascript
-const canGrant = UserControl.canGrantPermission(
-    UserControl.USER_LEVEL.USER,
-    'DANGEROUS'
-);
+const canGrant = UserControl.canGrantPermission('CRYPT_GENERATE_KEY');
 if (!canGrant) {
     console.log('普通用户无法授权高风险权限');
 }
 ```
 
-#### `getPermissionGrantMessage(userLevel, permissionLevel)`
+#### `getGrantablePermissions()`
+
+获取当前用户可授权的所有权限列表（JSON 数组格式），供 UserToken JWT 载荷等使用。
+
+**返回值**: `string[]` - 权限名称数组
+
+**示例**:
+```javascript
+const permissions = UserControl.getGrantablePermissions();
+// 管理员返回全部权限；普通用户返回非高风险权限
+console.log('可授权权限数量:', permissions.length);
+// 用于登录时生成 UserToken
+await RandomSecurity.generateUserToken(userLevel, permissions);
+```
+
+#### `getPermissionGrantMessage(permission)`
 
 获取权限授权的提示消息。
 
 **参数**:
-- `userLevel` (string): 用户级别
-- `permissionLevel` (string): 权限级别
+- `permission` (string): 权限名称
 
 **返回值**: `string` - 提示消息
 
 **示例**:
 ```javascript
-const message = UserControl.getPermissionGrantMessage(
-    UserControl.USER_LEVEL.USER,
-    'DANGEROUS'
-);
-console.log(message); // '普通用户无法授权高风险权限'
+const message = UserControl.getPermissionGrantMessage('CRYPT_GENERATE_KEY');
+console.log(message); // '此权限需要管理员授权，当前用户（xxx）无法授权'
 ```
 
 ## 使用示例
@@ -408,15 +426,16 @@ if (UserControl.isAdmin()) {
 ### 权限控制示例
 
 ```javascript
-// 检查当前用户是否可以授权高风险权限
-const currentLevel = UserControl.getCurrentUserLevel();
-const canGrant = UserControl.canGrantPermission(currentLevel, 'DANGEROUS');
-
+// 检查当前用户是否可以授权指定权限
+const canGrant = UserControl.canGrantPermission('CRYPT_GENERATE_KEY');
 if (!canGrant) {
-    const message = UserControl.getPermissionGrantMessage(currentLevel, 'DANGEROUS');
+    const message = UserControl.getPermissionGrantMessage('CRYPT_GENERATE_KEY');
     console.warn(message);
-    // 输出: '普通用户无法授权高风险权限'
 }
+
+// 获取当前用户可授权的全部权限（用于 UserToken 载荷等）
+const permissions = UserControl.getGrantablePermissions();
+console.log('可授权权限:', permissions);
 ```
 
 ## 注意事项
@@ -436,4 +455,5 @@ if (!canGrant) {
 - [LStorage.md](./LStorage.md) - 本地存储 API
 - [CryptDrive.md](./CryptDrive.md) - 加密驱动 API
 - [PermissionManager.md](./PermissionManager.md) - 权限管理 API
+- [RandomSecurity.md](./RandomSecurity.md) - 安全模块（UserToken 载荷中的 permissions 来源于 getGrantablePermissions）
 

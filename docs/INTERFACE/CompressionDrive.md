@@ -4,6 +4,8 @@
 
 `CompressionDirve` 是 ZerOS 内核的压缩驱动服务，提供 ZIP 和 RAR 格式压缩与解压缩操作接口。系统支持 **PHP** 和 **SpringBoot** 两种后端实现，可通过 `SystemInformation` 动态切换。
 
+**User JWT 必须携带 upid**：应用和 bin 程序调用本服务时，必须在 GET 参数中传入 `upid`。使用 `buildServiceUrlObject(serviceName, { upid: this._upid })` 或手动 `url.searchParams.set('upid', this._upid)`。
+
 支持文件或目录的压缩、解压缩、列表查看等功能。
 
 ## 后端服务支持
@@ -18,10 +20,10 @@
 **推荐使用 `SystemInformation` 构建服务URL**：
 
 ```javascript
-// 使用 SystemInformation 构建URL（推荐，自动适配后端类型）
-const url = SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.COMPRESSION_DIRVE);
+// 应用/bin 程序必须传入 upid
+const url = SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.COMPRESSION_DIRVE, { upid: this._upid });
 
-// 或直接获取URL
+// 或直接获取URL（无 upid，仅适用于 SystemToken 场景）
 const serviceUrl = SystemInformation.getCompressionDirveUrl();
 ```
 
@@ -30,7 +32,7 @@ const serviceUrl = SystemInformation.getCompressionDirveUrl();
 - PHP 后端：`http://localhost:8089/system/service/CompressionDirve.php`
 - SpringBoot 后端：`http://localhost:8080/system/service/CompressionDirve`
 
-详细说明请参考 [SystemInformation API 文档](./SystemInformation.md)。
+详细说明请参考 [SystemInformation API 文档](../API/SystemInformation.md)。
 
 ## 请求格式
 
@@ -671,6 +673,6 @@ try {
 
 ## 相关文档
 
-- [FSDirve.md](./FSDirve.md) - 文件系统驱动服务（文件操作）
-- [ProcessManager.md](./ProcessManager.md) - 进程管理器（路径转换）
+- [FSDirve](./FSDirve.md) - 文件系统驱动服务（文件操作）
+- [ProcessManager](../API/ProcessManager.md) - 进程管理器（路径转换）
 

@@ -1,0 +1,35 @@
+/* Store - ZerOS 应用商店样式 */
+
+.store-window {
+    font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.store-window .store-header {
+    -webkit-app-region: no-drag;
+}
+
+.store-window .store-search-input {
+    -webkit-app-region: no-drag;
+}
+
+.store-app-card {
+    user-select: none;
+}
+
+.store-loading,
+.store-empty,
+.store-error {
+    user-select: none;
+}
+
+.store-detail-overlay {
+    font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.store-app-card:active {
+    transform: scale(0.98);
+}
+
+.store-spinner {
+    -webkit-app-region: no-drag;
+}

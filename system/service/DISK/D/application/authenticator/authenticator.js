@@ -32,6 +32,7 @@
                 KernelLogger.debug('Authenticator', `__init__ 被调用, PID: ${pid}`);
             }
             this.pid = pid;
+            this._upid = initArgs && initArgs.upid;
 
             // 获取 GUI 容器
             const guiContainer =
@@ -1341,10 +1342,11 @@
 
                             // 保存文件
                             const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
-                            ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
-                            : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                            ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE, { upid: this._upid })
+                            : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin)
                                 ? SystemInformation.getOrigin()
                                 : window.location.origin);
+                            if (this._upid != null) url.searchParams.set('upid', this._upid);
                             url.searchParams.set('action', 'write_file');
                             url.searchParams.set('path', folderPath);
                             url.searchParams.set('fileName', fileName);

@@ -1,4 +1,4 @@
-﻿// 全局网络管理器
+// 全局网络管理器
 // 使用 Service Worker 截取所有网络请求进行统一处理与管理
 // 注意：此模块必须通过 BootLoader 加载
 
@@ -207,6 +207,116 @@
         }
 
         /**
+         * 检查请求头是否已携带 JWT
+         * @param {Headers|Object|undefined} headers - 请求头
+         * @returns {boolean} 是否已有 JWT
+         */
+        _headersHasJWT(headers) {
+            if (!headers) return false;
+            const get = (name) => {
+                if (headers instanceof Headers) return headers.get(name) || headers.get(name.toLowerCase());
+                if (typeof headers === 'object') {
+                    const v = headers[name] || headers[name.toLowerCase()];
+                    if (v != null) return String(v);
+                    for (const k of Object.keys(headers)) {
+                        if (k.toLowerCase() === name.toLowerCase()) return String(headers[k]);
+                    }
+                }
+                return null;
+            };
+            const auth = get('Authorization');
+            if (auth && (auth.startsWith('Bearer ') ? auth.length > 7 : auth.length > 0)) return true;
+            const xAuth = get('X-Auth-Token');
+            if (xAuth && xAuth.length > 0) return true;
+            const xJwt = get('X-JWT');
+            if (xJwt && xJwt.length > 0) return true;
+            return false;
+        }
+
+        /**
+         * 获取调用者应使用的 JWT 类型（严格遵守，无后备方案）
+         * - DISK/ 之外：系统 JWT
+         * - DISK/D/server/：系统 JWT（系统盘 D 且子目录为 server）
+         * - 其余（DISK/D/application、DISK/C/ 等）：用户 JWT，由调用方自行传递
+         * @returns {'system'|'user'} 或 null（需用户 JWT 但不可用时）
+         */
+        _getJWTTypeForCaller() {
+            try {
+                const stack = new Error().stack;
+                if (!stack) return null;
+                const lines = stack.split('\n');
+                for (let i = 1; i < Math.min(lines.length, 25); i++) {
+                    const line = lines[i];
+                    if (line.includes('networkManager.js')) continue;
+                    const norm = line.replace(/\\/g, '/');
+                    if (!/\/DISK[\/\\]/i.test(norm)) return 'system'; // DISK 之外统一系统 JWT
+                    if (/\/DISK[\/\\]D[\/\\]server[\/\\]/i.test(norm)) return 'system'; // 系统盘 D 且子目录为 server
+                    return 'user'; // 其余位置（含 DISK/D/application、DISK/C/ 等）使用用户 JWT
+                }
+                return null;
+            } catch (e) {
+                return null;
+            }
+        }
+
+        /**
+         * 若请求未携带 JWT，则按调用来源自动注入对应 JWT；已有 JWT 则直接放行
+         * 规则：DISK/ 之外 + DISK/D/server/ → 自动注入系统 JWT；其余 → 自动注入用户 JWT（无后备）
+         * @param {Array} args - fetch 参数 (input, init?)
+         * @param {string} [url] - 请求 URL（用于 debug 日志）
+         * @param {string} [source] - 来源标识，如 'fetch' / 'XHR'
+         */
+        _ensureRequestHasJWT(args, url, source) {
+            const src = source || 'fetch';
+            const logJWT = (msg, meta) => {
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.debug("NetworkManager", `[JWT] ${msg}`, meta || {});
+                }
+            };
+            if (typeof RandomSecurity === 'undefined') {
+                logJWT(`${src} 未注入: RandomSecurity 不可用`, { url: url || '' });
+                return;
+            }
+            const jwtType = this._getJWTTypeForCaller();
+            let jwt = null;
+            if (jwtType === 'system' && typeof RandomSecurity.getSystemJWT === 'function') {
+                jwt = RandomSecurity.getSystemJWT();
+            } else if (jwtType === 'user' && typeof RandomSecurity.getUserJWT === 'function') {
+                jwt = RandomSecurity.getUserJWT();
+            }
+            if (!jwt) {
+                logJWT(`${src} 未注入: 无可用 JWT (类型=${jwtType || '?'})`, { url: url || '' });
+                return;
+            }
+            const tokenLabel = jwtType === 'system' ? 'SystemToken' : 'UserToken';
+
+            const input = args[0];
+
+            if (input instanceof Request) {
+                if (this._headersHasJWT(input.headers)) {
+                    logJWT(`${src} 直接放行: 请求已携带 JWT`);
+                    return;
+                }
+                const newHeaders = new Headers(input.headers);
+                newHeaders.set('Authorization', 'Bearer ' + jwt);
+                args[0] = new Request(input, { headers: newHeaders });
+                logJWT(`${src} 已注入 ${tokenLabel}`, { url: input.url || url || '' });
+            } else {
+                const options = args[1] || {};
+                const headers = options.headers;
+                if (this._headersHasJWT(headers)) {
+                    logJWT(`${src} 直接放行: 请求已携带 JWT`);
+                    return;
+                }
+                args[1] = options;
+                const newHeaders = new Headers(headers || {});
+                newHeaders.set('Authorization', 'Bearer ' + jwt);
+                options.headers = newHeaders;
+                logJWT(`${src} 已注入 ${tokenLabel}`, { url: url || '' });
+            }
+        }
+
+        /**
          * 拦截全局 fetch API
          */
         _interceptFetch() {
@@ -223,6 +333,9 @@
 
                 // 只处理 HTTP/HTTPS 请求
                 if (!url || (!url.startsWith('http://') && !url.startsWith('https://'))) {
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.debug("NetworkManager", `[拦截-跳过] 非 HTTP(S) 请求`, { url: url || '(unknown)' });
+                    }
                     return originalFetch.apply(this, args);
                 }
 
@@ -235,6 +348,11 @@
                         headers: options.headers || {},
                         body: options.body || null
                     });
+
+                    // [NetworkService] debug 日志，可通过 Log.getBySubsystem("NetworkService") 过滤
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.debug("NetworkService", `[拦截-拒绝] ${options.method || 'GET'} ${url} (网络已禁用)`);
+                    }
 
                     self._handleRequestFailed({
                         url: url,
@@ -256,6 +374,20 @@
                     headers: options.headers || {},
                     body: options.body || null
                 });
+
+                // [NetworkService] debug 日志，可通过 Log.getBySubsystem("NetworkService") 过滤
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.debug("NetworkService", `[拦截] ${options.method || 'GET'} ${url}`, { url, method: options.method || 'GET' });
+                }
+
+                // 若请求未携带 JWT，则注入用户 JWT（用户 JWT 未准备好时临时使用系统 JWT）；已有 JWT 则直接放行
+                try {
+                    self._ensureRequestHasJWT(args, url, 'fetch');
+                } catch (e) {
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.debug("NetworkManager", `[JWT] fetch 注入异常: ${e.message}`, { url });
+                    }
+                }
 
                 // 执行原始 fetch
                 // 对于 D:/bin/ 路径的请求，静默处理404错误（文件不存在是正常情况，不应该输出到控制台）
@@ -311,9 +443,16 @@
                 const xhr = new OriginalXHR(...args);
                 const originalOpen = xhr.open;
                 const originalSend = xhr.send;
+                const originalSetRequestHeader = xhr.setRequestHeader;
                 let requestUrl = null;
                 let requestMethod = 'GET';
                 let requestHeaders = {};
+
+                // 拦截 setRequestHeader 以记录请求头
+                xhr.setRequestHeader = function (name, value) {
+                    requestHeaders[name] = value;
+                    return originalSetRequestHeader.apply(this, arguments);
+                };
 
                 // 拦截 open 方法
                 xhr.open = function (method, url, ...rest) {
@@ -326,6 +465,9 @@
                 xhr.send = function (body) {
                     // 只处理 HTTP/HTTPS 请求
                     if (!requestUrl || (!requestUrl.startsWith('http://') && !requestUrl.startsWith('https://'))) {
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.debug("NetworkManager", `[拦截-跳过] XHR 非 HTTP(S) 请求`, { url: requestUrl || '(unknown)' });
+                        }
                         return originalSend.apply(this, [body]);
                     }
 
@@ -338,6 +480,11 @@
                             headers: requestHeaders,
                             body: body || null
                         });
+
+                        // [NetworkService] debug 日志，可通过 Log.getBySubsystem("NetworkService") 过滤
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.debug("NetworkService", `[拦截-拒绝] XHR ${requestMethod} ${requestUrl} (网络已禁用)`);
+                        }
 
                         self._handleRequestFailed({
                             url: requestUrl,
@@ -367,6 +514,48 @@
                         headers: requestHeaders,
                         body: body || null
                     });
+
+                    // [NetworkService] debug 日志，可通过 Log.getBySubsystem("NetworkService") 过滤
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.debug("NetworkService", `[拦截] XHR ${requestMethod} ${requestUrl}`, { url: requestUrl, method: requestMethod });
+                    }
+
+                    // 若请求未携带 JWT，则按调用来源自动注入：DISK/ 之外 + DISK/D/server/ → 系统 JWT；其余 → 用户 JWT
+                    try {
+                        const hasJwt = self._headersHasJWT(requestHeaders);
+                        if (hasJwt) {
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.debug("NetworkManager", "[JWT] XHR 直接放行: 请求已携带 JWT", { url: requestUrl });
+                            }
+                        } else if (typeof RandomSecurity !== 'undefined') {
+                            const jwtType = self._getJWTTypeForCaller();
+                            let jwt = null;
+                            if (jwtType === 'system' && typeof RandomSecurity.getSystemJWT === 'function') {
+                                jwt = RandomSecurity.getSystemJWT();
+                            } else if (jwtType === 'user' && typeof RandomSecurity.getUserJWT === 'function') {
+                                jwt = RandomSecurity.getUserJWT();
+                            }
+                            if (jwt) {
+                                xhr.setRequestHeader('Authorization', 'Bearer ' + jwt);
+                                const tokenLabel = jwtType === 'system' ? 'SystemToken' : 'UserToken';
+                                if (typeof KernelLogger !== 'undefined') {
+                                    KernelLogger.debug("NetworkManager", `[JWT] XHR 已注入 ${tokenLabel}`, { url: requestUrl });
+                                }
+                            } else {
+                                if (typeof KernelLogger !== 'undefined') {
+                                    KernelLogger.debug("NetworkManager", `[JWT] XHR 未注入: 无可用 JWT (类型=${jwtType || '?'})`, { url: requestUrl });
+                                }
+                            }
+                        } else {
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.debug("NetworkManager", "[JWT] XHR 未注入: RandomSecurity 不可用", { url: requestUrl });
+                            }
+                        }
+                    } catch (e) {
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.debug("NetworkManager", `[JWT] XHR 注入异常: ${e.message}`, { url: requestUrl });
+                        }
+                    }
 
                     // 监听响应
                     xhr.addEventListener('load', function () {

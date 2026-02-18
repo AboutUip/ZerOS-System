@@ -48,6 +48,7 @@
          */
         __init__: async function(pid, initArgs = {}) {
             this.pid = pid;
+            this._upid = initArgs && initArgs.upid;
             this.terminal = initArgs.terminal;
             /** 进程绑定的内核 API（由 ProcessManager 注入），在 setTimeout 等异步回调中调用时不会触发 PID 调用栈校验失败 */
             this.kernelAPI = initArgs.kernelAPI || null;
@@ -343,10 +344,11 @@
 
                 // 构建压缩服务 URL（直接使用 .zom 文件）
                 const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
-                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.COMPRESSION_DIRVE)
+                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.COMPRESSION_DIRVE, { upid: this._upid })
                     : new URL('/system/service/CompressionDirve.php', (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
                         ? SystemInformation.getOrigin()
                         : window.location.origin);
+                if (this._upid != null) url.searchParams.set('upid', this._upid);
                 
                 url.searchParams.set('action', 'extract_zip');
                 url.searchParams.set('sourcePath', zomFilePath);
@@ -431,10 +433,11 @@
                 
                 // 使用 PHP 服务的 copy_file API（直接复制二进制文件，避免文本编码问题）
                 const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
-                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE, { upid: this._upid })
                     : new URL('/system/service/FSDirve.php', (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
                         ? SystemInformation.getOrigin()
                         : window.location.origin);
+                if (this._upid != null) url.searchParams.set('upid', this._upid);
                 
                 url.searchParams.set('action', 'copy_file');
                 url.searchParams.set('sourcePath', normalizedSourceDir);
@@ -479,10 +482,11 @@
             } else {
                 // 降级方案：使用 PHP 服务
                 const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
-                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE, { upid: this._upid })
                     : new URL('/system/service/FSDirve.php', (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
                         ? SystemInformation.getOrigin()
                         : window.location.origin);
+                if (this._upid != null) url.searchParams.set('upid', this._upid);
                 
                 url.searchParams.set('action', 'write_file');
                 url.searchParams.set('path', normalizedTargetDir);
@@ -521,10 +525,11 @@
                 const dirPath = pathParts.slice(0, -1).join('/');
 
                 const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
-                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE, { upid: this._upid })
                     : new URL('/system/service/FSDirve.php', (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
                         ? SystemInformation.getOrigin()
                         : window.location.origin);
+                if (this._upid != null) url.searchParams.set('upid', this._upid);
                 
                 url.searchParams.set('action', 'delete_file');
                 url.searchParams.set('path', dirPath);
@@ -585,10 +590,11 @@
                 this.terminal.write(`使用 PHP 服务读取（直接读取文件系统）: 目录=${dirPath}, 文件名=${fileName}\n`);
                 
                 const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
-                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE, { upid: this._upid })
                     : new URL('/system/service/FSDirve.php', (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
                         ? SystemInformation.getOrigin()
                         : window.location.origin);
+                if (this._upid != null) url.searchParams.set('upid', this._upid);
                 
                 url.searchParams.set('action', 'read_file');
                 url.searchParams.set('path', dirPath);
@@ -644,10 +650,11 @@
                     // 尝试使用 exists API 检查文件（如果可用）
                     try {
                         const checkUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
-                            ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                            ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE, { upid: this._upid })
                             : new URL('/system/service/FSDirve.php', (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
                                 ? SystemInformation.getOrigin()
                                 : window.location.origin);
+                        if (this._upid != null) checkUrl.searchParams.set('upid', this._upid);
                         checkUrl.searchParams.set('action', 'exists');
                         checkUrl.searchParams.set('path', jsonPath);
                         
@@ -1094,10 +1101,11 @@
                 // 降级方案：使用 PHP 服务
                 this.terminal.write(`[调试] 使用 PHP 服务列出目录: ${dirPath}\n`);
                 const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
-                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE, { upid: this._upid })
                     : new URL('/system/service/FSDirve.php', (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
                         ? SystemInformation.getOrigin()
                         : window.location.origin);
+                if (this._upid != null) url.searchParams.set('upid', this._upid);
                 
                 url.searchParams.set('action', 'list_dir');
                 url.searchParams.set('path', dirPath);
@@ -1215,10 +1223,11 @@
                 }
 
                 const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
-                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE, { upid: this._upid })
                     : new URL('/system/service/FSDirve.php', (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
                         ? SystemInformation.getOrigin()
                         : window.location.origin);
+                if (this._upid != null) url.searchParams.set('upid', this._upid);
                 
                 url.searchParams.set('action', 'read_file');
                 url.searchParams.set('path', dirPath);
@@ -1613,10 +1622,11 @@
                     
                     // 使用 PHP 服务删除文件
                     const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
-                        ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                        ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE, { upid: this._upid })
                         : new URL('/system/service/FSDirve.php', (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
                             ? SystemInformation.getOrigin()
                             : window.location.origin);
+                if (this._upid != null) url.searchParams.set('upid', this._upid);
                     
                     url.searchParams.set('action', 'delete_file');
                     url.searchParams.set('path', dirPath);

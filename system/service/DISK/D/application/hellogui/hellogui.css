@@ -1,4 +1,4 @@
-/* Hello GUI - 支持后台的测试程序 */
+/* JWT/Upid 测试程序 */
 
 .hellogui-window {
     box-sizing: border-box;
@@ -8,6 +8,11 @@
     background: rgba(26, 31, 46, 0.6);
 }
 
-.hellogui-hello:hover {
-    opacity: 0.9;
+.hellogui-results::-webkit-scrollbar {
+    width: 6px;
+}
+
+.hellogui-results::-webkit-scrollbar-thumb {
+    background: rgba(160, 174, 192, 0.4);
+    border-radius: 3px;
 }

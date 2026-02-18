@@ -10,6 +10,17 @@
 - `LStorage` - 本地存储（用于权限持久化）
 - `GUIManager` - GUI 管理器（用于显示权限请求对话框）
 
+## 获取实例
+
+PermissionManager 注册在 POOL 中，可以通过以下方式获取：
+
+```javascript
+// 从 POOL 获取
+const PermissionManager = POOL.__GET__("KERNEL_GLOBAL_POOL", "PermissionManager");
+```
+
+**注意**：在内核初始化完成后，PermissionManager 已加载，可以直接使用。
+
 ## 权限级别
 
 权限管理系统定义了三种权限级别：
@@ -599,6 +610,8 @@ try {
 ## 相关文档
 
 - [ProcessManager.md](./ProcessManager.md) - 进程管理器（权限检查集成）
+- [UserControl.md](./UserControl.md) - 用户控制（canGrantPermission、getGrantablePermissions，UserToken 中的 permissions 来源）
+- [RandomSecurity.md](./RandomSecurity.md) - 安全模块（UserToken 载荷包含 permissions）
 - [NotificationManager.md](./NotificationManager.md) - 通知管理器（权限检查集成）
 - [LStorage.md](./LStorage.md) - 本地存储（权限持久化）
 - [ZEROS_KERNEL.md](../ZEROS_KERNEL.md) - 内核概述

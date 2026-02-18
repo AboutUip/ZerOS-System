@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <path d="M56 24h104l48 48v160c0 13.255-10.745 24-24 24H56c-13.255 0-24-10.745-24-24V48c0-13.255 10.745-24 24-24z" fill="#2B2F3A"/>
+  <path d="M160 24v48h48" fill="#3D4250"/>
+  <rect x="56" y="120" width="144" height="76" rx="12" fill="#6C8EFF"/>
+  <text x="128" y="172" font-family="system-ui,Segoe UI,Arial" font-size="40" text-anchor="middle" fill="#0B1020" font-weight="700">ZDOC</text>
+</svg>
+

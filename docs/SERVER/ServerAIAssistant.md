@@ -33,6 +33,7 @@
 
 ## 相关文档
 
+- [AIProxy 后端接口](../INTERFACE/AIProxy.md) - 讯飞星火、通义千问代理
 - [ServerExpansion API](../API/ServerExpansion.md) - 服务扩展加载与启停
 - [SpeechDrive API](../API/SpeechDrive.md) - 语音识别与合成
 - [服务模块编写 (ServiceModule.md)](./ServiceModule.md) - D/server 服务编写约定

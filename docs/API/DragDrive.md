@@ -10,6 +10,22 @@
 - `PermissionManager` - 权限管理器（用于拖拽权限验证）
 - `KernelLogger` - 内核日志（用于日志记录）
 
+## 获取实例
+
+DragDrive 注册在 POOL 和 window 中，可以通过以下方式获取：
+
+```javascript
+// 方式 1：从 POOL 获取
+const DragDrive = POOL.__GET__("KERNEL_GLOBAL_POOL", "DragDrive");
+
+// 方式 2：从 window 获取
+const DragDrive = window.DragDrive;
+```
+
+**注意**：
+- DragDrive 主要通过 `ProcessManager.callKernelAPI('Drag.xxx', [...])` 调用
+- 文档中「通过 ProcessManager 调用」章节详细说明了这种方式
+
 ## 常量
 
 ### 拖拽类型

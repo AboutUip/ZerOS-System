@@ -5,7 +5,7 @@ KernelLogger.info("SystemInformation", "模块初始化");
 
 class SystemInformation {
     // 系统版本
-    static SYSTEM_VERSION = '0.6.7';
+    static SYSTEM_VERSION = '0.6.8';
     
     // 内核版本
     static KERNEL_VERSION = '0.6.5';
@@ -320,15 +320,20 @@ class SystemInformation {
     /**
      * 构建URL对象（用于需要修改查询参数的场景）
      * @param {string} serviceName 服务名称（如 'FSDirve'）或完整路径
+     * @param {{ upid?: number }} [options] 可选，upid 用于 UserToken 鉴权（GET 参数）
      * @returns {URL} URL对象
      */
-    static buildServiceUrlObject(serviceName) {
+    static buildServiceUrlObject(serviceName, options) {
         // 如果已经是完整路径，直接使用；否则根据服务名称构建
         const servicePath = serviceName.startsWith('/') 
             ? serviceName 
             : SystemInformation.getServicePath(serviceName);
         
-        return new URL(servicePath, SystemInformation.getOrigin());
+        const url = new URL(servicePath, SystemInformation.getOrigin());
+        if (options && options.upid != null) {
+            url.searchParams.set('upid', String(options.upid));
+        }
+        return url;
     }
     
     /**

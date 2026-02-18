@@ -740,6 +740,78 @@ class ThemeManager {
             }
         });
         
+        // 主题7：浅色主题 - 清新明亮风格（新增）
+        ThemeManager.registerTheme('light', {
+            id: 'light',
+            name: '浅色主题',
+            description: '银灰质感，优化对比度，适配多种文字颜色',
+            colors: {
+                // 背景色（银灰色，非纯白，保证浅色文字依然可见）
+                background: '#e2e8f0',      // Slate-200，明显的银灰色，避免刺眼，提供反白对比
+                backgroundSecondary: '#f1f5f9', // Slate-100，卡片背景
+                backgroundTertiary: '#cbd5e1',  // Slate-300，深一点的辅助背景
+                backgroundElevated: '#ffffff',  // 纯白仅用于浮层
+                
+                // 文字色（深色，高对比度）
+                text: '#0f172a',            // Slate-900，极深蓝黑
+                textSecondary: '#334155',   // Slate-700，深灰
+                textMuted: '#475569',       // Slate-600，中灰
+                textDisabled: '#94a3b8',    // Slate-400
+                
+                // 强调色（Indigo，与冷灰色背景更和谐）
+                primary: '#4f46e5',         // Indigo-600
+                primaryLight: 'rgba(79, 70, 229, 0.1)',
+                primaryDark: '#4338ca',     // Indigo-700
+                primaryGradient: 'linear-gradient(135deg, #4f46e5, #6366f1)',
+                secondary: '#6366f1',
+                secondaryLight: '#818cf8',
+                secondaryDark: '#4f46e5',
+                secondaryGradient: 'linear-gradient(135deg, #6366f1, #4f46e5)',
+                
+                // 状态色（加深以匹配灰色背景）
+                success: '#059669',         // Emerald-600
+                successLight: '#d1fae5',
+                successDark: '#047857',
+                successGradient: 'linear-gradient(135deg, #059669, #10b981)',
+                warning: '#d97706',         // Amber-600
+                warningLight: '#fef3c7',
+                warningDark: '#b45309',
+                warningGradient: 'linear-gradient(135deg, #d97706, #f59e0b)',
+                error: '#dc2626',           // Red-600
+                errorLight: '#fee2e2',
+                errorDark: '#b91c1c',
+                errorGradient: 'linear-gradient(135deg, #dc2626, #ef4444)',
+                info: '#2563eb',            // Blue-600
+                infoLight: '#dbeafe',
+                infoDark: '#1d4ed8',
+                infoGradient: 'linear-gradient(135deg, #2563eb, #3b82f6)',
+                
+                // 边框色（加深，增强边界感）
+                border: '#94a3b8',          // Slate-400，清晰的边框
+                borderLight: '#cbd5e1',     // Slate-300
+                borderDark: '#64748b',      // Slate-500
+                borderFocus: 'rgba(79, 70, 229, 0.5)',
+                
+                // 阴影色（加深阴影，增强立体感）
+                shadow: 'rgba(15, 23, 42, 0.1)',
+                shadowLight: 'rgba(15, 23, 42, 0.05)',
+                shadowDark: 'rgba(15, 23, 42, 0.2)',
+                shadowColored: 'rgba(79, 70, 229, 0.25)',
+                
+                // 特殊色
+                accent: '#4f46e5',
+                accentGradient: 'linear-gradient(135deg, #4f46e5, #6366f1)',
+                glow: 'rgba(79, 70, 229, 0.3)',
+                
+                // Glow 效果
+                primaryGlow: 'rgba(79, 70, 229, 0.4)',
+                secondaryGlow: 'rgba(99, 102, 241, 0.3)',
+                successGlow: 'rgba(16, 185, 129, 0.3)',
+                warningGlow: 'rgba(245, 158, 11, 0.3)',
+                errorGlow: 'rgba(239, 68, 68, 0.3)',
+            }
+        });
+        
         KernelLogger.info("ThemeManager", `已注册 ${ThemeManager._themes.size} 个内置主题`);
     }
     

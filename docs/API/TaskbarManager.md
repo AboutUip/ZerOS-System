@@ -14,6 +14,17 @@
 - `LStorage` - 本地存储（用于保存任务栏位置和固定程序列表）
 - `GeographyDrive` - 地理位置驱动（用于天气组件的城市名称获取，可选依赖）
 
+## 获取实例
+
+TaskbarManager 注册在 POOL 中，可以通过以下方式获取：
+
+```javascript
+// 从 POOL 获取
+const TaskbarManager = POOL.__GET__("KERNEL_GLOBAL_POOL", "TaskbarManager");
+```
+
+**注意**：在内核初始化完成后，TaskbarManager 已加载，可以直接使用。
+
 ## 初始化
 
 任务栏在系统启动时自动初始化：

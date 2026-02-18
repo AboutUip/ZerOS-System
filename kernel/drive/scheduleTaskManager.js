@@ -221,6 +221,22 @@ class ScheduleTaskManager {
         ScheduleTaskManager._systemShuttingDown = true;
         KernelLogger.info("ScheduleTaskManager", "系统关闭中，执行关闭任务");
         
+        // 立即清空所有 JWT（包括文件），关机/重启时调用
+        try {
+            const origin = typeof window !== 'undefined' && window.location ? window.location.origin : '';
+            if (origin && typeof navigator !== 'undefined' && typeof navigator.sendBeacon === 'function') {
+                const clearUrl = origin + '/system/service/randomSecurity.php?action=clear';
+                navigator.sendBeacon(clearUrl, '');
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.info("ScheduleTaskManager", "已发送 JWT 清空请求");
+                }
+            }
+        } catch (e) {
+            if (typeof KernelLogger !== 'undefined') {
+                KernelLogger.warn("ScheduleTaskManager", `清空 JWT 请求失败: ${e.message}`);
+            }
+        }
+        
         // 执行所有系统关闭任务
         const shutdownTasks = [];
         for (const [taskId, task] of ScheduleTaskManager._tasks) {

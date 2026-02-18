@@ -9,6 +9,17 @@
 - `anime.js` - 动画库（动态加载）
 - `animate.css` - CSS 动画库（仅供程序内部使用）
 
+## 获取实例
+
+AnimateManager 注册在 POOL 中，可以通过以下方式获取：
+
+```javascript
+// 从 POOL 获取
+const AnimateManager = POOL.__GET__("KERNEL_GLOBAL_POOL", "AnimateManager");
+```
+
+**注意**：在内核初始化完成后，AnimateManager 已加载，可以直接使用。
+
 ## 动画类别
 
 AnimateManager 支持以下动画类别：

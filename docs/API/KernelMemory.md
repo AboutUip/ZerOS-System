@@ -10,13 +10,24 @@
 - `Heap` - 堆内存（用于数据存储）
 - `Shed` - 栈内存（用于地址映射）
 
+## 获取实例
+
+KernelMemory 注册在 POOL 中，可以通过以下方式获取：
+
+```javascript
+// 从 POOL 获取
+const KernelMemory = POOL.__GET__("KERNEL_GLOBAL_POOL", "KernelMemory");
+```
+
+**注意**：在内核初始化完成后，KernelMemory 已加载，可以直接使用。
+
 ## 常量
 
 ```javascript
 KernelMemory.EXPLOIT_PID = 10000;        // Exploit 程序固定 PID
 KernelMemory.EXPLOIT_HEAP_ID = 1;       // Exploit 堆 ID
 KernelMemory.EXPLOIT_SHED_ID = 1;       // Exploit 栈 ID
-KernelMemory.EXPLOIT_HEAP_SIZE = 1048576; // 1MB Heap 用于存储内核数据
+KernelMemory.EXPLOIT_HEAP_SIZE = 2097152; // 2MB Heap 用于存储内核数据
 ```
 
 ## API 方法
@@ -216,10 +227,10 @@ if (usage.available) {
 
 ## 注意事项
 
-1. **数据大小**: 单个数据不能超过 Heap 总大小（1MB）
+1. **数据大小**: 单个数据不能超过 Heap 总大小（2MB）
 2. **序列化**: 数据会被序列化为 JSON，不支持函数、Symbol 等不可序列化的类型
 3. **键名规范**: 建议使用大写字母和下划线，遵循内核数据存储键名规范
-4. **内存限制**: Exploit 程序分配 1MB Heap，所有内核数据共享此空间
+4. **内存限制**: Exploit 程序分配 2MB Heap，所有内核数据共享此空间
 5. **性能**: 频繁的保存/加载操作会影响性能，建议批量操作或使用缓存
 
 ## 相关文档

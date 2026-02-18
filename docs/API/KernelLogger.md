@@ -17,6 +17,17 @@
 
 `KernelLogger` 是 ZerOS 内核的统一日志系统，提供结构化的日志输出。完全独立，不依赖任何外部模块，确保日志系统稳定运行。
 
+## 获取实例
+
+KernelLogger 注册在 POOL 中，可以通过以下方式获取：
+
+```javascript
+// 从 POOL 获取
+const KernelLogger = POOL.__GET__("KERNEL_GLOBAL_POOL", "KernelLogger");
+```
+
+**注意**：在内核初始化完成后，KernelLogger 已加载，可以直接使用。
+
 ## 特性
 
 - 多级别日志：DEBUG (3)、INFO (2)、WARN (1)、ERROR (0)

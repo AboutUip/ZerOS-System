@@ -1,0 +1,15 @@
+[
+  { "link": "hTitle", "value": "ZDOC 示例文档" },
+  { "link": "hSub", "value": "用于验证布局、文本样式与资源加载（image/asset/url）" },
+
+  { "link": "cTitle", "value": "排版与布局" },
+  { "link": "cPara", "value": "这是一个用于截图宣传的简约示例：包含 Header / Content / Footer；中间展示卡片 + SVG 图片 + 链接与附件下载。" },
+
+  { "link": "img1", "value": "sample.svg" },
+  { "link": "cardText", "value": "左侧为 SVG 资源（assets/images/sample.svg）。右侧为说明文本，用于验证图片加载、flex(row) 与间距是否正确。" },
+
+  { "link": "link1", "value": "https://example.com" },
+  { "link": "att1", "value": "attachments/sample.txt" },
+
+  { "link": "f1", "value": "Footer: ZerOS Office · ZDOC Preview" }
+]

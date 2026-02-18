@@ -2141,7 +2141,7 @@ class LStorage {
                     // 对于数组类型，验证数组长度和内容
                     if (Array.isArray(value) && Array.isArray(savedValue)) {
                         if (savedValue.length !== value.length) {
-                            KernelLogger.warn("LStorage", `保存后验证失败: Key=${key} 数组长度不匹配 (期望: ${value.length}, 实际: ${savedValue.length})`);
+                            KernelLogger.info("LStorage", `保存后验证失败: Key=${key} 数组长度不匹配 (期望: ${value.length}, 实际: ${savedValue.length})`);
                             return false;
                         }
                         // 验证关键字段是否存在（对于 localDesktopBackgrounds）

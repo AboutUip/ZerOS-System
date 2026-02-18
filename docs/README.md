@@ -7,7 +7,7 @@
 一个完整的虚拟操作系统开发文档集合
 
 [![Documentation](https://img.shields.io/badge/docs-complete-brightgreen.svg)](./README.md)
-[![API](https://img.shields.io/badge/API-40+-blue.svg)](./API/README.md)
+[![API](https://img.shields.io/badge/API-40+-blue.svg)](./API/README.md) [![后端接口](https://img.shields.io/badge/INTERFACE-12-green.svg)](./INTERFACE/README.md)
 [![Guide](https://img.shields.io/badge/guide-complete-yellow.svg)](./DEVELOPER_GUIDE.md)
 
 </div>
@@ -66,10 +66,11 @@
 | [扩展与插件索引 (PLUGINS)](./PLUGINS/README.md) | 语言包等扩展的编写与使用说明 |
 | [语言包格式](./PLUGINS/LanguagePack.md) | D/plugins 语言包存放位置与 JSON 格式 |
 | [服务文档 (SERVER)](./SERVER/README.md) | D/server 服务模块编写与各内置服务说明 |
+| [Office 规范 (OFFICE)](./OFFICE/README.md) | ZerOS 自研 Office 体系规范（格式/编辑/导出/动态库） |
 
 ### 🔧 API 参考文档
 
-所有内核 API 的详细文档位于 [`docs/API/`](./API/) 目录，按功能分类如下：
+所有内核 API 的详细文档位于 [`docs/API/`](./API/) 目录。**后端 HTTP 接口**（含 JWT、文件、磁盘、代理、AI 等）见 [`docs/INTERFACE/`](./INTERFACE/README.md)。
 
 #### ⚡ 核心系统 API（必读）
 
@@ -96,11 +97,11 @@
 | API | 描述 | 状态 |
 |-----|------|------|
 | [FileFramework](./API/FileFramework.md) | 文件操作基础 API | ✅ |
-| [FSDirve](./API/FSDirve.md) | 后端服务文件操作（支持 PHP 和 SpringBoot） | ✅ |
+| [FSDirve](./INTERFACE/FSDirve.md) | 后端服务文件操作（支持 PHP 和 SpringBoot） | ✅ |
 | [SystemInformation](./API/SystemInformation.md) | 系统信息和后端服务管理 | ✅ |
 | [Disk](./API/Disk.md) | 虚拟磁盘管理 | ✅ |
 | [NodeTree](./API/NodeTree.md) | 内存文件系统结构 | ✅ |
-| [DISKMANAGER](./API/DISKMANAGER.md) | 磁盘分区管理服务（创建、检查、删除、合并等） | ✅ |
+| [DISKMANAGER](./INTERFACE/DISKMANAGER.md) | 磁盘分区管理服务（创建、检查、删除、合并等） | ✅ |
 
 #### 🎨 用户界面 API
 
@@ -118,6 +119,7 @@
 
 | API | 描述 | 状态 |
 |-----|------|------|
+| [RandomSecurity](./API/RandomSecurity.md) | JWT 鉴权（SystemToken/UserToken、NetworkManager 自动注入） | ✅ |
 | [PermissionManager](./API/PermissionManager.md) | 权限管理、审计、统计 | ⚠️ **必读** |
 | [CryptDrive](./API/CryptDrive.md) | RSA 加密、MD5 哈希、随机数 | ✅ |
 
@@ -144,14 +146,16 @@
 
 | API | 描述 | 状态 |
 |-----|------|------|
-| [CompressionDrive](./API/CompressionDrive.md) | ZIP/RAR 压缩解压缩（支持 PHP 和 SpringBoot 后端） | ✅ |
+| [CompressionDrive](./INTERFACE/CompressionDrive.md) | ZIP/RAR 压缩解压缩（支持 PHP 和 SpringBoot 后端） | ✅ |
 | [SystemInformation](./API/SystemInformation.md) | 系统信息和后端服务管理 | ✅ |
 | [DragDrive](./API/DragDrive.md) | 文件拖拽处理 | ✅ |
 | [GeographyDrive](./API/GeographyDrive.md) | 地理位置相关功能 | ✅ |
 | [SpeechDrive](./API/SpeechDrive.md) | 语音识别驱动（基于 Web Speech API） | ✅ |
 | [MultithreadingDrive](./API/MultithreadingDrive.md) | 并发处理 | ✅ |
 | [ScheduleTaskManager](./API/ScheduleTaskManager.md) | 计划任务管理器 | ✅ |
-| [BrowserProxy](./API/BrowserProxy.md) | 浏览器网页代理服务（绕过 iframe 限制） | ✅ |
+| [BrowserProxy](./INTERFACE/BrowserProxy.md) | 浏览器网页代理服务（绕过 iframe 限制） | ✅ |
+| [AIProxy](./INTERFACE/AIProxy.md) | AI 代理（讯飞星火、通义千问） | ✅ |
+| [networkDirve](./INTERFACE/networkDirve.md) | 网络驱动（TCP 端口） | ✅ |
 
 #### 🔌 系统扩展 API
 
@@ -176,7 +180,7 @@
 | 开发场景 | 推荐阅读 |
 |---------|---------|
 | **GUI 程序开发** | [GUIManager](./API/GUIManager.md) + [EventManager](./API/EventManager.md) |
-| **文件操作** | [FileFramework](./API/FileFramework.md) + [FSDirve](./API/FSDirve.md) + [SystemInformation](./API/SystemInformation.md) |
+| **文件操作** | [FileFramework](./API/FileFramework.md) + [FSDirve](./INTERFACE/FSDirve.md) + [SystemInformation](./API/SystemInformation.md) |
 | **程序打包与安装** | [ZOMInstall](./API/ZOMInstall.md)（zompkg 打包、zominstall 安装；本地开发可用 dev/toolkit/zompkg.ps1） |
 | **数据存储** | [LStorage](./API/LStorage.md) + [CacheDrive](./API/CacheDrive.md) |
 | **权限管理** | [PermissionManager](./API/PermissionManager.md) |
@@ -216,6 +220,12 @@
 ## 📝 文档更新
 
 文档会随着系统更新而持续改进。如果你发现文档有误或需要补充，欢迎提交 Issue 或 Pull Request（更推荐发送邮件）。
+
+### 一致性原则
+
+- 以实现为准：API 名称、参数、返回、权限要求、路径规则需与当前代码一致
+- 变更同步：代码或目录结构变更后，同步更新 docs/API 索引与相关交叉引用
+- 过时处理：实现已移除的能力需删除或标注 Deprecated，并提供替代方案
 
 ---
 

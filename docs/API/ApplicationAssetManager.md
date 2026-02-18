@@ -10,6 +10,20 @@
 - `LStorage` - 本地存储管理器（用于获取动态安装的程序）
 - `POOL` - 全局对象池（用于存储资源映射）
 
+## 获取实例
+
+ApplicationAssetManager 注册在 POOL 和 window 中，可以通过以下方式获取：
+
+```javascript
+// 方式 1：从 POOL 获取
+const ApplicationAssetManager = POOL.__GET__("KERNEL_GLOBAL_POOL", "ApplicationAssetManager");
+
+// 方式 2：从 window 获取
+const ApplicationAssetManager = window.ApplicationAssetManager;
+```
+
+**注意**：在内核初始化完成后，ApplicationAssetManager 已加载，可以直接使用。
+
 ## 初始化
 
 应用程序资源管理器在系统启动时自动初始化：

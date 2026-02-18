@@ -22,7 +22,24 @@
         
         // 已选择的 ZIP 文件列表（用于解压）
         _selectedZipFiles: [],
-        
+
+        /**
+         * 获取当前语言下的本地化文本
+         */
+        _getText: function(key, fallback) {
+            if (!key) return (fallback != null ? fallback : '');
+            try {
+                const LanguagesExpansion = (typeof POOL !== 'undefined' && POOL && typeof POOL.__GET__ === 'function')
+                    ? POOL.__GET__('KERNEL_GLOBAL_POOL', 'LanguagesExpansion')
+                    : (typeof window !== 'undefined' ? window.LanguagesExpansion : null);
+                if (LanguagesExpansion && typeof LanguagesExpansion.getText === 'function') {
+                    const value = LanguagesExpansion.getText(key);
+                    if (value && value !== key) return value;
+                }
+            } catch (e) {}
+            return (fallback != null ? fallback : '');
+        },
+
         /**
          * 辅助函数：为按钮注册事件（使用 EventManager）
          * @param {HTMLElement} btn 按钮元素
@@ -63,6 +80,7 @@
         
         __init__: async function(pid, initArgs) {
             this.pid = pid;
+            this._upid = initArgs && initArgs.upid;
             
             // 初始化内存管理
             this._initMemory(pid);
@@ -179,7 +197,7 @@
             
             // 标题
             const title = document.createElement('div');
-            title.textContent = 'ZIP 压缩工具';
+            title.textContent = this._getText('ZIPER_TITLE', 'ZIP 压缩工具');
             title.style.cssText = `
                 font-size: 20px;
                 font-weight: bold;
@@ -234,7 +252,7 @@
             
             // 标题
             const title = document.createElement('div');
-            title.textContent = '压缩文件/目录';
+            title.textContent = this._getText('ZIPER_COMPRESS', '压缩文件/目录');
             title.style.cssText = `
                 font-size: 16px;
                 font-weight: bold;
@@ -251,7 +269,7 @@
             `;
             
             const sourceLabel = document.createElement('label');
-            sourceLabel.textContent = '源文件/目录 (可多选):';
+            sourceLabel.textContent = this._getText('ZIPER_SOURCE', '源文件/目录 (可多选):');
             sourceLabel.style.cssText = `
                 font-size: 14px;
                 color: var(--theme-text-secondary, rgba(255, 255, 255, 0.7));
@@ -277,7 +295,7 @@
             // 空状态提示
             const emptyHint = document.createElement('div');
             emptyHint.className = 'ziper-empty-hint';
-            emptyHint.textContent = '未选择任何文件或目录';
+            emptyHint.textContent = this._getText('ZIPER_SOURCE_EMPTY', '未选择任何文件或目录');
             emptyHint.style.cssText = `
                 padding: 8px;
                 text-align: center;
@@ -293,7 +311,7 @@
             `;
             
             const sourceBtn = document.createElement('button');
-            sourceBtn.textContent = '添加文件/目录...';
+            sourceBtn.textContent = this._getText('ZIPER_ADD_FILES', '添加文件/目录...');
             sourceBtn.className = 'ziper-button';
             sourceBtn.style.cssText = `
                 padding: 10px 20px;
@@ -485,7 +503,7 @@
             
             // 标题
             const title = document.createElement('div');
-            title.textContent = '解压缩文件';
+            title.textContent = this._getText('ZIPER_EXTRACT', '解压缩文件');
             title.style.cssText = `
                 font-size: 16px;
                 font-weight: bold;
@@ -736,7 +754,7 @@
             
             // 标题
             const title = document.createElement('div');
-            title.textContent = '查看 ZIP 内容';
+            title.textContent = this._getText('ZIPER_VIEW', '查看 ZIP 内容');
             title.style.cssText = `
                 font-size: 16px;
                 font-weight: bold;
@@ -1228,10 +1246,11 @@
             
             try {
                 const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
-                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.COMPRESSION_DIRVE)
-                    : new URL(SystemInformation.getCompressionDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.COMPRESSION_DIRVE, { upid: this._upid })
+                    : new URL(SystemInformation.getCompressionDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin)
                         ? SystemInformation.getOrigin()
                         : window.location.origin);
+                if (this._upid != null) url.searchParams.set('upid', this._upid);
                 url.searchParams.set('action', 'compress_zip');
                 url.searchParams.set('targetPath', targetPath);
                 
@@ -1309,10 +1328,11 @@
                 for (const zipPath of paths) {
                     try {
                         const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
-                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.COMPRESSION_DIRVE)
-                    : new URL(SystemInformation.getCompressionDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.COMPRESSION_DIRVE, { upid: this._upid })
+                    : new URL(SystemInformation.getCompressionDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin)
                         ? SystemInformation.getOrigin()
                         : window.location.origin);
+                        if (this._upid != null) url.searchParams.set('upid', this._upid);
                         url.searchParams.set('action', 'extract_zip');
                         url.searchParams.set('sourcePath', zipPath);
                         url.searchParams.set('targetPath', targetPath);
@@ -1381,10 +1401,11 @@
             
             try {
                 const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
-                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.COMPRESSION_DIRVE)
-                    : new URL(SystemInformation.getCompressionDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.COMPRESSION_DIRVE, { upid: this._upid })
+                    : new URL(SystemInformation.getCompressionDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin)
                         ? SystemInformation.getOrigin()
                         : window.location.origin);
+                if (this._upid != null) url.searchParams.set('upid', this._upid);
                 url.searchParams.set('action', 'list_zip');
                 url.searchParams.set('sourcePath', zipPath);
                 

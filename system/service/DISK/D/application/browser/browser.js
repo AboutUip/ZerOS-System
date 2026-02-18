@@ -19,6 +19,23 @@
         bookmarks: [], // 书签列表
         _navToken: 0,
         _navTimeoutId: null,
+
+        /**
+         * 获取当前语言下的本地化文本
+         */
+        _getText: function(key, fallback) {
+            if (!key) return (fallback != null ? fallback : '');
+            try {
+                const LanguagesExpansion = (typeof POOL !== 'undefined' && POOL && typeof POOL.__GET__ === 'function')
+                    ? POOL.__GET__('KERNEL_GLOBAL_POOL', 'LanguagesExpansion')
+                    : (typeof window !== 'undefined' ? window.LanguagesExpansion : null);
+                if (LanguagesExpansion && typeof LanguagesExpansion.getText === 'function') {
+                    const value = LanguagesExpansion.getText(key);
+                    if (value && value !== key) return value;
+                }
+            } catch (e) {}
+            return (fallback != null ? fallback : '');
+        },
         
         __init__: async function(pid, initArgs) {
             this.pid = pid;
@@ -65,7 +82,7 @@
                 }
                 
                 const windowInfo = GUIManager.registerWindow(pid, this.window, {
-                    title: '浏览器',
+                    title: this._getText('BROWSER_TITLE', '浏览器'),
                     icon: icon,
                     onClose: () => {
                         // onClose 回调只做清理工作，不调用 _closeWindow 或 unregisterWindow
@@ -158,7 +175,7 @@
             const addressBar = document.createElement('input');
             addressBar.className = 'browser-address-bar';
             addressBar.type = 'text';
-            addressBar.placeholder = '输入网址或搜索...';
+            addressBar.placeholder = this._getText('BROWSER_PLACEHOLDER', '输入网址或搜索...');
             addressBar.value = this.currentUrl;
             addressBar.addEventListener('keydown', (e) => {
                 if (e.key === 'Enter') {
@@ -501,7 +518,7 @@
                     loadingIndicator.style.display = 'flex';
                     // 3秒后恢复
                     setTimeout(() => {
-                        text.textContent = '正在加载...';
+                        text.textContent = this._getText('BROWSER_LOADING', '正在加载...');
                         text.style.color = 'rgba(215, 224, 221, 0.8)';
                         loadingIndicator.style.display = 'none';
                     }, 3000);

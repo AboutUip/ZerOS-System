@@ -14,6 +14,17 @@
 - `TaskbarManager` - 任务栏管理器（用于获取任务栏位置）
 - `LStorage` - 本地存储（用于保存桌面配置）
 
+## 获取实例
+
+DesktopManager 注册在 POOL 中，可以通过以下方式获取：
+
+```javascript
+// 从 POOL 获取
+const DesktopManager = POOL.__GET__("KERNEL_GLOBAL_POOL", "DesktopManager");
+```
+
+**注意**：在内核初始化完成后，DesktopManager 已加载，可以直接使用。
+
 ## 初始化
 
 桌面管理器在系统启动时自动初始化：

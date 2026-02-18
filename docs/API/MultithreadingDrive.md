@@ -17,6 +17,31 @@
 
 - `KernelLogger` - 内核日志系统（用于日志输出）
 
+## 获取实例
+
+MultithreadingDrive 通过 `ProcessManager.callKernelAPI` 暴露 API，不直接获取实例：
+
+```javascript
+// 通过 ProcessManager 调用
+const ProcessManager = POOL.__GET__("KERNEL_GLOBAL_POOL", "ProcessManager");
+
+// 创建线程
+const threadId = await ProcessManager.callKernelAPI(
+    this.pid,
+    'Thread.create',
+    [{ script: 'worker.js', name: 'MyWorker' }]
+);
+
+// 执行任务
+const result = await ProcessManager.callKernelAPI(
+    this.pid,
+    'Thread.postMessage',
+    [threadId, { type: 'task', data: 'Hello' }]
+);
+```
+
+**注意**：多线程功能需要 `MULTITHREADING` 权限，详细调用方式见「通过 ProcessManager 使用」章节。
+
 ## 初始化
 
 多线程驱动器在浏览器环境中自动初始化：

@@ -32,6 +32,7 @@
          * @param {Object} initArgs
          */
         __init__: async function(pid, initArgs = {}) {
+            this._upid = initArgs && initArgs.upid;
             try {
                 this.pid = pid;
                 GUIManager.init();
@@ -364,10 +365,11 @@
 
                             // 使用 FSDirve 写入（支持 base64）
                             const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
-                            ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
-                            : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                            ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE, { upid: this._upid })
+                            : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin)
                                 ? SystemInformation.getOrigin()
                                 : window.location.origin);
+                            if (this._upid != null) url.searchParams.set('upid', this._upid);
                             url.searchParams.set('action', 'write_file');
                             url.searchParams.set('path', folderPath);
                             url.searchParams.set('fileName', defaultName);

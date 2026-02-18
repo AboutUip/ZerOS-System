@@ -22,6 +22,17 @@
 - `PermissionManager` - 权限管理器（用于权限验证）
 - `KernelLogger` - 内核日志（用于日志记录）
 
+## 获取实例
+
+ScheduleTaskManager 注册在 POOL 中，可以通过以下方式获取：
+
+```javascript
+// 从 POOL 获取
+const ScheduleTaskManager = POOL.__GET__("KERNEL_GLOBAL_POOL", "ScheduleTaskManager");
+```
+
+**注意**：在内核初始化完成后，ScheduleTaskManager 已加载，可以直接使用。
+
 ## 数据存储
 
 计划任务数据存储在 `LocalSData.json` 文件的 `scheduleTaskManager.tasks` 键中：

@@ -359,7 +359,30 @@ __info__: function() {
 
 **详细说明**：请参考 [PermissionManager API 文档](API/PermissionManager.md)
 
-#### 5. 资源清理 - 必须完整清理
+#### 5. 后端服务调用 - 必须传递 upid
+
+**调用 FSDirve、CompressionDirve、DISKMANAGER 等后端时，必须在 URL 中携带 `upid` 参数**
+
+应用和 bin 程序使用 User JWT 鉴权，后端要求 GET 参数中必须包含 `upid`，否则会拒绝请求。
+
+```javascript
+// ✅ 正确：在 __init__ 中保存 upid，构建 URL 时传入
+__init__: async function(pid, initArgs) {
+    this._upid = initArgs && initArgs.upid;
+    // ...
+}
+// 调用后端时
+const url = SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE, { upid: this._upid });
+// 或手动构建 URL 时
+if (this._upid != null) url.searchParams.set('upid', this._upid);
+
+// ❌ 错误：未传入 upid，后端会拒绝
+const url = SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE);
+```
+
+**详细说明**：请参考 [SystemInformation API](API/SystemInformation.md)、[RandomSecurity API](API/RandomSecurity.md)
+
+#### 6. 资源清理 - 必须完整清理
 
 **程序必须在 `__exit__` 中清理所有资源**
 
@@ -570,6 +593,7 @@ __init__: async function(pid, initArgs) {
   ```javascript
   {
       pid: number,              // 进程 ID
+      upid: number,             // 用户进程 ID，调用 FSDirve/CompressionDirve/DISKMANAGER 等后端时必须传入 URL
       args: Array,              // 命令行参数
       env: Object,              // 环境变量
       cwd: string,              // 当前工作目录（如 "C:"）
@@ -2224,10 +2248,12 @@ A: 使用 Disk API 或后端服务（推荐使用 SystemInformation 构建URL）
 const content = await Disk.readFile('D:/data.txt');
 await Disk.writeFile('D:/data.txt', '新内容');
 
-// 使用 SystemInformation 构建服务URL（推荐，自动适配后端类型）
+// 使用 SystemInformation 构建服务URL（应用必须传入 upid）
+this._upid = initArgs && initArgs.upid;
 const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
-    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE, { upid: this._upid })
     : new URL('/system/service/FSDirve.php', window.location.origin);
+if (this._upid != null) url.searchParams.set('upid', this._upid);
 url.searchParams.set('action', 'read_file');
 url.searchParams.set('path', 'D:/');
 url.searchParams.set('fileName', 'data.txt');
@@ -2270,12 +2296,13 @@ console.log(`包含 ${list.fileCount} 个文件`);
 
 ### Q: 如何检查文件是否存在？
 
-A: 使用后端服务的 `check_path_exists` 操作（推荐使用 SystemInformation）：
+A: 使用后端服务的 `check_path_exists` 操作（应用需传 upid）：
 
 ```javascript
 const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
-    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE, { upid: this._upid })
     : new URL('/system/service/FSDirve.php', window.location.origin);
+if (this._upid != null) url.searchParams.set('upid', this._upid);
 url.searchParams.set('action', 'check_path_exists');
 url.searchParams.set('path', 'D:/data.txt');
 
@@ -2288,13 +2315,14 @@ if (result.status === 'success' && result.data.exists) {
 
 ### Q: 如何创建和删除目录？
 
-A: 使用后端服务（推荐使用 SystemInformation）：
+A: 使用后端服务（应用需传 upid）：
 
 ```javascript
 // 创建目录
 const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
-    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE, { upid: this._upid })
     : new URL('/system/service/FSDirve.php', window.location.origin);
+if (this._upid != null) url.searchParams.set('upid', this._upid);
 url.searchParams.set('action', 'create_dir');
 url.searchParams.set('path', 'D:/newdir');
 
@@ -2308,12 +2336,13 @@ await fetch(url.toString());
 
 ### Q: 如何列出目录内容？
 
-A: 使用后端服务的 `list_dir` 操作（推荐使用 SystemInformation）：
+A: 使用后端服务的 `list_dir` 操作（应用需传 upid）：
 
 ```javascript
 const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
-    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE, { upid: this._upid })
     : new URL('/system/service/FSDirve.php', window.location.origin);
+if (this._upid != null) url.searchParams.set('upid', this._upid);
 url.searchParams.set('action', 'list_dir');
 url.searchParams.set('path', 'D:/application');
 

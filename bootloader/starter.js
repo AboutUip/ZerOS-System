@@ -3,6 +3,9 @@
 (function() {
     'use strict';
     
+    /** 引导前安全校验模块：必须第一个加载并完全执行完成后才继续引导 */
+    const RANDOM_SECURITY_MODULE = "../kernel/core/safemode/randomSecurity.js";
+
     // 定义模块依赖关系图
     const MODULE_DEPENDENCIES = {
         // 第零层：基础核心模块（在 HTML 中直接加载）
@@ -10,9 +13,12 @@
         // - DependencyConfig: 在 HTML 中直接加载（依赖 KernelLogger）
         // - POOL: 在 HTML 中直接加载（依赖 KernelLogger 和 DependencyConfig）
         // 这些模块不在此依赖图中
-        
+        // - RandomSecurity: 由 BootLoader 在 loadModules 前单独加载并等待完成，不在此图中
+
         // 第一层：系统信息模块（必须在最早期加载，供其他模块使用）
         "../kernel/SystemInformation.js": [],
+        // 第一层：网络管理器（尽早 patch fetch，确保所有请求都经 JWT 注入）
+        "../kernel/drive/networkManager.js": [],
         
         // 第一层：基础枚举管理器（依赖 pool）
         // 注意：pool、DependencyConfig 已在 HTML 中加载，不需要在依赖图中
@@ -59,8 +65,6 @@
             "../kernel/filesystem/fileFramework.js"
         ],
         
-        // 第八层：网络管理模块（独立模块）
-        "../kernel/drive/networkManager.js": [],
         
         // 第九层：动态模块管理器（独立模块）
         "../kernel/dynamicModule/dynamicManager.js": [],
@@ -1127,7 +1131,24 @@
             Object.keys(MODULE_DEPENDENCIES).forEach(module => {
                 Dependency.addDependency(module);
             });
-            
+
+            // 引导前安全校验：第一个加载并必须完全执行完成后才继续引导
+            // JWT 由安全模块私有保存，通过 Security.getSystemJWT API 获取
+            Dependency.addDependency(RANDOM_SECURITY_MODULE);
+            await loadScript(RANDOM_SECURITY_MODULE);
+            try {
+                await Dependency.waitLoaded(RANDOM_SECURITY_MODULE, { interval: 50, timeout: 15000 }); // 增加超时时间，因为需要网络请求
+                
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.info("BootLoader", "RandomSecurity 引导前安全校验已完成");
+                }
+            } catch (e) {
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error("BootLoader", `RandomSecurity 等待超时或失败: ${e.message}`, e);
+                }
+                throw e;
+            }
+
             // 异步加载所有其他模块
             await loadModules(MODULE_DEPENDENCIES);
             

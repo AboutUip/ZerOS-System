@@ -35,6 +35,7 @@
          */
         __init__: async function(pid, initArgs) {
             this.pid = pid;
+            this._upid = initArgs && initArgs.upid;
             this._kernelAPI = (initArgs && initArgs.kernelAPI) || null;
             
             if (typeof KernelLogger !== 'undefined') {
@@ -1823,8 +1824,9 @@
                 if (!taskManagerContent) {
                     try {
                         const url = typeof SystemInformation !== 'undefined' && typeof SystemInformation.buildServiceUrlObject === 'function'
-                            ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                            ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE, { upid: this._upid })
                             : new URL('/system/service/FSDirve.php', window.location.origin);
+                        if (this._upid != null) url.searchParams.set('upid', this._upid);
                         url.searchParams.set('action', 'read_file');
                         url.searchParams.set('path', 'D:/application/taskmanager');
                         url.searchParams.set('fileName', 'taskmanager.js');

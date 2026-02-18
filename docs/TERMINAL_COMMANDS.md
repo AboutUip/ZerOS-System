@@ -11,6 +11,8 @@
 3. **程序注册表** - 从 `ApplicationAssetManager` 查找已注册的程序
 4. **环境变量** - 从环境变量中查找命令名，如果找到则执行其值（可以是程序名或文件路径）
 
+**D:/bin/ 程序与 upid**：终端启动 D:/bin/ 程序时会传入 `initArgs.upid`。若程序需要调用 FSDirve、CompressionDirve、DISKMANAGER 等后端，必须在请求中携带 `upid`。见 [API/SystemInformation.md](./API/SystemInformation.md) 与 [API/RandomSecurity.md](./API/RandomSecurity.md)。
+
 ## 文件系统命令
 
 ### `ls [-l] [path]`
@@ -291,6 +293,8 @@ check
 
 显示磁盘分区信息。
 
+**说明**：命令名为 `diskmanger`（历史拼写），请按文档使用该名称。
+
 **参数**:
 - `-l` (可选): 显示详细文件和目录占用
 - `disk` (可选): 指定磁盘（如 `C:` 或 `D:`）
@@ -364,7 +368,7 @@ debug services --status translate        # 仅显示 translate 服务状态
 - ⚠️ **程序异常 (program)**: 将导致当前程序（终端）被终止
 - ✓ **服务异常 (service)**: 仅记录日志，不影响系统运行
 
-**注意**: `exception` 主要用于测试异常处理机制，请谨慎使用。翻译服务详见 [翻译服务 (ServerTranslate)](../SERVER/ServerTranslate.md)。
+**注意**: `exception` 主要用于测试异常处理机制，请谨慎使用。翻译服务详见 [翻译服务 (ServerTranslate)](./SERVER/ServerTranslate.md)。
 
 ### `exit`
 

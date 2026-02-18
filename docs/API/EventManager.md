@@ -29,6 +29,20 @@
 - `PermissionManager` - 权限管理系统（用于权限检查）
 - `ProcessManager` - 进程管理系统（用于获取当前 PID）
 
+## 获取实例
+
+EventManager 注册在 POOL 和 window 中，可以通过以下方式获取：
+
+```javascript
+// 方式 1：从 POOL 获取
+const EventManager = POOL.__GET__("KERNEL_GLOBAL_POOL", "EventManager");
+
+// 方式 2：从 window 获取（在内核上下文中）
+const EventManager = window.EventManager;
+```
+
+**注意**：在内核初始化完成后，EventManager 已加载，可以直接使用。
+
 ## 初始化
 
 事件管理器在首次使用时自动初始化：

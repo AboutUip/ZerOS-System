@@ -9,6 +9,20 @@
 - `ProcessManager` - 进程管理器（用于程序菜单管理）
 - `KernelLogger` - 内核日志系统（用于日志输出）
 
+## 获取实例
+
+ContextMenuManager 注册在 POOL 和 window 中，可以通过以下方式获取：
+
+```javascript
+// 方式 1：从 POOL 获取
+const ContextMenuManager = POOL.__GET__("KERNEL_GLOBAL_POOL", "ContextMenuManager");
+
+// 方式 2：从 window 获取
+const ContextMenuManager = window.ContextMenuManager;
+```
+
+**注意**：在内核初始化完成后，ContextMenuManager 已加载，可以直接使用。
+
 ## 初始化
 
 上下文菜单管理器在系统启动时自动初始化：

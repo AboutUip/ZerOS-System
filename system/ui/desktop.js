@@ -1,4 +1,4 @@
-﻿// 桌面管理器
+// 桌面管理器
 // 负责沙盒环境的桌面实现，包括快捷方式、桌面图标排列、右键菜单等
 // 依赖：GUIManager, ThemeManager, ApplicationAssetManager, ContextMenuManager, ProcessManager
 
@@ -1929,6 +1929,8 @@ class DesktopManager {
                     // ZOM 文件：使用 zominstall 安装
                     programName = 'zominstall';
                     programArgs = [iconData.targetPath];
+                } else if (fileType === 'ZDOC') {
+                    programName = 'office';
                 } else if (fileType === 'AUDIO') {
                     programName = 'audioplayer';
                 } else if (fileType === 'VIDEO') {
@@ -2080,6 +2082,10 @@ class DesktopManager {
         // ZOM 文件类型（ZerOS 程序安装包）
         if (ext === 'zom') {
             return 'ZOM';
+        }
+
+        if (ext === 'zdoc') {
+            return 'ZDOC';
         }
         
         // 音频格式

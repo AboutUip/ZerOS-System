@@ -581,6 +581,7 @@ class ProcessManager {
     static _backgroundTrayClickHandlers = new Map();
     /** 后台进程托盘：按 PID 注册的右键菜单项提供者 Map<pid, function>，提供者返回 Array<{ label: string, onClick: function }> */
     static _backgroundTrayContextMenuProviders = new Map();
+    static _pidToUpid = new Map();
 
     // DOM 观察器（全局，观察 document.body 的变化）
     static _globalDOMObserver = null;
@@ -1760,20 +1761,43 @@ class ProcessManager {
                 throw new Error(`Program class ${programNameUpper} not found`);
             }
 
-            ProcessManager._log(2, `[启动程序] 找到程序对象，检查类型`);
+            ProcessManager._log(2, `[启动程序] 找到程序对象，优先调用 __info__ 获取权限`);
 
-            // 检查程序类型（CLI或GUI）
+            let programInfo = null;
             let programType = null;
             if (programClass && typeof programClass.__info__ === 'function') {
                 try {
-                    const programInfo = programClass.__info__();
+                    programInfo = programClass.__info__();
                     programType = programInfo.type || null;
                     ProcessManager._log(2, `[启动程序] 程序类型: ${programType}`);
                 } catch (e) {
-                    ProcessManager._log(1, `获取程序类型失败: ${e.message}`);
+                    ProcessManager._log(1, `获取程序信息失败: ${e.message}`);
                 }
             } else {
-                ProcessManager._log(2, `[启动程序] 程序没有__info__方法`);
+                ProcessManager._log(2, `[启动程序] 程序没有 __info__ 方法`);
+            }
+
+            let upid = null;
+            if (programInfo) {
+                const permissions = Array.isArray(programInfo.permissions) ? programInfo.permissions : [];
+                try {
+                    const origin = typeof window !== 'undefined' && window.location ? window.location.origin : 'http://localhost:8089';
+                    const url = `${origin}/system/service/programPermissions.php`;
+                    const res = await fetch(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ action: 'register', programName: programName, permissions: permissions })
+                    });
+                    const data = await res.json();
+                    if (data && data.status === 'success' && data.data && data.data.upid != null) {
+                        upid = data.data.upid;
+                        processInfo.upid = upid;
+                        ProcessManager._pidToUpid.set(pid, upid);
+                        ProcessManager._log(2, `[启动程序] 程序权限已注册到后端，upid: ${upid}`);
+                    }
+                } catch (e) {
+                    ProcessManager._log(1, `注册程序权限到后端失败: ${e.message}`);
+                }
             }
 
             // 如果是CLI程序，处理终端环境
@@ -1865,14 +1889,10 @@ class ProcessManager {
             // 清除已使用PID缓存（进程状态已更新）
             ProcessManager._invalidateUsedPidsCache();
 
-            // 注册程序权限（从 __info__ 中读取）
+            // 注册程序权限（从 __info__ 中读取，复用已获取的 programInfo）
             // 必须在 __init__ 之前完成权限注册，确保程序初始化时已拥有所需权限
             if (typeof PermissionManager !== 'undefined') {
                 try {
-                    let programInfo = null;
-                    if (programClass && typeof programClass.__info__ === 'function') {
-                        programInfo = programClass.__info__();
-                    }
                     if (programInfo) {
                         // 等待权限注册完成，确保程序初始化时已拥有所需权限
                         // 如果是管理员专用程序，传递 isAdminProgram 标志，自动授予危险权限
@@ -1905,6 +1925,7 @@ class ProcessManager {
                     // 构建标准化的初始化参数（方案三：注入进程绑定的 kernelAPI，推荐敏感/多实例程序使用）
                     const standardizedInitArgs = {
                         pid: pid,
+                        upid: upid,  // 后端分配的权限映射 ID
                         args: initArgs.args || [],  // 命令行参数（如文件名）
                         env: initArgs.env || {},  // 环境变量
                         cwd: initArgs.cwd || defaultCwd,  // 当前工作目录（默认使用系统盘 D: 或第一个可用分区）
@@ -1970,6 +1991,23 @@ class ProcessManager {
                         stack: e.stack,
                         timestamp: Date.now()
                     };
+
+                    // 回收 upid（__init__ 失败时也要回收）
+                    const upidToReclaim = processInfo.upid ?? ProcessManager._pidToUpid.get(pid);
+                    if (upidToReclaim != null) {
+                        try {
+                            const origin = typeof window !== 'undefined' && window.location ? window.location.origin : 'http://localhost:8089';
+                            const res = await fetch(`${origin}/system/service/programPermissions.php`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ action: 'reclaim', upid: upidToReclaim })
+                            });
+                            await res.json();
+                        } catch (reclaimErr) {
+                            ProcessManager._log(1, `回收 upid 失败: ${reclaimErr.message}`);
+                        }
+                        ProcessManager._pidToUpid.delete(pid);
+                    }
 
                     // 尝试清理已创建的资源
                     try {
@@ -2335,6 +2373,27 @@ class ProcessManager {
                 }
             }
 
+            // 回收 upid（通知后端从权限 Map 中移除）
+            const upidToReclaim = processInfo.upid ?? ProcessManager._pidToUpid.get(pid);
+            if (upidToReclaim != null) {
+                try {
+                    const origin = typeof window !== 'undefined' && window.location ? window.location.origin : 'http://localhost:8089';
+                    const url = `${origin}/system/service/programPermissions.php`;
+                    const res = await fetch(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ action: 'reclaim', upid: upidToReclaim })
+                    });
+                    const data = await res.json();
+                    if (data && data.status === 'success') {
+                        ProcessManager._log(2, `已回收程序 PID ${pid} 的 upid: ${upidToReclaim}`);
+                    }
+                } catch (e) {
+                    ProcessManager._log(1, `回收 upid 失败: ${e.message}`);
+                }
+                ProcessManager._pidToUpid.delete(pid);
+            }
+
             // 清理程序权限
             if (typeof PermissionManager !== 'undefined' && typeof PermissionManager.clearProgramPermissions === 'function') {
                 try {
@@ -2424,6 +2483,16 @@ class ProcessManager {
         } catch (e) {
             if (force) {
                 // 强制终止，即使出错也清理
+                const upidToReclaim = processInfo.upid ?? ProcessManager._pidToUpid.get(pid);
+                if (upidToReclaim != null) {
+                    const origin = typeof window !== 'undefined' && window.location ? window.location.origin : 'http://localhost:8089';
+                    fetch(`${origin}/system/service/programPermissions.php`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ action: 'reclaim', upid: upidToReclaim })
+                    }).catch(() => {});
+                    ProcessManager._pidToUpid.delete(pid);
+                }
                 // 清理 GUI 元素
                 ProcessManager._cleanupGUI(pid);
 
@@ -6307,8 +6376,6 @@ class ProcessManager {
                 }
                 return await ServerExpansion.setConfig(id, config || {}, token);
             },
-
-            // 其他API可以在这里添加
         };
 
         const apiHandler = kernelAPIs[apiName];

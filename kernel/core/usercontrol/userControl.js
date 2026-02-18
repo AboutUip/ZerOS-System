@@ -1143,6 +1143,23 @@ class UserControl {
     }
     
     /**
+     * 获取当前用户可授权的所有权限列表（JSON 数组格式，供 JWT 载荷等使用）
+     * @returns {string[]} 权限名称数组
+     */
+    static getGrantablePermissions() {
+        if (typeof PermissionManager === 'undefined' || !PermissionManager.PERMISSION) {
+            return [];
+        }
+        const list = [];
+        for (const perm of Object.values(PermissionManager.PERMISSION)) {
+            if (typeof perm === 'string' && UserControl.canGrantPermission(perm)) {
+                list.push(perm);
+            }
+        }
+        return list;
+    }
+
+    /**
      * 获取权限授权提示信息
      * @param {string} permission 权限名称
      * @returns {string} 提示信息

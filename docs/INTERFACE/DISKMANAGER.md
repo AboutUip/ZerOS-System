@@ -4,6 +4,8 @@
 
 `DISKMANAGER` 是 ZerOS 内核的磁盘分区管理服务，提供分区的创建、检查、删除、合并等管理功能。所有分区实际存储在 `system/service/DISK/` 目录下，支持 A-Z 共 26 个分区。
 
+**User JWT 必须携带 upid**：应用调用本服务时，必须在 GET 参数中传入 `upid`。使用 `buildServiceUrlObject(serviceName, { upid: this._upid })` 或手动 `url.searchParams.set('upid', this._upid)`。
+
 分区元数据存储在 `system/service/DISK/D/DiskData.json` 文件中（D: 是系统盘，如果 D: 不存在则使用第一个可用分区），包含分区数量、分区名称、分区大小和磁盘总大小等信息。
 
 ## 服务地址
@@ -13,11 +15,12 @@
 **推荐使用 `SystemInformation` 构建服务URL**：
 
 ```javascript
-// 使用 SystemInformation 构建URL（推荐，自动适配后端类型）
-const url = SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.DISKMANAGER);
+// 应用必须传入 upid
+const url = SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.DISKMANAGER, { upid: this._upid });
 
 // 或直接构建URL
 const serviceUrl = new URL('/system/service/DISKMANAGER.php', window.location.origin);
+if (this._upid != null) serviceUrl.searchParams.set('upid', this._upid);
 ```
 
 ## 请求格式
@@ -784,10 +787,10 @@ console.log('分区信息:', checkResult.data);
 
 ## 相关文档
 
-- [Disk.md](./Disk.md) - 虚拟磁盘管理接口（前端 JavaScript API）
-- [FSDirve.md](./FSDirve.md) - 文件系统驱动服务（文件操作 API）
-- [SystemInformation.md](./SystemInformation.md) - 系统信息和后端服务管理
-- [GUIManager.md](./GUIManager.md) - GUI 窗口管理（无边框、自定义标题栏等）
+- [Disk](../API/Disk.md) - 虚拟磁盘管理接口（前端 JavaScript API）
+- [FSDirve](./FSDirve.md) - 文件系统驱动服务（文件操作 API）
+- [SystemInformation](../API/SystemInformation.md) - 系统信息和后端服务管理
+- [GUIManager](../API/GUIManager.md) - GUI 窗口管理（无边框、自定义标题栏等）
 
 ---
 

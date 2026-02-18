@@ -21,6 +21,23 @@
 - `FileSystem` - 文件系统（用于缓存目录和元数据文件管理）
 - `KernelLogger` - 内核日志（用于日志记录）
 
+## 获取实例
+
+CacheDrive 注册在 POOL 和 window 中，可以通过以下方式获取：
+
+```javascript
+// 方式 1：从 POOL 获取
+const CacheDrive = POOL.__GET__("KERNEL_GLOBAL_POOL", "CacheDrive");
+
+// 方式 2：从 window 获取
+const CacheDrive = window.CacheDrive;
+```
+
+**注意**：
+- CacheDrive 主要通过 `ProcessManager.callKernelAPI('Cache.xxx', [...])` 调用
+- 文档中「通过 ProcessManager 调用」章节详细说明了这种方式
+- 两种获取方式都可以使用
+
 ## 配置
 
 ### 默认路径
@@ -431,5 +448,6 @@ if (stats.expiredCount > 10) {
 
 - [ProcessManager API 文档](./ProcessManager.md) - 进程管理
 - [PermissionManager API 文档](./PermissionManager.md) - 权限管理
-- [FileSystem API 文档](./FileSystem.md) - 文件系统
+- [Disk API 文档](./Disk.md) - 虚拟磁盘管理
+- [NodeTree API 文档](./NodeTree.md) - 内存文件系统结构
 

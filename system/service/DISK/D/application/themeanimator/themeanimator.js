@@ -55,6 +55,7 @@
                 KernelLogger.debug('ThemeAnimator', `__init__ 被调用, PID: ${pid}`);
             }
             this.pid = pid;
+            this._upid = initArgs && initArgs.upid;
             
             // 获取 GUI 容器
             const guiContainer = initArgs.guiContainer || document.getElementById('gui-container');
@@ -760,10 +761,11 @@
                 
                 // 保存文件
                 const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
-                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE, { upid: this._upid })
                     : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
                         ? SystemInformation.getOrigin()
                         : window.location.origin);
+                if (this._upid != null) url.searchParams.set('upid', this._upid);
                 url.searchParams.set('action', 'write_file');
                 url.searchParams.set('path', 'D:/cache/');
                 url.searchParams.set('fileName', fileName);
@@ -2138,14 +2140,14 @@
          */
         _loadThemesList: async function(container) {
             if (typeof ProcessManager === 'undefined') {
-                container.innerHTML = '<p style="color: rgba(215, 224, 221, 0.7);">' + this._getText('THEMEANIM_PM_UNAVAILABLE', 'ProcessManager 不可用') + '</p>';
+                container.innerHTML = '<p style="color: var(--theme-text-secondary, rgba(215, 224, 221, 0.7));">' + this._getText('THEMEANIM_PM_UNAVAILABLE', 'ProcessManager 不可用') + '</p>';
                 return;
             }
             
             try {
                 const themes = await ProcessManager.getAllThemes(this.pid);
                 if (!themes || themes.length === 0) {
-                    container.innerHTML = '<p style="color: rgba(215, 224, 221, 0.7);">' + this._getText('THEMEANIM_NO_THEMES', '没有可用的主题') + '</p>';
+                    container.innerHTML = '<p style="color: var(--theme-text-secondary, rgba(215, 224, 221, 0.7));">' + this._getText('THEMEANIM_NO_THEMES', '没有可用的主题') + '</p>';
                     return;
                 }
                 
@@ -2155,7 +2157,7 @@
                     container.appendChild(themeCard);
                 });
             } catch (e) {
-                container.innerHTML = '<p style="color: rgba(255, 95, 87, 0.8);">' + this._getText('THEMEANIM_LOAD_THEMES_FAILED', '加载主题列表失败') + ': ' + e.message + '</p>';
+                container.innerHTML = '<p style="color: var(--theme-error, rgba(255, 95, 87, 0.8));">' + this._getText('THEMEANIM_LOAD_THEMES_FAILED', '加载主题列表失败') + ': ' + e.message + '</p>';
             }
         },
         
@@ -2166,11 +2168,12 @@
             const card = document.createElement('div');
             card.className = 'theme-card';
             const isActive = theme.id === this.currentThemeId;
+            if (isActive) {
+                card.classList.add('active');
+            }
             
             card.style.cssText = `
                 padding: 16px;
-                background: ${isActive ? 'rgba(139, 92, 246, 0.15)' : 'rgba(139, 92, 246, 0.05)'};
-                border: 2px solid ${isActive ? 'rgba(139, 92, 246, 0.5)' : 'rgba(139, 92, 246, 0.2)'};
                 border-radius: 8px;
                 cursor: pointer;
                 transition: all 0.2s ease;
@@ -2186,7 +2189,7 @@
                 background: linear-gradient(135deg, 
                     ${theme.colors?.primary || '#8b5cf6'} 0%, 
                     ${theme.colors?.secondary || '#6366f1'} 100%);
-                border: 1px solid rgba(255, 255, 255, 0.1);
+                border: 1px solid var(--theme-border, rgba(255, 255, 255, 0.1));
             `;
             card.appendChild(preview);
             
@@ -2195,7 +2198,7 @@
             name.style.cssText = `
                 font-size: 16px;
                 font-weight: 600;
-                color: rgba(215, 224, 221, 0.9);
+                color: var(--theme-text, rgba(215, 224, 221, 0.9));
                 margin-bottom: 4px;
                 overflow: hidden;
                 text-overflow: ellipsis;
@@ -2212,7 +2215,7 @@
                 const desc = document.createElement('div');
                 desc.style.cssText = `
                     font-size: 12px;
-                    color: rgba(215, 224, 221, 0.6);
+                    color: var(--theme-text-secondary, rgba(215, 224, 221, 0.6));
                     line-height: 1.4;
                     overflow: hidden;
                     text-overflow: ellipsis;
@@ -2232,8 +2235,8 @@
                 badge.style.cssText = `
                     margin-top: 8px;
                     padding: 4px 8px;
-                    background: rgba(139, 92, 246, 0.3);
-                    color: rgba(139, 92, 246, 1);
+                    background: var(--theme-primary-light, rgba(139, 92, 246, 0.3));
+                    color: var(--theme-primary, rgba(139, 92, 246, 1));
                     border-radius: 4px;
                     font-size: 11px;
                     font-weight: 600;
@@ -2270,16 +2273,6 @@
                         // 错误时静默处理，不显示弹窗
                     }
                 });
-                
-                card.addEventListener('mouseenter', () => {
-                    card.style.background = 'rgba(139, 92, 246, 0.1)';
-                    card.style.borderColor = 'rgba(139, 92, 246, 0.4)';
-                });
-                
-                card.addEventListener('mouseleave', () => {
-                    card.style.background = 'rgba(139, 92, 246, 0.05)';
-                    card.style.borderColor = 'rgba(139, 92, 246, 0.2)';
-                });
             }
             
             return card;
@@ -2290,14 +2283,14 @@
          */
         _loadStylesList: async function(container) {
             if (typeof ProcessManager === 'undefined') {
-                container.innerHTML = '<p style="color: rgba(215, 224, 221, 0.7);">' + this._getText('THEMEANIM_PM_UNAVAILABLE', 'ProcessManager 不可用') + '</p>';
+                container.innerHTML = '<p style="color: var(--theme-text-secondary, rgba(215, 224, 221, 0.7));">' + this._getText('THEMEANIM_PM_UNAVAILABLE', 'ProcessManager 不可用') + '</p>';
                 return;
             }
             
             try {
                 const styles = await ProcessManager.getAllStyles(this.pid);
                 if (!styles || styles.length === 0) {
-                    container.innerHTML = '<p style="color: rgba(215, 224, 221, 0.7);">' + this._getText('THEMEANIM_NO_STYLES', '没有可用的风格') + '</p>';
+                    container.innerHTML = '<p style="color: var(--theme-text-secondary, rgba(215, 224, 221, 0.7));">' + this._getText('THEMEANIM_NO_STYLES', '没有可用的风格') + '</p>';
                     return;
                 }
                 
@@ -2307,7 +2300,7 @@
                     container.appendChild(styleCard);
                 });
             } catch (e) {
-                container.innerHTML = '<p style="color: rgba(255, 95, 87, 0.8);">' + this._getText('THEMEANIM_LOAD_STYLES_FAILED', '加载风格列表失败') + ': ' + e.message + '</p>';
+                container.innerHTML = '<p style="color: var(--theme-error, rgba(255, 95, 87, 0.8));">' + this._getText('THEMEANIM_LOAD_STYLES_FAILED', '加载风格列表失败') + ': ' + e.message + '</p>';
             }
         },
         
@@ -2318,11 +2311,12 @@
             const card = document.createElement('div');
             card.className = 'style-card';
             const isActive = style.id === this.currentStyleId;
+            if (isActive) {
+                card.classList.add('active');
+            }
             
             card.style.cssText = `
                 padding: 16px;
-                background: ${isActive ? 'rgba(139, 92, 246, 0.15)' : 'rgba(139, 92, 246, 0.05)'};
-                border: 2px solid ${isActive ? 'rgba(139, 92, 246, 0.5)' : 'rgba(139, 92, 246, 0.2)'};
                 border-radius: 8px;
                 cursor: pointer;
                 transition: all 0.2s ease;
@@ -2335,8 +2329,8 @@
                 height: 80px;
                 border-radius: ${style.styles?.window?.borderRadius || '8px'};
                 margin-bottom: 12px;
-                background: rgba(139, 92, 246, 0.1);
-                border: 1px solid rgba(139, 92, 246, 0.3);
+                background: var(--theme-primary-light, rgba(139, 92, 246, 0.1));
+                border: 1px solid var(--theme-primary, rgba(139, 92, 246, 0.3));
                 display: flex;
                 align-items: center;
                 justify-content: center;
@@ -2354,7 +2348,7 @@
             name.style.cssText = `
                 font-size: 16px;
                 font-weight: 600;
-                color: rgba(215, 224, 221, 0.9);
+                color: var(--theme-text, rgba(215, 224, 221, 0.9));
                 margin-bottom: 4px;
                 overflow: hidden;
                 text-overflow: ellipsis;
@@ -2371,7 +2365,7 @@
                 const desc = document.createElement('div');
                 desc.style.cssText = `
                     font-size: 12px;
-                    color: rgba(215, 224, 221, 0.6);
+                    color: var(--theme-text-secondary, rgba(215, 224, 221, 0.6));
                     line-height: 1.4;
                     overflow: hidden;
                     text-overflow: ellipsis;
@@ -2391,8 +2385,8 @@
                 badge.style.cssText = `
                     margin-top: 8px;
                     padding: 4px 8px;
-                    background: rgba(139, 92, 246, 0.3);
-                    color: rgba(139, 92, 246, 1);
+                    background: var(--theme-primary-light, rgba(139, 92, 246, 0.3));
+                    color: var(--theme-primary, rgba(139, 92, 246, 1));
                     border-radius: 4px;
                     font-size: 11px;
                     font-weight: 600;
@@ -2428,16 +2422,6 @@
                         }
                         // 错误时静默处理，不显示弹窗
                     }
-                });
-                
-                card.addEventListener('mouseenter', () => {
-                    card.style.background = 'rgba(139, 92, 246, 0.1)';
-                    card.style.borderColor = 'rgba(139, 92, 246, 0.4)';
-                });
-                
-                card.addEventListener('mouseleave', () => {
-                    card.style.background = 'rgba(139, 92, 246, 0.05)';
-                    card.style.borderColor = 'rgba(139, 92, 246, 0.2)';
                 });
             }
             
@@ -2582,10 +2566,11 @@
                 
                 // 使用 PHP 服务检查文件是否存在
                 const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
-                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE, { upid: this._upid })
                     : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
                         ? SystemInformation.getOrigin()
                         : window.location.origin);
+                if (this._upid != null) url.searchParams.set('upid', this._upid);
                 url.searchParams.set('action', 'exists');
                 url.searchParams.set('path', phpPath);
                 
@@ -3061,10 +3046,11 @@
                 
                 // 读取文件
                 const readUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
-                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE, { upid: this._upid })
                     : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
                         ? SystemInformation.getOrigin()
                         : window.location.origin);
+                if (this._upid != null) readUrl.searchParams.set('upid', this._upid);
                 readUrl.searchParams.set('action', 'read_file');
                 readUrl.searchParams.set('path', dirPath);
                 readUrl.searchParams.set('fileName', fileName);
@@ -3085,10 +3071,11 @@
                 
                 // 确保锁屏缓存目录存在
                 const createDirUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
-                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE, { upid: this._upid })
                     : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
                         ? SystemInformation.getOrigin()
                         : window.location.origin);
+                if (this._upid != null) createDirUrl.searchParams.set('upid', this._upid);
                 createDirUrl.searchParams.set('action', 'create_dir');
                 createDirUrl.searchParams.set('path', 'D:/cache/');
                 createDirUrl.searchParams.set('name', 'lockscreen');
@@ -3111,10 +3098,11 @@
                 
                 // 保存到锁屏缓存目录
                 const saveUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
-                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE, { upid: this._upid })
                     : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
                         ? SystemInformation.getOrigin()
                         : window.location.origin);
+                if (this._upid != null) saveUrl.searchParams.set('upid', this._upid);
                 saveUrl.searchParams.set('action', 'write_file');
                 saveUrl.searchParams.set('path', 'D:/cache/lockscreen/');
                 saveUrl.searchParams.set('fileName', lockscreenFileName);
@@ -3866,10 +3854,11 @@
                 
                 // 确保目录存在（直接尝试创建，409 表示已存在，忽略即可）
                 const createDirUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
-                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE, { upid: this._upid })
                     : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
                         ? SystemInformation.getOrigin()
                         : window.location.origin);
+                if (this._upid != null) createDirUrl.searchParams.set('upid', this._upid);
                 createDirUrl.searchParams.set('action', 'create_dir');
                 createDirUrl.searchParams.set('path', 'D:/');
                 createDirUrl.searchParams.set('name', 'cache');
@@ -3911,10 +3900,11 @@
                 
                 // 使用 FileSystem.write 保存图片文件（通过 PHP 服务，支持 base64）
                 const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
-                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE, { upid: this._upid })
                     : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
                         ? SystemInformation.getOrigin()
                         : window.location.origin);
+                if (this._upid != null) url.searchParams.set('upid', this._upid);
                 url.searchParams.set('action', 'write_file');
                 url.searchParams.set('path', 'D:/cache/');
                 url.searchParams.set('fileName', fileName);
@@ -4434,10 +4424,11 @@
                         }
                         
                         const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
-                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE, { upid: this._upid })
                     : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
                         ? SystemInformation.getOrigin()
                         : window.location.origin);
+                if (this._upid != null) url.searchParams.set('upid', this._upid);
                         url.searchParams.set('action', 'delete_file');
                         url.searchParams.set('path', phpPath);
                         url.searchParams.set('fileName', fileName);

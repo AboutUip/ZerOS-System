@@ -10,6 +10,31 @@
 - `PermissionManager` - 权限管理器（用于地理位置权限验证）
 - `KernelLogger` - 内核日志（用于日志记录）
 
+## 获取实例
+
+GeographyDrive 通过 `ProcessManager.callKernelAPI` 暴露 API，不直接获取实例：
+
+```javascript
+// 通过 ProcessManager 调用
+const ProcessManager = POOL.__GET__("KERNEL_GLOBAL_POOL", "ProcessManager");
+
+// 获取当前位置
+const location = await ProcessManager.callKernelAPI(
+    this.pid,
+    'Geography.getCurrentPosition',
+    [{ enableHighAccuracy: true, timeout: 5000 }]
+);
+
+// 获取位置信息（包含地址）
+const locationInfo = await ProcessManager.callKernelAPI(
+    this.pid,
+    'Geography.getLocationInfo',
+    [location.coords.latitude, location.coords.longitude]
+);
+```
+
+**注意**：地理位置功能需要 `GEOGRAPHY` 权限，详细调用方式见「通过 ProcessManager 调用」章节。
+
 ## 常量
 
 ### 定位精度

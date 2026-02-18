@@ -9,6 +9,17 @@
 - `Disk` - 虚拟磁盘管理器（用于文件读写）
 - `KernelLogger` - 内核日志系统（用于日志输出）
 
+## 获取实例
+
+LStorage 注册在 POOL 中，可以通过以下方式获取：
+
+```javascript
+// 从 POOL 获取
+const LStorage = POOL.__GET__("KERNEL_GLOBAL_POOL", "LStorage");
+```
+
+**注意**：在内核初始化完成后，LStorage 已加载，可以直接使用。
+
 ## 存储结构
 
 ```javascript

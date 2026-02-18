@@ -40,6 +40,7 @@
          */
         __init__: async function(pid, initArgs = {}) {
             this.pid = pid;
+            this._upid = initArgs && initArgs.upid;
             this.terminal = initArgs.terminal;
 
             if (!this.terminal) {
@@ -107,10 +108,11 @@
             }
 
             const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject)
-                ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
+                ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE, { upid: this._upid })
                 : new URL('/system/service/FSDirve.php', (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin)
                     ? SystemInformation.getOrigin()
                     : window.location.origin);
+            if (this._upid != null) url.searchParams.set('upid', this._upid);
 
             url.searchParams.set('action', 'read_file');
             url.searchParams.set('path', dirPath);
@@ -261,10 +263,11 @@
             }
 
             const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject)
-                ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.COMPRESSION_DIRVE)
+                ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.COMPRESSION_DIRVE, { upid: this._upid })
                 : new URL('/system/service/CompressionDirve.php', (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin)
                     ? SystemInformation.getOrigin()
                     : window.location.origin);
+            if (this._upid != null) url.searchParams.set('upid', this._upid);
 
             url.searchParams.set('action', 'compress_zip');
 

@@ -4,6 +4,10 @@
 
 `FSDirve` 是 ZerOS 内核的文件系统驱动服务，提供文件和目录操作接口。系统支持 **PHP** 和 **SpringBoot** 两种后端实现，可通过 `SystemInformation` 动态切换。
 
+**鉴权**：所有请求需通过 JWT 校验（`jwtVerify.php`），NetworkManager 会根据调用来源自动注入 System JWT 或 User JWT。
+
+**User JWT 必须携带 upid**：当请求使用 UserToken（即由应用或 bin 程序发起）时，必须在 GET 参数中传入 `upid`（用户进程 ID），否则后端拒绝请求。应用在 `__init__` 中保存 `this._upid = initArgs.upid`，构建 URL 时使用 `buildServiceUrlObject(serviceName, { upid: this._upid })`，或手动 `url.searchParams.set('upid', this._upid)`。
+
 所有文件实际存储在 `system/service/DISK/{分区字母}/` 目录下（支持 A-Z 共 26 个分区），与 `kernel/filesystem/` 协同工作。
 
 ## 后端服务支持
@@ -18,10 +22,13 @@
 **推荐使用 `SystemInformation` 构建服务URL**：
 
 ```javascript
-// 使用 SystemInformation 构建URL（推荐，自动适配后端类型）
-const url = SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE);
+// 应用/CLI 程序必须传入 upid
+const url = SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE, { upid: this._upid });
 
-// 或直接获取URL
+// 内核上下文（SystemToken）可省略 upid
+const urlKernel = SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE);
+
+// 或直接获取URL（无 upid，仅适用于 SystemToken 场景）
 const serviceUrl = SystemInformation.getFSDirveUrl();
 ```
 
@@ -30,7 +37,7 @@ const serviceUrl = SystemInformation.getFSDirveUrl();
 - PHP 后端：`http://localhost:8089/system/service/FSDirve.php`
 - SpringBoot 后端：`http://localhost:8080/system/service/FSDirve`
 
-详细说明请参考 [SystemInformation API 文档](./SystemInformation.md)。
+详细说明请参考 [SystemInformation API 文档](../API/SystemInformation.md)。
 
 ## 请求格式
 
@@ -616,11 +623,12 @@ const result = await response.json();
 
 ## 安全特性
 
-1. **路径验证**: 所有路径都经过验证，支持 A-Z 所有分区盘符
-2. **目录遍历防护**: 自动过滤 `..` 路径，防止目录遍历攻击
-3. **文件名验证**: 文件名不能包含 `/` 或 `\` 字符
-4. **CORS 支持**: 支持跨域请求（开发环境）
-5. **系统盘保护**: D: 是系统盘，优先使用，但系统支持使用其他分区
+1. **User JWT 与 upid**: 应用和 bin 程序调用时必须传递 `upid` 参数，详见 [SystemInformation](../API/SystemInformation.md#buildserviceurlobjectservicename-options)
+2. **路径验证**: 所有路径都经过验证，支持 A-Z 所有分区盘符
+3. **目录遍历防护**: 自动过滤 `..` 路径，防止目录遍历攻击
+4. **文件名验证**: 文件名不能包含 `/` 或 `\` 字符
+5. **CORS 支持**: 支持跨域请求（开发环境）
+6. **系统盘保护**: D: 是系统盘，优先使用，但系统支持使用其他分区
 
 ## 使用示例
 
@@ -765,7 +773,7 @@ FSDirve.php 与以下内核模块协同工作：
 
 ## 相关文档
 
-- [LStorage.md](./LStorage.md) - 本地存储管理器（使用 FSDirve.php）
-- [NodeTree.md](./NodeTree.md) - 文件树结构（使用 FSDirve.php）
-- [ProcessManager.md](./ProcessManager.md) - 进程管理器（路径转换）
+- [LStorage](../API/LStorage.md) - 本地存储管理器（使用 FSDirve.php）
+- [NodeTree](../API/NodeTree.md) - 文件树结构（使用 FSDirve.php）
+- [ProcessManager](../API/ProcessManager.md) - 进程管理器（路径转换）
 

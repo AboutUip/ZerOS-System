@@ -10,6 +10,19 @@
 - `DynamicManager` - 动态模块管理器（用于加载 jsencrypt 库）
 - `KernelLogger` - 内核日志系统（用于日志记录）
 
+## 获取实例
+
+CryptDrive 注册在 POOL 中，可以通过以下方式获取：
+
+```javascript
+// 从 POOL 获取
+const CryptDrive = POOL.__GET__("KERNEL_GLOBAL_POOL", "CryptDrive");
+```
+
+**注意**：
+- CryptDrive 主要通过 `ProcessManager.callKernelAPI('Crypt.xxx', [...])` 调用
+- 文档中「通过 ProcessManager 调用」章节详细说明了这种方式
+
 ## 初始化
 
 加密驱动在系统启动时自动初始化，无需手动调用。
