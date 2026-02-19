@@ -209,6 +209,7 @@ KernelLogger.info("BIOSManager", "模块初始化");
                 'memory-config': {
                     title: 'Memory Configuration',
                     items: [
+                        { id: 'memory-allocation', label: 'Memory Allocation', type: 'boolean', key: 'bios.memoryAllocation', defaultValue: true },
                         { id: 'back', label: 'Back', action: 'back' }
                     ]
                 },
@@ -299,6 +300,12 @@ KernelLogger.info("BIOSManager", "模块初始化");
             let currentLogLevel = null;
             if (pageId === 'log-level') {
                 currentLogLevel = await BIOSManager._getLogLevel();
+            }
+            
+            // 获取布尔值设置（如果是内存配置页面）
+            let booleanSettings = {};
+            if (pageId === 'memory-config') {
+                booleanSettings = await BIOSManager._getBooleanSettings(page.items);
             }
             
             // 获取系统信息（如果是系统信息页面）
@@ -434,6 +441,12 @@ KernelLogger.info("BIOSManager", "模块初始化");
                     } else {
                         label = `[ ] ${label}`;
                     }
+                } else if (item.type === 'boolean') {
+                    // BIOS 页面中的布尔类型设置项
+                    menuItem.classList.add('bios-boolean');
+                    const boolValue = booleanSettings[item.id] !== undefined ? booleanSettings[item.id] : item.defaultValue;
+                    item.currentValue = boolValue;
+                    label = `${label}: [${boolValue ? 'true' : 'false'}] (Use ← → to toggle)`;
                 } else if (item.type === 'registry-item') {
                     // 注册表项：显示键名和值的预览
                     if (item.isObject) {
@@ -473,10 +486,13 @@ KernelLogger.info("BIOSManager", "模块初始化");
             const help = document.createElement('div');
             help.className = 'bios-help';
             let helpText = '↑↓: Navigate  Enter: Select  Esc: Back  F10: Save & Exit';
-            // 如果是注册表页面，检查当前选中项是否为布尔类型
-            if (pageId === 'registry' && page.items && page.items.length > 0) {
+            // 如果是注册表页面或配置页面，检查当前选中项是否为布尔类型
+            if ((pageId === 'registry' || pageId === 'memory-config') && page.items && page.items.length > 0) {
                 const currentItem = page.items[BIOSManager._currentItemIndex];
                 if (currentItem && currentItem.type === 'registry-item' && currentItem.isBoolean) {
+                    helpText += '  ← →: Toggle Boolean';
+                }
+                if (currentItem && currentItem.type === 'boolean') {
                     helpText += '  ← →: Toggle Boolean';
                 }
             }
@@ -867,6 +883,62 @@ KernelLogger.info("BIOSManager", "模块初始化");
         }
         
         /**
+         * 获取布尔值设置
+         * @param {Array} items 页面项数组
+         * @returns {Promise<Object>} 布尔值设置对象
+         */
+        static async _getBooleanSettings(items) {
+            const settings = {};
+            const booleanItems = items.filter(item => item.type === 'boolean');
+            
+            for (const item of booleanItems) {
+                settings[item.id] = await BIOSManager._getBooleanValue(item.key, item.defaultValue);
+            }
+            
+            return settings;
+        }
+        
+        /**
+         * 获取单个布尔值
+         * @param {string} key 注册表键
+         * @param {boolean} defaultValue 默认值
+         * @returns {Promise<boolean>} 布尔值
+         */
+        static async _getBooleanValue(key, defaultValue = true) {
+            if (typeof LStorage !== 'undefined' && typeof LStorage.getSystemStorage === 'function') {
+                try {
+                    const value = await LStorage.getSystemStorage(key);
+                    if (value !== undefined && value !== null) {
+                        return Boolean(value);
+                    }
+                } catch (e) {
+                    // 忽略错误，返回默认值
+                }
+            }
+            return defaultValue;
+        }
+        
+        /**
+         * 设置布尔值
+         * @param {string} key 注册表键
+         * @param {boolean} value 布尔值
+         */
+        static async _setBooleanValue(key, value) {
+            if (typeof LStorage !== 'undefined' && typeof LStorage.setSystemStorage === 'function') {
+                try {
+                    await LStorage.setSystemStorage(key, value);
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.info("BIOSManager", `已设置 ${key} = ${value}`);
+                    }
+                } catch (e) {
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.error("BIOSManager", `保存布尔值失败: ${e.message}`, e);
+                    }
+                }
+            }
+        }
+        
+        /**
          * 获取当前日志级别
          * @returns {Promise<number>} 日志级别
          */
@@ -1189,6 +1261,11 @@ KernelLogger.info("BIOSManager", "模块初始化");
             if (BIOSManager._currentPage === 'registry' && item.type === 'registry-item' && item.isBoolean) {
                 await BIOSManager._toggleRegistryBoolean(item, false);
             }
+            
+            // 如果是配置页面且当前项是布尔类型，切换值
+            if (BIOSManager._currentPage === 'memory-config' && item.type === 'boolean') {
+                await BIOSManager._toggleBooleanSetting(item, false);
+            }
         }
         
         /**
@@ -1209,6 +1286,31 @@ KernelLogger.info("BIOSManager", "模块初始化");
             if (BIOSManager._currentPage === 'registry' && item.type === 'registry-item' && item.isBoolean) {
                 await BIOSManager._toggleRegistryBoolean(item, true);
             }
+            
+            // 如果是配置页面且当前项是布尔类型，切换值
+            if (BIOSManager._currentPage === 'memory-config' && item.type === 'boolean') {
+                await BIOSManager._toggleBooleanSetting(item, true);
+            }
+        }
+        
+        /**
+         * 切换 BIOS 布尔设置
+         * @param {Object} item 设置项
+         * @param {boolean} direction true 表示向右（设为 true），false 表示向左（设为 false）
+         */
+        static async _toggleBooleanSetting(item, direction) {
+            if (!item || !item.key) {
+                return;
+            }
+            
+            const newValue = direction;
+            await BIOSManager._setBooleanValue(item.key, newValue);
+            
+            // 更新当前项的值
+            item.currentValue = newValue;
+            
+            // 刷新页面以显示新值
+            await BIOSManager._renderPage(BIOSManager._currentPage);
         }
         
         /**

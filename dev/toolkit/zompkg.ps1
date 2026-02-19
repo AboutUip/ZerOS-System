@@ -168,7 +168,8 @@ if ($Config) {
         exit 1
     }
     Write-Host "zompkg: Using config file for application.json -> $configPath"
-} elseif ($Name -and ($Name = $Name.Trim())) {
+} elseif ($Name) {
+    $Name = $Name.Trim()
     $scriptEntry = if ($Script) { $Script.Trim() } else { "$Name.js" }
     $stylesArr = if ($Styles) { $Styles.Split(',').Trim() | Where-Object { $_ } } else { @() }
     $assetsArr = if ($Assets) { $Assets.Split(',').Trim() | Where-Object { $_ } } else { @() }
@@ -205,8 +206,7 @@ Add-Type -AssemblyName System.IO.Compression
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 $tempZip = Join-Path (Split-Path -Parent $SourceDir) (".zompkg_" + [System.IO.Path]::GetRandomFileName() + ".zip")
 try {
-    $zipModeCreate = 1
-    $zip = [System.IO.Compression.ZipFile]::Open($tempZip, $zipModeCreate)
+    $zip = [System.IO.Compression.ZipFile]::Open($tempZip, [System.IO.Compression.ZipArchiveMode]::Create)
     try {
         $sourceFull = (Resolve-Path -LiteralPath $SourceDir).Path
         $entries = Get-ChildItem -LiteralPath $SourceDir -Recurse -File

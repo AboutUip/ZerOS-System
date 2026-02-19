@@ -2,7 +2,11 @@
   "system": {
     "permissionManager.permissions": {
       "servicemanager": [
+        "SYSTEM_NOTIFICATION",
         "SERVER_SERVICE_MANAGE"
+      ],
+      "settings": [
+        "SYSTEM_STORAGE_WRITE"
       ]
     },
     "system.style": "macos",
@@ -284,7 +288,7 @@
         "password": "61b249bf6d604d14120821f43625e84e",
         "avatar": "avatar_root_1766272534753.jpg",
         "createdAt": 1766271155991,
-        "lastLogin": 1771433889133
+        "lastLogin": 1771499601941
       },
       "TestUser": {
         "level": "USER",
@@ -330,9 +334,7 @@
     "system.taskbarWeatherEnabled": true,
     "scheduleTaskManager.tasks": [],
     "registry": {
-      "environment": {
-        "ZEROS_SERVER_AIA_CONFIG": "{\"enableVoiceReply\":false,\"enableWakeSound\":true,\"wakeWords\":\"你好,你好小A,小A小A\",\"goodbyeWords\":\"再见,拜拜\",\"debug\":false,\"aiModel\":\"spark\",\"sparkAppId\":\"6e64b5fe\",\"sparkApiPassword\":\"pieePLKJXdbyqKXVPrUw:LrlWnnpGrYLgBZaUCixS\",\"dashscopeApiKey\":\"sk-779df8e5a9f6461e80fd209f851cf7b0\"}"
-      },
+      "environment": {},
       "brightness": 100
     },
     "applicationTable": {},
@@ -352,7 +354,11 @@
     "exceptionHandler.blockNormalBoot": false,
     "languagesExpansion": {
       "currentLocale": "zh-CN"
-    }
+    },
+    "_server_notice_history": [
+      "2026-02-16T18:37:38.455747"
+    ],
+    "bios.memoryAllocation": true
   },
   "programs": {}
 }

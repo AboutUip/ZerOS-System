@@ -1,5 +1,5 @@
 // 系统公告通知获取服务
-// 每隔 3 分钟请求公告 API，按 data.subTime 去重，新公告按等级处理；已接收时间仅存内存，避免写入 LStorage 覆盖 LocalSData（桌面图标、注册表等）
+// 每隔 3 分钟请求公告 API，按 data.subTime 去重，新公告按等级处理；已接收时间存储到 LStorage 持久化
 // 公告 API 地址待定，响应格式：response.data { level(0-2), title, content, subTime }
 
 (function () {
@@ -13,6 +13,8 @@
     const SYSTEM_PID = (typeof ProcessManager !== 'undefined' && ProcessManager.SERVER_SERVICE_PID !== undefined)
         ? ProcessManager.SERVER_SERVICE_PID
         : 10000;
+    /** LStorage 中存储公告历史的键名 */
+    const STORAGE_KEY = '_server_notice_history';
 
     var _timerId = null;
     var _running = false;
@@ -20,11 +22,61 @@
     var _lastSubTime = null;
     var _lastError = null;
 
-    /** 已接收公告的 subTime 列表（仅内存，不写 LStorage，避免覆盖 desktop.icons/registry） */
+    /** 已接收公告的 subTime 列表（持久化到 LStorage） */
     var _receivedTimes = [];
 
     /**
-     * 获取已接收的公告发布时间列表（仅内存）
+     * 从 LStorage 加载历史记录
+     * @returns {Promise<string[]>}
+     */
+    function loadFromStorage() {
+        return new Promise(async (resolve) => {
+            if (typeof LStorage === 'undefined' || typeof LStorage.getSystemStorage !== 'function') {
+                resolve([]);
+                return;
+            }
+            try {
+                const data = await LStorage.getSystemStorage(STORAGE_KEY);
+                if (data && Array.isArray(data)) {
+                    _receivedTimes = data;
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.debug('server-announcement', `从 LStorage 加载了 ${data.length} 条公告历史`);
+                    }
+                }
+                resolve(_receivedTimes.slice());
+            } catch (e) {
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.warn('server-announcement', '加载公告历史失败: ' + e.message);
+                }
+                resolve([]);
+            }
+        });
+    }
+
+    /**
+     * 保存历史记录到 LStorage
+     * @returns {Promise<void>}
+     */
+    function saveToStorage() {
+        return new Promise(async (resolve) => {
+            if (typeof LStorage === 'undefined' || typeof LStorage.setSystemStorage !== 'function') {
+                resolve();
+                return;
+            }
+            try {
+                await LStorage.setSystemStorage(STORAGE_KEY, _receivedTimes);
+                resolve();
+            } catch (e) {
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.warn('server-announcement', '保存公告历史失败: ' + e.message);
+                }
+                resolve();
+            }
+        });
+    }
+
+    /**
+     * 获取已接收的公告发布时间列表
      * @returns {Promise<string[]>}
      */
     function getReceivedTimes() {
@@ -32,13 +84,14 @@
     }
 
     /**
-     * 将 subTime 追加到已接收列表（仅内存，不写 LStorage）
+     * 将 subTime 追加到已接收列表（持久化到 LStorage）
      * @param {string} subTime
      * @returns {Promise<void>}
      */
     function addReceivedTime(subTime) {
         if (_receivedTimes.indexOf(subTime) >= 0) return Promise.resolve();
         _receivedTimes.push(subTime);
+        saveToStorage();
         return Promise.resolve();
     }
 
@@ -151,6 +204,7 @@
         if (typeof KernelLogger !== 'undefined') {
             KernelLogger.info('server-announcement', 'init');
         }
+        loadFromStorage();
     }
 
     function __start__() {

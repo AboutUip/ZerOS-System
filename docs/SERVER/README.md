@@ -8,6 +8,7 @@
 |------|------|
 | [服务模块编写 (ServiceModule.md)](./ServiceModule.md) | D/server 服务模块命名、接口约定与生命周期 |
 | [通知服务 (ServerNotice.md)](./ServerNotice.md) | 内置通知服务说明、API 约定与 ZerOS API 使用 |
+| [通知服务维护指南 (ServerNotice)](../MAINTENANCE/ServerNotice.md) | 公告服务配置、故障排查与维护文档 |
 | [翻译服务 (ServerTranslate.md)](./ServerTranslate.md) | 内置翻译服务说明、POOL API（translateSimple/translate）与终端 debug |
 | [进程堆内存服务 (ServerProcessMemory.md)](./ServerProcessMemory.md) | 内置进程堆内存读写服务、POOL API（getProcessMemoryInfo/readProcessHeap/writeProcessHeap）与内存编辑器支持 |
 | [AI 助手服务 (ServerAIAssistant.md)](./ServerAIAssistant.md) | 语音唤醒式 AI 助手，唤醒词触发、打开/关闭程序、调节亮度、闲聊，唤醒音效为 D/server/start.mp3 |

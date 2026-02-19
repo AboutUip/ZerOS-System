@@ -24,6 +24,35 @@ class MemoryManager {
             return;
         }
     }
+    
+    /**
+     * 检查是否可以申请内存（BIOS 设置）
+     * 安全逻辑：未初始化/读取失败时默认允许(true)，只有明确为 false 时才禁止
+     * @returns {boolean} 是否允许申请内存
+     */
+    static _canAllocateMemory() {
+        try {
+            let LStorage = null;
+            if (typeof POOL !== 'undefined' && typeof POOL.__GET__ === 'function') {
+                try {
+                    LStorage = POOL.__GET__("KERNEL_GLOBAL_POOL", "LStorage");
+                } catch (e) {}
+            }
+            if (!LStorage && typeof window !== 'undefined' && window.LStorage) {
+                LStorage = window.LStorage;
+            }
+            if (!LStorage || !LStorage._storageData || !LStorage._storageData.system) {
+                return true;
+            }
+            const value = LStorage._storageData.system['bios.memoryAllocation'];
+            if (value === undefined || value === null) {
+                return true;
+            }
+            return Boolean(value);
+        } catch (e) {
+            return true;
+        }
+    }
 
     // 应用程序分区管理Map<pid,Object>
     // 注意：实际数据存储在Exploit内存中
@@ -339,6 +368,13 @@ class MemoryManager {
      * @returns {Object} { heapId: number, shedId: number, heap: Heap|null, shed: Shed|null }
      */
     static allocateMemory(pid, heapSize = -1, shedSize = -1, heapId = null, shedId = null) {
+        // 检查 BIOS 内存申请设置
+        if (!MemoryManager._canAllocateMemory()) {
+            const error = new Error('内存申请已被 BIOS 设置禁止');
+            MemoryManager._log(1, `拒绝为应用程序 ${pid} 分配内存: ${error.message}`);
+            throw error;
+        }
+        
         if (pid != null && typeof ProcessManager !== 'undefined' && typeof ProcessManager.recordKernelModuleCall === 'function') {
             ProcessManager.recordKernelModuleCall(pid, 'Memory.allocateMemory', { heapSize, shedSize });
         }

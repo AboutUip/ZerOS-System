@@ -552,8 +552,10 @@
                 border-top: 1px solid var(--theme-border, rgba(139, 92, 246, 0.15));
             `;
 
+            const installState = this._checkAppInstallState(app);
             const downloadBtn = document.createElement('button');
             downloadBtn.className = 'store-download-btn';
+            downloadBtn.dataset.appId = app.id;
             downloadBtn.style.cssText = `
                 flex: 1;
                 padding: 14px 24px;
@@ -570,26 +572,211 @@
                 gap: 8px;
                 transition: all 0.2s;
             `;
-            downloadBtn.innerHTML = `
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
-                    <polyline points="7 10 12 15 17 10"/>
-                    <line x1="12" y1="15" x2="12" y2="3"/>
-                </svg>
-                <span>下载应用</span>
-            `;
+            
+            const updateDownloadButtonState = () => {
+                const state = this._checkAppInstallState(app);
+                if (state === 'not_installed') {
+                    downloadBtn.innerHTML = `
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+                            <polyline points="7 10 12 15 17 10"/>
+                            <line x1="12" y1="15" x2="12" y2="3"/>
+                        </svg>
+                        <span>下载应用</span>
+                    `;
+                    downloadBtn.style.background = 'linear-gradient(135deg, #0078D4, #00a0e8)';
+                } else if (state === 'update_available') {
+                    downloadBtn.innerHTML = `
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="23 4 23 10 17 10"/>
+                            <polyline points="1 20 1 14 7 14"/>
+                            <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
+                        </svg>
+                        <span>更新版本</span>
+                    `;
+                    downloadBtn.style.background = 'linear-gradient(135deg, #28a745, #20c997)';
+                } else {
+                    downloadBtn.innerHTML = `
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="20 6 9 17 4 12"/>
+                        </svg>
+                        <span>已安装</span>
+                    `;
+                    downloadBtn.style.background = 'linear-gradient(135deg, #6c757d, #495057)';
+                    downloadBtn.disabled = true;
+                }
+            };
+            
             downloadBtn.addEventListener('mouseenter', () => {
-                downloadBtn.style.transform = 'translateY(-2px)';
-                downloadBtn.style.boxShadow = '0 4px 16px rgba(0, 120, 212, 0.4)';
+                if (!downloadBtn.disabled) {
+                    downloadBtn.style.transform = 'translateY(-2px)';
+                    downloadBtn.style.boxShadow = '0 4px 16px rgba(0, 120, 212, 0.4)';
+                }
             });
             downloadBtn.addEventListener('mouseleave', () => {
                 downloadBtn.style.transform = '';
                 downloadBtn.style.boxShadow = '';
             });
             downloadBtn.addEventListener('click', async () => {
-                await this._downloadApp(app);
+                const state = this._checkAppInstallState(app);
+                
+                if (state === 'update_available') {
+                    const confirmed = await this._showConfirmDialog(
+                        `检测到新版本，是否先卸载当前版本再安装新版本？`,
+                        '更新应用',
+                        'info'
+                    );
+                    if (!confirmed) return;
+                    
+                    const uninstalled = await this._uninstallApp(app);
+                    if (!uninstalled) {
+                        await this._showAlertDialog('卸载失败，无法继续更新', '错误', 'error');
+                        return;
+                    }
+                }
+                
+                const progressContainer = detail.querySelector('.store-progress-container');
+                if (progressContainer) {
+                    progressContainer.style.display = 'block';
+                }
+                downloadBtn.disabled = true;
+                downloadBtn.style.opacity = '0.7';
+                downloadBtn.style.cursor = 'not-allowed';
+                this._updateDownloadButton(downloadBtn, 'downloading', 0);
+                
+                try {
+                    await this._downloadApp(app, (progress) => {
+                        this._updateDownloadButton(downloadBtn, 'downloading', progress);
+                    });
+                    this._updateDownloadButton(downloadBtn, 'completed');
+                    updateDownloadButtonState();
+                } catch (error) {
+                    this._updateDownloadButton(downloadBtn, 'error', error.message);
+                }
+                
+                setTimeout(() => {
+                    downloadBtn.disabled = false;
+                    downloadBtn.style.opacity = '1';
+                    downloadBtn.style.cursor = 'pointer';
+                    this._updateDownloadButton(downloadBtn, 'idle');
+                    updateDownloadButtonState();
+                    if (progressContainer) {
+                        progressContainer.style.display = 'none';
+                        const progressBar = progressContainer.querySelector('.store-progress-bar');
+                        if (progressBar) {
+                            progressBar.style.width = '0%';
+                        }
+                    }
+                }, 3000);
             });
+            
+            updateDownloadButtonState();
+            
+            const deleteBtn = document.createElement('button');
+            deleteBtn.className = 'store-delete-btn';
+            deleteBtn.style.cssText = `
+                padding: 14px 20px;
+                border: none;
+                border-radius: 10px;
+                background: linear-gradient(135deg, #dc3545, #c82333);
+                color: white;
+                font-size: 15px;
+                font-weight: 500;
+                cursor: pointer;
+                display: none;
+                align-items: center;
+                justify-content: center;
+                gap: 8px;
+                transition: all 0.2s;
+            `;
+            deleteBtn.innerHTML = `
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="3 6 5 6 21 6"/>
+                    <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+                </svg>
+                <span>卸载</span>
+            `;
+            deleteBtn.addEventListener('mouseenter', () => {
+                deleteBtn.style.transform = 'translateY(-2px)';
+                deleteBtn.style.boxShadow = '0 4px 16px rgba(220, 53, 69, 0.4)';
+            });
+            deleteBtn.addEventListener('mouseleave', () => {
+                deleteBtn.style.transform = '';
+                deleteBtn.style.boxShadow = '';
+            });
+            deleteBtn.addEventListener('click', async () => {
+                const confirmed = await this._showConfirmDialog(
+                    `确定要卸载 ${app.name} 吗？`,
+                    '卸载应用',
+                    'warning'
+                );
+                if (!confirmed) return;
+                
+                const result = await this._uninstallApp(app);
+                if (result) {
+                    updateDownloadButtonState();
+                    updateDeleteButtonState();
+                }
+            });
+            
+            const updateDeleteButtonState = () => {
+                const state = this._checkAppInstallState(app);
+                if (state === 'installed' || state === 'update_available') {
+                    deleteBtn.style.display = 'flex';
+                } else {
+                    deleteBtn.style.display = 'none';
+                }
+            };
+            
+            updateDeleteButtonState();
+            actionBar.appendChild(deleteBtn);
             actionBar.appendChild(downloadBtn);
+
+            const progressContainer = document.createElement('div');
+            progressContainer.className = 'store-progress-container';
+            progressContainer.style.cssText = `
+                display: none;
+                margin-top: 12px;
+                padding: 12px;
+                background: rgba(0, 0, 0, 0.2);
+                border-radius: 8px;
+            `;
+            
+            const progressLabel = document.createElement('div');
+            progressLabel.className = 'store-progress-label';
+            progressLabel.style.cssText = `
+                font-size: 12px;
+                color: rgba(255, 255, 255, 0.7);
+                margin-bottom: 8px;
+                display: flex;
+                justify-content: space-between;
+            `;
+            progressLabel.innerHTML = `<span>下载进度</span><span class="store-progress-percent">0%</span>`;
+            progressContainer.appendChild(progressLabel);
+            
+            const progressBarBg = document.createElement('div');
+            progressBarBg.className = 'store-progress-bar-bg';
+            progressBarBg.style.cssText = `
+                width: 100%;
+                height: 6px;
+                background: rgba(255, 255, 255, 0.1);
+                border-radius: 3px;
+                overflow: hidden;
+            `;
+            
+            const progressBar = document.createElement('div');
+            progressBar.className = 'store-progress-bar';
+            progressBar.style.cssText = `
+                width: 0%;
+                height: 100%;
+                background: linear-gradient(90deg, #00a0e8, #0078D4);
+                border-radius: 3px;
+                transition: width 0.3s ease;
+            `;
+            progressBarBg.appendChild(progressBar);
+            progressContainer.appendChild(progressBarBg);
+            
+            actionBar.appendChild(progressContainer);
 
             detail.appendChild(actionBar);
 
@@ -766,16 +953,22 @@
             }
         },
 
-        _downloadApp: async function(app) {
+        _downloadApp: async function(app, onProgress) {
             try {
                 const baseUrl = 'http://localhost:8088';
+                const cacheDir = 'D:/cache/store';
+                const fileName = app.name.replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/g, '_') + '.zom';
 
-                const confirmed = await GUIManager.showConfirm(
-                    `确定要下载 ${app.name} 吗？`,
-                    '下载应用',
-                    'info'
-                );
-                if (!confirmed) return;
+                if (onProgress) onProgress(5);
+
+                await NotificationManager.createNotification(this.pid, {
+                    type: 'snapshot',
+                    title: '正在获取下载链接',
+                    content: `正在获取 ${app.name} 的下载链接...`,
+                    duration: 3000
+                });
+
+                if (onProgress) onProgress(10);
 
                 const downloadResponse = await fetch(`${baseUrl}/api/application/${app.id}/download`, {
                     method: 'POST'
@@ -792,30 +985,66 @@
                 }
 
                 const packageUrl = downloadResult.data;
-                const fileName = app.name.replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/g, '_') + '.zom';
+                const saveDir = cacheDir + '/';
 
-                const folderItem = await this._selectSaveFolder();
-                if (!folderItem || !folderItem.path) {
-                    return;
-                }
-
-                const saveDir = this._normalizePath(folderItem.path).replace(/\/$/, '') + '/';
+                if (onProgress) onProgress(20);
 
                 await NotificationManager.createNotification(this.pid, {
                     type: 'snapshot',
                     title: '正在下载',
-                    content: `正在下载 ${app.name} 到 ${saveDir}`,
+                    content: `正在下载 ${app.name} 到缓存目录...`,
                     duration: 3000
                 });
+
+                if (onProgress) onProgress(25);
 
                 const fileResponse = await fetch(packageUrl);
                 if (!fileResponse.ok) {
                     throw new Error(`下载文件失败: HTTP ${fileResponse.status}`);
                 }
 
+                const contentLength = fileResponse.headers.get('content-length');
+                const totalSize = contentLength ? parseInt(contentLength, 10) : 0;
+                
+                if (onProgress) onProgress(40);
+
                 const blob = await fileResponse.blob();
+                
+                if (onProgress) onProgress(60);
+
                 const arrayBuffer = await blob.arrayBuffer();
+                
+                if (onProgress) onProgress(75);
+
                 const base64 = this._arrayBufferToBase64(arrayBuffer);
+                
+                if (onProgress) onProgress(85);
+
+                const createDirUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject)
+                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE, { upid: this._upid })
+                    : new URL('/system/service/FSDirve.php', window.location.origin);
+                if (this._upid != null) createDirUrl.searchParams.set('upid', this._upid);
+                createDirUrl.searchParams.set('action', 'create_dir');
+                createDirUrl.searchParams.set('path', 'D:/');
+                createDirUrl.searchParams.set('name', 'cache');
+
+                try {
+                    await fetch(createDirUrl.toString(), { method: 'POST' });
+                } catch (e) {
+                }
+
+                const createStoreDirUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject)
+                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE, { upid: this._upid })
+                    : new URL('/system/service/FSDirve.php', window.location.origin);
+                if (this._upid != null) createStoreDirUrl.searchParams.set('upid', this._upid);
+                createStoreDirUrl.searchParams.set('action', 'create_dir');
+                createStoreDirUrl.searchParams.set('path', 'D:/cache');
+                createStoreDirUrl.searchParams.set('name', 'store');
+
+                try {
+                    await fetch(createStoreDirUrl.toString(), { method: 'POST' });
+                } catch (e) {
+                }
 
                 const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject)
                     ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE, { upid: this._upid })
@@ -837,32 +1066,140 @@
                 const saveResult = await saveResponse.json();
 
                 if (saveResult.status === 'success') {
-                    await NotificationManager.createNotification(this.pid, {
-                        type: 'snapshot',
-                        title: '下载完成',
-                        content: `${app.name} 已保存到 ${saveDir}${fileName}`,
-                        duration: 5000
-                    });
+                    const packagePath = saveDir + fileName;
+                    let installSuccess = false;
+                    let installError = null;
 
-                    const openFolder = await GUIManager.showConfirm(
-                        `应用已下载到 ${saveDir}${fileName}\n\n是否立即打开所在文件夹？`,
-                        '下载完成',
-                        'info'
-                    );
-
-                    if (openFolder) {
-                        await ProcessManager.startProgram('filemanager', {
-                            args: [saveDir]
+                    try {
+                        await NotificationManager.createNotification(this.pid, {
+                            type: 'snapshot',
+                            title: '正在安装',
+                            content: `正在安装 ${app.name}...`,
+                            duration: 3000
                         });
+
+                        await new Promise(resolve => setTimeout(resolve, 500));
+
+                        let tempAsset = null;
+                        try {
+                            const baseUrl = window.location.origin;
+                            const url = new URL('/system/service/FSDirve.php', baseUrl);
+                            if (this._upid != null) url.searchParams.set('upid', this._upid);
+                            url.searchParams.set('action', 'read_file');
+                            url.searchParams.set('path', 'D:/bin');
+                            url.searchParams.set('fileName', 'zominstall.js');
+                            
+                            const response = await fetch(url.toString());
+                            if (response.ok) {
+                                const result = await response.json();
+                                if (result.status === 'success') {
+                                    const fileContent = result.data?.content || result.data || '';
+                                    if (fileContent && typeof fileContent === 'string') {
+                                        tempAsset = {
+                                            script: fileContent,
+                                            styles: [],
+                                            icon: null,
+                                            metadata: {
+                                                name: 'zominstall',
+                                                type: 'CLI',
+                                                allowMultipleInstances: false
+                                            }
+                                        };
+                                    }
+                                }
+                            }
+                        } catch (e) {
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.debug('STORE', `加载 zominstall.js 失败: ${e.message}`);
+                            }
+                        }
+
+                        if (!tempAsset) {
+                            throw new Error('无法加载安装程序');
+                        }
+
+                        if (onProgress) onProgress(90);
+
+                        await ProcessManager.startProgram('zominstall', {
+                            args: [packagePath],
+                            tempAsset: tempAsset
+                        });
+
+                        await new Promise(resolve => setTimeout(resolve, 2000));
+                        
+                        if (onProgress) onProgress(95);
+                        
+                        installSuccess = true;
+
+                    } catch (installErr) {
+                        installError = installErr;
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.error('STORE', `安装失败: ${installErr.message}`, installErr);
+                        }
+                    }
+
+                    if (installSuccess) {
+                        await NotificationManager.createNotification(this.pid, {
+                            type: 'snapshot',
+                            title: '安装完成',
+                            content: `${app.name} 安装完成`,
+                            duration: 5000
+                        });
+                    } else {
+                        await this._showAlertDialog(
+                            `安装失败: ${installError ? installError.message : '未知错误'}`,
+                            '安装错误',
+                            'error'
+                        );
+                    }
+
+                    if (onProgress) onProgress(100);
+
+                    const deleteUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject)
+                        ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE, { upid: this._upid })
+                        : new URL('/system/service/FSDirve.php', window.location.origin);
+                    if (this._upid != null) deleteUrl.searchParams.set('upid', this._upid);
+                    deleteUrl.searchParams.set('action', 'delete_file');
+                    deleteUrl.searchParams.set('path', 'D:/cache/store');
+                    deleteUrl.searchParams.set('fileName', fileName);
+
+                    try {
+                        await fetch(deleteUrl.toString(), { method: 'POST' });
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.debug('STORE', `已删除安装包: ${fileName}`);
+                        }
+                    } catch (deleteError) {
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('STORE', `删除安装包失败: ${deleteError.message}`);
+                        }
                     }
                 } else {
                     throw new Error(saveResult.message || '保存文件失败');
                 }
             } catch (error) {
+                const deleteUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject)
+                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE, { upid: this._upid })
+                    : new URL('/system/service/FSDirve.php', window.location.origin);
+                if (this._upid != null) deleteUrl.searchParams.set('upid', this._upid);
+                deleteUrl.searchParams.set('action', 'delete_file');
+                deleteUrl.searchParams.set('path', 'D:/cache/store');
+                deleteUrl.searchParams.set('fileName', fileName);
+
+                try {
+                    await fetch(deleteUrl.toString(), { method: 'POST' });
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.debug('STORE', `下载失败，已删除残留安装包: ${fileName}`);
+                    }
+                } catch (deleteError) {
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.warn('STORE', `删除残留安装包失败: ${deleteError.message}`);
+                    }
+                }
+
                 if (typeof KernelLogger !== 'undefined') {
                     KernelLogger.error('STORE', `下载应用失败: ${error.message}`, error);
                 }
-                await GUIManager.showAlert(
+                await this._showAlertDialog(
                     `下载失败: ${error.message}`,
                     '错误',
                     'error'
@@ -908,6 +1245,303 @@
             return path;
         },
 
+        _showConfirmDialog: function(message, title, type = 'info') {
+            return new Promise((resolve) => {
+                const guiContainer = ProcessManager.getGUIContainer 
+                    ? ProcessManager.getGUIContainer() 
+                    : document.getElementById('gui-container') || document.body;
+                
+                const dialogWindow = document.createElement('div');
+                dialogWindow.className = 'store-dialog-window zos-gui-window';
+                dialogWindow.style.cssText = `
+                    width: 420px;
+                    min-height: 180px;
+                    display: flex;
+                    flex-direction: column;
+                    position: fixed;
+                    top: 50%;
+                    left: 50%;
+                    transform: translate(-50%, -50%);
+                    z-index: 100001;
+                    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+                `;
+                
+                const titleBar = document.createElement('div');
+                titleBar.style.cssText = `
+                    height: 40px;
+                    min-height: 40px;
+                    display: flex;
+                    align-items: center;
+                    padding: 0 16px;
+                    border-bottom: 1px solid rgba(108, 142, 255, 0.2);
+                    background: rgba(30, 35, 50, 0.95);
+                `;
+                
+                const titleText = document.createElement('span');
+                titleText.textContent = title || '确认';
+                titleText.style.cssText = `
+                    color: rgba(215, 224, 221, 0.95);
+                    font-size: 14px;
+                    font-weight: 500;
+                `;
+                titleBar.appendChild(titleText);
+                
+                const closeBtn = document.createElement('button');
+                closeBtn.innerHTML = '×';
+                closeBtn.style.cssText = `
+                    margin-left: auto;
+                    width: 24px;
+                    height: 24px;
+                    border: none;
+                    background: transparent;
+                    color: rgba(215, 224, 221, 0.6);
+                    font-size: 18px;
+                    cursor: pointer;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    border-radius: 4px;
+                `;
+                closeBtn.addEventListener('mouseenter', () => {
+                    closeBtn.style.background = 'rgba(255, 255, 255, 0.1)';
+                });
+                closeBtn.addEventListener('mouseleave', () => {
+                    closeBtn.style.background = 'transparent';
+                });
+                closeBtn.addEventListener('click', () => {
+                    dialogWindow.remove();
+                    resolve(false);
+                });
+                titleBar.appendChild(closeBtn);
+                dialogWindow.appendChild(titleBar);
+                
+                const contentArea = document.createElement('div');
+                contentArea.style.cssText = `
+                    flex: 1;
+                    padding: 24px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                `;
+                
+                const messageDiv = document.createElement('div');
+                messageDiv.textContent = message;
+                messageDiv.style.cssText = `
+                    color: rgba(215, 224, 221, 0.85);
+                    font-size: 14px;
+                    text-align: center;
+                    line-height: 1.6;
+                    white-space: pre-wrap;
+                    word-break: break-word;
+                `;
+                contentArea.appendChild(messageDiv);
+                dialogWindow.appendChild(contentArea);
+                
+                const buttonBar = document.createElement('div');
+                buttonBar.style.cssText = `
+                    height: 56px;
+                    min-height: 56px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    padding: 0 24px;
+                    gap: 12px;
+                    border-top: 1px solid rgba(108, 142, 255, 0.15);
+                `;
+                
+                const cancelBtn = document.createElement('button');
+                cancelBtn.textContent = '取消';
+                cancelBtn.style.cssText = `
+                    padding: 8px 24px;
+                    min-width: 80px;
+                    border: 1px solid rgba(108, 142, 255, 0.3);
+                    background: rgba(108, 142, 255, 0.1);
+                    color: rgba(215, 224, 221, 0.85);
+                    font-size: 13px;
+                    border-radius: 6px;
+                    cursor: pointer;
+                    transition: all 0.2s;
+                `;
+                cancelBtn.addEventListener('mouseenter', () => {
+                    cancelBtn.style.background = 'rgba(108, 142, 255, 0.2)';
+                });
+                cancelBtn.addEventListener('mouseleave', () => {
+                    cancelBtn.style.background = 'rgba(108, 142, 255, 0.1)';
+                });
+                cancelBtn.addEventListener('click', () => {
+                    dialogWindow.remove();
+                    resolve(false);
+                });
+                
+                const confirmBtn = document.createElement('button');
+                confirmBtn.textContent = '确定';
+                confirmBtn.style.cssText = `
+                    padding: 8px 24px;
+                    min-width: 80px;
+                    border: none;
+                    background: rgba(108, 142, 255, 0.8);
+                    color: white;
+                    font-size: 13px;
+                    font-weight: 500;
+                    border-radius: 6px;
+                    cursor: pointer;
+                    transition: all 0.2s;
+                `;
+                confirmBtn.addEventListener('mouseenter', () => {
+                    confirmBtn.style.background = 'rgba(108, 142, 255, 1)';
+                });
+                confirmBtn.addEventListener('mouseleave', () => {
+                    confirmBtn.style.background = 'rgba(108, 142, 255, 0.8)';
+                });
+                confirmBtn.addEventListener('click', () => {
+                    dialogWindow.remove();
+                    resolve(true);
+                });
+                
+                buttonBar.appendChild(cancelBtn);
+                buttonBar.appendChild(confirmBtn);
+                dialogWindow.appendChild(buttonBar);
+                
+                guiContainer.appendChild(dialogWindow);
+            });
+        },
+
+        _showAlertDialog: function(message, title, type = 'info') {
+            return new Promise((resolve) => {
+                const guiContainer = ProcessManager.getGUIContainer 
+                    ? ProcessManager.getGUIContainer() 
+                    : document.getElementById('gui-container') || document.body;
+                
+                const dialogWindow = document.createElement('div');
+                dialogWindow.className = 'store-dialog-window zos-gui-window';
+                dialogWindow.style.cssText = `
+                    width: 420px;
+                    min-height: 180px;
+                    display: flex;
+                    flex-direction: column;
+                    position: fixed;
+                    top: 50%;
+                    left: 50%;
+                    transform: translate(-50%, -50%);
+                    z-index: 100001;
+                    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+                `;
+                
+                const titleBar = document.createElement('div');
+                titleBar.style.cssText = `
+                    height: 40px;
+                    min-height: 40px;
+                    display: flex;
+                    align-items: center;
+                    padding: 0 16px;
+                    border-bottom: 1px solid rgba(108, 142, 255, 0.2);
+                    background: rgba(30, 35, 50, 0.95);
+                `;
+                
+                const titleText = document.createElement('span');
+                titleText.textContent = title || '提示';
+                titleText.style.cssText = `
+                    color: rgba(215, 224, 221, 0.95);
+                    font-size: 14px;
+                    font-weight: 500;
+                `;
+                titleBar.appendChild(titleText);
+                
+                const closeBtn = document.createElement('button');
+                closeBtn.innerHTML = '×';
+                closeBtn.style.cssText = `
+                    margin-left: auto;
+                    width: 24px;
+                    height: 24px;
+                    border: none;
+                    background: transparent;
+                    color: rgba(215, 224, 221, 0.6);
+                    font-size: 18px;
+                    cursor: pointer;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    border-radius: 4px;
+                `;
+                closeBtn.addEventListener('mouseenter', () => {
+                    closeBtn.style.background = 'rgba(255, 255, 255, 0.1)';
+                });
+                closeBtn.addEventListener('mouseleave', () => {
+                    closeBtn.style.background = 'transparent';
+                });
+                closeBtn.addEventListener('click', () => {
+                    dialogWindow.remove();
+                    resolve();
+                });
+                titleBar.appendChild(closeBtn);
+                dialogWindow.appendChild(titleBar);
+                
+                const contentArea = document.createElement('div');
+                contentArea.style.cssText = `
+                    flex: 1;
+                    padding: 24px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                `;
+                
+                const messageDiv = document.createElement('div');
+                messageDiv.textContent = message;
+                messageDiv.style.cssText = `
+                    color: rgba(215, 224, 221, 0.85);
+                    font-size: 14px;
+                    text-align: center;
+                    line-height: 1.6;
+                    white-space: pre-wrap;
+                    word-break: break-word;
+                `;
+                contentArea.appendChild(messageDiv);
+                dialogWindow.appendChild(contentArea);
+                
+                const buttonBar = document.createElement('div');
+                buttonBar.style.cssText = `
+                    height: 56px;
+                    min-height: 56px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    padding: 0 24px;
+                    gap: 12px;
+                    border-top: 1px solid rgba(108, 142, 255, 0.15);
+                `;
+                
+                const okBtn = document.createElement('button');
+                okBtn.textContent = '确定';
+                okBtn.style.cssText = `
+                    padding: 8px 32px;
+                    min-width: 100px;
+                    border: none;
+                    background: rgba(108, 142, 255, 0.8);
+                    color: white;
+                    font-size: 13px;
+                    font-weight: 500;
+                    border-radius: 6px;
+                    cursor: pointer;
+                    transition: all 0.2s;
+                `;
+                okBtn.addEventListener('mouseenter', () => {
+                    okBtn.style.background = 'rgba(108, 142, 255, 1)';
+                });
+                okBtn.addEventListener('mouseleave', () => {
+                    okBtn.style.background = 'rgba(108, 142, 255, 0.8)';
+                });
+                okBtn.addEventListener('click', () => {
+                    dialogWindow.remove();
+                    resolve();
+                });
+                
+                buttonBar.appendChild(okBtn);
+                dialogWindow.appendChild(buttonBar);
+                
+                guiContainer.appendChild(dialogWindow);
+            });
+        },
+
 
         _arrayBufferToBase64: function(buffer) {
             let binary = '';
@@ -917,6 +1551,63 @@
                 binary += String.fromCharCode(bytes[i]);
             }
             return btoa(binary);
+        },
+
+        _updateDownloadButton: function(btn, state, progress = 0) {
+            const percentSpan = btn.closest('.store-detail-panel')?.querySelector('.store-progress-percent');
+            
+            if (state === 'downloading') {
+                btn.innerHTML = `
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="store-spinner">
+                        <circle cx="12" cy="12" r="10" stroke-dasharray="60" stroke-dashoffset="20"/>
+                    </svg>
+                    <span>下载中 ${Math.round(progress)}%</span>
+                `;
+                if (percentSpan) {
+                    percentSpan.textContent = `${Math.round(progress)}%`;
+                }
+                const progressBar = btn.closest('.store-detail-panel')?.querySelector('.store-progress-bar');
+                if (progressBar) {
+                    progressBar.style.width = `${progress}%`;
+                }
+            } else if (state === 'completed') {
+                btn.innerHTML = `
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="20 6 9 17 4 12"/>
+                    </svg>
+                    <span>安装完成</span>
+                `;
+                btn.style.background = 'linear-gradient(135deg, #28a745, #20c997)';
+                if (percentSpan) {
+                    percentSpan.textContent = '100%';
+                }
+                const progressBar = btn.closest('.store-detail-panel')?.querySelector('.store-progress-bar');
+                if (progressBar) {
+                    progressBar.style.width = '100%';
+                }
+            } else if (state === 'error') {
+                btn.innerHTML = `
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"/>
+                        <line x1="15" y1="9" x2="9" y2="15"/>
+                        <line x1="9" y1="9" x2="15" y2="15"/>
+                    </svg>
+                    <span>下载失败</span>
+                `;
+                btn.style.background = 'linear-gradient(135deg, #dc3545, #c82333)';
+            } else {
+                btn.innerHTML = `
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+                        <polyline points="7 10 12 15 17 10"/>
+                        <line x1="12" y1="15" x2="12" y2="3"/>
+                    </svg>
+                    <span>下载应用</span>
+                `;
+                btn.style.background = 'linear-gradient(135deg, #0078D4, #00a0e8)';
+                btn.style.opacity = '1';
+                btn.style.cursor = 'pointer';
+            }
         },
 
         _formatNumber: function(num) {
@@ -946,6 +1637,128 @@
                 return `${year}-${month}-${day}`;
             } catch (e) {
                 return dateString;
+            }
+        },
+
+        _checkAppInstallState: function(app) {
+            if (typeof ApplicationAssetManager === 'undefined') {
+                return 'not_installed';
+            }
+            
+            try {
+                const programInfo = ApplicationAssetManager.getProgramInfo(app.programName || app.name);
+                if (!programInfo) {
+                    return 'not_installed';
+                }
+                
+                const localVersion = programInfo.metadata?.version;
+                const serverVersion = app.version;
+                
+                if (!localVersion || !serverVersion) {
+                    return 'installed';
+                }
+                
+                if (this._compareVersion(localVersion, serverVersion) < 0) {
+                    return 'update_available';
+                }
+                
+                return 'installed';
+            } catch (e) {
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.warn('STORE', `检查安装状态失败: ${e.message}`);
+                }
+                return 'not_installed';
+            }
+        },
+
+        _compareVersion: function(localVer, serverVer) {
+            const localParts = localVer.split('.').map(Number);
+            const serverParts = serverVer.split('.').map(Number);
+            
+            for (let i = 0; i < Math.max(localParts.length, serverParts.length); i++) {
+                const localNum = localParts[i] || 0;
+                const serverNum = serverParts[i] || 0;
+                
+                if (localNum < serverNum) return -1;
+                if (localNum > serverNum) return 1;
+            }
+            return 0;
+        },
+
+        _uninstallApp: async function(app) {
+            try {
+                const programName = app.programName || app.name;
+                
+                await NotificationManager.createNotification(this.pid, {
+                    type: 'snapshot',
+                    title: '正在卸载',
+                    content: `正在卸载 ${app.name}...`,
+                    duration: 3000
+                });
+
+                let tempAsset = null;
+                try {
+                    const baseUrl = window.location.origin;
+                    const url = new URL('/system/service/FSDirve.php', baseUrl);
+                    if (this._upid != null) url.searchParams.set('upid', this._upid);
+                    url.searchParams.set('action', 'read_file');
+                    url.searchParams.set('path', 'D:/bin');
+                    url.searchParams.set('fileName', 'zominstall.js');
+                    
+                    const response = await fetch(url.toString());
+                    if (response.ok) {
+                        const result = await response.json();
+                        if (result.status === 'success') {
+                            const fileContent = result.data?.content || result.data || '';
+                            if (fileContent && typeof fileContent === 'string') {
+                                tempAsset = {
+                                    script: fileContent,
+                                    styles: [],
+                                    icon: null,
+                                    metadata: {
+                                        name: 'zominstall',
+                                        type: 'CLI',
+                                        allowMultipleInstances: false
+                                    }
+                                };
+                            }
+                        }
+                    }
+                } catch (e) {
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.debug('STORE', `加载 zominstall.js 失败: ${e.message}`);
+                    }
+                }
+
+                if (!tempAsset) {
+                    throw new Error('无法加载卸载程序');
+                }
+
+                await ProcessManager.startProgram('zominstall', {
+                    args: ['--uninstall', programName],
+                    tempAsset: tempAsset
+                });
+
+                await new Promise(resolve => setTimeout(resolve, 2000));
+
+                await NotificationManager.createNotification(this.pid, {
+                    type: 'snapshot',
+                    title: '卸载完成',
+                    content: `${app.name} 已卸载`,
+                    duration: 5000
+                });
+
+                return true;
+            } catch (error) {
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('STORE', `卸载应用失败: ${error.message}`, error);
+                }
+                await this._showAlertDialog(
+                    `卸载失败: ${error.message}`,
+                    '错误',
+                    'error'
+                );
+                return false;
             }
         },
 
@@ -992,7 +1805,14 @@
                 permissions: typeof PermissionManager !== 'undefined' ? [
                     PermissionManager.PERMISSION.GUI_WINDOW_CREATE,
                     PermissionManager.PERMISSION.EVENT_LISTENER,
-                    PermissionManager.PERMISSION.SYSTEM_NOTIFICATION
+                    PermissionManager.PERMISSION.SYSTEM_NOTIFICATION,
+                    PermissionManager.PERMISSION.NETWORK_ACCESS,
+                    PermissionManager.PERMISSION.KERNEL_DISK_READ,
+                    PermissionManager.PERMISSION.KERNEL_DISK_WRITE,
+                    PermissionManager.PERMISSION.KERNEL_DISK_CREATE,
+                    PermissionManager.PERMISSION.KERNEL_DISK_DELETE,
+                    PermissionManager.PERMISSION.APPLICATION_INSTALL,
+                    PermissionManager.PERMISSION.APPLICATION_UNINSTALL
                 ] : [],
                 metadata: {
                     allowMultipleInstances: true,

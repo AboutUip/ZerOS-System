@@ -1280,11 +1280,6 @@
             
             // 更新详情面板
             this._updateProcessDetail(pid);
-            
-            // 如果当前在日志标签页，更新日志
-            if (this.tabs && this.tabs.logs && this.tabs.logs.classList.contains('active')) {
-                this._updateProcessLogs(pid);
-            }
         },
         
         _selectProcessForSelection: function(process) {
@@ -2893,10 +2888,6 @@
                 const selectedPid = this._getSelectedPid();
                 if (selectedPid) {
                     this._updateProcessDetail(selectedPid);
-                    // 如果当前在日志标签页，也更新日志
-                    if (this.tabs && this.tabs.logs && this.tabs.logs.classList.contains('active')) {
-                        this._updateProcessLogs(selectedPid);
-                    }
                 }
                 
                 // 更新所有打开的内存查看窗口
@@ -3015,9 +3006,35 @@
                 }
             });
             
+            const refreshLogsBtn = document.createElement('button');
+            refreshLogsBtn.textContent = this._getText('TASKMANAGER_LOG_REFRESH', '刷新');
+            refreshLogsBtn.style.cssText = `
+                padding: 4px 12px;
+                border: 1px solid rgba(108, 142, 255, 0.3);
+                background: rgba(108, 142, 255, 0.1);
+                color: #e8ecf0;
+                border-radius: 4px;
+                cursor: pointer;
+                font-size: 12px;
+                transition: all 0.2s;
+            `;
+            refreshLogsBtn.addEventListener('mouseenter', () => {
+                refreshLogsBtn.style.background = 'rgba(108, 142, 255, 0.2)';
+            });
+            refreshLogsBtn.addEventListener('mouseleave', () => {
+                refreshLogsBtn.style.background = 'rgba(108, 142, 255, 0.1)';
+            });
+            refreshLogsBtn.addEventListener('click', () => {
+                const selectedPid = this._getSelectedPid();
+                if (selectedPid) {
+                    this._updateProcessLogs(selectedPid);
+                }
+            });
+            
             toolbar.appendChild(filterLabel);
             toolbar.appendChild(filterSelect);
             toolbar.appendChild(clearBtn);
+            toolbar.appendChild(refreshLogsBtn);
             panel.appendChild(toolbar);
             
             // 说明：本列表为该进程每次调用内核 API 的记录（非程序主动发送的日志）
@@ -4552,6 +4569,7 @@
                     PermissionManager.PERMISSION.GUI_WINDOW_CREATE,
                     PermissionManager.PERMISSION.PROCESS_MANAGE,
                     PermissionManager.PERMISSION.KERNEL_MEMORY_READ,
+                    PermissionManager.PERMISSION.KERNEL_DISK_READ,
                     PermissionManager.PERMISSION.SYSTEM_NOTIFICATION,
                     PermissionManager.PERMISSION.EVENT_LISTENER
                 ] : [],

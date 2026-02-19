@@ -24,37 +24,61 @@
       }
     },
     "TaskbarManager": {
-      "weather:兴县": {
+      "weather:神池县": {
         "value": {
           "code": 200,
           "data": {
-            "city": "山西省 吕梁市",
+            "city": "神池县",
             "today": {
-              "current_temp": "7℃",
-              "current_cond": "多云",
-              "low": "-6℃",
+              "current_temp": "3℃",
+              "current_cond": "晴",
+              "low": "-3℃",
               "quality": "--"
             },
-            "low_temperature": -6,
+            "low_temperature": -3,
             "tips": "建议穿棉服、羽绒服等厚实保暖衣物",
             "seven_day": [
               {
-                "date": "2026-02-18",
+                "date": "2026-02-19",
                 "cond": "晴",
-                "high": "9℃",
-                "low": "-6℃"
+                "high": "5℃",
+                "low": "-3℃"
               },
               {
-                "date": "2026-02-19",
+                "date": "2026-02-20",
                 "cond": "晴",
                 "high": "12℃",
                 "low": "-2℃"
               },
               {
-                "date": "2026-02-20",
+                "date": "2026-02-21",
+                "cond": "多云",
+                "high": "5℃",
+                "low": "-8℃"
+              },
+              {
+                "date": "2026-02-22",
                 "cond": "晴",
-                "high": "16℃",
-                "low": "1℃"
+                "high": "0℃",
+                "low": "-8℃"
+              },
+              {
+                "date": "2026-02-23",
+                "cond": "多云",
+                "high": "2℃",
+                "low": "-6℃"
+              },
+              {
+                "date": "2026-02-24",
+                "cond": "晴",
+                "high": "5℃",
+                "low": "-5℃"
+              },
+              {
+                "date": "2026-02-25",
+                "cond": "晴",
+                "high": "6℃",
+                "low": "-4℃"
               }
             ],
             "life_indices": {
@@ -64,9 +88,9 @@
                 "advice": "建议穿棉服、羽绒服等厚实保暖衣物"
               },
               "uv": {
-                "level": "中等",
-                "brief": "中等",
-                "advice": "紫外线中等，建议涂抹SPF15+防晒霜，戴帽子"
+                "level": "高",
+                "brief": "较强",
+                "advice": "紫外线较强，减少10-14点户外活动，涂抹SPF30+防晒霜，戴帽子和墨镜"
               },
               "car_wash": {
                 "level": "非常适宜",
@@ -84,40 +108,90 @@
                 "advice": "建议开启空调制热或使用其他取暖设备"
               },
               "cold_risk": {
-                "level": "较低",
-                "brief": "较少发",
-                "advice": "感冒风险较低，注意适当增减衣物"
+                "level": "中等",
+                "brief": "易发",
+                "advice": "感冒风险中等，注意保暖和作息规律"
               },
               "exercise": {
-                "level": "非常适宜",
-                "brief": "极佳",
-                "advice": "天气非常适合户外运动，尽情享受吧"
+                "level": "适宜",
+                "brief": "较好",
+                "advice": "天气适合运动，建议适当进行户外锻炼"
               },
               "comfort": {
-                "level": "冷",
-                "brief": "偏冷",
-                "advice": "体感偏冷，适当添加衣物"
+                "level": "极冷",
+                "brief": "寒冷",
+                "advice": "体感寒冷，注意保暖防寒"
+              },
+              "travel": {
+                "level": "适宜",
+                "brief": "较好",
+                "advice": "天气不错，适合外出活动"
+              },
+              "fishing": {
+                "level": "不宜",
+                "brief": "难钓",
+                "advice": "天气条件不佳，鱼类活动低迷，不建议出钓"
+              },
+              "allergy": {
+                "level": "较易",
+                "brief": "中等",
+                "advice": "有一定过敏风险，敏感人群注意防护"
+              },
+              "sunscreen": {
+                "level": "SPF30",
+                "brief": "较强",
+                "advice": "紫外线较强，建议涂抹SPF30防晒霜，戴帽子遮阳"
+              },
+              "mood": {
+                "level": "一般",
+                "brief": "平淡",
+                "advice": "天气一般，可通过运动或社交提升心情"
+              },
+              "beer": {
+                "level": "微量",
+                "brief": "偏凉",
+                "advice": "天气偏凉，可少量饮用或选择常温啤酒"
+              },
+              "umbrella": {
+                "level": "不需要",
+                "brief": "晴好",
+                "advice": "天气良好，无需携带雨伞"
+              },
+              "traffic": {
+                "level": "一般",
+                "brief": "注意",
+                "advice": "通行条件一般，注意减速慢行，保持车距"
+              },
+              "air_purifier": {
+                "level": "建议开启",
+                "brief": "轻度",
+                "advice": "空气质量一般，敏感人群建议开启净化器"
+              },
+              "pollen": {
+                "level": "偏高",
+                "brief": "较高",
+                "advice": "花粉扩散活跃，敏感人群外出请做好防护"
               }
             },
             "feels_like": 3,
             "wind_direction": "西南风",
-            "wind_power": "2级",
-            "humidity": 11
+            "wind_power": "4级",
+            "humidity": 50
           }
         },
-        "expiresAt": 1771446144957,
-        "createdAt": 1771402944957,
-        "updatedAt": 1771402944957,
-        "size": 1407
+        "expiresAt": 1771541665664,
+        "createdAt": 1771498465664,
+        "updatedAt": 1771498465664,
+        "size": 2766
       }
     },
     "exploit": {
       "system.dailyQuote": {
-        "value": "就算现在正看着你的时候，也好想要你继续那些温柔的话语，但愿让我们两的关系长久的继续下去。",
+        "value": "生活中若没有朋友，就像生活中没有阳光一样。",
         "expiresAt": 0,
-        "createdAt": 1771433886109,
-        "updatedAt": 1771433886109,
-        "size": 134
+        "createdAt": 1771499600848,
+        "updatedAt": 1771499600848,
+        "size": 65
       }
     }
   }
