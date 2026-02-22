@@ -163,13 +163,24 @@
         },
 
         _buildUrl: function(serviceName, params) {
+            if (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) {
+                const nameMap = { FSDirve: SystemInformation.SERVICE_NAMES.FSDIRVE, CompressionDirve: SystemInformation.SERVICE_NAMES.COMPRESSION_DIRVE, DISKMANAGER: SystemInformation.SERVICE_NAMES.DISKMANAGER };
+                const key = nameMap[serviceName] || serviceName;
+                const url = SystemInformation.buildServiceUrlObject(key, { upid: this._upid });
+                if (params) {
+                    for (const [k, v] of Object.entries(params)) {
+                        url.searchParams.set(k, String(v));
+                    }
+                }
+                return url.toString();
+            }
             const origin = typeof window !== 'undefined' && window.location ? window.location.origin : 'http://localhost:8089';
             const pathMap = {
-                FSDirve: '/system/service/FSDirve.php',
-                CompressionDirve: '/system/service/CompressionDirve.php',
-                DISKMANAGER: '/system/service/DISKMANAGER.php'
+                FSDirve: (typeof SystemInformation !== 'undefined' && SystemInformation.getFSDirvePath) ? SystemInformation.getFSDirvePath() : '/system/service/FSDirve.php',
+                CompressionDirve: (typeof SystemInformation !== 'undefined' && SystemInformation.getCompressionDirvePath) ? SystemInformation.getCompressionDirvePath() : '/system/service/CompressionDirve.php',
+                DISKMANAGER: (typeof SystemInformation !== 'undefined' && SystemInformation.getServicePath) ? SystemInformation.getServicePath(SystemInformation.SERVICE_NAMES.DISKMANAGER) : '/system/service/DISKMANAGER.php'
             };
-            const url = new URL(pathMap[serviceName] || serviceName, origin);
+            const url = new URL(pathMap[serviceName] || serviceName, (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) ? SystemInformation.getOrigin() : origin);
             if (this._upid != null) url.searchParams.set('upid', String(this._upid));
             if (params) {
                 for (const [k, v] of Object.entries(params)) {
@@ -219,8 +230,9 @@
         },
 
         _testNoUpidRejected: async function() {
-            const origin = typeof window !== 'undefined' && window.location ? window.location.origin : 'http://localhost:8089';
-            const url = new URL('/system/service/FSDirve.php', origin);
+            const base = (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) ? SystemInformation.getOrigin() : (typeof window !== 'undefined' && window.location ? window.location.origin : 'http://localhost:8089');
+            const path = (typeof SystemInformation !== 'undefined' && SystemInformation.getFSDirvePath) ? SystemInformation.getFSDirvePath() : '/system/service/FSDirve.php';
+            const url = new URL(path, base);
             url.searchParams.set('action', 'list_dir');
             url.searchParams.set('path', 'D:');
             const res = await fetch(url.toString());

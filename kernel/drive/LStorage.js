@@ -124,8 +124,12 @@ class LStorage {
         }
     }
 
-    // PHP 服务地址（已废弃，使用 SystemInformation.getFSDirvePath() 替代）
-    static PHP_SERVICE_URL = "/system/service/FSDirve.php";
+    /** 获取文件服务路径（优先 SystemInformation，否则降级路径） */
+    static _getFsServicePath() {
+        return (typeof SystemInformation !== 'undefined' && typeof SystemInformation.getFSDirvePath === 'function')
+            ? SystemInformation.getFSDirvePath()
+            : '/system/service/FSDirve.php';
+    }
 
     // 存储数据结构
     // {
@@ -245,7 +249,7 @@ class LStorage {
         try {
             const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject)
                 ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
-                : new URL(LStorage.PHP_SERVICE_URL, (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin)
+                : new URL(LStorage._getFsServicePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin)
                     ? SystemInformation.getOrigin()
                     : window.location.origin);
             url.searchParams.set('action', 'read_file');
@@ -335,7 +339,7 @@ class LStorage {
         try {
             const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject)
                 ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
-                : new URL(LStorage.PHP_SERVICE_URL, (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin)
+                : new URL(LStorage._getFsServicePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin)
                     ? SystemInformation.getOrigin()
                     : window.location.origin);
             url.searchParams.set('action', 'write_file');
@@ -419,7 +423,7 @@ class LStorage {
         try {
             const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject)
                 ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
-                : new URL(LStorage.PHP_SERVICE_URL, (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin)
+                : new URL(LStorage._getFsServicePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin)
                     ? SystemInformation.getOrigin()
                     : window.location.origin);
             url.searchParams.set('action', 'exists');
@@ -470,7 +474,7 @@ class LStorage {
         try {
             const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject)
                 ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
-                : new URL(LStorage.PHP_SERVICE_URL, (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin)
+                : new URL(LStorage._getFsServicePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin)
                     ? SystemInformation.getOrigin()
                     : window.location.origin);
             url.searchParams.set('action', 'create_file');
@@ -2735,7 +2739,7 @@ class LStorage {
                     // 使用 PHP 服务创建目录
                     const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject)
                         ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
-                        : new URL(LStorage.PHP_SERVICE_URL, (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin)
+                        : new URL(LStorage._getFsServicePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin)
                             ? SystemInformation.getOrigin()
                             : window.location.origin);
                     url.searchParams.set('action', 'create_dir');
@@ -2828,7 +2832,7 @@ class LStorage {
                     // 降级方案：直接使用 PHP 服务写入文件
                     const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject)
                         ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
-                        : new URL(LStorage.PHP_SERVICE_URL, (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin)
+                        : new URL(LStorage._getFsServicePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin)
                             ? SystemInformation.getOrigin()
                             : window.location.origin);
                     url.searchParams.set('action', 'write_file');
@@ -2857,7 +2861,7 @@ class LStorage {
 
                                     const createUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject)
                                         ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
-                                        : new URL(LStorage.PHP_SERVICE_URL, (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin)
+                                        : new URL(LStorage._getFsServicePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin)
                                             ? SystemInformation.getOrigin()
                                             : window.location.origin);
                                     createUrl.searchParams.set('action', 'create_dir');
@@ -2965,7 +2969,7 @@ class LStorage {
             try {
                 const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject)
                     ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
-                    : new URL(LStorage.PHP_SERVICE_URL, (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin)
+                    : new URL(LStorage._getFsServicePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin)
                         ? SystemInformation.getOrigin()
                         : window.location.origin);
                 url.searchParams.set('action', 'read_file');
@@ -3225,7 +3229,7 @@ class LStorage {
                     // 降级方案：使用 PHP 服务删除文件
                     const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject)
                         ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
-                        : new URL(LStorage.PHP_SERVICE_URL, (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin)
+                        : new URL(LStorage._getFsServicePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin)
                             ? SystemInformation.getOrigin()
                             : window.location.origin);
                     url.searchParams.set('action', 'delete_file');
@@ -3290,7 +3294,7 @@ class LStorage {
                                 try {
                                     const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject)
                                         ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE)
-                                        : new URL(LStorage.PHP_SERVICE_URL, (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin)
+                                        : new URL(LStorage._getFsServicePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin)
                                             ? SystemInformation.getOrigin()
                                             : window.location.origin);
                                     url.searchParams.set('action', 'delete_dir_recursive');

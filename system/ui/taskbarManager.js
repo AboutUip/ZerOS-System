@@ -7658,6 +7658,15 @@ class TaskbarManager {
     }
     
     /**
+     * 更新电池显示（多语言切换时刷新 tooltip 等，委托给 _updateBatteryStatus）
+     * @param {HTMLElement} batteryContainer 电池容器元素
+     */
+    static _updateBatteryDisplay(batteryContainer) {
+        if (!batteryContainer) return;
+        TaskbarManager._updateBatteryStatus(batteryContainer);
+    }
+    
+    /**
      * 切换电池面板（显示/隐藏）
      * @param {HTMLElement} batteryContainer 电池显示容器
      */
@@ -11132,30 +11141,70 @@ class TaskbarManager {
         }
         
         try {
+            const previewProvider = typeof GUIManager !== 'undefined' && typeof GUIManager.getTaskbarPreviewProvider === 'function'
+                ? GUIManager.getTaskbarPreviewProvider(pid)
+                : null;
+
             // 创建预览容器
             const preview = document.createElement('div');
             preview.id = `taskbar-preview-${pid}`;
             preview.className = 'taskbar-window-preview';
             preview.dataset.pid = pid.toString();
-            
-            // 创建预览缩略图
-            const thumbnail = TaskbarManager._createWindowThumbnail(windowElement, pid);
-            if (thumbnail) {
-                preview.appendChild(thumbnail);
-            }
-            
-            // 添加窗口标题
-            const titleBar = windowElement.querySelector('.zos-window-titlebar');
-            if (titleBar) {
-                const title = titleBar.querySelector('.zos-window-title');
-                if (title) {
-                    const previewTitle = document.createElement('div');
-                    previewTitle.className = 'taskbar-preview-title';
-                    previewTitle.textContent = title.textContent || '';
-                    preview.appendChild(previewTitle);
+
+            if (previewProvider) {
+                // 程序已注册预览提供者：使用程序提供的 HTML 片段渲染，点击事件交于程序处理
+                const contentWrap = document.createElement('div');
+                contentWrap.className = 'taskbar-window-preview-content';
+                contentWrap.style.cssText = 'width:100%;height:100%;overflow:auto;';
+                try {
+                    const content = previewProvider.getPreviewContent();
+                    if (typeof content === 'string') {
+                        contentWrap.innerHTML = content;
+                    } else if (content && content.nodeType === 1) {
+                        contentWrap.appendChild(content);
+                    }
+                } catch (e) {
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.warn("TaskbarManager", `预览提供者 getPreviewContent 执行失败: ${e.message}`);
+                    }
+                }
+                preview.appendChild(contentWrap);
+                if (previewProvider.onPreviewClick && typeof previewProvider.onPreviewClick === 'function') {
+                    // 使用捕获阶段，确保在其它逻辑之前交给程序处理；点击预览内按钮时不应关闭预览
+                    contentWrap.addEventListener('click', (e) => {
+                        try {
+                            previewProvider.onPreviewClick(e);
+                            // 若点击的是带 data-action 的控件，阻止冒泡与默认行为，避免预览被关或焦点被抢
+                            var el = e.target && e.target.nodeType === 1 ? e.target : (e.target && e.target.parentElement);
+                            if (el && el.closest && el.closest('[data-action]')) {
+                                e.preventDefault();
+                                e.stopPropagation();
+                            }
+                        } catch (err) {
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.warn("TaskbarManager", `预览提供者 onPreviewClick 执行失败: ${err.message}`);
+                            }
+                        }
+                    }, true);
+                }
+            } else {
+                // 默认预览：缩略图 + 窗口标题
+                const thumbnail = TaskbarManager._createWindowThumbnail(windowElement, pid);
+                if (thumbnail) {
+                    preview.appendChild(thumbnail);
+                }
+                const titleBar = windowElement.querySelector('.zos-window-titlebar');
+                if (titleBar) {
+                    const title = titleBar.querySelector('.zos-window-title');
+                    if (title) {
+                        const previewTitle = document.createElement('div');
+                        previewTitle.className = 'taskbar-preview-title';
+                        previewTitle.textContent = title.textContent || '';
+                        preview.appendChild(previewTitle);
+                    }
                 }
             }
-            
+
             // 添加到body
             document.body.appendChild(preview);
             
@@ -11268,7 +11317,9 @@ class TaskbarManager {
             
             return preview;
         } catch (e) {
-            KernelLogger.warn("TaskbarManager", `显示窗口预览失败: ${e.message}`);
+            if (typeof KernelLogger !== 'undefined') {
+                KernelLogger.warn("TaskbarManager", `显示窗口预览失败: ${e.message}`);
+            }
             return null;
         }
     }

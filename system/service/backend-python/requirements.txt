@@ -1,0 +1,4 @@
+# ZerOS Python 后端依赖
+fastapi>=0.100.0
+uvicorn[standard]>=0.22.0
+PyJWT>=2.8.0

@@ -2799,9 +2799,7 @@
             try {
                 const success = await UserControl.renameUser(oldUsername, trimmedUsername);
                 if (success) {
-                    if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                        await GUIManager.showAlert(`用户已重命名为 ${trimmedUsername}`, '成功', 'success');
-                    }
+                    await this._showNotification(`用户已重命名为 ${trimmedUsername}`, 'success');
                     // 刷新用户列表
                     this._switchCategory('users');
                 } else {
@@ -3140,25 +3138,19 @@
                         await UserControl.setPassword(username.trim(), password.trim());
                     }
                     
-                    if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                        await GUIManager.showAlert('用户创建成功', '成功', 'success');
-                    }
+                    await this._showNotification('用户创建成功', 'success');
                     
                     // 返回用户列表
                     this.userManagementPage = 'list';
                     this._switchCategory('users');
                 } else {
-                    if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                        await GUIManager.showAlert('用户创建失败', '错误', 'error');
-                    }
+                    await this._showNotification('用户创建失败', 'error');
                 }
             } catch (error) {
                 if (typeof KernelLogger !== 'undefined') {
                     KernelLogger.error('SETTINGS', `创建用户失败: ${error.message}`, error);
                 }
-                if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                    await GUIManager.showAlert(`创建用户失败: ${error.message}`, '错误', 'error');
-                }
+                await this._showNotification(`创建用户失败: ${error.message}`, 'error');
             }
         },
         
@@ -3333,25 +3325,17 @@
                         const success = await UserGroup.addMember(group.name, username);
                         if (!success) {
                             checkbox.checked = false;
-                            if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                                await GUIManager.showAlert(`将用户添加到组 "${group.name}" 失败`, '错误', 'error');
-                            }
+                            await this._showNotification(`将用户添加到组 "${group.name}" 失败`, 'error');
                         } else {
-                            if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                                await GUIManager.showAlert(`用户已添加到组 "${group.name}"`, '成功', 'success');
-                            }
+                            await this._showNotification(`用户已添加到组 "${group.name}"`, 'success');
                         }
                     } else {
                         const success = await UserGroup.removeMember(group.name, username);
                         if (!success) {
                             checkbox.checked = true;
-                            if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                                await GUIManager.showAlert(`从组 "${group.name}" 移除用户失败`, '错误', 'error');
-                            }
+                            await this._showNotification(`从组 "${group.name}" 移除用户失败`, 'error');
                         } else {
-                            if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                                await GUIManager.showAlert(`用户已从组 "${group.name}" 移除`, '成功', 'success');
-                            }
+                            await this._showNotification(`用户已从组 "${group.name}" 移除`, 'success');
                         }
                     }
                 } catch (error) {
@@ -3359,9 +3343,7 @@
                     if (typeof KernelLogger !== 'undefined') {
                         KernelLogger.error('SETTINGS', `管理组成员失败: ${error.message}`, error);
                     }
-                    if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                        await GUIManager.showAlert(`操作失败: ${error.message}`, '错误', 'error');
-                    }
+                    await this._showNotification(`操作失败: ${error.message}`, 'error');
                 }
             });
             
@@ -4184,9 +4166,7 @@
                 if (typeof KernelLogger !== 'undefined') {
                     KernelLogger.error('SETTINGS', 'UserGroup 未定义');
                 }
-                if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                    await GUIManager.showAlert('用户组管理系统未加载', '错误', 'error');
-                }
+                await this._showNotification('用户组管理系统未加载', 'error');
                 return;
             }
             
@@ -4212,9 +4192,7 @@
                 }
                 
                 if (success) {
-                    if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                        await GUIManager.showAlert('组创建成功', '成功', 'success');
-                    }
+                    await this._showNotification('组创建成功', 'success');
                     // 返回组列表页面
                     this.userManagementPage = 'groups';
                     this._switchCategory('users');
@@ -4226,18 +4204,14 @@
                     if (typeof KernelLogger !== 'undefined') {
                         KernelLogger.warn('SETTINGS', '组创建失败，但未抛出异常');
                     }
-                    if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                        await GUIManager.showAlert('组创建失败，请检查权限或组名是否已存在', '错误', 'error');
-                    }
+                    await this._showNotification('组创建失败，请检查权限或组名是否已存在', 'error');
                 }
             } catch (error) {
                 if (typeof KernelLogger !== 'undefined') {
                     KernelLogger.error('SETTINGS', `创建组失败: ${error.message}`, error);
                     KernelLogger.error('SETTINGS', `创建组失败堆栈: ${error.stack}`);
                 }
-                if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                    await GUIManager.showAlert(`创建组失败: ${error.message}`, '错误', 'error');
-                }
+                await this._showNotification(`创建组失败: ${error.message}`, 'error');
             }
         },
         
@@ -4263,24 +4237,18 @@
             try {
                 const success = await UserGroup.deleteGroup(groupName);
                 if (success) {
-                    if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                        await GUIManager.showAlert('组已删除', '成功', 'success');
-                    }
+                    await this._showNotification('组已删除', 'success');
                     // 刷新组列表
                     this.userManagementPage = 'groups';
                     this._switchCategory('users');
                 } else {
-                    if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                        await GUIManager.showAlert('删除组失败', '错误', 'error');
-                    }
+                    await this._showNotification('删除组失败', 'error');
                 }
             } catch (error) {
                 if (typeof KernelLogger !== 'undefined') {
                     KernelLogger.error('SETTINGS', `删除组失败: ${error.message}`, error);
                 }
-                if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                    await GUIManager.showAlert(`删除组失败: ${error.message}`, '错误', 'error');
-                }
+                await this._showNotification(`删除组失败: ${error.message}`, 'error');
             }
         },
         
@@ -4295,23 +4263,17 @@
             try {
                 const success = await UserGroup.removeMember(groupName, username);
                 if (success) {
-                    if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                        await GUIManager.showAlert(`用户已从组 "${groupName}" 移除`, '成功', 'success');
-                    }
+                    await this._showNotification(`用户已从组 "${groupName}" 移除`, 'success');
                     // 刷新组详情
                     this._switchCategory('users');
                 } else {
-                    if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                        await GUIManager.showAlert('移除成员失败', '错误', 'error');
-                    }
+                    await this._showNotification('移除成员失败', 'error');
                 }
             } catch (error) {
                 if (typeof KernelLogger !== 'undefined') {
                     KernelLogger.error('SETTINGS', `移除成员失败: ${error.message}`, error);
                 }
-                if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                    await GUIManager.showAlert(`移除成员失败: ${error.message}`, '错误', 'error');
-                }
+                await this._showNotification(`移除成员失败: ${error.message}`, 'error');
             }
         },
         
@@ -4941,9 +4903,7 @@
                     
                     await ProcessManager.callKernelAPI(this.pid, 'Environment.set', [existingName, value]);
                     
-                    if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                        await GUIManager.showAlert('环境变量已更新', '成功', 'success');
-                    }
+                    await this._showNotification('环境变量已更新', 'success');
                     
                     // 返回列表页面
                     this.environmentManagementPage = 'list';
@@ -4952,9 +4912,7 @@
                     if (typeof KernelLogger !== 'undefined') {
                         KernelLogger.error('SETTINGS', `更新环境变量失败: ${error.message}`, error);
                     }
-                    if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
-                        await GUIManager.showAlert(`更新环境变量失败: ${error.message}`, '错误', 'error');
-                    }
+                    await this._showNotification(`更新环境变量失败: ${error.message}`, 'error');
                 }
             });
             buttonGroup.appendChild(saveBtn);
@@ -4987,7 +4945,7 @@
             try {
                 await ProcessManager.callKernelAPI(this.pid, 'Environment.delete', [name]);
                 
-                await GUIManager.showAlert('环境变量已删除', '成功', 'success');
+                await this._showNotification('环境变量已删除', 'success');
                 
                 // 刷新环境变量列表
                 const listContainer = this.window.querySelector('#environment-variables-list');
@@ -4998,7 +4956,7 @@
                 if (typeof KernelLogger !== 'undefined') {
                     KernelLogger.error('SETTINGS', `删除环境变量失败: ${error.message}`, error);
                 }
-                await GUIManager.showAlert(`删除环境变量失败: ${error.message}`, '错误', 'error');
+                await this._showNotification(`删除环境变量失败: ${error.message}`, 'error');
             }
         },
         
@@ -5333,7 +5291,7 @@
             try {
                 await ProcessManager.callKernelAPI(this.pid, 'Application.uninstall', [programName]);
                 
-                await GUIManager.showAlert('程序已卸载', '成功', 'success');
+                await this._showNotification('程序已卸载', 'success');
                 
                 // 重新加载程序列表
                 const listContainer = document.getElementById('applications-list');
@@ -5344,7 +5302,7 @@
                 if (typeof KernelLogger !== 'undefined') {
                     KernelLogger.error('SETTINGS', `卸载程序失败: ${error.message}`, error);
                 }
-                await GUIManager.showAlert(`卸载失败: ${error.message}`, '错误', 'error');
+                await this._showNotification(`卸载失败: ${error.message}`, 'error');
             }
         }
     };

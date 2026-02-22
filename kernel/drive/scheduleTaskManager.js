@@ -223,9 +223,10 @@ class ScheduleTaskManager {
         
         // 立即清空所有 JWT（包括文件），关机/重启时调用
         try {
-            const origin = typeof window !== 'undefined' && window.location ? window.location.origin : '';
-            if (origin && typeof navigator !== 'undefined' && typeof navigator.sendBeacon === 'function') {
-                const clearUrl = origin + '/system/service/randomSecurity.php?action=clear';
+            const clearUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrl)
+                ? SystemInformation.buildServiceUrl(SystemInformation.SERVICE_NAMES.RANDOM_SECURITY, { action: 'clear' })
+                : (typeof window !== 'undefined' && window.location ? window.location.origin : '') + '/system/service/randomSecurity.php?action=clear';
+            if (clearUrl && typeof navigator !== 'undefined' && typeof navigator.sendBeacon === 'function') {
                 navigator.sendBeacon(clearUrl, '');
                 if (typeof KernelLogger !== 'undefined') {
                     KernelLogger.info("ScheduleTaskManager", "已发送 JWT 清空请求");

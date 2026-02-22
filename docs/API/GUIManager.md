@@ -243,6 +243,57 @@ const recentLogs = GUIManager.getWindowLogs(windowId, { limit: 10 });
 const focusLogs = GUIManager.getWindowLogs(windowId, { action: 'focus' });
 ```
 
+### 任务栏单窗口预览提供者
+
+程序可注册「任务栏单窗口预览提供者」，使悬停任务栏图标时的预览使用程序提供的 HTML 片段渲染，点击预览时由程序的回调处理。未注册时保持系统默认预览（缩略图 + 窗口标题）。**仅对单窗口预览生效**，多窗口预览不在此增强范围内。
+
+程序应通过内核 API 调用（pid 由内核自动注入），见 [ProcessManager.md - 可用 API](./ProcessManager.md)。
+
+#### `registerTaskbarPreviewProvider(pid, provider)`
+
+注册任务栏单窗口预览提供者。由内核或 TaskbarManager 使用；程序侧请使用内核 API `GUI.registerTaskbarPreviewProvider`。
+
+**参数**:
+- `pid` (number): 进程 ID
+- `provider` (Object): 提供者对象
+  - `getPreviewContent` (Function): `() => string | HTMLElement`，返回预览内容：字符串将作为 HTML 插入，HTMLElement 将直接挂载
+  - `onPreviewClick` (Function，可选): `(e: Event) => void`，预览区域内的点击事件由该回调处理
+
+**说明**:
+- 注册后，该进程在**单窗口**且任务栏显示预览时，将使用 `getPreviewContent()` 的返回值渲染预览区域
+- 预览区域内的点击会调用 `onPreviewClick(e)`，由程序自行决定行为（如聚焦窗口、执行操作等）
+- 进程退出或窗口被清理时，内核会自动调用 `unregisterTaskbarPreviewProvider(pid)`，无需程序显式注销
+
+#### `unregisterTaskbarPreviewProvider(pid)`
+
+注销任务栏单窗口预览提供者。程序侧请使用内核 API `GUI.unregisterTaskbarPreviewProvider`；进程退出时内核会自动调用，一般无需程序显式调用。
+
+**参数**:
+- `pid` (number): 进程 ID
+
+#### `getTaskbarPreviewProvider(pid)`
+
+获取指定进程的预览提供者（供 TaskbarManager 等内部使用，程序无需调用）。
+
+**参数**:
+- `pid` (number): 进程 ID
+
+**返回值**: `Object | null` - `{ getPreviewContent, onPreviewClick }` 或 `null`
+
+**程序侧调用示例**（在 `__init__(pid, initArgs)` 中，使用进程绑定 API，pid 由内核注入）:
+```javascript
+// 注册自定义预览：悬停任务栏图标时显示自定义 HTML，点击预览时聚焦窗口
+initArgs.kernelAPI.call('GUI.registerTaskbarPreviewProvider', [{
+    getPreviewContent: () => {
+        return '<div class="my-preview">当前文档: ' + (this.docTitle || '未命名') + '</div>';
+    },
+    onPreviewClick: (e) => {
+        if (typeof GUIManager !== 'undefined') GUIManager.focusWindow(this.pid);
+    }
+}]);
+// 进程退出时内核会自动注销，无需手动调用 GUI.unregisterTaskbarPreviewProvider
+```
+
 ### 模态对话框
 
 #### `showAlert(message, title, type)`

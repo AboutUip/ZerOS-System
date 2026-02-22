@@ -310,9 +310,9 @@
         if (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrl) {
             return SystemInformation.buildServiceUrl(SystemInformation.SERVICE_NAMES.SPARK_AI_PROXY);
         }
-        return (typeof window !== 'undefined' && window.location)
-            ? new URL('/system/service/spark-ai-proxy.php', window.location.origin).toString()
-            : '/system/service/spark-ai-proxy.php';
+        const base = (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) ? SystemInformation.getOrigin() : (typeof window !== 'undefined' && window.location ? window.location.origin : '');
+        const path = (typeof SystemInformation !== 'undefined' && SystemInformation.getServicePath) ? SystemInformation.getServicePath(SystemInformation.SERVICE_NAMES.SPARK_AI_PROXY) : '/system/service/spark-ai-proxy.php';
+        return base ? new URL(path, base).toString() : path;
     }
 
     /** 获取阿里云 DashScope 代理 URL（由代理转发至北京地域，绕过 CORS） */
@@ -332,9 +332,9 @@
             }
         }
         if (!proxyUrl) {
-            proxyUrl = (typeof window !== 'undefined' && window.location)
-                ? new URL('/system/service/dashscope-ai-proxy.php', window.location.origin).toString()
-                : '/system/service/dashscope-ai-proxy.php';
+            const base = (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) ? SystemInformation.getOrigin() : (typeof window !== 'undefined' && window.location ? window.location.origin : '');
+            const path = (typeof SystemInformation !== 'undefined' && SystemInformation.getServicePath) ? SystemInformation.getServicePath(SystemInformation.SERVICE_NAMES.DASHSCOPE_AI_PROXY) : '/system/service/dashscope-ai-proxy.php';
+            proxyUrl = base ? new URL(path, base).toString() : path;
             if (typeof KernelLogger !== 'undefined') {
                 KernelLogger.debug('server-aiassistant', 'DashScope 代理 URL (回退): ' + proxyUrl);
             }

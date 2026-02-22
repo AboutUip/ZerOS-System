@@ -1022,7 +1022,7 @@
 
                 const createDirUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject)
                     ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE, { upid: this._upid })
-                    : new URL('/system/service/FSDirve.php', window.location.origin);
+                    : new URL((typeof SystemInformation !== 'undefined' && SystemInformation.getFSDirvePath) ? SystemInformation.getFSDirvePath() : '/system/service/FSDirve.php', (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) ? SystemInformation.getOrigin() : (window.location && window.location.origin));
                 if (this._upid != null) createDirUrl.searchParams.set('upid', this._upid);
                 createDirUrl.searchParams.set('action', 'create_dir');
                 createDirUrl.searchParams.set('path', 'D:/');
@@ -1035,7 +1035,7 @@
 
                 const createStoreDirUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject)
                     ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE, { upid: this._upid })
-                    : new URL('/system/service/FSDirve.php', window.location.origin);
+                    : new URL((typeof SystemInformation !== 'undefined' && SystemInformation.getFSDirvePath) ? SystemInformation.getFSDirvePath() : '/system/service/FSDirve.php', (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) ? SystemInformation.getOrigin() : (window.location && window.location.origin));
                 if (this._upid != null) createStoreDirUrl.searchParams.set('upid', this._upid);
                 createStoreDirUrl.searchParams.set('action', 'create_dir');
                 createStoreDirUrl.searchParams.set('path', 'D:/cache');
@@ -1048,7 +1048,7 @@
 
                 const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject)
                     ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE, { upid: this._upid })
-                    : new URL('/system/service/FSDirve.php', window.location.origin);
+                    : new URL((typeof SystemInformation !== 'undefined' && SystemInformation.getFSDirvePath) ? SystemInformation.getFSDirvePath() : '/system/service/FSDirve.php', (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) ? SystemInformation.getOrigin() : (window.location && window.location.origin));
                 if (this._upid != null) url.searchParams.set('upid', this._upid);
                 url.searchParams.set('action', 'write_file');
                 url.searchParams.set('path', saveDir);
@@ -1082,8 +1082,9 @@
 
                         let tempAsset = null;
                         try {
-                            const baseUrl = window.location.origin;
-                            const url = new URL('/system/service/FSDirve.php', baseUrl);
+                            const baseUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) ? SystemInformation.getOrigin() : (window.location && window.location.origin);
+                            const path = (typeof SystemInformation !== 'undefined' && SystemInformation.getFSDirvePath) ? SystemInformation.getFSDirvePath() : '/system/service/FSDirve.php';
+                            const url = new URL(path, baseUrl);
                             if (this._upid != null) url.searchParams.set('upid', this._upid);
                             url.searchParams.set('action', 'read_file');
                             url.searchParams.set('path', 'D:/bin');
@@ -1157,7 +1158,7 @@
 
                     const deleteUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject)
                         ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE, { upid: this._upid })
-                        : new URL('/system/service/FSDirve.php', window.location.origin);
+                        : new URL((typeof SystemInformation !== 'undefined' && SystemInformation.getFSDirvePath) ? SystemInformation.getFSDirvePath() : '/system/service/FSDirve.php', (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) ? SystemInformation.getOrigin() : (window.location && window.location.origin));
                     if (this._upid != null) deleteUrl.searchParams.set('upid', this._upid);
                     deleteUrl.searchParams.set('action', 'delete_file');
                     deleteUrl.searchParams.set('path', 'D:/cache/store');
@@ -1179,7 +1180,7 @@
             } catch (error) {
                 const deleteUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject)
                     ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE, { upid: this._upid })
-                    : new URL('/system/service/FSDirve.php', window.location.origin);
+                    : new URL((typeof SystemInformation !== 'undefined' && SystemInformation.getFSDirvePath) ? SystemInformation.getFSDirvePath() : '/system/service/FSDirve.php', (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) ? SystemInformation.getOrigin() : (window.location && window.location.origin));
                 if (this._upid != null) deleteUrl.searchParams.set('upid', this._upid);
                 deleteUrl.searchParams.set('action', 'delete_file');
                 deleteUrl.searchParams.set('path', 'D:/cache/store');
@@ -1698,8 +1699,9 @@
 
                 let tempAsset = null;
                 try {
-                    const baseUrl = window.location.origin;
-                    const url = new URL('/system/service/FSDirve.php', baseUrl);
+                    const baseUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) ? SystemInformation.getOrigin() : (window.location && window.location.origin);
+                    const path = (typeof SystemInformation !== 'undefined' && SystemInformation.getFSDirvePath) ? SystemInformation.getFSDirvePath() : '/system/service/FSDirve.php';
+                    const url = new URL(path, baseUrl);
                     if (this._upid != null) url.searchParams.set('upid', this._upid);
                     url.searchParams.set('action', 'read_file');
                     url.searchParams.set('path', 'D:/bin');

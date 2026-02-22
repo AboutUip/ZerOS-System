@@ -1610,7 +1610,10 @@
 
             try {
                 // 调用 PHP 服务注册端口
-                const response = await fetch(`/system/service/networkDirve.php?action=register&port=${port}&pid=${pid}&programName=${encodeURIComponent(programName)}`, {
+                const registerUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrl)
+                    ? SystemInformation.buildServiceUrl(SystemInformation.SERVICE_NAMES.NETWORK_DIRVE, { action: 'register', port, pid, programName: programName })
+                    : `${(typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) ? SystemInformation.getOrigin() : (typeof window !== 'undefined' && window.location ? window.location.origin : '')}/system/service/networkDirve.php?action=register&port=${port}&pid=${pid}&programName=${encodeURIComponent(programName)}`;
+                const response = await fetch(registerUrl, {
                     method: 'GET'
                 });
 
@@ -1676,7 +1679,10 @@
 
             try {
                 // 调用 PHP 服务取消端口
-                const response = await fetch(`/system/service/networkDirve.php?action=unregister&port=${port}`, {
+                const unregisterUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrl)
+                    ? SystemInformation.buildServiceUrl(SystemInformation.SERVICE_NAMES.NETWORK_DIRVE, { action: 'unregister', port })
+                    : `${(typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) ? SystemInformation.getOrigin() : (typeof window !== 'undefined' && window.location ? window.location.origin : '')}/system/service/networkDirve.php?action=unregister&port=${port}`;
+                const response = await fetch(unregisterUrl, {
                     method: 'GET'
                 });
 
@@ -1723,7 +1729,10 @@
             }
 
             try {
-                const response = await fetch(`/system/service/networkDirve.php?action=check&port=${port}`, {
+                const checkUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrl)
+                    ? SystemInformation.buildServiceUrl(SystemInformation.SERVICE_NAMES.NETWORK_DIRVE, { action: 'check', port })
+                    : `${(typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) ? SystemInformation.getOrigin() : (typeof window !== 'undefined' && window.location ? window.location.origin : '')}/system/service/networkDirve.php?action=check&port=${port}`;
+                const response = await fetch(checkUrl, {
                     method: 'GET'
                 });
 
@@ -1771,7 +1780,10 @@
          */
         async getPortStatus(port) {
             try {
-                const response = await fetch(`/system/service/networkDirve.php?action=status&port=${port}`, {
+                const statusUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrl)
+                    ? SystemInformation.buildServiceUrl(SystemInformation.SERVICE_NAMES.NETWORK_DIRVE, { action: 'status', port })
+                    : `${(typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) ? SystemInformation.getOrigin() : (typeof window !== 'undefined' && window.location ? window.location.origin : '')}/system/service/networkDirve.php?action=status&port=${port}`;
+                const response = await fetch(statusUrl, {
                     method: 'GET'
                 });
 
@@ -1806,7 +1818,10 @@
          */
         async listPorts() {
             try {
-                const response = await fetch(`/system/service/networkDirve.php?action=list`, {
+                const listUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrl)
+                    ? SystemInformation.buildServiceUrl(SystemInformation.SERVICE_NAMES.NETWORK_DIRVE, { action: 'list' })
+                    : `${(typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) ? SystemInformation.getOrigin() : (typeof window !== 'undefined' && window.location ? window.location.origin : '')}/system/service/networkDirve.php?action=list`;
+                const response = await fetch(listUrl, {
                     method: 'GET'
                 });
 
@@ -1848,7 +1863,10 @@
             }
 
             try {
-                const response = await fetch(`/system/service/networkDirve.php?action=send&host=${encodeURIComponent(host || '127.0.0.1')}&port=${port}&data=${encodeURIComponent(dataString)}`, {
+                const sendUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrl)
+                    ? SystemInformation.buildServiceUrl(SystemInformation.SERVICE_NAMES.NETWORK_DIRVE, { action: 'send', host: host || '127.0.0.1', port, data: dataString })
+                    : `${(typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) ? SystemInformation.getOrigin() : (typeof window !== 'undefined' && window.location ? window.location.origin : '')}/system/service/networkDirve.php?action=send&host=${encodeURIComponent(host || '127.0.0.1')}&port=${port}&data=${encodeURIComponent(dataString)}`;
+                const response = await fetch(sendUrl, {
                     method: 'GET'
                 });
 

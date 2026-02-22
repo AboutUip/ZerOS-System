@@ -24,73 +24,73 @@
       }
     },
     "TaskbarManager": {
-      "weather:神池县": {
+      "weather:忻府区": {
         "value": {
           "code": 200,
           "data": {
-            "city": "神池县",
+            "city": "山西省 忻州市",
             "today": {
-              "current_temp": "3℃",
+              "current_temp": "6℃",
               "current_cond": "晴",
-              "low": "-3℃",
+              "low": "-9℃",
               "quality": "--"
             },
-            "low_temperature": -3,
-            "tips": "建议穿棉服、羽绒服等厚实保暖衣物",
+            "low_temperature": -9,
+            "tips": "建议穿厚外套、毛衣，注意保暖",
             "seven_day": [
-              {
-                "date": "2026-02-19",
-                "cond": "晴",
-                "high": "5℃",
-                "low": "-3℃"
-              },
-              {
-                "date": "2026-02-20",
-                "cond": "晴",
-                "high": "12℃",
-                "low": "-2℃"
-              },
-              {
-                "date": "2026-02-21",
-                "cond": "多云",
-                "high": "5℃",
-                "low": "-8℃"
-              },
               {
                 "date": "2026-02-22",
                 "cond": "晴",
-                "high": "0℃",
-                "low": "-8℃"
+                "high": "7℃",
+                "low": "-9℃"
               },
               {
                 "date": "2026-02-23",
                 "cond": "多云",
-                "high": "2℃",
+                "high": "11℃",
                 "low": "-6℃"
               },
               {
                 "date": "2026-02-24",
                 "cond": "晴",
-                "high": "5℃",
-                "low": "-5℃"
+                "high": "13℃",
+                "low": "-3℃"
               },
               {
                 "date": "2026-02-25",
-                "cond": "晴",
-                "high": "6℃",
-                "low": "-4℃"
+                "cond": "多云",
+                "high": "11℃",
+                "low": "-2℃"
+              },
+              {
+                "date": "2026-02-26",
+                "cond": "阴",
+                "high": "5℃",
+                "low": "-2℃"
+              },
+              {
+                "date": "2026-02-27",
+                "cond": "多云",
+                "high": "7℃",
+                "low": "-2℃"
+              },
+              {
+                "date": "2026-02-28",
+                "cond": "雨夹雪",
+                "high": "5℃",
+                "low": "-1℃"
               }
             ],
             "life_indices": {
               "clothing": {
-                "level": "寒冷",
-                "brief": "很冷",
-                "advice": "建议穿棉服、羽绒服等厚实保暖衣物"
+                "level": "冷",
+                "brief": "冷",
+                "advice": "建议穿厚外套、毛衣，注意保暖"
               },
               "uv": {
-                "level": "高",
-                "brief": "较强",
-                "advice": "紫外线较强，减少10-14点户外活动，涂抹SPF30+防晒霜，戴帽子和墨镜"
+                "level": "中等",
+                "brief": "中等",
+                "advice": "紫外线中等，建议涂抹SPF15+防晒霜，戴帽子"
               },
               "car_wash": {
                 "level": "非常适宜",
@@ -108,14 +108,14 @@
                 "advice": "建议开启空调制热或使用其他取暖设备"
               },
               "cold_risk": {
-                "level": "中等",
-                "brief": "易发",
-                "advice": "感冒风险中等，注意保暖和作息规律"
+                "level": "较高",
+                "brief": "较易发",
+                "advice": "感冒风险较高，注意防寒保暖，避免受凉"
               },
               "exercise": {
-                "level": "适宜",
-                "brief": "较好",
-                "advice": "天气适合运动，建议适当进行户外锻炼"
+                "level": "非常适宜",
+                "brief": "极佳",
+                "advice": "天气非常适合户外运动，尽情享受吧"
               },
               "comfort": {
                 "level": "极冷",
@@ -123,24 +123,24 @@
                 "advice": "体感寒冷，注意保暖防寒"
               },
               "travel": {
-                "level": "适宜",
-                "brief": "较好",
-                "advice": "天气不错，适合外出活动"
+                "level": "极适宜",
+                "brief": "极佳",
+                "advice": "天气晴好能见度高，非常适合出行游玩"
               },
               "fishing": {
-                "level": "不宜",
-                "brief": "难钓",
-                "advice": "天气条件不佳，鱼类活动低迷，不建议出钓"
+                "level": "一般",
+                "brief": "尚可",
+                "advice": "可以钓鱼，但鱼口可能不太活跃"
               },
               "allergy": {
-                "level": "较易",
-                "brief": "中等",
-                "advice": "有一定过敏风险，敏感人群注意防护"
+                "level": "易",
+                "brief": "偏高",
+                "advice": "过敏风险较高，建议佩戴口罩，回家后清洗面部"
               },
               "sunscreen": {
-                "level": "SPF30",
-                "brief": "较强",
-                "advice": "紫外线较强，建议涂抹SPF30防晒霜，戴帽子遮阳"
+                "level": "SPF15",
+                "brief": "中等",
+                "advice": "紫外线中等，建议涂抹SPF15防晒霜"
               },
               "mood": {
                 "level": "一般",
@@ -158,9 +158,9 @@
                 "advice": "天气良好，无需携带雨伞"
               },
               "traffic": {
-                "level": "一般",
-                "brief": "注意",
-                "advice": "通行条件一般，注意减速慢行，保持车距"
+                "level": "畅通",
+                "brief": "极佳",
+                "advice": "天气晴好能见度高，道路通行条件极佳"
               },
               "air_purifier": {
                 "level": "建议开启",
@@ -173,25 +173,25 @@
                 "advice": "花粉扩散活跃，敏感人群外出请做好防护"
               }
             },
-            "feels_like": 3,
-            "wind_direction": "西南风",
-            "wind_power": "4级",
-            "humidity": 50
+            "feels_like": 6,
+            "wind_direction": "东南风",
+            "wind_power": "3级",
+            "humidity": 25
           }
         },
-        "expiresAt": 1771541665664,
-        "createdAt": 1771498465664,
-        "updatedAt": 1771498465664,
-        "size": 2766
+        "expiresAt": 1771779765148,
+        "createdAt": 1771736565148,
+        "updatedAt": 1771736565148,
+        "size": 2749
       }
     },
     "exploit": {
       "system.dailyQuote": {
-        "value": "生活中若没有朋友，就像生活中没有阳光一样。",
+        "value": "如果你死了，那什么也改变不了，可如果你还活着，那就能改变一些事情。",
         "expiresAt": 0,
-        "createdAt": 1771499600848,
-        "updatedAt": 1771499600848,
-        "size": 65
+        "createdAt": 1771760436259,
+        "updatedAt": 1771760436259,
+        "size": 101
       }
     }
   }

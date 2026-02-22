@@ -1,21 +1,18 @@
 {
   "system": {
     "permissionManager.permissions": {
-      "servicemanager": [
-        "SYSTEM_NOTIFICATION",
-        "SERVER_SERVICE_MANAGE"
-      ],
       "settings": [
-        "SYSTEM_STORAGE_WRITE",
         "GUI_WINDOW_CREATE",
         "EVENT_LISTENER",
         "SYSTEM_STORAGE_READ",
+        "SYSTEM_STORAGE_WRITE",
         "ENVIRONMENT_READ",
         "ENVIRONMENT_WRITE",
         "THEME_READ",
         "LANGUAGES_READ",
         "LANGUAGES_WRITE",
-        "KERNEL_DISK_READ"
+        "KERNEL_DISK_READ",
+        "SYSTEM_NOTIFICATION"
       ]
     },
     "system.style": "macos",
@@ -297,7 +294,7 @@
         "password": "61b249bf6d604d14120821f43625e84e",
         "avatar": "avatar_root_1766272534753.jpg",
         "createdAt": 1766271155991,
-        "lastLogin": 1771499601941
+        "lastLogin": 1771760437579
       },
       "TestUser": {
         "level": "USER",
@@ -365,7 +362,8 @@
       "currentLocale": "zh-CN"
     },
     "_server_notice_history": [
-      "2026-02-16T18:37:38.455747"
+      "2026-02-16T18:37:38.455747",
+      "2026-02-22T13:05:41.821472"
     ],
     "bios.memoryAllocation": true
   },

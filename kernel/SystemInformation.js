@@ -86,7 +86,7 @@ class SystemInformation {
     static _backendConfig = {
         type: SystemInformation.BACKEND_TYPE.PHP,
         phpPort: 8089,                              // PHP 默认端口
-        springBootPort: 8080                        // SpringBoot 默认端口
+        springBootPort: 8000                        // SpringBoot 默认端口
     };
     
     // 服务名称常量（不含后缀，根据后端类型自动添加）
@@ -99,7 +99,10 @@ class SystemInformation {
         BROWSER_PROXY: 'BrowserProxy',
         DISKMANAGER: 'DISKMANAGER',
         SPARK_AI_PROXY: 'spark-ai-proxy',
-        DASHSCOPE_AI_PROXY: 'dashscope-ai-proxy'
+        DASHSCOPE_AI_PROXY: 'dashscope-ai-proxy',
+        RANDOM_SECURITY: 'randomSecurity',
+        PROGRAM_PERMISSIONS: 'programPermissions',
+        NETWORK_DIRVE: 'networkDirve'
     };
     
     // 服务基础路径
@@ -294,6 +297,22 @@ class SystemInformation {
      */
     static getBrowserProxyUrl() {
         return new URL(SystemInformation.getBrowserProxyPath(), SystemInformation.getOrigin()).toString();
+    }
+    
+    /**
+     * 获取随机安全校验服务路径（引导前 JWT 签发，供 RandomSecurity 使用）
+     * @returns {string} 服务路径（不含 origin）
+     */
+    static getRandomSecurityPath() {
+        return SystemInformation.getServicePath(SystemInformation.SERVICE_NAMES.RANDOM_SECURITY);
+    }
+    
+    /**
+     * 获取随机安全校验服务完整 URL（支持多后端：根据 getOrigin 端口与后端类型）
+     * @returns {string} 完整的 randomSecurity 服务 URL
+     */
+    static getRandomSecurityUrl() {
+        return new URL(SystemInformation.getRandomSecurityPath(), SystemInformation.getOrigin()).toString();
     }
     
     /**

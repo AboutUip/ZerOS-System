@@ -10101,7 +10101,7 @@ function lookup(obj, key) {
   return temp;
 }
 function toggleImg(src, size) {
-  if (!src) {
+  if (!src || src === "undefined") {
     return Promise.reject(`toggleImg：传递的src为空: ${src}`);
   }
   const img = new Image();
@@ -10285,7 +10285,13 @@ function checkUrlValidity(url2) {
   }
 }
 function convertToProxyUrl(originalUrl) {
+  if (!originalUrl || originalUrl === "undefined") return originalUrl || "";
   try {
+    const stored = localStorage.getItem(USER_SETTINGS);
+    if (stored) {
+      const o = JSON.parse(stored);
+      if (o && o.baseUrl && (o.baseUrl + "").indexOf("localhost:3000") !== -1) return originalUrl;
+    }
     const url2 = new URL(originalUrl);
     const hostParts = url2.hostname.split(".");
     const serverNum = hostParts[0].replace("m", "");
@@ -110318,7 +110324,7 @@ const {
 const USER_SETTINGS = "USER_SETTINGS";
 const useSettings = /* @__PURE__ */ defineStore("settingsId", () => {
   const state = reactive({
-    baseUrl: "https://api-music.cenguigui.cn",
+    baseUrl: "http://47.108.183.165:3000",
     lyricBg: "rhythm",
     bold: true,
     font: "Avenir, Helvetica, Arial, sans-serif"
@@ -110365,10 +110371,19 @@ function setBaseURL(url2) {
   http.defaults.baseURL = url2;
 }
 const ignoreState = ["/login/qr/check"];
+const isLocalApi = () => (http.defaults.baseURL || "").indexOf("localhost:3000") !== -1;
 http.interceptors.request.use(
   (config3) => {
     if (!config3.params) {
       config3.params = {};
+    }
+    if (isLocalApi()) {
+      const u = config3.url?.split("?")[0] || "";
+      if (u === "/song/url/v1") {
+        config3.url = "/song/url" + (config3.url?.indexOf("?") >= 0 ? config3.url.slice(config3.url.indexOf("?")) : "");
+      } else if (u === "/lyric/new") {
+        config3.url = "/lyric" + (config3.url?.indexOf("?") >= 0 ? config3.url.slice(config3.url.indexOf("?")) : "");
+      }
     }
     const cookie2 = localStorage.getItem(`MUSIC_U`);
     if (cookie2) {
@@ -110383,21 +110398,20 @@ http.interceptors.request.use(
 );
 http.interceptors.response.use(
   (response) => {
-    const {
-      status,
-      data: { code }
-    } = response;
+    const status = response.status;
+    const data = response.data;
+    const code = data?.code;
     const url2 = response.config.url?.split("?")[0];
-    if (!ignoreState.includes(url2) && status !== 200 && code !== 200) {
-      ElMessage.error(response.data.message || `请求出现错误，当前状态码为${code || status}`);
-      return Promise.reject(response.data);
+    if (!ignoreState.includes(url2) && status !== 200 && code !== 200 && code !== undefined) {
+      ElMessage.error(data?.message || `请求出现错误，当前状态码为${code ?? status}`);
+      return Promise.reject(data || {});
     }
-    return response.data;
+    return data != null ? data : response;
   },
   (error2) => {
-    const data = error2.response.data;
-    ElMessage.error(data.message || data.msg || error2.message);
-    return Promise.reject(data);
+    const data = error2.response?.data;
+    ElMessage.error(data?.message || data?.msg || error2.message);
+    return Promise.reject(data || error2);
   }
 );
 const request = (url2, method4, config3) => {
@@ -111565,26 +111579,32 @@ const _sfc_main$o = /* @__PURE__ */ defineComponent$1({
   }
 });
 const Search = /* @__PURE__ */ _export_sfc(_sfc_main$o, [["__scopeId", "data-v-9a196e21"]]);
+const isZerOSEmbedded = () => typeof window !== "undefined" && window.parent !== window;
 const handle = () => {
   const flags2 = useFlags();
   const maximize = () => {
     flags2.isMaximize = true;
-    window.electron?.ipcRenderer.send("maximize");
+    if (window.electron?.ipcRenderer) window.electron.ipcRenderer.send("maximize");
+    else if (isZerOSEmbedded()) try { window.parent.postMessage({ type: "kitemusic-window-control", action: "maximize" }, "*"); } catch (e2) {}
   };
   const unmaximize = () => {
     flags2.isMaximize = false;
-    window.electron?.ipcRenderer.send("unmaximize");
+    if (window.electron?.ipcRenderer) window.electron.ipcRenderer.send("unmaximize");
+    else if (isZerOSEmbedded()) try { window.parent.postMessage({ type: "kitemusic-window-control", action: "unmaximize" }, "*"); } catch (e2) {}
   };
   const minimize = () => {
     flags2.isMinimize = true;
-    window.electron?.ipcRenderer.send("minimize");
+    if (window.electron?.ipcRenderer) window.electron.ipcRenderer.send("minimize");
+    else if (isZerOSEmbedded()) try { window.parent.postMessage({ type: "kitemusic-window-control", action: "minimize" }, "*"); } catch (e2) {}
   };
   const restore = () => {
     flags2.isMinimize = false;
-    window.electron?.ipcRenderer.send("restore");
+    if (window.electron?.ipcRenderer) window.electron.ipcRenderer.send("restore");
+    else if (isZerOSEmbedded()) try { window.parent.postMessage({ type: "kitemusic-window-control", action: "unmaximize" }, "*"); } catch (e2) {}
   };
   const close2 = () => {
-    window.electron?.ipcRenderer.send("close");
+    if (window.electron?.ipcRenderer) window.electron.ipcRenderer.send("close");
+    else if (isZerOSEmbedded()) try { window.parent.postMessage({ type: "kitemusic-window-control", action: "close" }, "*"); } catch (e2) {}
   };
   return {
     maximize,
@@ -111676,7 +111696,7 @@ const _sfc_main$n = /* @__PURE__ */ defineComponent$1({
                 _: 1
               })
             ]),
-            unref(isElectron)() ? (openBlock(), createElementBlock(Fragment, { key: 0 }, [
+            (unref(isElectron)() || isZerOSEmbedded()) ? (openBlock(), createElementBlock(Fragment, { key: 0 }, [
               createBaseVNode("div", {
                 class: "handler",
                 onClick: _cache[0] || (_cache[0] = //@ts-ignore
@@ -111948,7 +111968,7 @@ const _sfc_main$k = /* @__PURE__ */ defineComponent$1({
           class: normalizeClass(["iconfont", __props.item.icon || ""])
         }, null, 2)) : __props.item.coverImgUrl ? (openBlock(), createElementBlock("img", {
           key: 1,
-          src: __props.item.coverImgUrl + "?param=150y150",
+          src: (__props.item.coverImgUrl ? __props.item.coverImgUrl + "?param=150y150" : "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"),
           alt: ""
         }, null, 8, _hoisted_1$g)) : createCommentVNode("", true),
         createBaseVNode("span", _hoisted_2$b, toDisplayString(__props.item.name), 1)
@@ -112089,7 +112109,7 @@ const _sfc_main$j = /* @__PURE__ */ defineComponent$1({
             unref(store).isLogin ? (openBlock(), createElementBlock(Fragment, { key: 0 }, [
               createBaseVNode("div", {
                 onClick: gotoDetail,
-                style: normalizeStyle({ backgroundImage: `url(${unref(store).profile.avatarUrl})` }),
+                style: normalizeStyle({ backgroundImage: `url(${unref(store).profile.avatarUrl || "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"})` }),
                 class: "head-portraits"
               }, null, 4),
               createBaseVNode("div", _hoisted_3$9, toDisplayString(unref(store).profile.nickname), 1)
@@ -117053,7 +117073,7 @@ const _sfc_main$d = /* @__PURE__ */ defineComponent$1({
             class: "picture-box"
           }, [
             createBaseVNode("div", {
-              style: normalizeStyle({ backgroundImage: `url(${props2.songs.al?.picUrl + "?param=150y150"})` }),
+              style: normalizeStyle({ backgroundImage: `url(${(props2.songs.al?.picUrl ? props2.songs.al.picUrl + "?param=150y150" : "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7")})` }),
               class: "picture"
             }, null, 4),
             _cache[4] || (_cache[4] = createBaseVNode("div", { class: "shade-box" }, null, -1)),
@@ -118946,7 +118966,7 @@ const _sfc_main$6 = /* @__PURE__ */ defineComponent$1({
                             style: { "max-width": "50px" },
                             width: "50",
                             "aspect-ratio": "1/1",
-                            src: unref(lookup)(data, config3.picUrl) + "?param=150y150",
+                            src: (function(v){ return v ? v + "?param=150y150" : "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"; })(unref(lookup)(data, config3.picUrl)),
                             class: "pic-url"
                           }, null, 8, ["src"]),
                           createBaseVNode("div", _hoisted_4$1, [
@@ -119179,6 +119199,26 @@ const _sfc_main$4 = /* @__PURE__ */ defineComponent$1({
         console.log("初始化全局$audio：", window.$audio);
       }
       window.$login = login.value;
+      window.__KiteMusicCut = (next) => music.cutSongHandler(!!next);
+      window.addEventListener("message", function(e) {
+        if (!e.data || e.data.type !== "kitemusic-control") return;
+        var a = e.data.action;
+        if (a === "play" && window.$audio) window.$audio.play();
+        else if (a === "pause" && window.$audio) window.$audio.pause();
+        else if (a === "toggle" && window.$audio) { var ip = window.$audio.isPlay && window.$audio.isPlay.value; if (ip) window.$audio.pause(); else window.$audio.play(); }
+        else if (a === "next" && window.__KiteMusicCut) window.__KiteMusicCut(true);
+        else if (a === "prev" && window.__KiteMusicCut) window.__KiteMusicCut(false);
+      });
+      setInterval(function() {
+        if (window.$audio && music && music.state && music.state.songs) {
+          var s = music.state.songs;
+          var name = s.name || "";
+          var artist = (s.ar && s.ar[0] && s.ar[0].name) ? s.ar[0].name : "";
+          var cover = (s.al && s.al.picUrl) ? s.al.picUrl : "";
+          var isPlaying = !!(window.$audio.isPlay && window.$audio.isPlay.value);
+          try { window.parent.postMessage({ type: "kitemusic-state", name: name, artist: artist, cover: cover, isPlaying: isPlaying }, "*"); } catch (e2) {}
+        }
+      }, 1500);
       document.addEventListener("click", () => {
         flags2.isOpenDrawer = false;
       });
@@ -119356,7 +119396,7 @@ const _sfc_main = /* @__PURE__ */ defineComponent$1({
       return openBlock(), createElementBlock("div", _hoisted_1, [
         createBaseVNode("div", {
           onClick: clickHandler,
-          style: normalizeStyle({ backgroundImage: `url(${props2.picUrl}?param=400y400` }),
+          style: normalizeStyle({ backgroundImage: `url(${props2.picUrl ? props2.picUrl + "?param=400y400" : "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"})` }),
           class: normalizeClass(["card", { "card-click": __props.isClick }])
         }, [
           renderSlot$1(_ctx.$slots, "default", {}, void 0, true),

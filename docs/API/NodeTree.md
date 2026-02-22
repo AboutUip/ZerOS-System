@@ -35,6 +35,111 @@ const nodeTreeC = Disk.diskSeparateMap.get("C:");
 - 应用程序进行文件读写，应优先使用 `ProcessManager.callKernelAPI('FileSystem.*', [...])` 接口
 - NodeTreeCollection 更偏向内核内部/系统模块使用
 
+## 程序用文件 API（FileSystem.*）
+
+以下 API 由内核在 `ProcessManager.callKernelAPI(pid, apiName, args)` 中暴露，供应用程序读写虚拟文件系统。调用前需在 `__info__` 中声明对应权限；路径格式为 `盘符:/路径`（如 `D:/app/data.txt`），盘符支持 `C:` 或 `C`。底层依赖 NodeTree 与 FSDirve，分区未初始化时会自动尝试重建。
+
+### `FileSystem.read`
+
+读取文件内容。
+
+**调用方式**：`ProcessManager.callKernelAPI(pid, 'FileSystem.read', [path])` 或 `initArgs.kernelAPI.call('FileSystem.read', [path])`
+
+**参数**：
+- `path` (string)：文件路径，如 `D:/app/readme.txt`
+
+**返回值**：`Promise<string>` - 文件内容字符串；文件不存在或读取失败时抛错
+
+**权限**：`KERNEL_DISK_READ`
+
+**示例**：
+```javascript
+const content = await this.kernelAPI.call('FileSystem.read', ['D:/myfile.txt']);
+```
+
+### `FileSystem.write`
+
+写入文件内容。
+
+**调用方式**：`ProcessManager.callKernelAPI(pid, 'FileSystem.write', [path, content, writeMode])`
+
+**参数**：
+- `path` (string)：文件路径
+- `content` (string)：要写入的内容（不可为 `undefined`/`null`）
+- `writeMode` (string，可选)：`'OVERWRITE'`（覆盖，默认）或 `'APPEND'`（追加）
+
+**返回值**：由内核内部处理；失败时抛错
+
+**权限**：`KERNEL_DISK_WRITE`
+
+**示例**：
+```javascript
+await this.kernelAPI.call('FileSystem.write', ['D:/app/log.txt', '一行日志\n', 'APPEND']);
+```
+
+### `FileSystem.create`
+
+创建目录或文件。
+
+**调用方式**：`ProcessManager.callKernelAPI(pid, 'FileSystem.create', [type, path])`
+
+**参数**：
+- `type` (string)：`'directory'` 或 `'file'`
+- `path` (string)：目录或文件的完整路径，如 `D:/app/newdir`、`D:/app/newfile.txt`
+
+**返回值**：`Promise<Object>` - 成功时返回 `{ status: 'success', data }`；失败时抛错
+
+**权限**：`KERNEL_DISK_CREATE`
+
+**示例**：
+```javascript
+await this.kernelAPI.call('FileSystem.create', ['directory', 'D:/app/mydir']);
+await this.kernelAPI.call('FileSystem.create', ['file', 'D:/app/empty.txt']);
+```
+
+### `FileSystem.delete`
+
+删除文件或目录。
+
+**调用方式**：`ProcessManager.callKernelAPI(pid, 'FileSystem.delete', [path])`
+
+**参数**：
+- `path` (string)：要删除的文件或目录路径
+
+**返回值**：`Promise<Object>` - 成功时返回 `{ status: 'success', data }`；若目标不存在可能返回 `{ status: 'success', data: { deleted: false, reason: 'file_not_found' } }`；失败时抛错
+
+**权限**：`KERNEL_DISK_DELETE`
+
+**示例**：
+```javascript
+await this.kernelAPI.call('FileSystem.delete', ['D:/app/old.txt']);
+```
+
+### `FileSystem.list`
+
+列出目录下的文件和子目录。
+
+**调用方式**：`ProcessManager.callKernelAPI(pid, 'FileSystem.list', [path])`
+
+**参数**：
+- `path` (string)：目录路径，如 `D:/app` 或 `D:`（根目录）
+
+**返回值**：`Promise<Object>` - 形如 `{ path?, files, directories }`：
+- `path` (string)：当前目录路径（部分实现会返回）
+- `files` (Array)：文件列表，每项 `{ name, size?, path?, type: 'file' }`
+- `directories` (Array)：子目录列表，每项 `{ name, path?, type: 'directory' }`
+
+**权限**：`KERNEL_DISK_LIST`
+
+**示例**：
+```javascript
+const { files, directories } = await this.kernelAPI.call('FileSystem.list', ['D:/app']);
+```
+
+---
+
+以下为内核内部使用的 NodeTree 类与节点/目录操作说明。
+
 ## 类结构
 
 ### Node 类
