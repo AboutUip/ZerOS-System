@@ -66,7 +66,7 @@ const _sfc_main = /* @__PURE__ */ defineComponent({
           ]),
           createBaseVNode("div", _hoisted_6, [
             createBaseVNode("div", {
-              style: normalizeStyle({ backgroundImage: `url(${unref(music).state.currentItem.creator.avatarUrl})` }),
+              style: normalizeStyle({ backgroundImage: `url(${unref(music).state.currentItem.creator?.avatarUrl || "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"})` }),
               class: "avatar"
             }, null, 4),
             createBaseVNode("div", {

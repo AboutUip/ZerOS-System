@@ -258,31 +258,17 @@
          * @returns {string} 代理服务 URL
          */
         _buildProxyUrl: function(targetUrl) {
-            // 浏览器代理仅提供 PHP 版本，始终使用 .php 后缀
-            let proxyPath = (typeof SystemInformation !== 'undefined' && SystemInformation.getBrowserProxyPath)
-                ? SystemInformation.getBrowserProxyPath()
-                : '/system/service/BrowserProxy.php';
-            if (!proxyPath.endsWith('.php')) {
-                proxyPath = '/system/service/BrowserProxy.php';
-            }
-            const origin = (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin)
-                ? SystemInformation.getOrigin()
-                : (window.location.origin || '');
-            const proxyBase = origin + proxyPath;
-            return proxyBase + '?url=' + encodeURIComponent(targetUrl);
+            const proxyBase = (typeof SystemInformation !== 'undefined' && SystemInformation.getBrowserProxyUrl)
+                ? SystemInformation.getBrowserProxyUrl()
+                : ((typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) ? SystemInformation.getOrigin() : (window.location && window.location.origin || '')) + ((typeof SystemInformation !== 'undefined' && SystemInformation.getBrowserProxyPath) ? SystemInformation.getBrowserProxyPath() : '/system/service/BrowserProxy.php');
+            return proxyBase + (proxyBase.indexOf('?') >= 0 ? '&' : '?') + 'url=' + encodeURIComponent(targetUrl);
         },
         
         _getProxyBaseUrl: function() {
-            let proxyPath = (typeof SystemInformation !== 'undefined' && SystemInformation.getBrowserProxyPath)
-                ? SystemInformation.getBrowserProxyPath()
-                : '/system/service/BrowserProxy.php';
-            if (!proxyPath.endsWith('.php')) {
-                proxyPath = '/system/service/BrowserProxy.php';
-            }
-            const origin = (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin)
-                ? SystemInformation.getOrigin()
-                : (window.location.origin || '');
-            return origin + proxyPath + '?url=';
+            const proxyBase = (typeof SystemInformation !== 'undefined' && SystemInformation.getBrowserProxyUrl)
+                ? SystemInformation.getBrowserProxyUrl()
+                : ((typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) ? SystemInformation.getOrigin() : (window.location && window.location.origin || '')) + ((typeof SystemInformation !== 'undefined' && SystemInformation.getBrowserProxyPath) ? SystemInformation.getBrowserProxyPath() : '/system/service/BrowserProxy.php');
+            return proxyBase + '?url=';
         },
         
         /**

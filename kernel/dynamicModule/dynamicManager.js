@@ -593,7 +593,7 @@ class DynamicManager {
                     } else {
                         const origin = (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
                             ? SystemInformation.getOrigin()
-                            : (typeof window !== 'undefined' && window.location ? window.location.origin : (typeof SystemInformation !== 'undefined' ? SystemInformation.DEFAULT_ORIGIN : 'http://localhost:8089'));
+                            : (typeof window !== 'undefined' && window.location ? window.location.origin : 'http://localhost:8089');
                         // ES 模块直接使用原始路径，确保相对导入能正确解析
                         // 服务器应该已经配置了正确的 MIME 类型（通过 .htaccess 或 router.php）
                         fullUrl = `${origin}${moduleUrl.startsWith('/') ? '' : '/'}${moduleUrl}`;
@@ -687,7 +687,7 @@ class DynamicManager {
                             } else {
                                 scriptUrl = ((typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
                                     ? SystemInformation.getOrigin()
-                                    : (typeof window !== 'undefined' && window.location ? window.location.origin : (typeof SystemInformation !== 'undefined' ? SystemInformation.DEFAULT_ORIGIN : 'http://localhost:8089'))) + scriptUrl;
+                                    : (typeof window !== 'undefined' && window.location ? window.location.origin : 'http://localhost:8089')) + scriptUrl;
                             }
                         }
                         

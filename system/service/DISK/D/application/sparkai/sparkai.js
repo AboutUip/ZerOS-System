@@ -875,12 +875,12 @@
                     return originalUrl;
                 }
                 
-                // 构建代理 URL
-                const proxyBaseUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.getAudioProxyPath) 
-                    ? SystemInformation.getAudioProxyPath()
-                    : '/system/service/audio-proxy.php';
+                // 构建代理 URL（优先 SystemInformation 以支持多后端）
+                const proxyBaseUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.getAudioProxyUrl)
+                    ? SystemInformation.getAudioProxyUrl()
+                    : ((typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) ? SystemInformation.getOrigin() : (window.location && window.location.origin || '')) + ((typeof SystemInformation !== 'undefined' && SystemInformation.getAudioProxyPath) ? SystemInformation.getAudioProxyPath() : '/system/service/audio-proxy.php');
                 const encodedUrl = encodeURIComponent(originalUrl);
-                return `${proxyBaseUrl}?url=${encodedUrl}`;
+                return `${proxyBaseUrl}${proxyBaseUrl.indexOf('?') >= 0 ? '&' : '?'}url=${encodedUrl}`;
             } catch (error) {
                 if (typeof KernelLogger !== 'undefined') {
                     KernelLogger.warn('SparkAI', `构建代理 URL 失败: ${error.message}`);

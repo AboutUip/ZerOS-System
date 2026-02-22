@@ -3,7 +3,9 @@
 (function() {
     'use strict';
     
-    /** 引导前安全校验模块：必须第一个加载并完全执行完成后才继续引导 */
+    /** 系统信息模块：支持多后端服务，安全脚本依赖其获取服务 URL，须在安全脚本前加载 */
+    const SYSTEM_INFORMATION_MODULE = "../kernel/SystemInformation.js";
+    /** 引导前安全校验模块：依赖 SystemInformation，在 SystemInformation 加载完成后加载并完全执行完成后才继续引导 */
     const RANDOM_SECURITY_MODULE = "../kernel/core/safemode/randomSecurity.js";
 
     // 定义模块依赖关系图
@@ -13,9 +15,10 @@
         // - DependencyConfig: 在 HTML 中直接加载（依赖 KernelLogger）
         // - POOL: 在 HTML 中直接加载（依赖 KernelLogger 和 DependencyConfig）
         // 这些模块不在此依赖图中
-        // - RandomSecurity: 由 BootLoader 在 loadModules 前单独加载并等待完成，不在此图中
+        // - SystemInformation: 由 BootLoader 在 RandomSecurity 前强制先加载，不在此图中首次加载
+        // - RandomSecurity: 由 BootLoader 在 SystemInformation 之后、loadModules 前单独加载并等待完成，不在此图中
 
-        // 第一层：系统信息模块（必须在最早期加载，供其他模块使用）
+        // 第一层：系统信息模块（已在引导前加载，此处仅参与依赖图以支持拓扑排序）
         "../kernel/SystemInformation.js": [],
         // 第一层：网络管理器（尽早 patch fetch，确保所有请求都经 JWT 注入）
         "../kernel/drive/networkManager.js": [],
@@ -112,6 +115,12 @@
         "../system/expansion/serverExpansion.js": [
             "../kernel/filesystem/init.js",
             "../kernel/process/processManager.js"
+        ],
+
+        // 第十二层：系统操作扩展（系统特殊操作管理器，依赖文件系统与本地存储）
+        "../system/expansion/systemExpansion.js": [
+            "../kernel/filesystem/init.js",
+            "../kernel/drive/LStorage.js"
         ],
         
         // 第十一层：锁屏界面（依赖用户控制系统和本地存储管理器，高优先级）
@@ -1132,8 +1141,14 @@
                 Dependency.addDependency(module);
             });
 
-            // 引导前安全校验：第一个加载并必须完全执行完成后才继续引导
-            // JWT 由安全模块私有保存，通过 Security.getSystemJWT API 获取
+            // 强制先加载 SystemInformation（支持多后端服务，安全脚本依赖其获取服务 URL）
+            await loadScript(SYSTEM_INFORMATION_MODULE);
+            if (typeof KernelLogger !== 'undefined') {
+                KernelLogger.info("BootLoader", "SystemInformation 已加载，支持多后端服务");
+            }
+
+            // 引导前安全校验：依赖 SystemInformation，加载并必须完全执行完成后才继续引导
+            // JWT 由安全模块私有保存，通过 RandomSecurity.getSystemJWT API 获取
             Dependency.addDependency(RANDOM_SECURITY_MODULE);
             await loadScript(RANDOM_SECURITY_MODULE);
             try {
@@ -1155,6 +1170,11 @@
             // 等待语言扩展完成从 LStorage 恢复当前语言并加载语言包（重启后语言保持一致）
             if (typeof LanguagesExpansion !== 'undefined' && LanguagesExpansion._ready) {
                 await LanguagesExpansion._ready;
+            }
+
+            // 等待系统操作扩展完成初始化
+            if (typeof SystemExpansion !== 'undefined' && SystemExpansion._ready) {
+                await SystemExpansion._ready;
             }
             
             // 检查内核异常标志（在加载模块后立即检查）

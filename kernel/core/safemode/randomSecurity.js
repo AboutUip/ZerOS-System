@@ -76,11 +76,16 @@
      */
     function getJWTFromBackend(randomValue, type, extraPayload) {
         return new Promise(function (resolve, reject) {
-            // 构建服务 URL（引导阶段可能 SystemInformation 未加载，直接构建）
-            const origin = typeof window !== 'undefined' && window.location 
-                ? window.location.origin 
-                : 'http://localhost:8089';
-            const serviceUrl = origin + '/system/service/randomSecurity.php';
+            // 优先使用 SystemInformation（BootLoader 已先加载），支持多后端服务；否则降级为当前 origin + 固定路径
+            let serviceUrl;
+            if (typeof SystemInformation !== 'undefined' && typeof SystemInformation.getRandomSecurityUrl === 'function') {
+                serviceUrl = SystemInformation.getRandomSecurityUrl();
+            } else {
+                const origin = typeof window !== 'undefined' && window.location
+                    ? window.location.origin
+                    : 'http://localhost:8089';
+                serviceUrl = origin + '/system/service/randomSecurity.php';
+            }
 
             var body = { randomValue: randomValue };
             if (type) {

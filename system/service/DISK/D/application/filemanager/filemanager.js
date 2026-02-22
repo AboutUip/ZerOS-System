@@ -977,10 +977,8 @@
             if (disks.length === 0) {
                 try {
                     const listUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
-                        ? SystemInformation.buildServiceUrlObject('/system/service/DISKMANAGER.php', { upid: this._upid })
-                        : new URL('/system/service/DISKMANAGER.php', (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
-                            ? SystemInformation.getOrigin()
-                            : window.location.origin);
+                        ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.DISKMANAGER, { upid: this._upid })
+                        : new URL((typeof SystemInformation !== 'undefined' && SystemInformation.getServicePath) ? SystemInformation.getServicePath(SystemInformation.SERVICE_NAMES.DISKMANAGER) : '/system/service/DISKMANAGER.php', (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) ? SystemInformation.getOrigin() : (window.location && window.location.origin));
                     if (this._upid != null) listUrl.searchParams.set('upid', this._upid);
                     listUrl.searchParams.set('action', 'list');
                     
@@ -1222,11 +1220,13 @@
             });
             addressInput.addEventListener('keydown', (e) => {
                 if (e.key === 'Enter') {
-                    const path = addressInput.value.trim();
-                    if (path === '\\' || path === '') {
+                    const path = addressInput.value.trim().toLowerCase();
+                    if (path === 'terminal') {
+                        this._openTerminalInCurrentDirectory();
+                    } else if (addressInput.value.trim() === '\\' || addressInput.value.trim() === '') {
                         this._loadRootDirectory();
-                    } else if (path) {
-                        this._navigateToPath(path);
+                    } else if (addressInput.value.trim()) {
+                        this._navigateToPath(addressInput.value.trim());
                     }
                 }
             });
@@ -3853,9 +3853,9 @@ this.fileCountText.textContent = this._getText('FM_ITEMS_COUNT_FOUND', '找到 {
                             url = new URL(SystemInfo.getFSDirvePath(), SystemInfo.getOrigin());
                             if (this._upid != null) url.searchParams.set('upid', this._upid);
                         } else {
-                            // 降级方案：使用默认路径
-                            const origin = window.location.origin || 'http://localhost:8089';
-                            url = new URL('/system/service/FSDirve.php', origin);
+                            const origin = (typeof SystemInfo !== 'undefined' && SystemInfo.getOrigin) ? SystemInfo.getOrigin() : (window.location && window.location.origin) || 'http://localhost:8089';
+                            const path = (typeof SystemInfo !== 'undefined' && SystemInfo.getFSDirvePath) ? SystemInfo.getFSDirvePath() : '/system/service/FSDirve.php';
+                            url = new URL(path, origin);
                             if (this._upid != null) url.searchParams.set('upid', this._upid);
                         }
                         url.searchParams.set('action', 'read_file');
@@ -4548,6 +4548,74 @@ this.fileCountText.textContent = this._getText('FM_ITEMS_COUNT_FOUND', '找到 {
          */
         _navigateToPath: async function(path) {
             await this._loadDirectory(path);
+        },
+        
+        /**
+         * 在当前目录打开终端
+         */
+        _openTerminalInCurrentDirectory: async function() {
+            const currentPath = this._getCurrentPath();
+            if (currentPath === null || currentPath === '') {
+                if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                    try {
+                        await NotificationManager.createNotification(this.pid, {
+                            type: 'snapshot',
+                            title: this._getText('FM_TITLE', '文件管理器'),
+                            content: this._getText('FM_OPEN_TERMINAL_IN_PARTITION', '请先进入磁盘分区后再打开终端'),
+                            duration: 3000
+                        });
+                    } catch (e) {
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('FileManager', `创建通知失败: ${e.message}`);
+                        }
+                    }
+                }
+                return;
+            }
+            
+            try {
+                // 先设置全局工作空间，再打开终端
+                if (typeof POOL !== 'undefined' && typeof POOL.__ADD__ === 'function') {
+                    POOL.__ADD__("KERNEL_GLOBAL_POOL", "WORK_SPACE", currentPath);
+                }
+                
+                const terminalPid = await ProcessManager.startProgram('terminal', {
+                    cwd: currentPath
+                });
+                
+                // 延迟恢复地址栏显示当前路径（等待窗口切换完成后）
+                setTimeout(() => {
+                    // 尝试多种方式恢复地址栏
+                    let addressInputEl = null;
+                    if (this.addressInput) {
+                        this.addressInput.value = currentPath;
+                    } else {
+                        // 尝试通过类名查找
+                        addressInputEl = document.querySelector('.filemanager-address-input');
+                        if (addressInputEl) {
+                            addressInputEl.value = currentPath;
+                        }
+                    }
+                }, 100);
+                
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.debug('FileManager', `已在目录 ${currentPath} 打开终端，PID: ${terminalPid}`);
+                }
+            } catch (e) {
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('FileManager', `打开终端失败: ${e.message}`);
+                }
+                if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                    try {
+                        await NotificationManager.createNotification(this.pid, {
+                            type: 'snapshot',
+                            title: this._getText('FM_TITLE', '文件管理器'),
+                            content: this._getText('FM_OPEN_TERMINAL_FAILED', '打开终端失败'),
+                            duration: 3000
+                        });
+                    } catch (err) {}
+                }
+            }
         },
         
         /**

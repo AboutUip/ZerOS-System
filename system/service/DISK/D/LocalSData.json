@@ -1,12 +1,8 @@
 {
   "system": {
     "permissionManager.permissions": {
-      "servicemanager": [
-        "SYSTEM_NOTIFICATION",
-        "SERVER_SERVICE_MANAGE"
-      ],
       "settings": [
-        "SYSTEM_STORAGE_WRITE"
+        "SYSTEM_NOTIFICATION"
       ]
     },
     "system.style": "macos",
@@ -288,7 +284,7 @@
         "password": "61b249bf6d604d14120821f43625e84e",
         "avatar": "avatar_root_1766272534753.jpg",
         "createdAt": 1766271155991,
-        "lastLogin": 1771499601941
+        "lastLogin": 1771760437579
       },
       "TestUser": {
         "level": "USER",
@@ -356,7 +352,8 @@
       "currentLocale": "zh-CN"
     },
     "_server_notice_history": [
-      "2026-02-16T18:37:38.455747"
+      "2026-02-16T18:37:38.455747",
+      "2026-02-22T13:05:41.821472"
     ],
     "bios.memoryAllocation": true
   },

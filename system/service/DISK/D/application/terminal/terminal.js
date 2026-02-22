@@ -143,6 +143,12 @@
             this.tabCounter = 0;
             this.pid = pid;  // 存储进程ID，用于标记DOM元素
             
+            // 从 initArgs 获取传入的 cwd 参数
+            this.initCwd = null;
+            if (typeof window !== 'undefined' && window._currentInitArgs && window._currentInitArgs.cwd) {
+                this.initCwd = window._currentInitArgs.cwd;
+            }
+            
             // 为每个实例生成唯一的类名前缀（基于pid）
             // 这样每个实例的DOM元素都有唯一的类名，避免CSS选择器冲突
             // 使用 this.pid 而不是直接使用 pid 参数，确保在闭包中也能访问
@@ -1376,8 +1382,8 @@
             
             this.terminalsContainer.appendChild(terminalInstanceEl);
             
-            // 创建终端实例（传入终端容器元素引用和pid）
-            const terminalInstance = new TerminalInstance(tabId, outputEl, promptEl, cmdEl, terminalInstanceEl, this.pid);
+            // 创建终端实例（传入终端容器元素引用和pid，以及initCwd）
+            const terminalInstance = new TerminalInstance(tabId, outputEl, promptEl, cmdEl, terminalInstanceEl, this.pid, this.initCwd);
             // 保存输入行引用，用于隐藏整个输入行
             terminalInstance.inputLineEl = inputLineEl;
             
@@ -1756,7 +1762,7 @@ function escapeHtml(s){
     }
 
     class TerminalInstance {
-        constructor(tabId, outputEl, promptEl, cmdEl, terminalElement = null, pid = null){
+        constructor(tabId, outputEl, promptEl, cmdEl, terminalElement = null, pid = null, initCwd = null){
             this.tabId = tabId;
             this.outputEl = outputEl;
             this.promptEl = promptEl;
@@ -1770,7 +1776,7 @@ function escapeHtml(s){
             this.env = {
                 user: 'root',
                 host: 'test',
-                cwd: '~',
+                cwd: initCwd || '~',
             };
 
             // 更新工作环境（在加载内存数据后，_loadTerminalDataFromMemory 会处理）
@@ -2599,7 +2605,7 @@ function escapeHtml(s){
                                 const cmd = parts[0];
                                 const second = parts[1];
                                 if (cmd === 'debug' && parts.length === 1) {
-                                    const debugActions = ['exception', 'geography', 'weather', 'translate', 'services'];
+                                    const debugActions = ['exception', 'geography', 'weather', 'translate', 'services', 'systemexpansion', 'se'];
                                     candidates = debugActions.filter(c => c.indexOf(token) === 0).slice();
                                     candidates.sort();
                                 } else if (cmd === 'debug' && second === 'exception' && parts.length === 2) {
@@ -2958,7 +2964,7 @@ function escapeHtml(s){
                                     const cmd = parts[0];
                                     const second = parts[1];
                                     if (cmd === 'debug' && parts.length === 1) {
-                                        const debugActions = ['exception', 'geography', 'weather', 'translate', 'services'];
+                                        const debugActions = ['exception', 'geography', 'weather', 'translate', 'services', 'systemexpansion', 'se'];
                                         candidates = debugActions.filter(c => c.indexOf(token) === 0).slice();
                                         candidates.sort();
                                     } else if (cmd === 'debug' && second === 'exception' && parts.length === 2) {
@@ -2966,25 +2972,25 @@ function escapeHtml(s){
                                         candidates = levels.filter(c => c.indexOf(token) === 0).slice();
                                         candidates.sort();
                                     } else {
-                                    // 文件路径补全（简化版，使用 FileSystem.list）
-                                    const idx = token.lastIndexOf('/');
-                                    const dirPart = idx >= 0 ? token.slice(0, idx + 1) : '';
-                                    const namePrefix = idx >= 0 ? token.slice(idx + 1) : token;
-                                    const dirToList = resolvePath(this.env.cwd, dirPart || '.');
-                                    
-                                    let phpPath = dirToList;
-                                    if (/^[A-Z]:$/.test(phpPath)) {
-                                        phpPath = phpPath + '/';
-                                    }
-                                    
-                                    const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
-                                    ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE, { upid: typeof TERMINAL !== 'undefined' ? TERMINAL._upid : undefined })
-                                        : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
-                                        ? SystemInformation.getOrigin()
-                                        : window.location.origin);
-                                if (typeof TERMINAL !== 'undefined' && TERMINAL._upid != null) url.searchParams.set('upid', TERMINAL._upid);
-                                url.searchParams.set('action', 'list_dir');
-                                url.searchParams.set('path', phpPath);
+                                        // 文件路径补全（简化版，使用 FileSystem.list）
+                                        const idx = token.lastIndexOf('/');
+                                        const dirPart = idx >= 0 ? token.slice(0, idx + 1) : '';
+                                        const namePrefix = idx >= 0 ? token.slice(idx + 1) : token;
+                                        const dirToList = resolvePath(this.env.cwd, dirPart || '.');
+                                        
+                                        let phpPath = dirToList;
+                                        if (/^[A-Z]:$/.test(phpPath)) {
+                                            phpPath = phpPath + '/';
+                                        }
+                                        
+                                        const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
+                                        ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE, { upid: typeof TERMINAL !== 'undefined' ? TERMINAL._upid : undefined })
+                                            : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
+                                            ? SystemInformation.getOrigin()
+                                            : window.location.origin);
+                                    if (typeof TERMINAL !== 'undefined' && TERMINAL._upid != null) url.searchParams.set('upid', TERMINAL._upid);
+                                    url.searchParams.set('action', 'list_dir');
+                                    url.searchParams.set('path', phpPath);
                                     
                                     try {
                                         const response = await fetch(url.toString());
@@ -3886,27 +3892,45 @@ function escapeHtml(s){
 
         // 简单演示脚本
         demo(){
-            const seq = [
-                {cmd:'echo Hello from demo'},
-                {out:'Hello from demo'},
-                {cmd:'pwd'},
-                {out:this.env.cwd},
-                {cmd:'whoami'},
-                {out:this.env.user}
-            ];
-            let i=0;
-            const runNext = () => {
-                if(i>=seq.length) return;
-                const item = seq[i++];
-                if(item.cmd){
-                    this._echoCommand(item.cmd);
-                    setTimeout(runNext, 250);
-                }else if(item.out){
-                    this.write(item.out);
-                    setTimeout(runNext, 250);
+            (async () => {
+                try {
+                    if(typeof SystemExpansion !== 'undefined'){
+                        const html = `
+                            <div style="padding: 24px; color: #1a1a1a; text-align: center;">
+                                <h2 style="margin-bottom: 16px;">ZerOS 服务协议</h2>
+                                <div style="text-align: left; max-height: 300px; overflow-y: auto; background: #f5f5f5; padding: 16px; border-radius: 4px; margin-bottom: 16px;">
+                                    <p style="margin-bottom: 12px;"><strong>第1条 服务条款</strong></p>
+                                    <p style="margin-bottom: 12px; color: #666;">ZerOS 是一个实验性操作系统，您使用本系统即表示同意以下条款。</p>
+                                    <p style="margin-bottom: 12px;"><strong>第2条 数据收集</strong></p>
+                                    <p style="margin-bottom: 12px; color: #666;">本系统可能会收集必要的系统信息以提供更好的服务体验。</p>
+                                    <p style="margin-bottom: 12px;"><strong>第3条 使用限制</strong></p>
+                                    <p style="margin-bottom: 12px; color: #666;">本系统仅供学习和研究使用，请勿用于商业目的。</p>
+                                    <p style="margin-bottom: 12px;"><strong>第4条 免责声明</strong></p>
+                                    <p style="color: #666;">本系统按"原样"提供，不提供任何明示或暗示的保证。</p>
+                                </div>
+                                <p style="color: #666; font-size: 14px;">请阅读以上协议内容后选择是否同意</p>
+                            </div>
+                        `;
+                        this.write('正在打开服务协议...');
+                        const result = await SystemExpansion.enterOverlay('SystemProtocol', html, {
+                            title: '服务协议',
+                            step: 1
+                        });
+                        this.write('---');
+                        if (result.action === 'done') {
+                            this.write('✓ 用户已同意服务协议');
+                        } else if (result.action === 'cancel') {
+                            this.write('✗ 用户不同意协议');
+                        } else {
+                            this.write(`用户操作: ${result.action}`);
+                        }
+                    }else{
+                        this.write('SystemExpansion 不可用');
+                    }
+                }catch(e){
+                    this.write('错误: ' + e.message);
                 }
-            };
-            runNext();
+            })();
         }
 
         _argsFrom(input){
@@ -4588,21 +4612,29 @@ function escapeHtml(s){
         _loadTerminalDataFromMemory() {
             // 初始化环境变量（从内存或使用默认值）
             const savedEnv = this._loadEnvFromMemory();
+            // 如果已经有有效的 cwd（来自 initCwd），则不覆盖
+            const hasValidCwd = this.env.cwd && typeof this.env.cwd === 'string' && 
+                                this.env.cwd !== '~' && this.env.cwd !== '[object Object]';
+            
             if (savedEnv) {
-                this.env = savedEnv;
+                // 只有在没有有效 cwd 时才使用保存的 env
+                if (!hasValidCwd && savedEnv.cwd) {
+                    this.env = savedEnv;
+                }
             }
-            // 确保 cwd 从全局池获取（优先使用全局池的值）
-            const workspaceCwd = safePoolGet("KERNEL_GLOBAL_POOL","WORK_SPACE");
-            // 优先使用 POOL 中的值，但如果值是 'C:'，则忽略并使用默认值 D:
-            if (workspaceCwd && typeof workspaceCwd === 'string' && workspaceCwd !== 'C:') {
-                // POOL 中有值且不是 'C:'，使用它
-                this.env.cwd = workspaceCwd;
-                this._saveEnvToMemory(); // 保存更新后的值
-            } else {
-                // POOL 中没有值或值无效，使用默认值（系统盘 D: 或第一个可用分区）
-                // 如果当前值是 '~' 或无效值，替换为系统盘或第一个可用分区
-                if (!this.env.cwd || typeof this.env.cwd !== 'string' || 
-                    this.env.cwd === '[object Object]' || this.env.cwd === '~') {
+            
+            // 如果还是没有有效的 cwd，才从全局池获取
+            if (!this.env.cwd || typeof this.env.cwd !== 'string' || 
+                this.env.cwd === '[object Object]' || this.env.cwd === '~') {
+                // 确保 cwd 从全局池获取（优先使用全局池的值）
+                const workspaceCwd = safePoolGet("KERNEL_GLOBAL_POOL","WORK_SPACE");
+                // 优先使用 POOL 中的值，但如果值是 'C:'，则忽略并使用默认值 D:
+                if (workspaceCwd && typeof workspaceCwd === 'string' && workspaceCwd !== 'C:') {
+                    // POOL 中有值且不是 'C:'，使用它
+                    this.env.cwd = workspaceCwd;
+                    this._saveEnvToMemory(); // 保存更新后的值
+                } else {
+                    // POOL 中没有值或值无效，使用默认值（系统盘 D: 或第一个可用分区）
                     // 获取默认工作目录（系统盘 D: 或第一个可用分区）
                     let defaultCwd = 'D:';  // 默认使用系统盘 D:
                     if (typeof Disk !== 'undefined' && Disk.diskSeparateSize && Disk.diskSeparateSize.size > 0) {
@@ -4932,9 +4964,7 @@ function escapeHtml(s){
                 if (binPrograms.length === 0) {
                     const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
                         ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE, { upid: typeof TERMINAL !== 'undefined' ? TERMINAL._upid : undefined })
-                                    : new URL('/system/service/FSDirve.php', (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
-                                        ? SystemInformation.getOrigin()
-                                        : window.location.origin);
+                        : new URL((typeof SystemInformation !== 'undefined' && SystemInformation.getFSDirvePath) ? SystemInformation.getFSDirvePath() : '/system/service/FSDirve.php', (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) ? SystemInformation.getOrigin() : (window.location && window.location.origin));
                     if (typeof TERMINAL !== 'undefined' && TERMINAL._upid != null) url.searchParams.set('upid', TERMINAL._upid);
                     
                     url.searchParams.set('action', 'list_dir');
@@ -7514,6 +7544,8 @@ function escapeHtml(s){
                             payload.write('  translate --simple "文本" <to_lang>  - 测试普通机器翻译（需翻译服务已启动）');
                             payload.write('  translate --ai "文本" <to_lang>  - 测试 AI 智能翻译（需翻译服务已启动）');
                             payload.write('  services [--status [id]]  - D/server 服务列表；--status 显示各服务状态，可指定 id 查看单服务');
+                            payload.write('  systemexpansion|se <action>  - SystemExpansion 全屏覆盖调试');
+                            payload.write('    actions: enter <type> [title] [step], exit, status, help');
                             payload.write('');
                             payload.write('Examples:');
                             payload.write('  debug exception service "测试服务异常"');
@@ -7524,6 +7556,8 @@ function escapeHtml(s){
                             payload.write('  debug translate --simple "明天" en');
                             payload.write('  debug translate --ai "明天" en');
                             payload.write('  debug services --status');
+                            payload.write('  debug systemexpansion enter SystemConfiguration "配置" 1');
+                            payload.write('  debug se status');
                             return;
                         }
                         
@@ -7889,6 +7923,87 @@ function escapeHtml(s){
                                     KernelLogger.debug('Terminal', 'debug services 失败', err);
                                 }
                             }
+                        } else if (action === 'systemexpansion' || action === 'se') {
+                            try {
+                                const subAction = payload.args[2] || 'help';
+                                
+                                if (typeof SystemExpansion === 'undefined') {
+                                    payload.write('debug systemexpansion: SystemExpansion 不可用');
+                                    return;
+                                }
+                                
+                                if (subAction === 'help' || subAction === '-h' || subAction === '--help') {
+                                    payload.write('debug systemexpansion: SystemExpansion 调试工具');
+                                    payload.write('');
+                                    payload.write('用法: debug systemexpansion <action> [args...]');
+                                    payload.write('');
+                                    payload.write('Actions:');
+                                    payload.write('  enter <type> [title] [step]  - 进入全屏覆盖模式');
+                                    payload.write('    type: SystemProtocol, SystemPatch, SystemConfiguration');
+                                    payload.write('    title: 标题文字（默认: 测试标题）');
+                                    payload.write('    step: 步骤数（默认: 1）');
+                                    payload.write('  exit                        - 退出全屏覆盖');
+                                    payload.write('  status                      - 显示当前状态');
+                                    payload.write('');
+                                    payload.write('Examples:');
+                                    payload.write('  debug systemexpansion enter SystemProtocol "测试协议" 1');
+                                    payload.write('  debug systemexpansion enter SystemConfiguration "配置" 2');
+                                    payload.write('  debug systemexpansion exit');
+                                    payload.write('  debug systemexpansion status');
+                                    return;
+                                }
+                                
+                                if (subAction === 'enter') {
+                                    const type = payload.args[3] || 'SystemProtocol';
+                                    const title = payload.args[4] || '测试标题';
+                                    const step = parseInt(payload.args[5]) || 1;
+                                    
+                                    const validTypes = ['SystemProtocol', 'SystemPatch', 'SystemConfiguration'];
+                                    if (!validTypes.includes(type)) {
+                                        payload.write(`debug systemexpansion: 无效的 type '${type}'`);
+                                        payload.write(`  有效的类型: ${validTypes.join(', ')}`);
+                                        return;
+                                    }
+                                    
+                                    const html = '<div style="padding: 20px; color: #fff;"><h2>测试内容</h2><p>这是用于测试的全屏覆盖内容</p></div>';
+                                    
+                                    payload.write(`正在进入全屏覆盖模式...`);
+                                    payload.write(`  type: ${type}`);
+                                    payload.write(`  title: ${title}`);
+                                    payload.write(`  step: ${step}`);
+                                    
+                                    const result = await SystemExpansion.enterOverlay(type, html, {
+                                        title: title,
+                                        step: step
+                                    });
+                                    
+                                    if (result && result.action) {
+                                        payload.write(`---`);
+                                        payload.write(`用户操作: ${result.action}`);
+                                        payload.write(`当前步骤: ${result.step}/${result.totalSteps}`);
+                                    } else if (result && !result.success) {
+                                        payload.write(`错误: ${result.message}`);
+                                    }
+                                } else if (subAction === 'exit') {
+                                    payload.write('debug systemexpansion: exit 方法未对外暴露');
+                                } else if (subAction === 'status') {
+                                    if (typeof SystemExpansion.getStatus === 'function') {
+                                        const status = SystemExpansion.getStatus();
+                                        payload.write('SystemExpansion 状态:');
+                                        payload.write(JSON.stringify(status, null, 2));
+                                    } else {
+                                        payload.write('debug systemexpansion: getStatus 方法不可用');
+                                    }
+                                } else {
+                                    payload.write(`debug systemexpansion: 未知的操作 '${subAction}'`);
+                                    payload.write('  使用 "debug systemexpansion help" 查看帮助');
+                                }
+                            } catch (err) {
+                                payload.write(`debug systemexpansion: 错误: ${err.message}`);
+                                if (typeof KernelLogger !== 'undefined') {
+                                    KernelLogger.debug('Terminal', 'debug systemexpansion 失败', err);
+                                }
+                            }
                         } else {
                             payload.write(`debug: 未知的操作 '${action}'`);
                             payload.write('  使用 "debug" 查看帮助信息');
@@ -7940,7 +8055,7 @@ function escapeHtml(s){
                 payload.write(' - getenv <name>          : 获取环境变量值');
                 payload.write(' - demo, toggleview       : 演示脚本 / 切换视图');
                 payload.write(' - power <action>         : 系统电源管理（reboot/shutdown/help）');
-                payload.write(' - debug <action> [args]   : 调试工具。exception/geography/weather/translate/services（debug 查看帮助）');
+                payload.write(' - debug <action> [args]   : 调试工具。exception/geography/weather/translate/services/systemexpansion（debug 查看帮助）');
                 payload.write('Notes: 路径格式以盘符开头如 C:/path，或相对于当前工作目录使用 ../ 和 ./ 。');
                 break;
             case 'diskmanger':
@@ -8073,10 +8188,8 @@ function escapeHtml(s){
                             if (partitions.length === 0) {
                                 try {
                                     const listUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
-                                        ? SystemInformation.buildServiceUrlObject('/system/service/DISKMANAGER.php', { upid: typeof TERMINAL !== 'undefined' ? TERMINAL._upid : undefined })
-                                        : new URL('/system/service/DISKMANAGER.php', (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
-                                        ? SystemInformation.getOrigin()
-                                        : window.location.origin);
+                                        ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.DISKMANAGER, { upid: typeof TERMINAL !== 'undefined' ? TERMINAL._upid : undefined })
+                                        : new URL((typeof SystemInformation !== 'undefined' && SystemInformation.getServicePath) ? SystemInformation.getServicePath(SystemInformation.SERVICE_NAMES.DISKMANAGER) : '/system/service/DISKMANAGER.php', (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) ? SystemInformation.getOrigin() : (window.location && window.location.origin));
                                     if (typeof TERMINAL !== 'undefined' && TERMINAL._upid != null) listUrl.searchParams.set('upid', TERMINAL._upid);
                                     listUrl.searchParams.set('action', 'list');
                                     
@@ -8116,10 +8229,8 @@ function escapeHtml(s){
                             if (disksToShow.length === 0 && !targetDisk) {
                                 try {
                                     const listUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
-                                        ? SystemInformation.buildServiceUrlObject('/system/service/DISKMANAGER.php', { upid: typeof TERMINAL !== 'undefined' ? TERMINAL._upid : undefined })
-                                        : new URL('/system/service/DISKMANAGER.php', (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
-                                        ? SystemInformation.getOrigin()
-                                        : window.location.origin);
+                                        ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.DISKMANAGER, { upid: typeof TERMINAL !== 'undefined' ? TERMINAL._upid : undefined })
+                                        : new URL((typeof SystemInformation !== 'undefined' && SystemInformation.getServicePath) ? SystemInformation.getServicePath(SystemInformation.SERVICE_NAMES.DISKMANAGER) : '/system/service/DISKMANAGER.php', (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) ? SystemInformation.getOrigin() : (window.location && window.location.origin));
                                     if (typeof TERMINAL !== 'undefined' && TERMINAL._upid != null) listUrl.searchParams.set('upid', TERMINAL._upid);
                                     listUrl.searchParams.set('action', 'list');
                                     
@@ -8632,9 +8743,9 @@ function escapeHtml(s){
                                 } else if (SystemInfo.getFSDirvePath && SystemInfo.getOrigin) {
                                     url = new URL(SystemInfo.getFSDirvePath(), SystemInfo.getOrigin());
                                 } else {
-                                    // 降级方案：使用默认路径
-                                    const origin = window.location.origin || 'http://localhost:8089';
-                                    url = new URL('/system/service/FSDirve.php', origin);
+                                    const origin = (typeof SystemInfo !== 'undefined' && SystemInfo.getOrigin) ? SystemInfo.getOrigin() : (window.location && window.location.origin) || 'http://localhost:8089';
+                                    const path = (typeof SystemInfo !== 'undefined' && SystemInfo.getFSDirvePath) ? SystemInfo.getFSDirvePath() : '/system/service/FSDirve.php';
+                                    url = new URL(path, origin);
                                 }
                                 if (typeof TERMINAL !== 'undefined' && TERMINAL._upid != null) url.searchParams.set('upid', TERMINAL._upid);
                                 url.searchParams.set('action', 'read_file');
@@ -8888,9 +8999,9 @@ function escapeHtml(s){
                                             } else if (SystemInfo.getFSDirvePath && SystemInfo.getOrigin) {
                                                 url = new URL(SystemInfo.getFSDirvePath(), SystemInfo.getOrigin());
                                             } else {
-                                                // 降级方案：使用默认路径
-                                                const origin = window.location.origin || 'http://localhost:8089';
-                                                url = new URL('/system/service/FSDirve.php', origin);
+                                                const origin = (typeof SystemInfo !== 'undefined' && SystemInfo.getOrigin) ? SystemInfo.getOrigin() : (window.location && window.location.origin) || 'http://localhost:8089';
+                                                const path = (typeof SystemInfo !== 'undefined' && SystemInfo.getFSDirvePath) ? SystemInfo.getFSDirvePath() : '/system/service/FSDirve.php';
+                                                url = new URL(path, origin);
                                             }
                                             if (typeof TERMINAL !== 'undefined' && TERMINAL._upid != null) url.searchParams.set('upid', TERMINAL._upid);
                                             url.searchParams.set('action', 'read_file');

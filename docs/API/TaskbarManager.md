@@ -170,6 +170,10 @@ await TaskbarManager.setPinnedPrograms(['filemanager', 'browser', 'musicplayer']
 - 其他并发请求会等待第一个请求完成，并共享其结果
 - 这确保了即使响应时间有差异，也不会导致重复请求第三方定位 API
 
+### 单窗口预览自定义
+
+悬停任务栏程序图标时，若该程序仅有一个窗口，会显示**单窗口预览**。默认使用窗口缩略图与标题。程序可通过内核 API `GUI.registerTaskbarPreviewProvider` 注册自定义预览：提供 HTML 片段或 DOM 节点作为预览内容，并可处理预览区域内的点击（如聚焦窗口、执行快捷操作）。未注册时保持默认预览。详见 [GUIManager.md - 任务栏单窗口预览提供者](./GUIManager.md#任务栏单窗口预览提供者) 与 [ProcessManager.md - 可用 API](./ProcessManager.md) 中的 `GUI.registerTaskbarPreviewProvider`。
+
 ### 程序状态指示
 
 - **运行中**: 程序图标正常显示

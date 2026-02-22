@@ -1781,8 +1781,9 @@ class ProcessManager {
             if (programInfo) {
                 const permissions = Array.isArray(programInfo.permissions) ? programInfo.permissions : [];
                 try {
-                    const origin = typeof window !== 'undefined' && window.location ? window.location.origin : 'http://localhost:8089';
-                    const url = `${origin}/system/service/programPermissions.php`;
+                    const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrl)
+                        ? SystemInformation.buildServiceUrl(SystemInformation.SERVICE_NAMES.PROGRAM_PERMISSIONS)
+                        : `${typeof window !== 'undefined' && window.location ? window.location.origin : 'http://localhost:8089'}/system/service/programPermissions.php`;
                     const res = await fetch(url, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -1996,8 +1997,10 @@ class ProcessManager {
                     const upidToReclaim = processInfo.upid ?? ProcessManager._pidToUpid.get(pid);
                     if (upidToReclaim != null) {
                         try {
-                            const origin = typeof window !== 'undefined' && window.location ? window.location.origin : 'http://localhost:8089';
-                            const res = await fetch(`${origin}/system/service/programPermissions.php`, {
+                            const reclaimUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrl)
+                                ? SystemInformation.buildServiceUrl(SystemInformation.SERVICE_NAMES.PROGRAM_PERMISSIONS)
+                                : `${typeof window !== 'undefined' && window.location ? window.location.origin : 'http://localhost:8089'}/system/service/programPermissions.php`;
+                            const res = await fetch(reclaimUrl, {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({ action: 'reclaim', upid: upidToReclaim })
@@ -2302,6 +2305,9 @@ class ProcessManager {
                         ProcessManager._log(1, `清理窗口 ${window.windowId} 失败: ${e.message}`);
                     }
                 }
+                if (typeof GUIManager.unregisterTaskbarPreviewProvider === 'function') {
+                    GUIManager.unregisterTaskbarPreviewProvider(pid);
+                }
             }
             // 然后清理其他 GUI 元素
             ProcessManager._cleanupGUI(pid);
@@ -2377,8 +2383,9 @@ class ProcessManager {
             const upidToReclaim = processInfo.upid ?? ProcessManager._pidToUpid.get(pid);
             if (upidToReclaim != null) {
                 try {
-                    const origin = typeof window !== 'undefined' && window.location ? window.location.origin : 'http://localhost:8089';
-                    const url = `${origin}/system/service/programPermissions.php`;
+                    const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrl)
+                        ? SystemInformation.buildServiceUrl(SystemInformation.SERVICE_NAMES.PROGRAM_PERMISSIONS)
+                        : `${typeof window !== 'undefined' && window.location ? window.location.origin : 'http://localhost:8089'}/system/service/programPermissions.php`;
                     const res = await fetch(url, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -2485,8 +2492,10 @@ class ProcessManager {
                 // 强制终止，即使出错也清理
                 const upidToReclaim = processInfo.upid ?? ProcessManager._pidToUpid.get(pid);
                 if (upidToReclaim != null) {
-                    const origin = typeof window !== 'undefined' && window.location ? window.location.origin : 'http://localhost:8089';
-                    fetch(`${origin}/system/service/programPermissions.php`, {
+                    const reclaimUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrl)
+                        ? SystemInformation.buildServiceUrl(SystemInformation.SERVICE_NAMES.PROGRAM_PERMISSIONS)
+                        : `${typeof window !== 'undefined' && window.location ? window.location.origin : 'http://localhost:8089'}/system/service/programPermissions.php`;
+                    fetch(reclaimUrl, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ action: 'reclaim', upid: upidToReclaim })
@@ -2655,6 +2664,9 @@ class ProcessManager {
                     } catch (e) {
                         ProcessManager._log(1, `清理窗口 ${window.windowId} 失败: ${e.message}`);
                     }
+                }
+                if (typeof GUIManager.unregisterTaskbarPreviewProvider === 'function') {
+                    GUIManager.unregisterTaskbarPreviewProvider(pid);
                 }
             }
 
@@ -3331,6 +3343,8 @@ class ProcessManager {
             // GUI API
             'GUI.createWindow': PermissionManager.PERMISSION.GUI_WINDOW_CREATE,
             'GUI.manageWindow': PermissionManager.PERMISSION.GUI_WINDOW_MANAGE,
+            'GUI.registerTaskbarPreviewProvider': PermissionManager.PERMISSION.GUI_WINDOW_CREATE,
+            'GUI.unregisterTaskbarPreviewProvider': null,
 
             // 存储API
             'Storage.read': PermissionManager.PERMISSION.SYSTEM_STORAGE_READ,
@@ -6275,6 +6289,18 @@ class ProcessManager {
                 return LanguagesExpansion.getLoadedLocales();
             },
 
+            // 任务栏单窗口预览提供者（程序注册后，悬停任务栏图标时使用程序提供的 HTML 渲染预览，点击由 onPreviewClick 处理）
+            'GUI.registerTaskbarPreviewProvider': (pid, provider) => {
+                if (typeof GUIManager === 'undefined') {
+                    throw new Error('GUI.registerTaskbarPreviewProvider: GUIManager 未加载');
+                }
+                GUIManager.registerTaskbarPreviewProvider(pid, provider || {});
+            },
+            'GUI.unregisterTaskbarPreviewProvider': (pid) => {
+                if (typeof GUIManager === 'undefined') return;
+                GUIManager.unregisterTaskbarPreviewProvider(pid);
+            },
+
             // 服务扩展API（委托 ServerExpansion，需 SERVER_SERVICE_MANAGE 权限；传内核令牌防绕过）
             'Server.start': async (id) => {
                 if (typeof ServerExpansion === 'undefined') {
@@ -6399,7 +6425,9 @@ class ProcessManager {
                 apiName === 'ScheduleTask.create' ||
                 apiName === 'ScheduleTask.delete' ||
                 apiName === 'ScheduleTask.update' ||
-                apiName === 'ScheduleTask.setEnabled'
+                apiName === 'ScheduleTask.setEnabled' ||
+                apiName === 'GUI.registerTaskbarPreviewProvider' ||
+                apiName === 'GUI.unregisterTaskbarPreviewProvider'
             )) {
                 // 这些 API 需要 pid 作为第一个参数
                 return await apiHandler(pid, ...args);

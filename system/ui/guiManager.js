@@ -26,6 +26,9 @@ class GUIManager {
     // 窗口日志记录
     static _windowLogs = new Map(); // Map<windowId, Array<LogEntry>>
     
+    // 任务栏单窗口预览提供者 Map<pid, { getPreviewContent: () => string|HTMLElement, onPreviewClick?: (e: Event) => void }>
+    static _previewProviders = new Map();
+    
     // 下一个窗口ID计数器
     static _nextWindowId = 1;
     
@@ -78,6 +81,50 @@ class GUIManager {
         }
         
         KernelLogger.info("GUIManager", "GUI管理器初始化完成");
+    }
+    
+    /**
+     * 注册任务栏单窗口预览提供者（程序通过内核 API 调用）
+     * 注册后，悬停该进程任务栏图标时将使用程序提供的 HTML 片段渲染预览，点击事件由 onPreviewClick 处理
+     * @param {number} pid 进程ID
+     * @param {Object} provider { getPreviewContent: () => string|HTMLElement, onPreviewClick?: (e: Event) => void }
+     */
+    static registerTaskbarPreviewProvider(pid, provider) {
+        if (!pid || !provider || typeof provider.getPreviewContent !== 'function') {
+            if (typeof KernelLogger !== 'undefined') {
+                KernelLogger.warn("GUIManager", "registerTaskbarPreviewProvider: 需要 pid 与 getPreviewContent 函数");
+            }
+            return;
+        }
+        GUIManager._previewProviders.set(pid, {
+            getPreviewContent: provider.getPreviewContent,
+            onPreviewClick: typeof provider.onPreviewClick === 'function' ? provider.onPreviewClick : null
+        });
+        if (typeof KernelLogger !== 'undefined') {
+            KernelLogger.debug("GUIManager", `已注册任务栏预览提供者 PID=${pid}`);
+        }
+    }
+    
+    /**
+     * 注销任务栏单窗口预览提供者（进程退出时应调用）
+     * @param {number} pid 进程ID
+     */
+    static unregisterTaskbarPreviewProvider(pid) {
+        if (GUIManager._previewProviders.has(pid)) {
+            GUIManager._previewProviders.delete(pid);
+            if (typeof KernelLogger !== 'undefined') {
+                KernelLogger.debug("GUIManager", `已注销任务栏预览提供者 PID=${pid}`);
+            }
+        }
+    }
+    
+    /**
+     * 获取指定进程的预览提供者（供 TaskbarManager 使用）
+     * @param {number} pid 进程ID
+     * @returns {Object|null} { getPreviewContent, onPreviewClick } 或 null
+     */
+    static getTaskbarPreviewProvider(pid) {
+        return GUIManager._previewProviders.get(pid) || null;
     }
     
     /**
@@ -338,6 +385,10 @@ class GUIManager {
         windowElement.classList.add('zos-gui-window');
         if (options && options.borderless === true) {
             windowElement.classList.add('zos-window-borderless');
+            windowElement.style.setProperty('border', 'none', 'important');
+            windowElement.style.setProperty('outline', 'none', 'important');
+            windowElement.style.setProperty('border-radius', '10px', 'important');
+            windowElement.style.setProperty('box-shadow', '0 16px 48px rgba(0, 0, 0, 0.55)', 'important');
         }
         
         const noTitleBar = options && options.noTitleBar === true;
@@ -2755,6 +2806,10 @@ class GUIManager {
             windowInfo.windowState.isMaximized = true;
         }
         windowInfo.window.classList.add('zos-window-maximized');
+        if (windowInfo.window.classList.contains('zos-window-borderless')) {
+            windowInfo.window.style.setProperty('border-radius', '0', 'important');
+            windowInfo.window.style.setProperty('box-shadow', 'none', 'important');
+        }
         
         // 更新任务栏可见性（在状态更新后立即调用，确保判断准确）
         // 注意：必须在 isMaximized 设置为 true 之后调用
@@ -2851,6 +2906,10 @@ class GUIManager {
             windowInfo.windowState.isMaximized = false;
         }
         windowInfo.window.classList.remove('zos-window-maximized');
+        if (windowInfo.window.classList.contains('zos-window-borderless')) {
+            windowInfo.window.style.setProperty('border-radius', '10px', 'important');
+            windowInfo.window.style.setProperty('box-shadow', windowInfo.window.classList.contains('zos-window-focused') ? '0 20px 56px rgba(0, 0, 0, 0.6)' : '0 8px 28px rgba(0, 0, 0, 0.45)', 'important');
+        }
         
         // 更新任务栏可见性（在状态更新后立即调用，确保判断准确）
         // 注意：必须在 isMaximized 设置为 false 之后调用
@@ -3085,7 +3144,7 @@ class GUIManager {
             }
             
             // 检查是否点击在排除的元素上
-            const excludeSelectors = ['.zos-window-btn', 'button', '.diskmanager-titlebar-btn', '.zos-window-resizer', '.videoplayer-controls-bar', '.videoplayer-progress-bar', '.videoplayer-progress-container', '.videoplayer-controls', 'video'];
+            const excludeSelectors = ['.zos-window-btn', 'button', '.diskmanager-titlebar-btn', '.musicplayer-titlebar-btn', '.zos-window-resizer', '.videoplayer-controls-bar', '.videoplayer-progress-bar', '.videoplayer-progress-container', '.videoplayer-controls', 'video'];
             if (excludeSelectors.some(selector => e.target.closest && e.target.closest(selector))) {
                 return;
             }
@@ -4043,8 +4102,16 @@ class GUIManager {
             const windowStyles = currentStyle.styles.window;
             const allWindows = document.querySelectorAll('.zos-gui-window');
             allWindows.forEach(window => {
-                window.style.borderRadius = windowStyles.borderRadius;
-                window.style.borderWidth = windowStyles.borderWidth;
+                const isBorderless = window.classList.contains('zos-window-borderless');
+                if (isBorderless) {
+                    window.style.setProperty('border', 'none', 'important');
+                    window.style.setProperty('outline', 'none', 'important');
+                    window.style.setProperty('border-radius', window.classList.contains('zos-window-maximized') ? '0' : '10px', 'important');
+                    window.style.setProperty('box-shadow', window.classList.contains('zos-window-focused') ? '0 20px 56px rgba(0, 0, 0, 0.6)' : '0 8px 28px rgba(0, 0, 0, 0.45)', 'important');
+                } else {
+                    window.style.borderRadius = windowStyles.borderRadius;
+                    window.style.borderWidth = windowStyles.borderWidth;
+                }
                 
                 // 处理 backdrop-filter（使用 !important 确保覆盖 CSS 默认值）
                 // 如果不是玻璃风格，强制删除backdrop-filter
@@ -4062,17 +4129,18 @@ class GUIManager {
                     window.style.setProperty('background-color', windowBg, 'important');
                 }
                 
-                // 根据焦点状态应用不同的阴影
-                if (window.classList.contains('zos-window-focused')) {
-                    window.style.boxShadow = windowStyles.boxShadowFocused || windowStyles.boxShadow;
-                } else {
-                    window.style.boxShadow = windowStyles.boxShadowUnfocused || windowStyles.boxShadow;
-                    window.style.opacity = windowStyles.opacityUnfocused || '1';
+                if (!isBorderless) {
+                    // 根据焦点状态应用不同的阴影
+                    if (window.classList.contains('zos-window-focused')) {
+                        window.style.boxShadow = windowStyles.boxShadowFocused || windowStyles.boxShadow;
+                    } else {
+                        window.style.boxShadow = windowStyles.boxShadowUnfocused || windowStyles.boxShadow;
+                        window.style.opacity = windowStyles.opacityUnfocused || '1';
+                    }
+                    // 设置边框颜色
+                    const borderColor = currentTheme.colors.border || (currentTheme.colors.primary ? currentTheme.colors.primary + '40' : 'rgba(139, 92, 246, 0.25)');
+                    window.style.borderColor = borderColor;
                 }
-                
-                // 设置边框颜色
-                const borderColor = currentTheme.colors.border || (currentTheme.colors.primary ? currentTheme.colors.primary + '40' : 'rgba(139, 92, 246, 0.25)');
-                window.style.borderColor = borderColor;
             });
         } else {
             // 没有风格系统，使用主题背景色
@@ -4085,8 +4153,15 @@ class GUIManager {
                 }
                 const windowBg = currentTheme.colors.backgroundElevated || currentTheme.colors.backgroundSecondary || currentTheme.colors.background;
                 window.style.setProperty('background-color', windowBg, 'important');
-                const borderColor = currentTheme.colors.border || (currentTheme.colors.primary ? currentTheme.colors.primary + '40' : 'rgba(139, 92, 246, 0.25)');
-                window.style.setProperty('border-color', borderColor, 'important');
+                if (window.classList.contains('zos-window-borderless')) {
+                    window.style.setProperty('border', 'none', 'important');
+                    window.style.setProperty('outline', 'none', 'important');
+                    window.style.setProperty('border-radius', window.classList.contains('zos-window-maximized') ? '0' : '10px', 'important');
+                    window.style.setProperty('box-shadow', window.classList.contains('zos-window-focused') ? '0 20px 56px rgba(0, 0, 0, 0.6)' : '0 8px 28px rgba(0, 0, 0, 0.45)', 'important');
+                } else {
+                    const borderColor = currentTheme.colors.border || (currentTheme.colors.primary ? currentTheme.colors.primary + '40' : 'rgba(139, 92, 246, 0.25)');
+                    window.style.setProperty('border-color', borderColor, 'important');
+                }
             });
         }
         

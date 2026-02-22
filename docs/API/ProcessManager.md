@@ -579,106 +579,27 @@ async __init__(pid, initArgs) {
 - 应用层禁止使用 Exploit 进程 PID (10000) 调用内核 API（调用栈含 application 等应用目录时拒绝）
 - 推荐使用进程绑定 API `initArgs.kernelAPI.call(apiName, args)` 以绑定本进程，无需传 pid
 
-**可用 API**:
-- `FileSystem.read` - 读取文件（需要 `KERNEL_DISK_READ` 权限）
-- `FileSystem.write` - 写入文件（需要 `KERNEL_DISK_WRITE` 权限）
-- `FileSystem.delete` - 删除文件（需要 `KERNEL_DISK_DELETE` 权限）
-- `FileSystem.create` - 创建文件/目录（需要 `KERNEL_DISK_CREATE` 权限）
-- `FileSystem.list` - 列出目录（需要 `KERNEL_DISK_LIST` 权限）
-- `Notification.create` - 创建通知（需要 `SYSTEM_NOTIFICATION` 权限）
-- `Notification.remove` - 移除通知（需要 `SYSTEM_NOTIFICATION` 权限）
-- `Network.request` - 网络请求（需要 `NETWORK_ACCESS` 权限，普通权限，自动授予）
-- `Network.fetch` - 网络获取（需要 `NETWORK_ACCESS` 权限，普通权限，自动授予）
-- `Network.Port.register` - 注册 TCP 端口监听（需要 `NETWORK_ACCESS` 权限，普通权限，自动授予）
-- `Network.Port.unregister` - 取消 TCP 端口监听（需要 `NETWORK_ACCESS` 权限，普通权限，自动授予）
-- `Network.Port.getStatus` - 获取端口状态（需要 `NETWORK_ACCESS` 权限，普通权限，自动授予）
-- `Network.Port.list` - 列出所有已注册的端口（需要 `NETWORK_ACCESS` 权限，普通权限，自动授予）
-- `Network.Port.send` - 向端口发送数据（需要 `NETWORK_ACCESS` 权限，普通权限，自动授予）
-- `GUI.createWindow` - 创建窗口（需要 `GUI_WINDOW_CREATE` 权限）
-- `GUI.manageWindow` - 管理窗口（需要 `GUI_WINDOW_MANAGE` 权限）
-- `Storage.read` - 读取系统存储（需要 `SYSTEM_STORAGE_READ` 权限）
-- `Storage.write` - 写入系统存储（需要 `SYSTEM_STORAGE_WRITE` 权限）
-- `Theme.read` - 读取主题（需要 `THEME_READ` 权限）
-- `Theme.write` - 修改主题（需要 `THEME_WRITE` 权限）
-- `Desktop.manage` - 管理桌面（需要 `DESKTOP_MANAGE` 权限）
-- `Desktop.addShortcut` - 添加桌面快捷方式（需要 `DESKTOP_SHORTCUT` 权限，普通权限）
-- `Desktop.addFileOrFolderIcon` - 添加文件/文件夹图标到桌面（需要 `DESKTOP_MANAGE` 权限）
-- `Desktop.removeShortcut` - 移除桌面快捷方式（需要 `DESKTOP_SHORTCUT` 权限，普通权限）
-- `Desktop.getIcons` - 获取桌面图标列表（无需权限）
-- `Desktop.getConfig` - 获取桌面配置（无需权限）
-- `Desktop.setArrangementMode` - 设置排列模式（需要 `DESKTOP_MANAGE` 权限）
-- `Desktop.setIconSize` - 设置图标大小（需要 `DESKTOP_MANAGE` 权限）
-- `Desktop.setAutoArrange` - 设置自动排列（需要 `DESKTOP_MANAGE` 权限）
-- `Desktop.refresh` - 刷新桌面（需要 `DESKTOP_MANAGE` 权限）
-- `Process.manage` - 管理进程（需要 `PROCESS_MANAGE` 权限）
-- `Process.requestBackground` - 申请由前台转后台（需要 `PROCESS_BACKGROUND` 普通权限，仅自身）
-- `Process.registerBackgroundTrayClick` - 注册后台托盘单击回调（需要 `PROCESS_BACKGROUND`，仅自身）
-- `Process.registerBackgroundTrayContextMenu` - 注册后台托盘右键菜单项（需要 `PROCESS_BACKGROUND`，仅自身；系统自动追加「关闭」）
-- `Process.requestSelfTermination` - 当前进程请求自终止（不需权限，仅自身；推荐使用 `kernelAPI.call` 避免 VM 中 PID 校验失败）
-- `Drag.createSession` - 创建拖拽会话（需要 `DRAG_ELEMENT` 权限）
-- `Drag.enable` - 启用拖拽（需要 `DRAG_ELEMENT` 权限）
-- `Drag.disable` - 禁用拖拽（需要 `DRAG_ELEMENT` 权限）
-- `Drag.destroySession` - 销毁拖拽会话（需要 `DRAG_ELEMENT` 权限）
-- `Drag.getSession` - 获取拖拽会话（需要 `DRAG_ELEMENT` 权限）
-- `Drag.registerDropZone` - 注册放置区域（需要 `DRAG_ELEMENT` 权限）
-- `Drag.unregisterDropZone` - 注销放置区域（需要 `DRAG_ELEMENT` 权限）
-- `Drag.createFileDrag` - 创建文件拖拽（需要 `DRAG_FILE` 权限）
-- `Drag.createWindowDrag` - 创建窗口拖拽（需要 `DRAG_WINDOW` 权限）
-- `Drag.getProcessDrags` - 获取进程拖拽会话（需要 `DRAG_ELEMENT` 权限）
-- `Geography.getCurrentPosition` - 获取当前位置（需要 `GEOGRAPHY_LOCATION` 权限）
-- `Geography.clearCache` - 清除位置缓存（需要 `GEOGRAPHY_LOCATION` 权限）
-- `Geography.isSupported` - 检查是否支持地理位置（无需权限）
-- `Geography.getCachedLocation` - 获取缓存的位置（需要 `GEOGRAPHY_LOCATION` 权限）
-- `Crypt.generateKeyPair` - 生成密钥对（需要 `CRYPT_GENERATE_KEY` 权限）
-- `Crypt.importKeyPair` - 导入密钥对（需要 `CRYPT_IMPORT_KEY` 权限）
-- `Crypt.getKeyInfo` - 获取密钥信息（无需权限）
-- `Crypt.listKeys` - 列出所有密钥（无需权限）
-- `Crypt.deleteKey` - 删除密钥（需要 `CRYPT_DELETE_KEY` 权限）
-- `Crypt.setDefaultKey` - 设置默认密钥（需要 `CRYPT_DELETE_KEY` 权限）
-- `Crypt.encrypt` - 加密数据（需要 `CRYPT_ENCRYPT` 权限）
-- `Crypt.decrypt` - 解密数据（需要 `CRYPT_DECRYPT` 权限）
-- `Crypt.md5` - MD5 哈希（需要 `CRYPT_MD5` 权限）
-- `Crypt.randomInt` - 生成随机整数（需要 `CRYPT_RANDOM` 权限）
-- `Crypt.randomFloat` - 生成随机浮点数（需要 `CRYPT_RANDOM` 权限）
-- `Crypt.randomBoolean` - 生成随机布尔值（需要 `CRYPT_RANDOM` 权限）
-- `Crypt.randomString` - 生成随机字符串（需要 `CRYPT_RANDOM` 权限）
-- `Crypt.randomChoice` - 从数组随机选择（需要 `CRYPT_RANDOM` 权限）
-- `Crypt.shuffle` - 打乱数组（需要 `CRYPT_RANDOM` 权限）
-- `Cache.set` - 设置缓存（需要 `CACHE_WRITE` 权限）
-- `Cache.get` - 获取缓存（需要 `CACHE_READ` 权限）
-- `Cache.has` - 检查缓存是否存在（需要 `CACHE_READ` 权限）
-- `Cache.delete` - 删除缓存（需要 `CACHE_WRITE` 权限）
-- `Cache.clear` - 清空缓存（需要 `CACHE_WRITE` 权限）
-- `Cache.getStats` - 获取缓存统计（需要 `CACHE_READ` 权限）
-- `Taskbar.pinProgram` - 固定程序到任务栏（需要 `DESKTOP_MANAGE` 权限）
-- `Taskbar.unpinProgram` - 从任务栏取消固定程序（需要 `DESKTOP_MANAGE` 权限）
-- `Taskbar.getPinnedPrograms` - 获取固定程序列表（无需权限）
-- `Taskbar.isPinned` - 检查程序是否固定（无需权限）
-- `Taskbar.setPinnedPrograms` - 批量设置固定程序（需要 `DESKTOP_MANAGE` 权限）
-- `Taskbar.addIcon` - 添加自定义图标到任务栏（需要 `DESKTOP_MANAGE` 权限）
-- `Taskbar.removeIcon` - 移除任务栏自定义图标（需要 `DESKTOP_MANAGE` 权限，且只能删除自己创建的图标）
-- `Taskbar.updateIcon` - 更新任务栏自定义图标（需要 `DESKTOP_MANAGE` 权限，且只能更新自己创建的图标）
-- `Taskbar.getCustomIcons` - 获取所有自定义图标（无需权限）
-- `Taskbar.getCustomIconsByPid` - 根据 PID 获取自定义图标（无需权限）
-- `Speech.isSupported` - 检查是否支持语音识别（无需权限）
-- `Speech.createSession` - 创建语音识别会话（需要 `SPEECH_RECOGNITION` 权限）
-- `Speech.startRecognition` - 开始语音识别（需要 `SPEECH_RECOGNITION` 权限）
-- `Speech.stopRecognition` - 停止语音识别（需要 `SPEECH_RECOGNITION` 权限）
-- `Speech.stopSession` - 停止语音识别会话（需要 `SPEECH_RECOGNITION` 权限）
-- `Speech.getSessionStatus` - 获取会话状态（需要 `SPEECH_RECOGNITION` 权限）
-- `Speech.getSessionResults` - 获取识别结果（需要 `SPEECH_RECOGNITION` 权限）
-- `ScheduleTask.create` - 创建计划任务（需要 `SCHEDULE_TASK_CREATE` 或 `SCHEDULE_TASK_STARTUP` 权限）
-- `ScheduleTask.delete` - 删除计划任务（需要 `SCHEDULE_TASK_MANAGE` 权限）
-- `ScheduleTask.update` - 更新计划任务（需要 `SCHEDULE_TASK_MANAGE` 权限）
-- `ScheduleTask.get` - 获取计划任务信息（无需权限）
-- `ScheduleTask.getAll` - 获取所有计划任务（无需权限）
-- `ScheduleTask.setEnabled` - 启用/禁用计划任务（需要 `SCHEDULE_TASK_MANAGE` 权限）
-- `Languages.loadPack` - 加载语言包（需要 `LANGUAGES_WRITE` 权限）
-- `Languages.setCurrent` - 设置当前语言（需要 `LANGUAGES_WRITE` 权限）
-- `Languages.getText` - 按常量名获取本地化文本（需要 `LANGUAGES_READ` 权限）
-- `Languages.listPacks` - 列出语言包文件（需要 `LANGUAGES_READ` 权限）
-- `Languages.getCurrentLocale` - 获取当前语言（需要 `LANGUAGES_READ` 权限）
-- `Languages.getLoadedLocales` - 获取已加载语言列表（需要 `LANGUAGES_READ` 权限）
+**可用 API**（快速索引）：以下按模块分组；**详细参数、返回值与示例**见各模块文档（[GUIManager](./GUIManager.md)、[TaskbarManager](./TaskbarManager.md)、[NotificationManager](./NotificationManager.md)、[LStorage](./LStorage.md)、[PermissionManager](./PermissionManager.md) 等）。
+
+- **文件系统**：`FileSystem.read`（读文件，需 `KERNEL_DISK_READ`）、`FileSystem.write`（写文件，需 `KERNEL_DISK_WRITE`）、`FileSystem.delete`、`FileSystem.create`、`FileSystem.list`。路径格式为 `盘符:/路径`，如 `D:/app/data.txt`。详见 [NodeTree.md - 程序用文件 API（FileSystem.*）](./NodeTree.md#程序用文件-apifilesystem)。
+- **通知**：`Notification.create`（需 `SYSTEM_NOTIFICATION`，参数 `[{ type, title, content }]`）、`Notification.remove`。详见 [NotificationManager](./NotificationManager.md)。
+- **网络**：`Network.request`、`Network.fetch`（需 `NETWORK_ACCESS`，普通权限）；`Network.Port.register` / `unregister` / `getStatus` / `list` / `send`。详见 [NetworkPort](./NetworkPort.md)。
+- **GUI 与窗口**：`GUI.createWindow`、`GUI.manageWindow`（需 `GUI_WINDOW_MANAGE`）；`GUI.registerTaskbarPreviewProvider`（需 `GUI_WINDOW_CREATE`，**pid 由内核注入**，程序仅传 `[provider]`，详见 [GUIManager - 任务栏单窗口预览提供者](./GUIManager.md#任务栏单窗口预览提供者)）、`GUI.unregisterTaskbarPreviewProvider`（不需权限，**pid 由内核注入**，程序传 `[]`）。详见 [GUIManager](./GUIManager.md)。
+- **存储与主题**：`Storage.read` / `Storage.write`（系统存储）；`Theme.read` / `Theme.write`。
+- **桌面**：`Desktop.manage`、`Desktop.addShortcut`、`Desktop.addFileOrFolderIcon`、`Desktop.removeShortcut`、`Desktop.getIcons`、`Desktop.getConfig`、`Desktop.setArrangementMode`、`Desktop.setIconSize`、`Desktop.setAutoArrange`、`Desktop.refresh`。详见 [DesktopManager](./DesktopManager.md)。
+- **进程与后台**：`Process.manage`（需 `PROCESS_MANAGE`）；`Process.requestBackground`、`Process.registerBackgroundTrayClick`、`Process.registerBackgroundTrayContextMenu`（需 `PROCESS_BACKGROUND`，仅自身）；`Process.requestSelfTermination`（不需权限，仅自身，推荐 `kernelAPI.call`）。详见上文「内核 API：Process.requestBackground / 后台进程托盘事件回调」。
+- **拖拽**：`Drag.createSession`、`Drag.enable`、`Drag.disable`、`Drag.destroySession`、`Drag.getSession`、`Drag.registerDropZone`、`Drag.unregisterDropZone`、`Drag.createFileDrag`、`Drag.createWindowDrag`、`Drag.getProcessDrags`。详见 [DragDrive](./DragDrive.md)。
+- **地理**：`Geography.getCurrentPosition`、`Geography.clearCache`、`Geography.isSupported`、`Geography.getCachedLocation`。详见 [GeographyDrive](./GeographyDrive.md)。
+- **加密**：`Crypt.generateKeyPair`、`Crypt.importKeyPair`、`Crypt.getKeyInfo`、`Crypt.listKeys`、`Crypt.deleteKey`、`Crypt.setDefaultKey`、`Crypt.encrypt`、`Crypt.decrypt`、`Crypt.md5` 及 `Crypt.random*` / `randomChoice` / `shuffle`。详见 [CryptDrive](./CryptDrive.md)。
+- **缓存**：`Cache.set`、`Cache.get`、`Cache.has`、`Cache.delete`、`Cache.clear`、`Cache.getStats`。详见 [CacheDrive](./CacheDrive.md)。
+- **任务栏**：`Taskbar.pinProgram`、`Taskbar.unpinProgram`、`Taskbar.getPinnedPrograms`、`Taskbar.isPinned`、`Taskbar.setPinnedPrograms`、`Taskbar.addIcon`、`Taskbar.removeIcon`、`Taskbar.updateIcon`、`Taskbar.getCustomIcons`、`Taskbar.getCustomIconsByPid`。详见 [TaskbarManager](./TaskbarManager.md)。
+- **语音**：`Speech.isSupported`、`Speech.createSession`、`Speech.startRecognition`、`Speech.stopRecognition`、`Speech.stopSession`、`Speech.getSessionStatus`、`Speech.getSessionResults`。详见 [SpeechDrive](./SpeechDrive.md)。
+- **计划任务**：`ScheduleTask.create`（需 `SCHEDULE_TASK_CREATE` 或 `SCHEDULE_TASK_STARTUP`）、`ScheduleTask.delete`、`ScheduleTask.update`、`ScheduleTask.get`、`ScheduleTask.getAll`、`ScheduleTask.setEnabled`。**pid 由内核注入**的 API 之一，程序调用时 args 不包含 pid。详见 [ScheduleTaskManager](./ScheduleTaskManager.md)。
+- **语言**：`Languages.loadPack`、`Languages.setCurrent`、`Languages.getText`、`Languages.listPacks`、`Languages.getCurrentLocale`、`Languages.getLoadedLocales`。详见 [LanguagesExpansion](./LanguagesExpansion.md)。
+
+**部分 API 调用约定**：
+- **pid 由内核注入**：以下 API 调用时，内核会把当前调用进程的 pid 作为第一个参数注入，程序传参**不要**包含 pid。例如：`kernelAPI.call('GUI.registerTaskbarPreviewProvider', [provider])`、`kernelAPI.call('GUI.unregisterTaskbarPreviewProvider', [])`、`kernelAPI.call('ScheduleTask.create', [taskConfig])`、`Notification.create` / `Notification.remove`、`Event.register` / `Event.unregister` / `Event.unregisterAll` 等。使用 `callKernelAPI(pid, apiName, args)` 时由调用方传入 pid，通常用于管理其他进程（需相应权限）。
+- **权限**：每项所需权限见上或 [PermissionManager](./PermissionManager.md)；未授权调用会抛错。
 
 **示例**:
 ```javascript

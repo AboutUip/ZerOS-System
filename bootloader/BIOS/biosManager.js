@@ -1461,16 +1461,13 @@ KernelLogger.info("BIOSManager", "模块初始化");
                         : '/system/service/test';
                     testUrl = SystemInformation.buildServiceUrl(servicePath);
                 } else {
-                    // 降级方案：手动构建URL
-                    const origin = typeof window !== 'undefined' && window.location 
-                        ? window.location.origin 
-                        : 'http://localhost:8089';
-                    
-                    if (backendType === 'php') {
-                        testUrl = `${origin}/system/service/test.php`;
-                    } else if (backendType === 'spring') {
-                        testUrl = `${origin}/system/service/test`;
-                    } else {
+                    // 降级方案：优先 SystemInformation.getOrigin，否则 window.location.origin
+                    const origin = (typeof SystemInformation !== 'undefined' && typeof SystemInformation.getOrigin === 'function')
+                        ? SystemInformation.getOrigin()
+                        : (typeof window !== 'undefined' && window.location ? window.location.origin : 'http://localhost:8089');
+                    const path = backendType === 'php' ? '/system/service/test.php' : '/system/service/test';
+                    testUrl = `${origin}${path}`;
+                    if (backendType !== 'php' && backendType !== 'spring') {
                         throw new Error(`Unknown backend type: ${backendType}`);
                     }
                 }

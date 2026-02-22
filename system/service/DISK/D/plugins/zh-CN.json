@@ -105,6 +105,7 @@
         "SETTINGS_APPLICATION_MANAGEMENT_DESC": "查看和管理已安装的应用程序，可以卸载动态安装的程序",
         "SETTINGS_LOCALE_ZH_CN": "简体中文 (zh-CN)",
         "SETTINGS_LOCALE_EN": "English (en)",
+        "SETTINGS_LOCALE_JA": "日本語 (ja)",
         "SETTINGS_USER_ACCOUNTS": "用户账户",
         "SETTINGS_MANAGE_GROUPS": "管理组",
         "SETTINGS_CREATE_USER": "+ 创建用户",

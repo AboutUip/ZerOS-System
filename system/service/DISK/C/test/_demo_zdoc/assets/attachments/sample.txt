@@ -1,3 +1,0 @@
-ZDOC attachment sample
-This file is packaged inside assets/attachments/ and referenced by an "asset" node.
-
