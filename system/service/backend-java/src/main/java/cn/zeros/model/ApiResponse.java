@@ -1,6 +1,7 @@
 package cn.zeros.model;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -18,6 +19,7 @@ public class ApiResponse<T> {
     private String status;
     private String message;
     private String timestamp;
+    @JsonProperty("timestamp_unix")
     private Long timestampUnix;
     private T data;
     

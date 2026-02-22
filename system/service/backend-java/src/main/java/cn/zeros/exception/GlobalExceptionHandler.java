@@ -144,6 +144,14 @@ public class GlobalExceptionHandler {
             }
             return HttpStatus.INTERNAL_SERVER_ERROR;
         }
+        // 401x - 认证错误
+        if (errorCode.startsWith("401")) {
+            return HttpStatus.UNAUTHORIZED;
+        }
+        // 403x - 授权错误
+        if (errorCode.startsWith("403")) {
+            return HttpStatus.FORBIDDEN;
+        }
         // 4xxx - 代理服务错误
         if (errorCode.startsWith("4")) {
             if (errorCode.contains("01") || errorCode.contains("02")) {
