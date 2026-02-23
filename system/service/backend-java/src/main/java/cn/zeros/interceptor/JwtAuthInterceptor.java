@@ -51,6 +51,11 @@ public class JwtAuthInterceptor implements HandlerInterceptor {
             return true;
         }
 
+        // 所有 GET 请求直接放行，不检查 JWT
+        if ("GET".equalsIgnoreCase(request.getMethod())) {
+            return true;
+        }
+
         String token = extractTokenFromRequest(request);
 
         if (isOptionalAuth(pathToMatch)) {

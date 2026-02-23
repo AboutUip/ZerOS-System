@@ -28,6 +28,7 @@ public class JwtProperties {
      */
     private List<String> excludePaths = List.of(
             "/api/auth/**",
+            "/DISK/**",
             "/randomSecurity",
             "/randomSecurity/**",
             "/module-proxy",
