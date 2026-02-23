@@ -6,12 +6,21 @@ server:
 spring:
   application:
     name: zeros-backend
+  web:
+    resources:
+      add-mappings: false
+  mvc:
+    throw-exception-if-no-handler-found: true
   servlet:
     multipart:
       max-file-size: 1GB
       max-request-size: 1GB
 
 # DISK 路径配置
+# 注意：路径是相对于 SpringBoot 运行时的当前工作目录
+# 如果从 backend-java 目录运行（推荐），使用 ../DISK
+# 如果从项目根目录运行，需要修改为 system/service/DISK
+# 如果作为 jar 包运行，建议使用绝对路径或相对于 jar 包位置的路径
 disk:
   base-path: ../DISK
   system-partition: D
@@ -24,6 +33,7 @@ jwt:
   issuer: zeros-system
   exclude-paths:
     - /api/auth/**
+    - /DISK/**
     - /randomSecurity
     - /randomSecurity/**
     - /module-proxy
