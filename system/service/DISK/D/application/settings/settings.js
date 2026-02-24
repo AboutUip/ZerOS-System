@@ -71,11 +71,17 @@
          * 初始化程序
          */
         __init__: async function(pid, initArgs) {
-            this._upid = initArgs && initArgs.upid;
             this.pid = pid;
             
+            if (typeof ProcessManager !== 'undefined' && typeof ProcessManager.getProcessInfo === 'function') {
+                const processInfo = ProcessManager.getProcessInfo(pid);
+                this._upid = processInfo && processInfo.upid != null ? processInfo.upid : null;
+            } else {
+                this._upid = initArgs && initArgs.upid;
+            }
+            
             if (typeof KernelLogger !== 'undefined') {
-                KernelLogger.info('SETTINGS', '设置程序初始化');
+                KernelLogger.info('SETTINGS', `设置程序初始化, PID: ${pid}, UPID: ${this._upid}`);
             }
             
             // 获取 GUI 容器

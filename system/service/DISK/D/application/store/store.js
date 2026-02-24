@@ -801,6 +801,14 @@
 
             this._appListContainer.innerHTML = '';
 
+            if (!Array.isArray(this._apps)) {
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.warn('STORE', `应用列表数据格式错误: ${typeof this._apps}`);
+                }
+                this._appListContainer.appendChild(this._createEmpty(this._getText('STORE_NO_APPS', '暂无应用')));
+                return;
+            }
+
             if (this._apps.length === 0) {
                 this._appListContainer.appendChild(this._createEmpty(this._getText('STORE_NO_APPS', '暂无应用')));
                 return;
@@ -894,7 +902,7 @@
             this._appListContainer.appendChild(this._createLoading());
 
             try {
-                const baseUrl = 'http://localhost:8088';
+                const baseUrl = 'http://60.205.142.158:80';
                 const response = await fetch(`${baseUrl}/api/application/list`);
 
                 if (!response.ok) {
@@ -904,7 +912,8 @@
                 const result = await response.json();
 
                 if (result.code === 200 && result.data) {
-                    this._apps = result.data;
+                    const appsData = Array.isArray(result.data) ? result.data : [];
+                    this._apps = appsData;
                     this._selectedApp = null;
                     this._renderAppList();
                     this._showWelcomeDetail();
@@ -943,7 +952,8 @@
                 const result = await response.json();
 
                 if (result.code === 200 && result.data) {
-                    this._apps = result.data;
+                    const appsData = Array.isArray(result.data) ? result.data : [];
+                    this._apps = appsData;
                     this._selectedApp = null;
                     this._renderAppList();
                     this._showWelcomeDetail();

@@ -28,6 +28,8 @@ class TaskbarManager {
     static _loadingPosition = false;
     // 电池事件是否已注册
     static _batteryEventRegistered = false;
+    // 电池不可用日志是否已记录（避免循环记录）
+    static _batteryUnavailableLogged = false;
     // WIN键监听是否已注册
     static _winKeyListenerRegistered = false;
     // 全屏多任务选择器相关
@@ -7597,7 +7599,7 @@ class TaskbarManager {
             try {
                 batteryInfo = await networkManager.getBatteryInfo();
             } catch (e) {
-                KernelLogger.warn("TaskbarManager", `从 NetworkManager 获取电池信息失败: ${e.message}`);
+                KernelLogger.info("TaskbarManager", `从 NetworkManager 获取电池信息失败: ${e.message}`);
             }
         }
         
@@ -7612,12 +7614,15 @@ class TaskbarManager {
                     level: battery.level
                 };
             } catch (e) {
-                KernelLogger.warn("TaskbarManager", `直接获取电池信息失败: ${e.message}`);
+                KernelLogger.info("TaskbarManager", `直接获取电池信息失败: ${e.message}`);
             }
         }
         
         if (!batteryInfo) {
             // 降级：电池信息不可用
+            if (!TaskbarManager._batteryUnavailableLogged) {
+                TaskbarManager._batteryUnavailableLogged = true;
+            }
             batteryLevel.style.width = '0px';
             batteryLevel.style.opacity = '0';
             if (chargingIndicator) {
@@ -7626,6 +7631,9 @@ class TaskbarManager {
             batteryContainer.title = TaskbarManager._getText('TASKBAR_BATTERY_UNAVAILABLE', '电池信息不可用');
             return;
         }
+        
+        // 电池可用时重置日志标志
+        TaskbarManager._batteryUnavailableLogged = false;
         
         const { level, charging } = batteryInfo;
         const percentage = Math.round(level * 100);
@@ -7711,7 +7719,7 @@ class TaskbarManager {
                     panel.style.borderColor = currentTheme.colors.border || (currentTheme.colors.primary ? currentTheme.colors.primary + '33' : 'rgba(108, 142, 255, 0.2)');
                 }
             } catch (e) {
-                KernelLogger.warn("TaskbarManager", `应用主题到电池面板失败: ${e.message}`);
+                KernelLogger.info("TaskbarManager", `应用主题到电池面板失败: ${e.message}`);
             }
         }
         
@@ -7793,7 +7801,7 @@ class TaskbarManager {
                 svg.appendChild(chargingCircle);
             }
         }).catch(e => {
-            KernelLogger.warn("TaskbarManager", `加载电池图标失败: ${e.message}，使用默认图标`);
+            KernelLogger.info("TaskbarManager", `加载电池图标失败: ${e.message}，使用默认图标`);
             // 降级：使用内联SVG
             batteryIcon.innerHTML = `
                 <svg width="100" height="50" viewBox="0 0 24 12" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -7863,7 +7871,7 @@ class TaskbarManager {
                     await TaskbarManager._updateBatteryStatus(batteryContainer);
                 }
             } catch (error) {
-                KernelLogger.warn("TaskbarManager", `刷新电池信息失败: ${error.message}`);
+                KernelLogger.info("TaskbarManager", `刷新电池信息失败: ${error.message}`);
             } finally {
                 // 恢复按钮状态
                 refreshBtn.innerHTML = originalHTML;
@@ -8146,7 +8154,7 @@ class TaskbarManager {
         const hasBatteryAPI = typeof navigator !== 'undefined' && typeof navigator.getBattery === 'function';
         
         if (!hasBatteryAPI) {
-            KernelLogger.warn("TaskbarManager", "navigator.getBattery API 不可用（可能需要 HTTPS 或浏览器不支持）");
+            KernelLogger.info("TaskbarManager", "navigator.getBattery API 不可用（可能需要 HTTPS 或浏览器不支持）");
             errorMessage = "电池 API 不可用（可能需要 HTTPS 或浏览器不支持）";
         } else {
             // 首先尝试通过 NetworkManager 获取
@@ -8184,7 +8192,7 @@ class TaskbarManager {
         const batteryInfoEl = document.getElementById('battery-info');
         
         if (!batteryDisplay || !batteryPercentage || !batteryInfoEl) {
-            KernelLogger.warn("TaskbarManager", `电池面板元素未找到: batteryDisplay=${!!batteryDisplay}, batteryPercentage=${!!batteryPercentage}, batteryInfoEl=${!!batteryInfoEl}`);
+            KernelLogger.info("TaskbarManager", `电池面板元素未找到: batteryDisplay=${!!batteryDisplay}, batteryPercentage=${!!batteryPercentage}, batteryInfoEl=${!!batteryInfoEl}`);
             return;
         }
         
@@ -12084,7 +12092,7 @@ class TaskbarManager {
                     }
                 }
             } catch (e) {
-                KernelLogger.warn("TaskbarManager", `更新电池图标失败: ${e.message}`);
+                KernelLogger.info("TaskbarManager", `更新电池图标失败: ${e.message}`);
             }
         }
         
@@ -12094,7 +12102,7 @@ class TaskbarManager {
             try {
                 await TaskbarManager._loadSystemIcon('power', powerIcon);
             } catch (e) {
-                KernelLogger.warn("TaskbarManager", `更新电源图标失败: ${e.message}`);
+                KernelLogger.info("TaskbarManager", `更新电源图标失败: ${e.message}`);
             }
         }
         

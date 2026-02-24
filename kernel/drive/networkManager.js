@@ -1249,7 +1249,7 @@
                     }
                 } catch (error) {
                     if (typeof KernelLogger !== 'undefined') {
-                        KernelLogger.warn("NetworkManager", `初始化电池信息失败: ${error.message}`);
+                        KernelLogger.info("NetworkManager", `初始化电池信息失败: ${error.message}`);
                     }
                 }
             }
@@ -1447,7 +1447,7 @@
             // 检查 getBattery API 是否可用
             if (!navigator.getBattery) {
                 if (typeof KernelLogger !== 'undefined') {
-                    KernelLogger.warn("NetworkManager", "navigator.getBattery API 不可用（可能需要 HTTPS 或浏览器不支持）");
+                    KernelLogger.info("NetworkManager", "navigator.getBattery API 不可用（可能需要 HTTPS 或浏览器不支持）");
                     KernelLogger.debug("NetworkManager", `当前协议: ${window.location.protocol}, 是否为 HTTPS: ${window.location.protocol === 'https:'}`);
                 }
                 return null;
@@ -1472,7 +1472,7 @@
                 return batteryInfo;
             } catch (error) {
                 if (typeof KernelLogger !== 'undefined') {
-                    KernelLogger.warn("NetworkManager", `获取电池信息失败: ${error.message}`);
+                    KernelLogger.info("NetworkManager", `获取电池信息失败: ${error.message}`);
                 }
                 return null;
             }

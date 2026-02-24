@@ -1,6 +1,19 @@
 {
   "system": {
-    "permissionManager.permissions": {},
+    "permissionManager.permissions": {
+      "zominstall": [
+        "KERNEL_DISK_READ",
+        "APPLICATION_INSTALL"
+      ],
+      "packetcap": [
+        "GUI_WINDOW_CREATE",
+        "EVENT_LISTENER"
+      ],
+      "settings": [
+        "APPLICATION_UNINSTALL",
+        "SYSTEM_NOTIFICATION"
+      ]
+    },
     "system.style": "macos",
     "desktop.icons": [
       {
@@ -274,7 +287,7 @@
         "password": "61b249bf6d604d14120821f43625e84e",
         "avatar": "avatar_root_1766272534753.jpg",
         "createdAt": 1766271155991,
-        "lastLogin": 1771946449044
+        "lastLogin": 1771955227433
       },
       "TestUser": {
         "level": "USER",
@@ -326,9 +339,9 @@
         "triggerConfig": {},
         "enabled": true,
         "createdAt": 1771942626583,
-        "updatedAt": 1771946450098,
-        "lastRunAt": 1771946450098,
-        "runCount": 14,
+        "updatedAt": 1771955228561,
+        "lastRunAt": 1771955228561,
+        "runCount": 30,
         "createdBy": "servicemanager",
         "requiresStartupPermission": true,
         "serviceId": "notice",
@@ -361,7 +374,8 @@
     "_server_notice_history": [
       "2026-02-16T18:37:38.455747",
       "2026-02-22T13:05:41.821472",
-      "2026-02-23T12:36:00.303667"
+      "2026-02-23T12:36:00.303667",
+      "2026-02-24 22:03:54"
     ],
     "bios.memoryAllocation": true
   },

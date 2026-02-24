@@ -2964,7 +2964,13 @@ class LStorage {
             const appDirPath = pathParts.slice(0, -1).join('/');
             const uninstallPath = `${appDirPath}/uninstall.js`;
 
-            // 先通过 fetch 检查并读取 uninstall.js，避免无谓调用 FileSystem.read 产生 404 错误日志
+            // 先检查 uninstall.js 是否存在，避免 404 错误
+            const uninstallExists = await LStorage._fileExistsInPHP(appDirPath, 'uninstall.js');
+            if (!uninstallExists) {
+                return true;
+            }
+
+            // 文件存在，读取内容
             let uninstallContent = null;
             try {
                 const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject)

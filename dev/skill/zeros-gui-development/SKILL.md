@@ -986,7 +986,85 @@ permissions: typeof PermissionManager !== 'undefined' ? [
 - Store `windowId` for later reference
 - Handle `onClose` callback properly (cleanup only, don't call `unregisterWindow`)
 
-### 2. Event Handling
+### 2. Window CSS - Fixed Height Required
+
+**IMPORTANT**: GUI窗口必须使用固定高度值来防止标题栏问题：
+
+```javascript
+this.window.style.cssText = `
+    width: 800px;
+    height: 600px;          // 必需：固定像素值
+    min-width: 600px;      // 可选：最小宽度
+    min-height: 600px;     // 必需：必须等于height
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+`;
+```
+
+**禁止使用**:
+- ❌ `height: 100%` (会导致标题栏问题)
+- ❌ `height: calc(100vh - xxx)` (可能导致问题)
+- ❌ 单独使用 `min-height` 没有 `height` (无效)
+- ❌ 父元素没有固定高度时使用 `flex: 1`
+
+**窗口初始化顺序（关键！）**:
+```javascript
+// 1. 先设置样式（不含innerHTML）
+this.window.style.cssText = `...`;
+
+// 2. 注册窗口
+if (typeof GUIManager !== 'undefined') {
+    GUIManager.registerWindow(pid, this.window, {...});
+}
+
+// 3. 先添加到DOM
+guiContainer.appendChild(this.window);
+
+// 4. 再设置innerHTML（重要！）
+this._buildUI();
+```
+
+**工具栏和状态栏必须有固定高度（必须使用min-height和max-height）**:
+ ```css
+ .toolbar {
+     height: 46px;
+     min-height: 46px;
+     max-height: 46px;
+     flex-shrink: 0;
+ }
+
+ .statusbar {
+     height: 28px;
+     min-height: 28px;
+     max-height: 28px;
+     flex-shrink: 0;
+ }
+ ```
+
+**内容区域使用Flexbox布局**:
+- 使用 `flex: 1` 和 `min-height: 0` 让子容器可以滚动
+
+```css
+.packetcap-main {
+    display: flex;
+    flex: 1;           /* Take remaining space */
+    overflow: hidden;
+    min-height: 0;     /* Required for flex child to scroll */
+}
+
+.toolbar {
+    flex-shrink: 0;    /* Prevent toolbar from shrinking */
+}
+
+.scrollable-content {
+    flex: 1;
+    overflow-y: auto;
+    min-height: 0;     /* Required for scrolling */
+}
+```
+
+### 3. Event Handling
 
 - **Always use `EventManager`** for event handling (mandatory requirement)
 - Store event handler IDs in an array for cleanup
@@ -994,7 +1072,7 @@ permissions: typeof PermissionManager !== 'undefined' ? [
 - Use appropriate priorities for event handlers
 - Use `selector` option to limit event scope when possible
 
-### 3. Resource Cleanup
+### 4. Resource Cleanup
 
 - Clean up all event handlers in `__exit__`
 - Unregister window from `GUIManager`
@@ -1003,35 +1081,35 @@ permissions: typeof PermissionManager !== 'undefined' ? [
 - Cancel any timers (`setInterval`, `setTimeout`)
 - Unsubscribe from theme changes, language changes, etc.
 
-### 4. Error Handling
+### 5. Error Handling
 
 - Always wrap kernel API calls in `try-catch`
 - Use `KernelLogger` for logging (never use `console.log`)
 - Report errors using `Exception.report()` if needed
 - Handle missing dependencies gracefully
 
-### 5. Theme Compatibility
+### 7. Theme Compatibility
 
 - Always use CSS theme variables for colors
 - Provide fallback values for theme variables
 - Listen to theme changes if UI needs dynamic updates
 - Test with different themes
 
-### 6. Background Mode
+### 8. Background Mode
 
 - Consider supporting background mode for long-running applications
 - Register tray click handler to restore window
 - Provide context menu for background processes
 - Handle window restoration properly
 
-### 7. Performance
+### 9. Performance
 
 - Avoid blocking operations in event handlers
 - Use `requestAnimationFrame` for animations
 - Debounce/throttle frequent events (scroll, resize, etc.)
 - Lazy load heavy content
 
-### 8. Accessibility
+### 11. Accessibility
 
 - Use semantic HTML elements
 - Provide keyboard shortcuts
