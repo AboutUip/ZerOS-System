@@ -84,6 +84,35 @@ KernelLogger.info("ExceptionHandler", "模块初始化");
         }
         
         /**
+         * 检查调用来源并返回允许的异常等级
+         * @returns {Object} { allowedLevels: string[], callerType: string }
+         */
+        static _checkCallerAndGetAllowedLevels() {
+            try {
+                const stack = new Error().stack;
+                if (!stack) {
+                    return { allowedLevels: Object.values(ExceptionLevel), callerType: 'unknown' };
+                }
+
+                if (stack.includes('system/service/DISK/D/server/')) {
+                    return { allowedLevels: [ExceptionLevel.SERVICE], callerType: 'service' };
+                }
+
+                if (stack.includes('system/service/DISK/D/application/')) {
+                    return { allowedLevels: [ExceptionLevel.PROGRAM], callerType: 'program' };
+                }
+
+                if (stack.includes('kernel/') || stack.includes('system/kernel/')) {
+                    return { allowedLevels: Object.values(ExceptionLevel), callerType: 'kernel' };
+                }
+
+                return { allowedLevels: [ExceptionLevel.PROGRAM], callerType: 'unknown' };
+            } catch (e) {
+                return { allowedLevels: Object.values(ExceptionLevel), callerType: 'error' };
+            }
+        }
+
+        /**
          * 报告异常（公共API，供程序调用）
          * @param {string} level 异常等级（KERNEL, SYSTEM, PROGRAM, SERVICE）
          * @param {string} message 异常消息
@@ -92,21 +121,25 @@ KernelLogger.info("ExceptionHandler", "模块初始化");
          * @returns {Promise<void>}
          */
         static async reportException(level, message, details = {}, pid = null) {
-            // 确保已初始化（异步）
             if (!ExceptionHandler._initialized) {
                 await ExceptionHandler.init();
             }
-            
-            // 验证异常等级
+
             if (!Object.values(ExceptionLevel).includes(level)) {
                 KernelLogger.error("ExceptionHandler", `无效的异常等级: ${level}`);
                 throw new Error(`无效的异常等级: ${level}`);
             }
-            
-            // 记录异常报告
-            KernelLogger.error("ExceptionHandler", `异常报告 [${level}]: ${message}`, details);
-            
-            // 根据异常等级处理
+
+            const { allowedLevels, callerType } = ExceptionHandler._checkCallerAndGetAllowedLevels();
+
+            if (!allowedLevels.includes(level)) {
+                const errorMsg = `非法的异常等级: ${level} (调用来源: ${callerType})。${callerType === 'service' ? '服务只允许报告 SERVICE 级别异常' : '程序只允许报告 PROGRAM 级别异常'}`;
+                KernelLogger.error("ExceptionHandler", errorMsg);
+                throw new Error(errorMsg);
+            }
+
+            KernelLogger.error("ExceptionHandler", `异常报告 [${level}] (来源: ${callerType}): ${message}`, details);
+
             switch (level) {
                 case ExceptionLevel.KERNEL:
                     await ExceptionHandler._handleKernelException(message, details);

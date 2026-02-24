@@ -11,8 +11,7 @@
         "THEME_READ",
         "LANGUAGES_READ",
         "LANGUAGES_WRITE",
-        "KERNEL_DISK_READ",
-        "SYSTEM_NOTIFICATION"
+        "KERNEL_DISK_READ"
       ]
     },
     "system.style": "macos",
@@ -244,12 +243,6 @@
         "path": "D:/cache/wallpaper_community_315795.mp4"
       },
       {
-        "id": "local_D__cache_wallpaper_community_59833_mp4",
-        "name": "wallpaper_community_59833.mp4",
-        "description": "Local video: D:/cache/wallpaper_community_59833.mp4 (muted loop)",
-        "path": "D:/cache/wallpaper_community_59833.mp4"
-      },
-      {
         "id": "local_D__cache_wallpaper_community_4958_mp4",
         "name": "wallpaper_community_4958.mp4",
         "description": "Local video: D:/cache/wallpaper_community_4958.mp4 (muted loop)",
@@ -286,7 +279,7 @@
           "tags": []
         }
       },
-      "defaultKeyId": null
+      "defaultKeyId": "key_1770442995245_szok1d7oi"
     },
     "userControl.users": {
       "root": {
@@ -294,7 +287,7 @@
         "password": "61b249bf6d604d14120821f43625e84e",
         "avatar": "avatar_root_1766272534753.jpg",
         "createdAt": 1766271155991,
-        "lastLogin": 1771760437579
+        "lastLogin": 1771946449044
       },
       "TestUser": {
         "level": "USER",
@@ -338,14 +331,31 @@
     },
     "desktop.iconSize": "medium",
     "system.taskbarWeatherEnabled": true,
-    "scheduleTaskManager.tasks": [],
+    "scheduleTaskManager.tasks": [
+      {
+        "id": "task_1771942626583_jb52439mg",
+        "taskType": "service",
+        "triggerType": "SYSTEM_STARTUP",
+        "triggerConfig": {},
+        "enabled": true,
+        "createdAt": 1771942626583,
+        "updatedAt": 1771946450098,
+        "lastRunAt": 1771946450098,
+        "runCount": 14,
+        "createdBy": "servicemanager",
+        "requiresStartupPermission": true,
+        "serviceId": "notice",
+        "serviceAction": "start"
+      }
+    ],
     "registry": {
       "environment": {},
       "brightness": 100
     },
     "applicationTable": {},
     "permissionManager.denialCounts": {
-      "zominstall_KERNEL_DISK_DELETE": 1
+      "zominstall_KERNEL_DISK_DELETE": 1,
+      "handtracker_MEDIA_ACCESS": 1
     },
     "bios.logLevel": 0,
     "exceptionHandler.kernelExceptionFlag": false,
@@ -363,7 +373,8 @@
     },
     "_server_notice_history": [
       "2026-02-16T18:37:38.455747",
-      "2026-02-22T13:05:41.821472"
+      "2026-02-22T13:05:41.821472",
+      "2026-02-23T12:36:00.303667"
     ],
     "bios.memoryAllocation": true
   },

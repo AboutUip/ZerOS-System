@@ -91,6 +91,35 @@ if (typeof window !== 'undefined' && typeof window.__ZerOS_ServerExpansion_Regis
 })();
 ```
 
+## 异常处理
+
+服务发生异常时**必须**报告 SERVICE 级别异常。
+
+```javascript
+// 在服务方法中捕获异常后报告
+async function __start__() {
+    try {
+        await connectToDatabase();
+    } catch (error) {
+        await KernelAPI.call('Exception.report', [
+            'SERVICE',
+            '数据库连接失败',
+            {
+                service: 'HelloService',
+                error: error.message,
+                stack: error.stack
+            }
+        ]);
+    }
+}
+```
+
+**权限限制**：
+- 服务只能报告 SERVICE 级别异常
+- 报告 KERNEL/SYSTEM/PROGRAM 级别会抛出错误
+
+详细说明请参考 [ExceptionHandler API 文档](../API/ExceptionHandler.md)
+
 ## 使用服务启停 API（程序侧）
 
 **权限**：服务启停与查询由进程管理器以 **Server.\*** 形式暴露，所需权限为 **SERVER_SERVICE_MANAGE**（权限等级最高，DANGEROUS）。程序**不得**直接调用 `ServerExpansion` 的 start/stop/listServices/loadAll/status/info/isInited/isStarted（会因内核令牌校验失败而抛错）。

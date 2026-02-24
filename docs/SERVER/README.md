@@ -7,6 +7,7 @@
 | 文档 | 描述 |
 |------|------|
 | [服务模块编写 (ServiceModule.md)](./ServiceModule.md) | D/server 服务模块命名、接口约定与生命周期 |
+| [WASM 总控服务 (ServerWasm.md)](./ServerWasm.md) | WebAssembly 模块总控服务，自动检测并加载 WASM 模块 |
 | [通知服务 (ServerNotice.md)](./ServerNotice.md) | 内置通知服务说明、API 约定与 ZerOS API 使用 |
 | [通知服务维护指南 (ServerNotice)](../MAINTENANCE/ServerNotice.md) | 公告服务配置、故障排查与维护文档 |
 | [翻译服务 (ServerTranslate.md)](./ServerTranslate.md) | 内置翻译服务说明、POOL API（translateSimple/translate）与终端 debug |

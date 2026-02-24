@@ -1425,10 +1425,12 @@ await ThemeManager.setLocalImageAsBackground('D:/images/wallpaper.jpg');
 
 始终使用 try-catch 处理异步操作。
 
-**异常报告**：对于严重错误，可以使用异常处理管理器报告异常：
+**异常报告（必须）**：程序和服务发生异常时必须报告异常，否则异常信息可能丢失。
 
 ```javascript
-// 报告程序异常（程序将被自动终止）
+// 程序异常（必须报告）
+// 调用来源：system/service/DISK/D/application/
+// 允许的异常等级：PROGRAM
 try {
     await someCriticalOperation();
 } catch (error) {
@@ -1444,7 +1446,9 @@ try {
     // 程序将被自动终止
 }
 
-// 报告服务异常（仅记录日志，不影响系统运行）
+// 服务异常（必须报告）
+// 调用来源：system/service/DISK/D/server/
+// 允许的异常等级：SERVICE
 try {
     await networkService.connect();
 } catch (error) {
@@ -1461,10 +1465,14 @@ try {
 ```
 
 **异常等级说明**：
-- **PROGRAM**：程序异常，程序将被自动终止
-- **SERVICE**：服务异常，仅记录日志，不影响系统运行
-- **SYSTEM**：系统异常，会显示蓝屏并重启系统（谨慎使用）
-- **KERNEL**：内核异常，会进入BIOS安全模式（仅内核模块使用）
+- **PROGRAM**：程序异常，程序将被自动终止（程序必须使用）
+- **SERVICE**：服务异常，仅记录日志（服务必须使用）
+- **SYSTEM**：系统异常，会显示蓝屏并重启系统（仅内核使用）
+- **KERNEL**：内核异常，会进入BIOS安全模式（仅内核使用）
+
+**权限限制**：
+- 服务调用 KERNEL/SYSTEM/PROGRAM → 抛出错误
+- 程序调用 KERNEL/SYSTEM/SERVICE → 抛出错误
 
 详细说明请参考 [ExceptionHandler API 文档](API/ExceptionHandler.md)
 
@@ -2624,7 +2632,7 @@ GUIManager.registerWindow(this.pid, this.window, {
 
 ### Q: 如何处理程序崩溃？
 
-A: 使用 try-catch 和错误边界：
+A: 使用 try-catch 和错误边界。程序发生异常时**必须**报告 PROGRAM 级别异常：
 
 ```javascript
 __init__: async function(pid, initArgs) {
@@ -2633,6 +2641,19 @@ __init__: async function(pid, initArgs) {
         await this._initialize();
     } catch (error) {
         console.error('初始化失败:', error);
+        
+        // 报告程序异常（必须）
+        // 调用来源：system/service/DISK/D/application/
+        // 允许的异常等级：PROGRAM
+        await KernelAPI.call('Exception.report', [
+            'PROGRAM',
+            `程序初始化失败: ${error.message}`,
+            {
+                errorCode: 'INIT_FAILED',
+                stack: error.stack,
+                timestamp: Date.now()
+            }
+        ]);
         
         // 显示错误提示
         if (typeof GUIManager !== 'undefined') {
@@ -2653,6 +2674,12 @@ __init__: async function(pid, initArgs) {
     }
 }
 ```
+
+**权限限制**：
+- 程序只能报告 PROGRAM 级别异常
+- 报告 KERNEL/SYSTEM/SERVICE 级别会抛出错误
+
+详细说明请参考 [ExceptionHandler API 文档](API/ExceptionHandler.md)
 
 ### Q: 如何实现程序更新检查？
 

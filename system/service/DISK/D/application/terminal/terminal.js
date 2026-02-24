@@ -432,6 +432,13 @@
                                     if (typeof KernelLogger !== 'undefined') {
                                         KernelLogger.error('Terminal', '获取 ProcessManager 失败', e);
                                     }
+                                    if (typeof ExceptionHandler !== 'undefined') {
+                                        ExceptionHandler.reportException(
+                                            ExceptionHandler.ExceptionLevel.SERVICE,
+                                            'Terminal 获取 ProcessManager 失败',
+                                            { error: e.message, stack: e.stack }
+                                        );
+                                    }
                                 }
                             }
                             // onClose 回调只做清理工作，不调用 _closeWindow 或 unregisterWindow
@@ -495,6 +502,13 @@
                                 } catch (e) {
                                     if (typeof KernelLogger !== 'undefined') {
                                         KernelLogger.error('Terminal', 'Failed to close terminal', e);
+                                    }
+                                    if (typeof ExceptionHandler !== 'undefined') {
+                                        ExceptionHandler.reportException(
+                                            ExceptionHandler.ExceptionLevel.SERVICE,
+                                            'Terminal 关闭终端失败',
+                                            { error: e.message, stack: e.stack }
+                                        );
                                     }
                                 }
                             }
@@ -4363,6 +4377,13 @@ function escapeHtml(s){
             } catch (e) {
                 if (typeof KernelLogger !== 'undefined') {
                     KernelLogger.error('Terminal', 'Failed to ensure Exploit memory', e);
+                }
+                if (typeof ExceptionHandler !== 'undefined') {
+                    ExceptionHandler.reportException(
+                        ExceptionHandler.ExceptionLevel.SERVICE,
+                        'Terminal 内存分配失败',
+                        { error: e.message, stack: e.stack }
+                    );
                 }
                 return null;
             }

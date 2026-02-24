@@ -1345,25 +1345,41 @@ class EventManager {
         
         // 注册 mousedown 事件处理程序（优先级高于拖动）
         const mousedownHandler = (e, eventContext) => {
-            KernelLogger.debug("EventManager", `拉伸处理程序被调用，resizerId: ${resizerId}, target: ${e.target?.tagName || 'unknown'}, button: ${e.button}, ctrlKey: ${e.ctrlKey}, stopped: ${eventContext?.stopped || false}`);
+            KernelLogger.debug("EventManager", `拉伸处理程序被调用，resizerId: ${resizerId}, target: ${e.target?.tagName || 'unknown'}, type: ${e.type}, button: ${e.button}, ctrlKey: ${e.ctrlKey}, stopped: ${eventContext?.stopped || false}`);
             
-            // 只处理鼠标左键
-            if (e.button !== 0) {
+            // 检查是否是触摸事件（触摸事件没有 button 属性）
+            const isTouchEvent = e.type && e.type.startsWith('touch');
+            
+            // 只处理鼠标左键或触摸事件
+            if (!isTouchEvent && e.button !== 0) {
                 KernelLogger.debug("EventManager", `拉伸被跳过：不是鼠标左键，resizerId: ${resizerId}`);
                 return;
             }
             
             // 如果事件传播已被停止（例如 Ctrl+鼠标左键），不处理拉伸
             // 但只有在明确是 Ctrl+鼠标左键时才跳过
-            if (eventContext && eventContext.stopped && e.ctrlKey) {
+            if (!isTouchEvent && eventContext && eventContext.stopped && e.ctrlKey) {
                 KernelLogger.debug("EventManager", `拉伸被跳过：事件已停止且是 Ctrl+鼠标左键，resizerId: ${resizerId}`);
                 return;
             }
             
             // 使用坐标检查，而不是元素检查，避免被其他元素遮挡的问题
+            // 支持触摸事件：优先使用 touches[0]，其次使用 changedTouches[0]
+            let clientX, clientY;
+            if (e.touches && e.touches.length > 0) {
+                clientX = e.touches[0].clientX;
+                clientY = e.touches[0].clientY;
+            } else if (e.changedTouches && e.changedTouches.length > 0) {
+                clientX = e.changedTouches[0].clientX;
+                clientY = e.changedTouches[0].clientY;
+            } else {
+                clientX = e.clientX;
+                clientY = e.clientY;
+            }
+            
             const rect = resizerElement.getBoundingClientRect();
-            const clickX = e.clientX;
-            const clickY = e.clientY;
+            const clickX = clientX;
+            const clickY = clientY;
             
             // 检查点击坐标是否在拉伸器范围内（使用更宽松的边界检查）
             const isInResizerBounds = clickX >= rect.left - 2 && 
@@ -1419,14 +1435,34 @@ class EventManager {
         // 注册 mousemove 事件处理程序
         const mousemoveHandler = (e) => {
             if (state.isResizing && onResize) {
-                onResize(e);
+                // 支持触摸事件
+                let clientX, clientY;
+                if (e.touches && e.touches.length > 0) {
+                    clientX = e.touches[0].clientX;
+                    clientY = e.touches[0].clientY;
+                } else {
+                    clientX = e.clientX;
+                    clientY = e.clientY;
+                }
+                const touchE = { ...e, clientX, clientY };
+                onResize(touchE);
             }
         };
-        
+
         // 注册 mouseup 事件处理程序
         const mouseupHandler = (e) => {
             if (state.isResizing && onResizeEnd) {
-                onResizeEnd(e);
+                // 支持触摸事件
+                let clientX, clientY;
+                if (e.changedTouches && e.changedTouches.length > 0) {
+                    clientX = e.changedTouches[0].clientX;
+                    clientY = e.changedTouches[0].clientY;
+                } else {
+                    clientX = e.clientX;
+                    clientY = e.clientY;
+                }
+                const touchE = { ...e, clientX, clientY };
+                onResizeEnd(touchE);
             }
         };
         
@@ -1441,15 +1477,35 @@ class EventManager {
             priority: 20,
             selector: null
         });
-        
+
         const mouseupHandlerId = EventManager.registerEventHandler(exploitPid, 'mouseup', mouseupHandler, {
             priority: 20,
             selector: null
         });
-        
+
+        // 触摸事件支持（用于移动设备）
+        const touchstartHandlerId = EventManager.registerEventHandler(exploitPid, 'touchstart', mousedownHandler, {
+            priority: 20,
+            useCapture: true,
+            selector: null
+        });
+
+        const touchmoveHandlerId = EventManager.registerEventHandler(exploitPid, 'touchmove', mousemoveHandler, {
+            priority: 20,
+            selector: null
+        });
+
+        const touchendHandlerId = EventManager.registerEventHandler(exploitPid, 'touchend', mouseupHandler, {
+            priority: 20,
+            selector: null
+        });
+
         // 保存 handlerId 以便后续注销
         EventManager._registeredResizers.set(resizerId, {
-            handlerIds: [mousedownHandlerId, mousemoveHandlerId, mouseupHandlerId].filter(id => id !== null)
+            handlerIds: [
+                mousedownHandlerId, mousemoveHandlerId, mouseupHandlerId,
+                touchstartHandlerId, touchmoveHandlerId, touchendHandlerId
+            ].filter(id => id !== null)
         });
         
         KernelLogger.debug("EventManager", `窗口拉伸已注册: ${resizerId}`);

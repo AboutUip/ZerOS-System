@@ -72,6 +72,7 @@
 ### 系统扩展
 - [LanguagesExpansion.md](./LanguagesExpansion.md) - 语言包管理器（加载/设置语言、按常量名获取文本） ✅
 - [ServerExpansion.md](./ServerExpansion.md) - 服务扩展（D/server 服务模块管理、start/stop 生命周期） ✅
+- [WasmExpansion.md](./WasmExpansion.md) - WebAssembly 模块管理器（加载/执行 WASM 模块） ✅
 
 ## 使用说明
 
@@ -148,6 +149,7 @@
 **系统扩展**
 - LanguagesExpansion（语言包管理器）
 - ServerExpansion（D/server 服务模块管理）
+- WasmExpansion（WebAssembly 模块管理器）
 
 ## 文档状态
 

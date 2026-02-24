@@ -1259,6 +1259,13 @@
                 if (typeof KernelLogger !== 'undefined') {
                     KernelLogger.error('TaskManager', '终止进程失败', e);
                 }
+                if (typeof ExceptionHandler !== 'undefined') {
+                    ExceptionHandler.reportException(
+                        ExceptionHandler.ExceptionLevel.SERVICE,
+                        'TaskManager 终止进程失败',
+                        { error: e.message, stack: e.stack, pid: targetPid }
+                    );
+                }
             }
         },
         

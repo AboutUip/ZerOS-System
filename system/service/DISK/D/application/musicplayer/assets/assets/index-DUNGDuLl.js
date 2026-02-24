@@ -117479,10 +117479,10 @@ function formattingTime(msec) {
   return result;
 }
 function addClass(el) {
-  el.classList.add("y-current-line");
+  if (el && el.classList) el.classList.add("y-current-line");
 }
 function removeClass(el) {
-  el.classList.remove("y-current-line");
+  if (el && el.classList) el.classList.remove("y-current-line");
 }
 function smoothScrollTo(element, targetTop, duration, easing) {
   function easeInOutCubic2(t2) {
@@ -117632,17 +117632,16 @@ class WordRender {
       return;
     }
     const curLine = this._getCurLine(index);
-    if (this.playerContainer) {
-      const scrollHalfHeight = this.playerContainer.clientHeight / 2;
-      const lineHalfHeight = curLine.clientHeight / 2;
-      const lineTop = curLine.offsetTop;
-      const top = lineTop - (scrollHalfHeight - lineHalfHeight) + 100;
-      const scroll = this.props.event.scroll;
-      if (scroll) {
-        scroll(this.playerContainer, top);
-      } else {
-        smoothScrollTo(this.playerContainer, top, 400, "power1.out");
-      }
+    if (!this.playerContainer || !curLine) return;
+    const scrollHalfHeight = this.playerContainer.clientHeight / 2;
+    const lineHalfHeight = curLine.clientHeight / 2;
+    const lineTop = curLine.offsetTop;
+    const top = lineTop - (scrollHalfHeight - lineHalfHeight) + 100;
+    const scroll = this.props.event.scroll;
+    if (scroll) {
+      scroll(this.playerContainer, top);
+    } else {
+      smoothScrollTo(this.playerContainer, top, 400, "power1.out");
     }
   }
   _getCurLine(index) {
@@ -118060,35 +118059,42 @@ class Player {
       const currentTime = this.getTime();
       const lrc = this.wordRender._getLrc();
       const index = this.getIndex();
-      const time = lrc[index].time;
-      if (currentTime >= time) {
-        const curLineEl = this.wordRender.playerItem[index];
-        const lastLineEl = this.wordRender.playerItem[this.lastIndex];
-        const wordType = this._core.wordType;
-        if (lrc[index].wait)
-          ;
-        someCondition = false;
-        if (wordType === "lrc") {
-          const yrc = lrc[index].yrc;
-          this.animationProcess.disposeLrcAnimationProcess(
-            curLineEl,
-            yrc,
-            sequence
-          ).then(() => {
-            this.updateIndex(this.getIndex() + 1);
-            this.timeupdate();
-          });
-        } else if (wordType === "yrc") {
-          const duration = lrc[index].duration - (currentTime - time);
-          removeClass(lastLineEl);
-          addClass(curLineEl);
-          clearTimeout(this._core.timer);
-          this._core.timer = setTimeout(() => {
-            removeClass(curLineEl);
-            this.updateIndex(this.getIndex() + 1);
-            this.timeupdate();
-          }, duration * 1e3);
-        }
+      if (!lrc.length || index < 0 || index >= lrc.length) {
+        this._core.animationFrameId = requestAnimationFrame(updateTime);
+        return;
+      }
+      const lineData = lrc[index];
+      const time = lineData && lineData.time;
+      if (time == null || currentTime < time) {
+        this._core.animationFrameId = requestAnimationFrame(updateTime);
+        return;
+      }
+      const curLineEl = this.wordRender.playerItem[index];
+      const lastLineEl = this.wordRender.playerItem[this.lastIndex];
+      const wordType = this._core.wordType;
+      if (lineData.wait)
+        ;
+      someCondition = false;
+      if (wordType === "lrc") {
+        const yrc = lineData.yrc;
+        this.animationProcess.disposeLrcAnimationProcess(
+          curLineEl,
+          yrc,
+          sequence
+        ).then(() => {
+          this.updateIndex(this.getIndex() + 1);
+          this.timeupdate();
+        }).catch(() => {});
+      } else if (wordType === "yrc") {
+        const duration = (lineData.duration || 0) - (currentTime - time);
+        removeClass(lastLineEl);
+        addClass(curLineEl);
+        clearTimeout(this._core.timer);
+        this._core.timer = setTimeout(() => {
+          removeClass(curLineEl);
+          this.updateIndex(this.getIndex() + 1);
+          this.timeupdate();
+        }, duration * 1e3);
       }
       this._core.animationFrameId = requestAnimationFrame(() => {
         if (someCondition) {
@@ -119208,7 +119214,74 @@ const _sfc_main$4 = /* @__PURE__ */ defineComponent$1({
         else if (a === "toggle" && window.$audio) { var ip = window.$audio.isPlay && window.$audio.isPlay.value; if (ip) window.$audio.pause(); else window.$audio.play(); }
         else if (a === "next" && window.__KiteMusicCut) window.__KiteMusicCut(true);
         else if (a === "prev" && window.__KiteMusicCut) window.__KiteMusicCut(false);
+        else if (a === "lyrics-on" || a === "lyrics-off") {
+          var btn = document.querySelector(".kitemusic-desktop-lyrics-btn");
+          if (btn) {
+            if (a === "lyrics-on") {
+              btn.style.background = "rgba(236, 65, 65, 0.4)";
+              btn.style.borderColor = "rgba(236, 65, 65, 0.6)";
+              btn.style.color = "rgba(236, 65, 65, 1)";
+            } else {
+              btn.style.background = "rgba(108, 142, 255, 0.2)";
+              btn.style.borderColor = "rgba(108, 142, 255, 0.5)";
+              btn.style.color = "rgba(108, 142, 255, 0.8)";
+            }
+          }
+        }
       });
+      
+      setTimeout(function() {
+        var bottomContainer = document.querySelector(".bottom-container");
+        if (bottomContainer) {
+          var rightContainer = bottomContainer.querySelector(".right");
+          if (!rightContainer) {
+            var children = bottomContainer.children;
+            for (var i = 0; i < children.length; i++) {
+              var child = children[i];
+              if (child.className && child.className.indexOf("right") >= 0) {
+                rightContainer = child;
+                break;
+              }
+            }
+          }
+          
+          var lyricsBtn = document.createElement("button");
+          lyricsBtn.className = "kitemusic-desktop-lyrics-btn";
+          lyricsBtn.textContent = "词";
+          lyricsBtn.title = "桌面歌词";
+          lyricsBtn.style.cssText = `
+            width: 36px;
+            height: 28px;
+            border-radius: 4px;
+            border: 1px solid rgba(108, 142, 255, 0.6);
+            background: rgba(108, 142, 255, 0.15);
+            color: rgba(129, 140, 248, 0.9);
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s;
+            margin-left: 12px;
+            flex-shrink: 0;
+          `;
+          lyricsBtn.addEventListener("click", function(e) {
+            e.stopPropagation();
+            window.parent.postMessage({ type: "kitemusic-lyrics-toggle" }, "*");
+          });
+          
+          if (rightContainer) {
+            rightContainer.appendChild(lyricsBtn);
+          } else {
+            bottomContainer.style.display = "flex";
+            bottomContainer.style.alignItems = "center";
+            bottomContainer.style.justifyContent = "center";
+            bottomContainer.appendChild(lyricsBtn);
+          }
+        }
+      }, 3000);
+      
       setInterval(function() {
         if (window.$audio && music && music.state && music.state.songs) {
           var s = music.state.songs;
@@ -119216,9 +119289,53 @@ const _sfc_main$4 = /* @__PURE__ */ defineComponent$1({
           var artist = (s.ar && s.ar[0] && s.ar[0].name) ? s.ar[0].name : "";
           var cover = (s.al && s.al.picUrl) ? s.al.picUrl : "";
           var isPlaying = !!(window.$audio.isPlay && window.$audio.isPlay.value);
-          try { window.parent.postMessage({ type: "kitemusic-state", name: name, artist: artist, cover: cover, isPlaying: isPlaying }, "*"); } catch (e2) {}
+          var lyricsLines = [];
+          var currentIndex = -1;
+          var progress = 0;
+          try {
+            var currentLine = document.querySelector(".y-player-item.y-current-line");
+            if (currentLine) {
+              currentIndex = parseInt(currentLine.getAttribute("data-index")) || 0;
+              var spans = currentLine.querySelectorAll(".y-text");
+              if (spans && spans.length > 0) {
+                var currentLyrics = "";
+                spans.forEach(function(span) { currentLyrics += span.textContent; });
+                lyricsLines[1] = currentLyrics;
+              }
+              var parent = currentLine.parentElement;
+              if (parent) {
+                var allLines = parent.querySelectorAll(".y-player-item");
+                var lineIndex = -1;
+                allLines.forEach(function(line, idx) {
+                  if (line === currentLine) lineIndex = idx;
+                });
+                if (lineIndex > 0) {
+                  var prevLine = allLines[lineIndex - 1];
+                  var prevSpans = prevLine.querySelectorAll(".y-text");
+                  if (prevSpans && prevSpans.length > 0) {
+                    var prevText = "";
+                    prevSpans.forEach(function(span) { prevText += span.textContent; });
+                    lyricsLines[0] = prevText;
+                  }
+                }
+                if (lineIndex < allLines.length - 1) {
+                  var nextLine = allLines[lineIndex + 1];
+                  var nextSpans = nextLine.querySelectorAll(".y-text");
+                  if (nextSpans && nextSpans.length > 0) {
+                    var nextText = "";
+                    nextSpans.forEach(function(span) { nextText += span.textContent; });
+                    lyricsLines[2] = nextText;
+                  }
+                }
+              }
+            }
+            if (window.$audio.el && window.$audio.el.duration) {
+              progress = (window.$audio.el.currentTime / window.$audio.el.duration) * 100;
+            }
+          } catch(e) {}
+          try { window.parent.postMessage({ type: "kitemusic-state", name: name, artist: artist, cover: cover, isPlaying: isPlaying, lyrics: lyricsLines, currentIndex: currentIndex, progress: progress }, "*"); } catch (e2) {}
         }
-      }, 1500);
+      }, 500);
       document.addEventListener("click", () => {
         flags2.isOpenDrawer = false;
       });

@@ -156,10 +156,45 @@ KernelLogger.info("LockScreen", "模块初始化");
             }
             
             if (bgPath && LockScreen.container) {
-                LockScreen.container.style.backgroundImage = `url(${bgPath})`;
-                LockScreen.container.style.backgroundSize = 'cover';
-                LockScreen.container.style.backgroundPosition = 'center';
-                LockScreen.container.style.backgroundRepeat = 'no-repeat';
+                // 检测是否为视频文件
+                const videoExtensions = ['.mp4', '.webm', '.ogg', '.mov', '.avi', '.mkv'];
+                const isVideo = videoExtensions.some(ext => bgPath.toLowerCase().endsWith(ext));
+                
+                // 移除已有的视频背景（如果有）
+                const existingVideo = LockScreen.container.querySelector('.lockscreen-video-bg');
+                if (existingVideo) {
+                    existingVideo.remove();
+                }
+                
+                // 清除图片背景
+                LockScreen.container.style.backgroundImage = '';
+                
+                if (isVideo) {
+                    // 视频背景
+                    const video = document.createElement('video');
+                    video.className = 'lockscreen-video-bg';
+                    video.src = bgPath;
+                    video.style.cssText = `
+                        position: fixed;
+                        top: 0;
+                        left: 0;
+                        width: 100%;
+                        height: 100%;
+                        object-fit: cover;
+                        z-index: -1;
+                    `;
+                    video.muted = true;
+                    video.loop = true;
+                    video.playsInline = true;
+                    video.autoplay = true;
+                    LockScreen.container.insertBefore(video, LockScreen.container.firstChild);
+                } else {
+                    // 图片背景
+                    LockScreen.container.style.backgroundImage = `url(${bgPath})`;
+                    LockScreen.container.style.backgroundSize = 'cover';
+                    LockScreen.container.style.backgroundPosition = 'center';
+                    LockScreen.container.style.backgroundRepeat = 'no-repeat';
+                }
             }
         }
         

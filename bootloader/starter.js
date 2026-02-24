@@ -122,6 +122,11 @@
             "../kernel/filesystem/init.js",
             "../kernel/drive/LStorage.js"
         ],
+
+        // 第十二层：WASM 扩展（WebAssembly 模块管理器，依赖文件系统）
+        "../system/expansion/wasmExpansion.js": [
+            "../kernel/filesystem/init.js"
+        ],
         
         // 第十一层：锁屏界面（依赖用户控制系统和本地存储管理器，高优先级）
         "../system/ui/lockscreen.js": [

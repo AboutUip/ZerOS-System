@@ -24,61 +24,61 @@
       }
     },
     "TaskbarManager": {
-      "weather:忻府区": {
+      "weather:神池县": {
         "value": {
           "code": 200,
           "data": {
             "city": "山西省 忻州市",
             "today": {
-              "current_temp": "6℃",
+              "current_temp": "10℃",
               "current_cond": "晴",
-              "low": "-9℃",
+              "low": "-1℃",
               "quality": "--"
             },
-            "low_temperature": -9,
+            "low_temperature": -1,
             "tips": "建议穿厚外套、毛衣，注意保暖",
             "seven_day": [
               {
-                "date": "2026-02-22",
-                "cond": "晴",
-                "high": "7℃",
-                "low": "-9℃"
-              },
-              {
-                "date": "2026-02-23",
-                "cond": "多云",
-                "high": "11℃",
-                "low": "-6℃"
-              },
-              {
                 "date": "2026-02-24",
                 "cond": "晴",
-                "high": "13℃",
-                "low": "-3℃"
+                "high": "10℃",
+                "low": "-1℃"
               },
               {
                 "date": "2026-02-25",
-                "cond": "多云",
-                "high": "11℃",
-                "low": "-2℃"
+                "cond": "雨夹雪",
+                "high": "10℃",
+                "low": "-4℃"
               },
               {
                 "date": "2026-02-26",
-                "cond": "阴",
-                "high": "5℃",
-                "low": "-2℃"
+                "cond": "多云",
+                "high": "3℃",
+                "low": "-3℃"
               },
               {
                 "date": "2026-02-27",
                 "cond": "多云",
-                "high": "7℃",
-                "low": "-2℃"
+                "high": "3℃",
+                "low": "-1℃"
               },
               {
                 "date": "2026-02-28",
-                "cond": "雨夹雪",
+                "cond": "小雪",
+                "high": "2℃",
+                "low": "0℃"
+              },
+              {
+                "date": "2026-03-01",
+                "cond": "多云",
                 "high": "5℃",
                 "low": "-1℃"
+              },
+              {
+                "date": "2026-03-02",
+                "cond": "晴",
+                "high": "11℃",
+                "low": "0℃"
               }
             ],
             "life_indices": {
@@ -108,9 +108,9 @@
                 "advice": "建议开启空调制热或使用其他取暖设备"
               },
               "cold_risk": {
-                "level": "较高",
-                "brief": "较易发",
-                "advice": "感冒风险较高，注意防寒保暖，避免受凉"
+                "level": "中等",
+                "brief": "易发",
+                "advice": "感冒风险中等，注意保暖和作息规律"
               },
               "exercise": {
                 "level": "非常适宜",
@@ -118,9 +118,9 @@
                 "advice": "天气非常适合户外运动，尽情享受吧"
               },
               "comfort": {
-                "level": "极冷",
-                "brief": "寒冷",
-                "advice": "体感寒冷，注意保暖防寒"
+                "level": "冷",
+                "brief": "偏冷",
+                "advice": "体感偏冷，适当添加衣物"
               },
               "travel": {
                 "level": "极适宜",
@@ -133,9 +133,9 @@
                 "advice": "可以钓鱼，但鱼口可能不太活跃"
               },
               "allergy": {
-                "level": "易",
-                "brief": "偏高",
-                "advice": "过敏风险较高，建议佩戴口罩，回家后清洗面部"
+                "level": "极易",
+                "brief": "极高",
+                "advice": "过敏原浓度极高，过敏体质者务必佩戴口罩，减少外出"
               },
               "sunscreen": {
                 "level": "SPF15",
@@ -168,30 +168,350 @@
                 "advice": "空气质量一般，敏感人群建议开启净化器"
               },
               "pollen": {
-                "level": "偏高",
-                "brief": "较高",
-                "advice": "花粉扩散活跃，敏感人群外出请做好防护"
+                "level": "极高",
+                "brief": "极高",
+                "advice": "花粉浓度极高，过敏者务必佩戴口罩，尽量避免户外活动"
+              }
+            },
+            "feels_like": 10,
+            "wind_direction": "西南风",
+            "wind_power": "4级",
+            "humidity": 14
+          }
+        },
+        "expiresAt": 1771957080007,
+        "createdAt": 1771913880007,
+        "updatedAt": 1771913880007,
+        "size": 2773
+      },
+      "weather:神池": {
+        "value": {
+          "code": 200,
+          "data": {
+            "city": "山西省 忻州市",
+            "today": {
+              "current_temp": "10℃",
+              "current_cond": "晴",
+              "low": "-1℃",
+              "quality": "--"
+            },
+            "low_temperature": -1,
+            "tips": "建议穿厚外套、毛衣，注意保暖",
+            "seven_day": [
+              {
+                "date": "2026-02-24",
+                "cond": "晴",
+                "high": "10℃",
+                "low": "-1℃"
+              },
+              {
+                "date": "2026-02-25",
+                "cond": "雨夹雪",
+                "high": "10℃",
+                "low": "-4℃"
+              },
+              {
+                "date": "2026-02-26",
+                "cond": "多云",
+                "high": "3℃",
+                "low": "-3℃"
+              },
+              {
+                "date": "2026-02-27",
+                "cond": "多云",
+                "high": "3℃",
+                "low": "-1℃"
+              },
+              {
+                "date": "2026-02-28",
+                "cond": "小雪",
+                "high": "2℃",
+                "low": "0℃"
+              },
+              {
+                "date": "2026-03-01",
+                "cond": "多云",
+                "high": "5℃",
+                "low": "-1℃"
+              },
+              {
+                "date": "2026-03-02",
+                "cond": "晴",
+                "high": "11℃",
+                "low": "0℃"
+              }
+            ],
+            "life_indices": {
+              "clothing": {
+                "level": "冷",
+                "brief": "冷",
+                "advice": "建议穿厚外套、毛衣，注意保暖"
+              },
+              "uv": {
+                "level": "低",
+                "brief": "弱",
+                "advice": "紫外线较弱，无需特别防护，可正常户外活动"
+              },
+              "car_wash": {
+                "level": "非常适宜",
+                "brief": "极佳",
+                "advice": "天气晴好，非常适合洗车，洗后能保持较长时间"
+              },
+              "drying": {
+                "level": "非常适宜",
+                "brief": "极佳",
+                "advice": "天气晴好干燥，非常适合晾晒衣物和被褥"
+              },
+              "air_conditioner": {
+                "level": "建议制热",
+                "brief": "寒冷",
+                "advice": "建议开启空调制热或使用其他取暖设备"
+              },
+              "cold_risk": {
+                "level": "中等",
+                "brief": "易发",
+                "advice": "感冒风险中等，注意保暖和作息规律"
+              },
+              "exercise": {
+                "level": "非常适宜",
+                "brief": "极佳",
+                "advice": "天气非常适合户外运动，尽情享受吧"
+              },
+              "comfort": {
+                "level": "冷",
+                "brief": "偏冷",
+                "advice": "体感偏冷，适当添加衣物"
+              },
+              "travel": {
+                "level": "极适宜",
+                "brief": "极佳",
+                "advice": "天气晴好能见度高，非常适合出行游玩"
+              },
+              "fishing": {
+                "level": "适宜",
+                "brief": "好钓",
+                "advice": "天气条件不错，适合垂钓"
+              },
+              "allergy": {
+                "level": "极易",
+                "brief": "极高",
+                "advice": "过敏原浓度极高，过敏体质者务必佩戴口罩，减少外出"
+              },
+              "sunscreen": {
+                "level": "无需防晒",
+                "brief": "弱",
+                "advice": "紫外线较弱，无需特别防晒措施"
+              },
+              "mood": {
+                "level": "一般",
+                "brief": "平淡",
+                "advice": "天气一般，可通过运动或社交提升心情"
+              },
+              "beer": {
+                "level": "微量",
+                "brief": "偏凉",
+                "advice": "天气偏凉，可少量饮用或选择常温啤酒"
+              },
+              "umbrella": {
+                "level": "不需要",
+                "brief": "晴好",
+                "advice": "天气良好，无需携带雨伞"
+              },
+              "traffic": {
+                "level": "畅通",
+                "brief": "极佳",
+                "advice": "天气晴好能见度高，道路通行条件极佳"
+              },
+              "air_purifier": {
+                "level": "建议开启",
+                "brief": "轻度",
+                "advice": "空气质量一般，敏感人群建议开启净化器"
+              },
+              "pollen": {
+                "level": "极高",
+                "brief": "极高",
+                "advice": "花粉浓度极高，过敏者务必佩戴口罩，尽量避免户外活动"
+              }
+            },
+            "feels_like": 10,
+            "wind_direction": "西南风",
+            "wind_power": "3级",
+            "humidity": 24
+          }
+        },
+        "expiresAt": 1771962132071,
+        "createdAt": 1771918932071,
+        "updatedAt": 1771918932071,
+        "size": 2763
+      },
+      "weather:您的IP无法解析，请核实后再查询！": {
+        "value": {
+          "code": 200,
+          "data": {
+            "city": "Ip",
+            "today": {
+              "current_temp": "8℃",
+              "current_cond": "雨",
+              "low": "6℃",
+              "quality": "--"
+            },
+            "low_temperature": 6,
+            "tips": "建议穿厚外套、毛衣，注意保暖，外出请携带雨具",
+            "seven_day": [
+              {
+                "date": "2026-02-24",
+                "cond": "早间有小雨",
+                "high": "9℃",
+                "low": "3℃"
+              },
+              {
+                "date": "2026-02-25",
+                "cond": "下午有小雨",
+                "high": "7℃",
+                "low": "0℃"
+              },
+              {
+                "date": "2026-02-26",
+                "cond": "晴朗",
+                "high": "8℃",
+                "low": "-3℃"
+              },
+              {
+                "date": "2026-02-27",
+                "cond": "局部多云",
+                "high": "10℃",
+                "low": "-2℃"
+              },
+              {
+                "date": "2026-02-28",
+                "cond": "晴朗",
+                "high": "13℃",
+                "low": "-1℃"
+              },
+              {
+                "date": "2026-03-01",
+                "cond": "晴朗",
+                "high": "15℃",
+                "low": "1℃"
+              },
+              {
+                "date": "2026-03-02",
+                "cond": "局部多云",
+                "high": "16℃",
+                "low": "1℃"
+              }
+            ],
+            "life_indices": {
+              "clothing": {
+                "level": "冷",
+                "brief": "冷",
+                "advice": "建议穿厚外套、毛衣，注意保暖，外出请携带雨具"
+              },
+              "uv": {
+                "level": "低",
+                "brief": "弱",
+                "advice": "紫外线较弱，无需特别防护，可正常户外活动"
+              },
+              "car_wash": {
+                "level": "较适宜",
+                "brief": "一般",
+                "advice": "天气尚可，可以洗车，但保持时间一般"
+              },
+              "drying": {
+                "level": "较适宜",
+                "brief": "一般",
+                "advice": "可以晾晒，但干燥速度一般"
+              },
+              "air_conditioner": {
+                "level": "建议制热",
+                "brief": "寒冷",
+                "advice": "建议开启空调制热或使用其他取暖设备"
+              },
+              "cold_risk": {
+                "level": "较低",
+                "brief": "较少发",
+                "advice": "感冒风险较低，注意适当增减衣物"
+              },
+              "exercise": {
+                "level": "适宜",
+                "brief": "较好",
+                "advice": "天气适合运动，建议适当进行户外锻炼"
+              },
+              "comfort": {
+                "level": "极冷",
+                "brief": "寒冷",
+                "advice": "体感寒冷，注意保暖防寒"
+              },
+              "travel": {
+                "level": "适宜",
+                "brief": "较好",
+                "advice": "天气不错，适合外出活动"
+              },
+              "fishing": {
+                "level": "适宜",
+                "brief": "好钓",
+                "advice": "天气条件不错，适合垂钓"
+              },
+              "allergy": {
+                "level": "不易",
+                "brief": "偏低",
+                "advice": "过敏风险较低，可正常外出"
+              },
+              "sunscreen": {
+                "level": "无需防晒",
+                "brief": "弱",
+                "advice": "紫外线较弱，无需特别防晒措施"
+              },
+              "mood": {
+                "level": "一般",
+                "brief": "平淡",
+                "advice": "天气一般，可通过运动或社交提升心情"
+              },
+              "beer": {
+                "level": "不适合",
+                "brief": "寒冷",
+                "advice": "天气寒冷，建议选择热饮暖身"
+              },
+              "umbrella": {
+                "level": "需要雨伞",
+                "brief": "中雨",
+                "advice": "降水明显，外出请携带雨伞"
+              },
+              "traffic": {
+                "level": "良好",
+                "brief": "较好",
+                "advice": "通行条件良好，正常驾驶即可"
+              },
+              "air_purifier": {
+                "level": "无需开启",
+                "brief": "优良",
+                "advice": "空气质量优良，可开窗通风，无需使用净化器"
+              },
+              "pollen": {
+                "level": "偏低",
+                "brief": "较低",
+                "advice": "花粉浓度较低，可正常户外活动"
               }
             },
             "feels_like": 6,
-            "wind_direction": "东南风",
+            "wind_direction": "西北风",
             "wind_power": "3级",
-            "humidity": 25
+            "humidity": 70
           }
         },
-        "expiresAt": 1771779765148,
-        "createdAt": 1771736565148,
-        "updatedAt": 1771736565148,
-        "size": 2749
+        "expiresAt": 1771986273626,
+        "createdAt": 1771943073626,
+        "updatedAt": 1771943073626,
+        "size": 2687
       }
     },
     "exploit": {
       "system.dailyQuote": {
-        "value": "如果你死了，那什么也改变不了，可如果你还活着，那就能改变一些事情。",
+        "value": "你一直这个样子，活着不累吗？你这样做到底有什么意义呢？",
         "expiresAt": 0,
-        "createdAt": 1771760436259,
-        "updatedAt": 1771760436259,
-        "size": 101
+        "createdAt": 1771946446109,
+        "updatedAt": 1771946446109,
+        "size": 83
       }
     }
   }

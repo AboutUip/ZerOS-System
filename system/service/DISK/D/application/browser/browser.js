@@ -570,6 +570,13 @@
                 if (typeof KernelLogger !== 'undefined') {
                     KernelLogger.error('Browser', '加载书签失败', error);
                 }
+                if (typeof ExceptionHandler !== 'undefined') {
+                    ExceptionHandler.reportException(
+                        ExceptionHandler.ExceptionLevel.SERVICE,
+                        'Browser 加载书签失败',
+                        { error: error.message, stack: error.stack }
+                    );
+                }
                 // 使用默认书签
                 this.bookmarks = [
                     { name: "必应", url: "https://www.bing.com" },

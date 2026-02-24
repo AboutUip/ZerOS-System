@@ -8513,9 +8513,12 @@ class ProcessManager {
                     taskbar = document.createElement('div');
                     taskbar.id = 'taskbar';
                     taskbar.className = 'taskbar';
-                    taskbar.style.position = 'relative';
+                    taskbar.style.position = 'fixed';  // 固定定位，确保在所有设备上显示
+                    taskbar.style.bottom = '0';
+                    taskbar.style.left = '0';
+                    taskbar.style.right = '0';
                     taskbar.style.width = '100%';
-                    taskbar.style.height = '40px';
+                    taskbar.style.height = '60px';
                     taskbar.style.background = 'rgba(0, 0, 0, 0.3)';
                     taskbar.style.borderTop = '1px solid rgba(255, 255, 255, 0.1)';
                     taskbar.style.display = 'flex';

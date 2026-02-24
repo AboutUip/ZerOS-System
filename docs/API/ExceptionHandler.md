@@ -2,6 +2,44 @@
 
 异常处理管理器（Exception Handler Manager）提供结构化异常处理（SEH）机制，支持4种异常等级，用于处理系统、内核、程序和服务异常。
 
+## 权限与安全
+
+### 调用来源限制
+
+| 调用来源 | 必须报告的异常等级 | 允许报告的异常等级 |
+|----------|-------------------|-------------------|
+| 内核 (`kernel/`) | 可选 | KERNEL, SYSTEM, PROGRAM, SERVICE (全部) |
+| 服务 (`system/service/DISK/D/server/`) | **SERVICE** | SERVICE |
+| 程序 (`system/service/DISK/D/application/`) | **PROGRAM** | PROGRAM |
+| 其他 | 可选 | PROGRAM |
+
+**规则说明**：
+- 服务发生异常时**必须**报告 SERVICE 级别异常，否则异常信息可能丢失
+- 程序发生异常时**必须**报告 PROGRAM 级别异常，否则无法被系统捕获和处理
+
+### 违规处理
+
+- 服务调用 KERNEL/SYSTEM/PROGRAM → 抛出错误 `非法的异常等级`
+- 程序调用 KERNEL/SYSTEM/SERVICE → 抛出错误 `非法的异常等级`
+
+### 正确使用示例
+
+```javascript
+// 程序异常（必须）
+await KernelAPI.call('Exception.report', [
+    'PROGRAM',
+    '程序崩溃',
+    { error: error.message }
+]);
+
+// 服务异常（必须）
+await KernelAPI.call('Exception.report', [
+    'SERVICE',
+    '服务连接失败',
+    { service: 'NetworkService' }
+]);
+```
+
 ## 模块概述
 
 **位置**：`kernel/core/exceptionHM/exceptionHandler.js`

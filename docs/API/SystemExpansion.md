@@ -9,8 +9,9 @@
 - **全屏覆盖**：创建模态界面，覆盖整个视口
 - **类型支持**：SystemProtocol（协议）、SystemPatch（补丁）、SystemConfiguration（配置）
 - **表单验证**：支持 check 配置验证用户输入
+- **多步骤支持**：内部切换步骤，assets 支持函数形式
 - **调用来源验证**：仅允许 D/server 目录下的服务调用
-- **快捷键拦截**：阻止 Ctrl/Alt/Shift/Meta + 任意键、Tab、右键菜单
+- **快捷键拦截**：阻止所有键盘输入和右键菜单
 
 ## 依赖
 
@@ -36,7 +37,7 @@ await SystemExpansion.enterOverlay(type, assets, meta)
 | 参数 | 类型 | 说明 |
 |------|------|------|
 | `type` | string | 类型：`SystemProtocol` / `SystemPatch` / `SystemConfiguration` |
-| `assets` | string / object | HTML 字符串或渲染器对象 |
+| `assets` | string / object / function | HTML 字符串、渲染器对象或函数（函数形式：`(step, meta) => string`） |
 | `meta` | object | 元数据配置 |
 
 #### meta 配置
@@ -46,6 +47,9 @@ await SystemExpansion.enterOverlay(type, assets, meta)
 | `title` | string | 标题文字 |
 | `step` | number | 步骤总数（默认 1） |
 | `check` | array | 验证规则数组（仅 SystemConfiguration 有效） |
+| `patchUrl` | string | 补丁下载 URL（仅 SystemPatch 有效） |
+| `patchDescription` | string | 补丁描述（必填，显示本次更新内容） |
+| `patchVersion` | string | 补丁版本号（默认 1.0.0） |
 
 #### check 配置
 
@@ -64,14 +68,19 @@ await SystemExpansion.enterOverlay(type, assets, meta)
 
 ```javascript
 {
-    action: 'next' | 'done',  // 用户操作类型
+    action: 'next' | 'done' | 'cancel',  // 用户操作类型
     step: 1,                    // 当前步骤
     totalSteps: 1,              // 总步骤数
-    isLastStep: true,          // 是否最后一步
-    type: 'SystemProtocol',    // 类型
+    isLastStep: true,           // 是否最后一步
+    type: 'SystemProtocol',     // 类型
     data: {                    // 用户填写的数据（仅 SystemConfiguration）
         username: 'admin',
         agree: true
+    },
+    patchResult: {              // 仅 SystemPatch 有效
+        success: true,
+        updatedFiles: ['kernel/...', 'system/...'],
+        message: '更新安装完成'
     }
 }
 ```
@@ -88,11 +97,20 @@ await SystemExpansion.enterOverlay(type, assets, meta)
 
 ### SystemPatch（系统补丁）
 
-- **按钮**：下一步、完成、取消
-- **下一步文字**：「我已了解本次补丁的重要性」
-- **完成文字**：「完成安装」
-- **取消文字**：「取消」
-- **验证**：无
+当提供 `patchUrl` 时，支持自动下载/解压/安装补丁流程：
+
+- **第1步**：显示补丁描述 + 「开始安装」按钮
+- **第2步**：下载补丁（显示进度）
+- **第3步**：解压补丁（显示进度）
+- **第4步**：安装覆盖（显示进度）
+- **无 patchUrl**：使用自定义 assets（与原来相同）
+
+**meta 字段**：
+- `patchUrl`：补丁下载地址（ZIP 压缩包）
+- `patchDescription`：补丁描述（必填，显示本次更新内容）
+- `patchVersion`：版本号（默认 1.0.0）
+
+**按钮**：「开始安装」/「完成」/「取消」/「重试」
 
 ### SystemConfiguration（系统配置）
 
@@ -162,18 +180,80 @@ console.log(result.data);
 ### 多步骤场景
 
 ```javascript
-// 第一步
-const result1 = await SystemExpansion.enterOverlay('SystemPatch', step1Html, {
-    title: '安装补丁 (1/2)',
+// 使用函数形式，根据 step 返回不同内容
+const result = await SystemExpansion.enterOverlay('SystemPatch', function(step, meta) {
+    if (step === 1) {
+        return `
+            <div style="padding: 24px;">
+                <h2>步骤 1/2：下载补丁</h2>
+                <p>正在下载补丁文件...</p>
+            </div>
+        `;
+    } else {
+        return `
+            <div style="padding: 24px;">
+                <h2>步骤 2/2：安装补丁</h2>
+                <p>正在安装补丁...</p>
+            </div>
+        `;
+    }
+}, {
+    title: '安装补丁',
     step: 2
 });
 
-// 用户点击下一步后，再次调用
-const result2 = await SystemExpansion.enterOverlay('SystemPatch', step2Html, {
-    title: '安装补丁 (2/2)',
-    step: 2
-});
+console.log(result.action);  // 'done'
+console.log(result.step);    // 2
+console.log(result.data);    // 表单数据
 ```
+
+### 补丁更新场景
+
+```javascript
+// 使用 SystemPatch 自动下载安装补丁
+const result = await SystemExpansion.enterOverlay('SystemPatch', null, {
+    title: '系统更新',
+    patchUrl: 'https://example.com/patch-v1.2.0.zip',
+    patchDescription: '- 修复了登录页面的显示问题\n- 优化了系统启动速度\n- 新增了深色主题支持',
+    patchVersion: '1.2.0'
+});
+
+console.log(result.action);  // 'done'
+console.log(result.patchResult);
+// {
+//     success: true,
+//     updatedFiles: ['kernel/core/...', 'system/expansion/...'],
+//     message: '更新安装完成'
+// }
+```
+
+#### 补丁更新流程
+
+| 步骤 | 操作 | 说明 |
+|------|------|------|
+| 1 | 下载 | `FileFramework.download(url, 'D/cache/temp', fileName)` |
+| 2 | 解压 | 尝试 `ziper` → `zipService` → `compression` |
+| 3 | 覆盖 | `copyDirectoryToPhysical(sourceDir, '/', true)` |
+
+#### 补丁包结构要求
+
+ZIP 压缩包必须从最外层开始包含文件：
+
+```
+patch.zip
+├── kernel/
+│   └── ...
+├── system/
+│   └── ...
+└── ...
+```
+
+解压后直接覆盖到项目根目录 `/`。
+
+**多步骤说明**：
+- 点击"下一步"时，内部切换步骤并重新渲染内容
+- 只有点击"完成"或"取消"时才会退出覆盖
+- `assets` 函数形式会在每步切换时调用，接收 `step` 和 `meta` 参数
 
 ## 终端调试命令
 

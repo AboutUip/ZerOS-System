@@ -6,7 +6,7 @@
     'use strict';
 
     /** 公告 API 地址（待定，正式上线前需替换） */
-    const ANNOUNCE_API_URL = 'http://zeros.xin/api/notice';
+    const ANNOUNCE_API_URL = 'http://60.205.142.158:80/api/notice'; // 示例地址，请替换为实际可用的 API URL
     /** 轮询间隔：3 分钟 */
     const POLL_INTERVAL_MS = 3 * 60 * 1000;
     /** 系统公告通知使用的 PID（D/server 服务约定使用 ProcessManager.SERVER_SERVICE_PID，内核对该 PID 放行） */

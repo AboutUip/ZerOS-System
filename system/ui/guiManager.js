@@ -1238,6 +1238,15 @@ class GUIManager {
             e.stopPropagation();
             GUIManager.minimizeWindow(windowInfo.windowId);
         });
+        // 触摸事件支持（移动设备）
+        minimizeBtn.addEventListener('touchstart', (e) => {
+            e.stopPropagation();
+        }, { passive: true });
+        minimizeBtn.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            GUIManager.minimizeWindow(windowInfo.windowId);
+        });
         controls.appendChild(minimizeBtn);
         
         // 最大化/还原按钮
@@ -1272,6 +1281,15 @@ class GUIManager {
             maximizeBtn.style.background = 'transparent';
         });
         maximizeBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            GUIManager.toggleMaximize(windowInfo.windowId);
+        });
+        // 触摸事件支持（移动设备）
+        maximizeBtn.addEventListener('touchstart', (e) => {
+            e.stopPropagation();
+        }, { passive: true });
+        maximizeBtn.addEventListener('touchend', (e) => {
+            e.preventDefault();
             e.stopPropagation();
             GUIManager.toggleMaximize(windowInfo.windowId);
         });
@@ -1327,6 +1345,16 @@ class GUIManager {
             // 1. 程序多窗口（同一PID的多个窗口）应该由程序自己管理
             // 2. 程序多实例（不同PID）应该独立管理，互不影响
             // 3. 关闭按钮应该只关闭当前窗口，由 _closeWindow 检查是否需要 kill 进程
+            GUIManager._closeWindow(windowInfo.windowId, false);
+        });
+        // 触摸事件支持（移动设备）
+        closeBtn.addEventListener('touchstart', (e) => {
+            e.stopPropagation();
+        }, { passive: true });
+        closeBtn.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            GUIManager._showTaskbar();
             GUIManager._closeWindow(windowInfo.windowId, false);
         });
         controls.appendChild(closeBtn);
@@ -3371,15 +3399,15 @@ class GUIManager {
             }
         }
         
-        // 右下角拉伸器（减小尺寸避免误触）
+        // 右下角拉伸器（增大触摸区域以适配移动设备）
         const resizerBottomRight = document.createElement('div');
         resizerBottomRight.className = 'zos-window-resizer zos-window-resizer-bottom-right';
         resizerBottomRight.style.cssText = `
             position: absolute;
             right: 0;
             bottom: 0;
-            width: 15px;
-            height: 15px;
+            width: 30px;
+            height: 30px;
             cursor: se-resize;
             z-index: 9999;
             background: transparent;
@@ -3394,15 +3422,15 @@ class GUIManager {
         resizerBottomRight.setAttribute('data-resizer', 'bottom-right');
         windowElement.appendChild(resizerBottomRight);
         
-        // 右上角拉伸器（减小尺寸避免覆盖关闭按钮）
+        // 右上角拉伸器（增大触摸区域以适配移动设备）
         const resizerTopRight = document.createElement('div');
         resizerTopRight.className = 'zos-window-resizer zos-window-resizer-top-right';
         resizerTopRight.style.cssText = `
             position: absolute;
             right: 0;
             top: 0;
-            width: 15px;
-            height: 15px;
+            width: 30px;
+            height: 30px;
             cursor: ne-resize;
             z-index: 9999;
             background: transparent;
@@ -3417,15 +3445,15 @@ class GUIManager {
         resizerTopRight.setAttribute('data-resizer', 'top-right');
         windowElement.appendChild(resizerTopRight);
         
-        // 左上角拉伸器（减小尺寸避免覆盖标题栏）
+        // 左上角拉伸器（增大触摸区域以适配移动设备）
         const resizerTopLeft = document.createElement('div');
         resizerTopLeft.className = 'zos-window-resizer zos-window-resizer-top-left';
         resizerTopLeft.style.cssText = `
             position: absolute;
             left: 0;
             top: 0;
-            width: 15px;
-            height: 15px;
+            width: 30px;
+            height: 30px;
             cursor: nw-resize;
             z-index: 9999;
             background: transparent;
@@ -3441,15 +3469,15 @@ class GUIManager {
         // 将左上角拉伸器添加到窗口末尾，确保它在 DOM 中最后渲染（z-index 更高）
         windowElement.appendChild(resizerTopLeft);
         
-        // 左下角拉伸器（减小尺寸避免误触）
+        // 左下角拉伸器（增大触摸区域以适配移动设备）
         const resizerBottomLeft = document.createElement('div');
         resizerBottomLeft.className = 'zos-window-resizer zos-window-resizer-bottom-left';
         resizerBottomLeft.style.cssText = `
             position: absolute;
             left: 0;
             bottom: 0;
-            width: 15px;
-            height: 15px;
+            width: 30px;
+            height: 30px;
             cursor: sw-resize;
             z-index: 9999;
             background: transparent;

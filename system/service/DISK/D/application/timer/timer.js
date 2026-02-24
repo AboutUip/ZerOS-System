@@ -1,5 +1,5 @@
 // ZerOS Timer - 3D Time Compass
-// Dynamic 3D time compass with ribbon and vortex effects using three.js
+// Cool 3D digital clock
 
 (function(window) {
     'use strict';
@@ -15,37 +15,25 @@
         animationId: null,
         
         // 3D对象引用
-        compassGroup: null,        // 罗盘组
-        timeTexts: [],            // 时间文字对象数组
-        currentTimeText: null,    // 当前时间文字对象
-        heartParticles: [],      // 爱心粒子数组
-        ribbons: [],             // 丝带数组
-        ambientLight: null,      // 环境光
-        pointLights: [],         // 点光源数组
-        fontLoader: null,        // 字体加载器
+        compassGroup: null,
+        timeTexts: [],
+        stars: [],
+        ambientLight: null,
+        pointLights: [],
         
         // 配置
-        heartCount: 50,          // 爱心数量
-        heartSpeed: 0.5,         // 爱心浮动速度
-        rotationSpeed: 0.01,     // 罗盘整体旋转速度
-        spiralTurns: 3,          // 螺旋圈数
-        baseRadius: 2,           // 起始半径
-        radiusStep: 0.15,        // 半径增长步长
-        textSize: 1.2,           // 文字大小
-        flySpeed: 0.3,           // 飞扬速度
-        flyAmplitude: 2,         // 飞扬幅度
-        tiltSpeed: 0.2,          // 倾斜速度
-        tiltAmplitude: 0.3,      // 倾斜幅度
+        starCount: 100,
+        textSize: 4,
         
         // 鼠标交互控制
-        isMouseDown: false,       // 鼠标是否按下
-        mouseX: 0,               // 鼠标X坐标
-        mouseY: 0,               // 鼠标Y坐标
-        cameraRotationX: 0,       // 相机旋转X
-        cameraRotationY: 0,       // 相机旋转Y
-        cameraDistance: 20,       // 相机距离（用于缩放）
-        minDistance: 5,          // 最小缩放距离
-        maxDistance: 50,         // 最大缩放距离
+        isMouseDown: false,
+        mouseX: 0,
+        mouseY: 0,
+        cameraRotationX: 0,
+        cameraRotationY: 0,
+        cameraDistance: 25,
+        minDistance: 10,
+        maxDistance: 50,
         
         __init__: async function(pid, initArgs) {
             this.pid = pid;
@@ -158,7 +146,7 @@
                 flex: 1;
                 position: relative;
                 overflow: hidden;
-                background: radial-gradient(ellipse at center, rgba(15, 20, 30, 0.95) 0%, rgba(5, 10, 20, 0.98) 100%);
+                background: radial-gradient(ellipse at center, #0a0a1a 0%, #050510 100%);
             `;
             this.window.appendChild(container);
             
@@ -166,10 +154,10 @@
             this.canvas = document.createElement('canvas');
             container.appendChild(this.canvas);
             
-            // 初始化Three.js场景
+            // 初始化Three.js场景 - 更深邃的星空背景
             this.scene = new THREE.Scene();
-            this.scene.background = new THREE.Color(0x050a14);
-            this.scene.fog = new THREE.FogExp2(0x050a14, 0.001);
+            this.scene.background = new THREE.Color(0x030308);
+            this.scene.fog = new THREE.FogExp2(0x030308, 0.0008);
             
             // 创建相机（从斜上方观察螺旋）
             const width = 800;
@@ -229,8 +217,8 @@
             // 创建时间罗盘
             this._createCompass();
             
-            // 创建爱心粒子
-            this._createHeartParticles();
+            // 创建星空背景
+            this._createStars();
             
             // 添加鼠标交互控制
             this._setupMouseControls();
@@ -245,55 +233,72 @@
         _createLights: function() {
             const THREE = this.THREE;
             
-            // 环境光
-            this.ambientLight = new THREE.AmbientLight(0xffffff, 0.3);
+            // 环境光 - 更柔和
+            this.ambientLight = new THREE.AmbientLight(0x8888ff, 0.2);
             this.scene.add(this.ambientLight);
             
-            // 主光源（从上方）
-            const mainLight = new THREE.DirectionalLight(0x8b5cf6, 1);
-            mainLight.position.set(0, 10, 10);
+            // 主光源 - 温暖的蓝紫色
+            const mainLight = new THREE.DirectionalLight(0xa78bfa, 0.8);
+            mainLight.position.set(5, 15, 10);
             mainLight.castShadow = true;
-            mainLight.shadow.mapSize.width = 2048;
-            mainLight.shadow.mapSize.height = 2048;
+            mainLight.shadow.mapSize.width = 1024;
+            mainLight.shadow.mapSize.height = 1024;
             this.scene.add(mainLight);
             
-            // 点光源1（紫色）
-            const pointLight1 = new THREE.PointLight(0x8b5cf6, 1, 50);
-            pointLight1.position.set(5, 5, 5);
+            // 点光源1 - 紫色光晕
+            const pointLight1 = new THREE.PointLight(0xa855f7, 1.2, 60);
+            pointLight1.position.set(10, 8, 10);
             this.scene.add(pointLight1);
             this.pointLights.push(pointLight1);
             
-            // 点光源2（粉色）
-            const pointLight2 = new THREE.PointLight(0xff6b9d, 0.8, 50);
-            pointLight2.position.set(-5, -5, 5);
+            // 点光源2 - 粉色星光
+            const pointLight2 = new THREE.PointLight(0xec4899, 0.8, 60);
+            pointLight2.position.set(-10, -5, 8);
             this.scene.add(pointLight2);
             this.pointLights.push(pointLight2);
             
-            // 点光源3（蓝色）
-            const pointLight3 = new THREE.PointLight(0x60a5fa, 0.6, 50);
-            pointLight3.position.set(0, -10, 10);
+            // 点光源3 - 蓝色氛围
+            const pointLight3 = new THREE.PointLight(0x3b82f6, 0.6, 80);
+            pointLight3.position.set(0, -15, 15);
             this.scene.add(pointLight3);
             this.pointLights.push(pointLight3);
         },
         
         /**
-         * 创建文字纹理
+         * 创建文字纹理 - 带发光效果
          */
         _createTextTexture: function(text, isHighlight = false) {
             const canvas = document.createElement('canvas');
             const context = canvas.getContext('2d');
-            const size = 512; // 增大canvas尺寸以获得更清晰的文字
+            const size = 512;
             canvas.width = size;
             canvas.height = size;
             
-            // 设置文字样式（移除发光效果）
-            const fontSize = isHighlight ? size * 0.25 : size * 0.2;
-            context.fillStyle = isHighlight ? '#ffffff' : '#ffffff'; // 所有文字都使用白色，提高对比度
+            // 高亮文字：蓝紫色渐变发光
+            if (isHighlight) {
+                // 外发光
+                context.shadowColor = '#a855f7';
+                context.shadowBlur = 30;
+                
+                // 渐变填充
+                const gradient = context.createLinearGradient(0, 0, size, size);
+                gradient.addColorStop(0, '#e9d5ff');
+                gradient.addColorStop(0.5, '#c084fc');
+                gradient.addColorStop(1, '#a855f7');
+                context.fillStyle = gradient;
+            } else {
+                // 普通文字：柔和白色发光
+                context.shadowColor = '#6366f1';
+                context.shadowBlur = 15;
+                context.fillStyle = '#e0e7ff';
+            }
+            
+            const fontSize = isHighlight ? size * 0.28 : size * 0.22;
             context.font = `bold ${fontSize}px "Microsoft YaHei", "SimHei", "Arial", sans-serif`;
             context.textAlign = 'center';
             context.textBaseline = 'middle';
             
-            // 绘制文字（无发光效果）
+            // 绘制文字
             context.fillText(text, size / 2, size / 2);
             
             const texture = new this.THREE.CanvasTexture(canvas);
@@ -322,7 +327,7 @@
         },
         
         /**
-         * 创建时间罗盘（螺旋形）
+         * 创建时间罗盘 - 简洁的当前时间显示
          */
         _createCompass: function() {
             const THREE = this.THREE;
@@ -330,57 +335,32 @@
             // 创建罗盘组
             this.compassGroup = new THREE.Group();
             
-            // 生成时间数据
-            const timeData = this._generateTimeData();
+            // 生成当前时间字符串 "HH:MM:SS"
+            const timeStr = this._getCurrentTimeString();
             
-            // 创建螺旋形时间文字
-            const totalItems = timeData.length;
+            // 分割时间字符
+            const chars = timeStr.split('');
             
-            timeData.forEach((item, i) => {
-                // 计算螺旋位置（从中心向外）
-                const t = i / totalItems; // 0 到 1
-                const angle = t * this.spiralTurns * Math.PI * 2;
-                // 使用更平滑的半径增长，使文字分布更均匀
-                const radius = this.baseRadius + t * this.radiusStep * totalItems * 0.5;
-                const height = Math.sin(t * Math.PI * 6) * 1.5; // 增大高度变化范围
-                
-                // 计算3D位置（螺旋形，在XZ平面上）
-                const x = Math.cos(angle) * radius;
-                const y = height;
-                const z = Math.sin(angle) * radius;
-                
-                const position = new THREE.Vector3(x, y, z);
-                
-                // 判断是否是当前时间
-                const isCurrent = item.isCurrent;
+            // 计算总宽度来居中
+            const charWidth = 4;
+            const totalWidth = chars.length * charWidth;
+            const startX = -totalWidth / 2 + charWidth / 2;
+            
+            // 为每个字符创建3D文字
+            chars.forEach((char, i) => {
+                const x = startX + i * charWidth;
+                const position = new THREE.Vector3(x, 0, 0);
                 
                 // 创建文字精灵
-                const textSprite = this._createTextSprite(item.text, position, isCurrent);
+                const textSprite = this._createTextSprite(char, position, true);
                 
-                // 计算文字朝向（沿着螺旋切线方向）
-                const nextAngle = ((i + 1) / totalItems) * this.spiralTurns * Math.PI * 2;
-                const nextX = Math.cos(nextAngle) * (this.baseRadius + ((i + 1) / totalItems) * ((i + 1) / totalItems) * this.radiusStep * totalItems);
-                const nextZ = Math.sin(nextAngle) * (this.baseRadius + ((i + 1) / totalItems) * ((i + 1) / totalItems) * this.radiusStep * totalItems);
-                const direction = new THREE.Vector3(nextX - x, 0, nextZ - z).normalize();
-                
-                // 让文字沿着螺旋方向
-                const lookAtPos = position.clone().add(direction);
-                textSprite.lookAt(lookAtPos);
-                
-                // 存储文字对象信息
+                // 存储信息
                 textSprite.userData = {
-                    timeData: item,
-                    originalPosition: position.clone(),
-                    isCurrent: isCurrent,
-                    angle: angle
+                    char: char,
+                    originalPosition: position.clone()
                 };
                 
-                if (isCurrent) {
-                    this.currentTimeText = textSprite;
-                } else {
-                    this.timeTexts.push(textSprite);
-                }
-                
+                this.timeTexts.push(textSprite);
                 this.compassGroup.add(textSprite);
             });
             
@@ -388,416 +368,106 @@
         },
         
         /**
-         * 生成时间数据
+         * 获取当前时间字符串
          */
-        _generateTimeData: function() {
+        _getCurrentTimeString: function() {
             const now = new Date();
-            const data = [];
-            
-            // 月份（1-12）
-            const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-            for (let i = 1; i <= 12; i++) {
-                const month = i;
-                const isCurrent = month === (now.getMonth() + 1);
-                data.push({
-                    text: monthNames[i - 1],
-                    type: 'month',
-                    value: month,
-                    isCurrent: isCurrent
-                });
-            }
-            
-            // 日期（1-31）
-            for (let i = 1; i <= 31; i++) {
-                const day = i;
-                const isCurrent = day === now.getDate();
-                data.push({
-                    text: day.toString(),
-                    type: 'day',
-                    value: day,
-                    isCurrent: isCurrent
-                });
-            }
-            
-            // 星期（1-7，1=周一，7=周日）
-            const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-            for (let i = 0; i < 7; i++) {
-                const weekday = i + 1; // 1-7
-                // JavaScript的getDay()返回0-6（0=周日，1=周一...6=周六）
-                // 转换为1-7格式：0->7, 1->1, 2->2, ..., 6->6
-                const currentDay = now.getDay() === 0 ? 7 : now.getDay();
-                const isCurrent = weekday === currentDay;
-                data.push({
-                    text: weekdays[i],
-                    type: 'weekday',
-                    value: weekday,
-                    isCurrent: isCurrent
-                });
-            }
-            
-            // 小时（0-23）
-            for (let i = 0; i < 24; i++) {
-                const hour = i;
-                const isCurrent = hour === now.getHours();
-                const hourText = hour.toString().padStart(2, '0') + 'h';
-                data.push({
-                    text: hourText,
-                    type: 'hour',
-                    value: hour,
-                    isCurrent: isCurrent
-                });
-            }
-            
-            // 分钟（0-59）
-            for (let i = 0; i < 60; i++) {
-                const minute = i;
-                const isCurrent = minute === now.getMinutes();
-                data.push({
-                    text: minute.toString().padStart(2, '0') + 'm',
-                    type: 'minute',
-                    value: minute,
-                    isCurrent: isCurrent
-                });
-            }
-            
-            // 秒（0-59）
-            for (let i = 0; i < 60; i++) {
-                const second = i;
-                const isCurrent = second === now.getSeconds();
-                data.push({
-                    text: second.toString().padStart(2, '0') + 's',
-                    type: 'second',
-                    value: second,
-                    isCurrent: isCurrent
-                });
-            }
-            
-            return data;
+            const hours = now.getHours().toString().padStart(2, '0');
+            const minutes = now.getMinutes().toString().padStart(2, '0');
+            const seconds = now.getSeconds().toString().padStart(2, '0');
+            return `${hours}:${minutes}:${seconds}`;
         },
         
         /**
-         * 创建丝带和漩涡效果
+         * 创建星空背景
          */
-        _createRibbons: function() {
+        _createStars: function() {
             const THREE = this.THREE;
             
-            for (let i = 0; i < this.ribbonCount; i++) {
-                // 创建螺旋曲线路径
-                const points = [];
-                const segments = 100;
-                const turns = 2 + Math.random() * 2; // 2-4圈
-                const radius = 3 + Math.random() * 5; // 3-8
-                const height = 10 + Math.random() * 10; // 10-20
+            // 创建星空粒子系统
+            const starGeometry = new THREE.BufferGeometry();
+            const positions = [];
+            const colors = [];
+            const sizes = [];
+            
+            // 星空颜色：蓝紫色系
+            const starColors = [
+                new THREE.Color(0xa855f7), // 紫色
+                new THREE.Color(0x6366f1), // 靛蓝
+                new THREE.Color(0x3b82f6), // 蓝色
+                new THREE.Color(0xe879f9), // 粉色
+                new THREE.Color(0x22d3ee), // 青色
+            ];
+            
+            for (let i = 0; i < this.starCount; i++) {
+                // 分布在更大的球形范围内
+                const radius = 40 + Math.random() * 60;
+                const theta = Math.random() * Math.PI * 2;
+                const phi = Math.acos(2 * Math.random() - 1);
                 
-                for (let j = 0; j <= segments; j++) {
-                    const t = j / segments;
-                    const angle = t * turns * Math.PI * 2;
-                    const r = radius * (1 + t * 0.5); // 半径逐渐增大
-                    const x = Math.cos(angle) * r;
-                    const y = (t - 0.5) * height; // 从下到上
-                    const z = Math.sin(angle) * r;
-                    points.push(new THREE.Vector3(x, y, z));
-                }
+                const x = radius * Math.sin(phi) * Math.cos(theta);
+                const y = radius * Math.sin(phi) * Math.sin(theta);
+                const z = radius * Math.cos(phi);
                 
-                // 创建曲线
-                const curve = new THREE.CatmullRomCurve3(points);
+                positions.push(x, y, z);
                 
-                // 创建管状几何体（丝带）
-                const ribbonGeometry = new THREE.TubeGeometry(
-                    curve,
-                    segments,
-                    0.1, // 半径
-                    8,   // 径向分段
-                    false // 不闭合
-                );
+                // 随机颜色
+                const color = starColors[Math.floor(Math.random() * starColors.length)];
+                colors.push(color.r, color.g, color.b);
                 
-                // 创建材质（渐变颜色）
-                const colors = [
-                    new THREE.Color(0xff6b9d),
-                    new THREE.Color(0x8b5cf6),
-                    new THREE.Color(0x60a5fa),
-                    new THREE.Color(0xff9f43),
-                    new THREE.Color(0xff4757)
-                ];
-                const color = colors[i % colors.length];
-                
-                const ribbonMaterial = new THREE.MeshStandardMaterial({
-                    color: color,
-                    emissive: color,
-                    emissiveIntensity: 0.3,
-                    metalness: 0.5,
-                    roughness: 0.3,
-                    transparent: true,
-                    opacity: 0.7,
-                    side: THREE.DoubleSide
-                });
-                
-                const ribbon = new THREE.Mesh(ribbonGeometry, ribbonMaterial);
-                
-                // 随机初始旋转
-                ribbon.rotation.x = Math.random() * Math.PI * 2;
-                ribbon.rotation.y = Math.random() * Math.PI * 2;
-                ribbon.rotation.z = Math.random() * Math.PI * 2;
-                
-                // 存储旋转速度
-                ribbon.userData = {
-                    rotationSpeedX: (Math.random() - 0.5) * 0.02,
-                    rotationSpeedY: (Math.random() - 0.5) * 0.02,
-                    rotationSpeedZ: (Math.random() - 0.5) * 0.02,
-                    baseRotationY: (i / this.ribbonCount) * Math.PI * 2 // 围绕中心旋转
-                };
-                
-                this.ribbons.push(ribbon);
-                this.scene.add(ribbon);
+                // 随机大小
+                sizes.push(0.5 + Math.random() * 1.5);
             }
-        },
-        
-        /**
-         * 创建爱心粒子
-         */
-        _createHeartParticles: function() {
-            const THREE = this.THREE;
             
-            const heartShape = new THREE.Shape();
-            heartShape.moveTo(0, 0.25);
-            heartShape.bezierCurveTo(0, 0.25, 0.1, 0.1, 0.25, 0.1);
-            heartShape.bezierCurveTo(0.4, 0.1, 0.5, 0.25, 0.5, 0.25);
-            heartShape.bezierCurveTo(0.5, 0.25, 0.6, 0.1, 0.75, 0.1);
-            heartShape.bezierCurveTo(0.9, 0.1, 1, 0.25, 1, 0.5);
-            heartShape.bezierCurveTo(1, 0.7, 0.8, 0.9, 0.5, 1.1);
-            heartShape.bezierCurveTo(0.2, 0.9, 0, 0.7, 0, 0.5);
-            heartShape.bezierCurveTo(0, 0.25, 0.1, 0.1, 0.25, 0.1);
+            starGeometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+            starGeometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+            starGeometry.setAttribute('size', new THREE.Float32BufferAttribute(sizes, 1));
             
-            const heartGeometry = new THREE.ExtrudeGeometry(heartShape, {
-                depth: 0.1,
-                bevelEnabled: true,
-                bevelThickness: 0.05,
-                bevelSize: 0.05,
-                bevelSegments: 8
+            // 星空材质 - 点发光效果
+            const starMaterial = new THREE.PointsMaterial({
+                size: 1.5,
+                vertexColors: true,
+                transparent: true,
+                opacity: 0.8,
+                sizeAttenuation: true,
+                blending: THREE.AdditiveBlending
             });
             
-            // 创建多个爱心
-            for (let i = 0; i < this.heartCount; i++) {
-                const scale = 0.1 + Math.random() * 0.2;
-                const heart = heartGeometry.clone();
-                heart.scale(scale, scale, scale);
-                
-                const colors = [0xff6b9d, 0x8b5cf6, 0x60a5fa, 0xff9f43, 0xff4757];
-                const color = colors[Math.floor(Math.random() * colors.length)];
-                
-                const heartMaterial = new THREE.MeshStandardMaterial({
-                    color: color,
-                    emissive: color,
-                    emissiveIntensity: 0.5,
-                    metalness: 0.7,
-                    roughness: 0.3,
-                    transparent: true,
-                    opacity: 0.8
-                });
-                
-                const heartMesh = new THREE.Mesh(heart, heartMaterial);
-                
-                // 随机位置
-                const radius = 20 + Math.random() * 30;
-                const theta = Math.random() * Math.PI * 2;
-                const phi = Math.random() * Math.PI;
-                heartMesh.position.set(
-                    radius * Math.sin(phi) * Math.cos(theta),
-                    radius * Math.sin(phi) * Math.sin(theta),
-                    radius * Math.cos(phi)
-                );
-                
-                // 随机旋转
-                heartMesh.rotation.set(
-                    Math.random() * Math.PI * 2,
-                    Math.random() * Math.PI * 2,
-                    Math.random() * Math.PI * 2
-                );
-                
-                // 存储动画参数
-                heartMesh.userData = {
-                    originalPosition: heartMesh.position.clone(),
-                    rotationSpeed: {
-                        x: (Math.random() - 0.5) * 0.02,
-                        y: (Math.random() - 0.5) * 0.02,
-                        z: (Math.random() - 0.5) * 0.02
-                    },
-                    floatSpeed: {
-                        x: (Math.random() - 0.5) * 0.01,
-                        y: (Math.random() - 0.5) * 0.01,
-                        z: (Math.random() - 0.5) * 0.01
-                    },
-                    floatAmplitude: {
-                        x: Math.random() * 2 + 1,
-                        y: Math.random() * 2 + 1,
-                        z: Math.random() * 2 + 1
-                    }
-                };
-                
-                this.heartParticles.push(heartMesh);
-                this.scene.add(heartMesh);
-            }
+            this.stars = new THREE.Points(starGeometry, starMaterial);
+            this.scene.add(this.stars);
         },
         
         /**
-         * 更新时间
+         * 更新时间 - 每秒更新时间显示
          */
         _updateTime: function() {
-            const now = new Date();
-            
-            // 更新当前时间文字的高亮状态
-            this.timeTexts.forEach(textSprite => {
-                const item = textSprite.userData.timeData;
-                let isCurrent = false;
-                
-                if (item.type === 'month') {
-                    isCurrent = item.value === (now.getMonth() + 1);
-                } else if (item.type === 'day') {
-                    isCurrent = item.value === now.getDate();
-                } else if (item.type === 'weekday') {
-                    const currentDay = now.getDay() === 0 ? 7 : now.getDay();
-                    isCurrent = item.value === currentDay;
-                } else if (item.type === 'hour') {
-                    isCurrent = item.value === now.getHours();
-                } else if (item.type === 'minute') {
-                    isCurrent = item.value === now.getMinutes();
-                } else if (item.type === 'second') {
-                    isCurrent = item.value === now.getSeconds();
-                }
-                
-                // 更新高亮状态
-                if (isCurrent !== textSprite.userData.isCurrent) {
-                    textSprite.userData.isCurrent = isCurrent;
-                    // 重新创建纹理
-                    const newTexture = this._createTextTexture(item.text, isCurrent);
-                    textSprite.material.map = newTexture;
-                    textSprite.material.needsUpdate = true;
-                    textSprite.material.opacity = isCurrent ? 1 : 0.95; // 移除呼吸效果
-                    textSprite.scale.set(
-                        this.textSize * (isCurrent ? 1.3 : 1), // 固定大小，无动画
-                        this.textSize * (isCurrent ? 1.3 : 1),
-                        1
-                    );
-                    
-                    if (isCurrent && this.currentTimeText !== textSprite) {
-                        // 取消之前的高亮
-                        if (this.currentTimeText) {
-                            const oldItem = this.currentTimeText.userData.timeData;
-                            const oldTexture = this._createTextTexture(oldItem.text, false);
-                            this.currentTimeText.material.map = oldTexture;
-                            this.currentTimeText.material.needsUpdate = true;
-                            this.currentTimeText.material.opacity = 0.95;
-                            this.currentTimeText.scale.set(this.textSize, this.textSize, 1);
-                            this.currentTimeText.userData.isCurrent = false;
-                        }
-                        this.currentTimeText = textSprite;
-                    }
-                }
-            });
-            
-            // 更新文字朝向（保持沿着螺旋方向，但稍微面向相机）
-            this.compassGroup.children.forEach((child, index) => {
-                if (child instanceof this.THREE.Sprite && child.userData.angle !== undefined) {
-                    const angle = child.userData.angle;
-                    const nextIndex = (index + 1) % this.compassGroup.children.length;
-                    const nextT = nextIndex / this.compassGroup.children.length;
-                    const nextAngle = nextT * this.spiralTurns * Math.PI * 2;
-                    
-                    // 计算螺旋切线方向
-                    const THREE = this.THREE;
-                    const direction = new THREE.Vector3(
-                        -Math.sin(angle),
-                        0,
-                        Math.cos(angle)
-                    ).normalize();
-                    
-                    // 混合螺旋方向和相机方向，让文字更易读
-                    const cameraDir = this.camera.position.clone().sub(child.position).normalize();
-                    const finalDir = direction.clone().multiplyScalar(0.6).add(cameraDir.multiplyScalar(0.4)).normalize();
-                    child.lookAt(child.position.clone().add(finalDir.multiplyScalar(5)));
-                }
-            });
-        },
-        
-        /**
-         * 更新爱心动画
-         */
-        _updateHeartParticles: function() {
-            const time = this.clock.getElapsedTime();
-            
-            this.heartParticles.forEach((heart, index) => {
-                // 旋转
-                heart.rotation.x += heart.userData.rotationSpeed.x;
-                heart.rotation.y += heart.userData.rotationSpeed.y;
-                heart.rotation.z += heart.userData.rotationSpeed.z;
-                
-                // 浮动
-                heart.position.x = heart.userData.originalPosition.x + 
-                    Math.sin(time * this.heartSpeed + index) * heart.userData.floatAmplitude.x;
-                heart.position.y = heart.userData.originalPosition.y + 
-                    Math.cos(time * this.heartSpeed * 0.7 + index) * heart.userData.floatAmplitude.y;
-                heart.position.z = heart.userData.originalPosition.z + 
-                    Math.sin(time * this.heartSpeed * 1.3 + index) * heart.userData.floatAmplitude.z;
-                
-                // 面向相机（可选，让爱心更立体）
-                heart.lookAt(this.camera.position);
-            });
-        },
-        
-        /**
-         * 更新罗盘动画（整体飞扬旋转效果）
-         */
-        _updateCompass: function() {
-            const time = this.clock.getElapsedTime();
-            const THREE = this.THREE;
-            
             if (!this.compassGroup) return;
             
-            // 整体旋转（Y轴旋转）
-            this.compassGroup.rotation.y = time * this.rotationSpeed;
+            const now = new Date();
+            const newTimeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`;
             
-            // 飞扬效果：上下浮动
-            this.compassGroup.position.y = Math.sin(time * this.flySpeed) * this.flyAmplitude;
-            
-            // 倾斜效果：X轴和Z轴轻微倾斜，形成飞扬感
-            this.compassGroup.rotation.x = Math.sin(time * this.tiltSpeed) * this.tiltAmplitude;
-            this.compassGroup.rotation.z = Math.cos(time * this.tiltSpeed * 0.7) * this.tiltAmplitude * 0.5;
-            
-            // 轻微的水平摆动（X轴和Z轴位置）
-            this.compassGroup.position.x = Math.sin(time * this.flySpeed * 0.5) * this.flyAmplitude * 0.3;
-            this.compassGroup.position.z = Math.cos(time * this.flySpeed * 0.7) * this.flyAmplitude * 0.3;
-            
-            // 保持文字在原始位置（相对于罗盘组）
-            this.compassGroup.children.forEach((child) => {
-                if (child instanceof THREE.Sprite) {
-                    child.position.y = child.userData.originalPosition.y;
+            // 更新每个字符
+            this.compassGroup.children.forEach((sprite, index) => {
+                if (!sprite.userData.char) return;
+                
+                const newChar = newTimeStr[index];
+                if (newChar && newChar !== sprite.userData.char) {
+                    sprite.userData.char = newChar;
+                    const texture = this._createTextTexture(newChar, true);
+                    sprite.material.map = texture;
+                    sprite.material.needsUpdate = true;
                 }
             });
         },
         
         /**
-         * 更新丝带和漩涡动画
+         * 更新罗盘动画 - 简洁优雅的旋转
          */
-        _updateRibbons: function() {
-            const time = this.clock.getElapsedTime();
+        _updateCompass: function() {
+            if (!this.compassGroup) return;
             
-            this.ribbons.forEach((ribbon) => {
-                // 自转
-                ribbon.rotation.x += ribbon.userData.rotationSpeedX;
-                ribbon.rotation.y += ribbon.userData.rotationSpeedY;
-                ribbon.rotation.z += ribbon.userData.rotationSpeedZ;
-                
-                // 围绕中心旋转（漩涡效果）
-                const orbitRadius = 8 + Math.sin(time * 0.5 + ribbon.userData.baseRotationY) * 2;
-                const orbitAngle = ribbon.userData.baseRotationY + time * this.ribbonRotationSpeed;
-                ribbon.position.x = Math.cos(orbitAngle) * orbitRadius;
-                ribbon.position.z = Math.sin(orbitAngle) * orbitRadius;
-                ribbon.position.y = Math.sin(time * 0.3 + ribbon.userData.baseRotationY) * 3;
-                
-                // 飞扬效果（轻微上下浮动）
-                ribbon.rotation.x += Math.sin(time * 0.7) * 0.01;
-                ribbon.rotation.z += Math.cos(time * 0.5) * 0.01;
-            });
+            // 缓慢优雅的Y轴旋转
+            this.compassGroup.rotation.y += 0.002;
         },
         
         /**
@@ -967,10 +637,13 @@
             // 更新时间
             this._updateTime();
             
-            // 更新爱心
-            this._updateHeartParticles();
+            // 更新星空旋转
+            if (this.stars) {
+                this.stars.rotation.y += 0.0002;
+                this.stars.rotation.x += 0.0001;
+            }
             
-            // 更新罗盘（包含飞扬旋转效果）
+            // 更新罗盘
             this._updateCompass();
             
             // 渲染
@@ -1048,12 +721,9 @@
                 this.clock = null;
                 this.compassGroup = null;
                 this.timeTexts = [];
-                this.currentTimeText = null;
-                this.heartParticles = [];
-                this.ribbons = [];
+                this.stars = [];
                 this.ambientLight = null;
                 this.pointLights = [];
-                this.fontLoader = null;
                 this.window = null;
                 this.windowId = null;
                 
@@ -1076,7 +746,7 @@
                 name: 'Timer',
                 type: 'GUI',
                 version: '1.0.0',
-                description: '3D Time Compass - Dynamic 3D time compass with ribbon and vortex effects',
+                description: '3D Time Compass - Cool 3D digital clock',
                 author: 'ZerOS Team',
                 copyright: '© 2025 ZerOS',
                 permissions: typeof PermissionManager !== 'undefined' ? [

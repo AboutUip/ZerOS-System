@@ -397,13 +397,15 @@ function readFileContent($path, $fileName, $asBase64 = false) {
         sendResponse(false, '文件读取失败', null, 500);
     }
     
-    // 检测文件类型，如果是二进制文件（图片等），自动使用base64编码
+    // 检测文件类型，如果是二进制文件（图片、视频等），自动使用base64编码
     $fileExt = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
     $imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'svg', 'ico'];
+    $videoExtensions = ['mp4', 'webm', 'ogg', 'mov', 'avi', 'mkv'];
     $isImage = in_array($fileExt, $imageExtensions);
+    $isVideo = in_array($fileExt, $videoExtensions);
     
-    // 如果请求base64编码，或者是图片文件，则使用base64编码
-    $shouldEncodeBase64 = $asBase64 || $isImage;
+    // 如果请求base64编码，或者是图片文件/视频文件，则使用base64编码
+    $shouldEncodeBase64 = $asBase64 || $isImage || $isVideo;
     
     if ($shouldEncodeBase64) {
         $content = base64_encode($content);

@@ -377,7 +377,7 @@
             this._detailContainer.appendChild(this._createLoading());
 
             try {
-                const baseUrl = 'http://localhost:8088';
+                const baseUrl = 'http://60.205.142.158:80';
                 const response = await fetch(`${baseUrl}/api/application/${app.id}`);
 
                 if (!response.ok) {
@@ -392,6 +392,13 @@
             } catch (error) {
                 if (typeof KernelLogger !== 'undefined') {
                     KernelLogger.error('STORE', `获取应用详情失败: ${error.message}`, error);
+                }
+                if (typeof ExceptionHandler !== 'undefined') {
+                    ExceptionHandler.reportException(
+                        ExceptionHandler.ExceptionLevel.SERVICE,
+                        'Store 获取应用详情失败',
+                        { error: error.message, stack: error.stack }
+                    );
                 }
             }
 

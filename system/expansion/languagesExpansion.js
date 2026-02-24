@@ -329,7 +329,7 @@
                 if (typeof KernelLogger !== 'undefined') {
                     KernelLogger.debug("LanguagesExpansion", "NodeTree 与 PHP 均无 D/plugins，使用默认语言包列表");
                 }
-                return ['zh-CN.json', 'en.json'];
+                return ['zh-CN.json', 'en.json', 'ru.json'];
             });
         },
 

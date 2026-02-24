@@ -11,9 +11,12 @@
         iframe: null,
         dragHandle: null,
         _isExiting: false,
-        _kitemusicState: { name: '', artist: '', isPlaying: false, cover: '' },
+        _kitemusicState: { name: '', artist: '', isPlaying: false, cover: '', lyrics: [], currentIndex: -1, progress: 0 },
         _messageHandler: null,
         _previewElement: null,
+        _desktopLyricsEnabled: false,
+        _desktopLyricsComponentId: null,
+        _lyricsSyncTimer: null,
 
         __init__: async function(pid, initArgs) {
             this.pid = pid;
@@ -81,9 +84,19 @@
                         name: s.name || '',
                         artist: s.artist || '',
                         isPlaying: !!s.isPlaying,
-                        cover: s.cover || ''
+                        cover: s.cover || '',
+                        lyrics: s.lyrics || [],
+                        currentIndex: s.currentIndex || -1,
+                        progress: s.progress || 0
                     };
                     this._refreshPreviewContent();
+                    if (this._desktopLyricsEnabled) {
+                        this._syncDesktopLyrics();
+                    }
+                    if (typeof KernelLogger !== 'undefined') {
+                        var lyricsInfo = this._kitemusicState.lyrics ? '[' + this._kitemusicState.lyrics.join('|') + ']' : '(无)';
+                        KernelLogger.debug('MusicPlayer', '收到状态: name=' + this._kitemusicState.name + ', lyrics=' + lyricsInfo);
+                    }
                     return;
                 }
                 if (e.data.type === 'kitemusic-window-control') {
@@ -91,6 +104,9 @@
                     if (a === 'minimize') this._minimize();
                     else if (a === 'maximize' || a === 'unmaximize') this._toggleMaximize();
                     else if (a === 'close') this._close();
+                }
+                if (e.data.type === 'kitemusic-lyrics-toggle') {
+                    this._toggleDesktopLyrics();
                 }
             };
             window.addEventListener('message', this._messageHandler);
@@ -158,7 +174,6 @@
 
         _onTaskbarPreviewClick: function(e) {
             if (this._isExiting) return;
-            // 点击可能落在按钮内文字上，target 为文本节点时无 closest，从可用的 element 上找
             var el = e.target && e.target.nodeType === 1 ? e.target : (e.target && e.target.parentElement);
             var btn = el && el.closest && el.closest('[data-action]');
             if (!btn) {
@@ -182,6 +197,216 @@
             } else if (typeof GUIManager !== 'undefined' && this.pid) {
                 GUIManager.focusWindow(this.pid);
             }
+        },
+
+        _enableDesktopLyrics: function() {
+            if (this._desktopLyricsEnabled) return { success: true, message: '桌面歌词已开启' };
+            
+            if (typeof DesktopManager === 'undefined') {
+                return { success: false, message: 'DesktopManager 不可用' };
+            }
+
+            try {
+                this._desktopLyricsComponentId = DesktopManager.createComponent(this.pid, {
+                    type: 'desktop-lyrics',
+                    position: { x: 100, y: 300 },
+                    size: { width: 500, height: 200 },
+                    style: {
+                        backgroundColor: 'transparent',
+                        backdropFilter: 'none',
+                        borderRadius: '16px',
+                        padding: '24px',
+                        color: '#ffffff',
+                        fontSize: '32px',
+                        fontWeight: 'bold',
+                        textAlign: 'center',
+                        textShadow: 'none',
+                        pointerEvents: 'auto',
+                        cursor: 'default',
+                        fontFamily: 'Microsoft YaHei, PingFang SC, sans-serif',
+                        overflow: 'hidden',
+                        border: 'none',
+                        boxShadow: 'none'
+                    },
+                    draggable: true,
+                    persistent: false
+                });
+
+                this._desktopLyricsEnabled = true;
+
+                const container = DesktopManager.getComponentContentContainer(this._desktopLyricsComponentId);
+                if (container) {
+                    container.innerHTML = '<div class="desktop-lyrics-text" style="opacity:0.9;width:100%;height:100%;display:flex;flex-direction:column;justify-content:center;align-items:center;">' + 
+                        (this._kitemusicState.name || '等待播放...') + 
+                        '</div>';
+                    
+                    container.addEventListener('click', () => {
+                        this._disableDesktopLyrics();
+                    });
+                }
+
+                this._startLyricsSync();
+
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.info('MusicPlayer', '桌面歌词已开启');
+                }
+
+                return { success: true, message: '桌面歌词已开启' };
+            } catch (e) {
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('MusicPlayer', '开启桌面歌词失败: ' + e.message);
+                }
+                if (typeof ExceptionHandler !== 'undefined') {
+                    ExceptionHandler.reportException(
+                        ExceptionHandler.ExceptionLevel.SERVICE,
+                        'MusicPlayer 开启桌面歌词失败',
+                        { error: e.message, stack: e.stack }
+                    );
+                }
+                return { success: false, message: e.message };
+            }
+        },
+
+        _disableDesktopLyrics: function() {
+            if (!this._desktopLyricsEnabled) return { success: true, message: '桌面歌词已关闭' };
+
+            this._stopLyricsSync();
+
+            if (this._desktopLyricsComponentId && typeof DesktopManager !== 'undefined') {
+                try {
+                    DesktopManager.removeComponent(this._desktopLyricsComponentId);
+                } catch (e) {
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.warn('MusicPlayer', '移除桌面歌词组件失败: ' + e.message);
+                    }
+                }
+            }
+
+            this._desktopLyricsEnabled = false;
+            this._desktopLyricsComponentId = null;
+
+            if (typeof KernelLogger !== 'undefined') {
+                KernelLogger.info('MusicPlayer', '桌面歌词已关闭');
+            }
+
+            return { success: true, message: '桌面歌词已关闭' };
+        },
+
+        _toggleDesktopLyrics: function() {
+            if (this._desktopLyricsEnabled) {
+                return this._disableDesktopLyrics();
+            } else {
+                return this._enableDesktopLyrics();
+            }
+        },
+
+        _startLyricsSync: function() {
+            if (this._lyricsSyncTimer) return;
+            
+            this._lyricsSyncTimer = setInterval(() => {
+                this._syncDesktopLyrics();
+            }, 500);
+        },
+
+        _stopLyricsSync: function() {
+            if (this._lyricsSyncTimer) {
+                clearInterval(this._lyricsSyncTimer);
+                this._lyricsSyncTimer = null;
+            }
+        },
+
+        _syncDesktopLyrics: function() {
+            if (!this._desktopLyricsEnabled || !this._desktopLyricsComponentId) return;
+
+            try {
+                const lyrics = this._kitemusicState.lyrics || [];
+                const progress = this._kitemusicState.progress || 0;
+                
+                const prevLine = lyrics[0] || '';
+                const currentLine = lyrics[1] || this._kitemusicState.name || '等待播放...';
+                const nextLine = lyrics[2] || '';
+
+                const gradientStyle = 'background: linear-gradient(to right, rgba(255,255,255,1) 0%, rgba(255,255,255,1) ' + progress + '%, rgba(255,255,255,0.6) ' + Math.min(100, progress + 20) + '%, rgba(255,255,255,0.3) 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;';
+
+                const container = DesktopManager.getComponentContentContainer(this._desktopLyricsComponentId);
+                if (container) {
+                    container.innerHTML = `
+                        <div class="desktop-lyrics-container" style="
+                            width: 100%;
+                            height: 100%;
+                            display: flex;
+                            flex-direction: column;
+                            justify-content: center;
+                            align-items: center;
+                            gap: 16px;
+                            font-family: 'Microsoft YaHei', 'PingFang SC', -apple-system, sans-serif;
+                            user-select: none;
+                        ">
+                            <div class="lyrics-prev" style="
+                                font-size: 18px;
+                                color: rgba(255, 255, 255, 0.35);
+                                text-align: center;
+                                transition: all 0.5s ease-out;
+                                opacity: 0.7;
+                                transform: translateY(-10px);
+                            ">${this._escapeHtml(prevLine)}</div>
+                            <div class="lyrics-current" style="
+                                font-size: 28px;
+                                font-weight: 600;
+                                text-align: center;
+                                background: linear-gradient(90deg, 
+                                    #fff 0%, 
+                                    #e0e7ff 30%, 
+                                    #a5b4fc 60%, 
+                                    #fff 100%
+                                );
+                                background-size: 200% 100%;
+                                -webkit-background-clip: text;
+                                -webkit-text-fill-color: transparent;
+                                background-clip: text;
+                                animation: lyrics-glow 3s ease-in-out infinite;
+                                transition: all 0.5s ease-out;
+                            ">${this._escapeHtml(currentLine)}</div>
+                            <div class="lyrics-next" style="
+                                font-size: 18px;
+                                color: rgba(255, 255, 255, 0.35);
+                                text-align: center;
+                                transition: all 0.5s ease-out;
+                                opacity: 0.7;
+                                transform: translateY(10px);
+                            ">${this._escapeHtml(nextLine)}</div>
+                        </div>
+                        <style>
+                            @keyframes lyrics-glow {
+                                0%, 100% { background-position: 0% 50%; }
+                                50% { background-position: 100% 50%; }
+                            }
+                        </style>`;
+                } else {
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.warn('MusicPlayer', '歌词容器获取失败');
+                    }
+                }
+            } catch (e) {
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('MusicPlayer', '同步歌词失败: ' + e.message);
+                }
+                if (typeof ExceptionHandler !== 'undefined') {
+                    ExceptionHandler.reportException(
+                        ExceptionHandler.ExceptionLevel.SERVICE,
+                        'MusicPlayer 同步歌词失败',
+                        { error: e.message, stack: e.stack }
+                    );
+                }
+            }
+        },
+
+        _escapeHtml: function(text) {
+            if (!text) return '';
+            return text.replace(/&/g, '&amp;')
+                       .replace(/</g, '&lt;')
+                       .replace(/>/g, '&gt;')
+                       .replace(/"/g, '&quot;');
         },
 
         _minimize: function() {
@@ -215,6 +440,7 @@
         _cleanup: function() {
             try {
                 this._isExiting = true;
+                this._disableDesktopLyrics();
                 this._previewElement = null;
                 if (this._messageHandler) {
                     window.removeEventListener('message', this._messageHandler);

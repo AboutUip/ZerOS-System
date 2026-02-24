@@ -195,6 +195,7 @@
                     PermissionManager.PERMISSION.KERNEL_DISK_LIST,
                     PermissionManager.PERMISSION.SYSTEM_STORAGE_READ,
                     PermissionManager.PERMISSION.SYSTEM_STORAGE_WRITE,
+                    PermissionManager.PERMISSION.KERNEL_DISK_CREATE,
                     PermissionManager.PERMISSION.NETWORK_ACCESS  // 壁纸社区功能需要网络访问
                 ] : [],
                 metadata: {
@@ -490,6 +491,13 @@
             } catch (error) {
                 if (typeof KernelLogger !== 'undefined') {
                     KernelLogger.error('ThemeAnimator', `搜索壁纸失败: ${error.message}`, error);
+                }
+                if (typeof ExceptionHandler !== 'undefined') {
+                    ExceptionHandler.reportException(
+                        ExceptionHandler.ExceptionLevel.SERVICE,
+                        'ThemeAnimator 搜索壁纸失败',
+                        { error: error.message, stack: error.stack }
+                    );
                 }
                 this.wallpaperCommunityContainer.innerHTML = '<div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: rgba(255, 95, 87, 0.8);">' + this._getText('THEMEANIM_LOAD_FAILED_MSG', '加载失败: {0}').replace('{0}', error.message) + '</div>';
             }
@@ -824,6 +832,13 @@
             } catch (error) {
                 if (typeof KernelLogger !== 'undefined') {
                     KernelLogger.error('ThemeAnimator', `下载并应用壁纸失败: ${error.message}`, error);
+                }
+                if (typeof ExceptionHandler !== 'undefined') {
+                    ExceptionHandler.reportException(
+                        ExceptionHandler.ExceptionLevel.SERVICE,
+                        'ThemeAnimator 下载并应用壁纸失败',
+                        { error: error.message, stack: error.stack }
+                    );
                 }
                 if (typeof GUIManager !== 'undefined' && typeof GUIManager.showAlert === 'function') {
                     await GUIManager.showAlert(this._getText('THEMEANIM_DOWNLOAD_APPLY_FAILED_MSG', '下载并应用壁纸失败: {0}').replace('{0}', error.message), this._getText('THEMEANIM_ERROR', '错误'), 'error');
@@ -1749,6 +1764,10 @@
                 // 获取已发送的锁屏背景（从 LStorage）
                 const sentBackgrounds = await this._getLockscreenBackgroundsList();
                 
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.debug('ThemeAnimator', `加载锁屏背景列表: 默认=${defaultBackgrounds.length}, 已发送=${sentBackgrounds.length}`);
+                }
+                
                 // 合并默认背景和已发送的背景
                 const allBackgrounds = [...defaultBackgrounds, ...sentBackgrounds];
                 
@@ -1842,18 +1861,40 @@
                 }
             }
             
-            // 预览图
-            const preview = document.createElement('div');
-            preview.style.cssText = `
-                width: 100%;
-                height: 120px;
-                background: rgba(139, 92, 246, 0.1);
-                background-image: url('${previewUrl}');
-                background-size: cover;
-                background-position: center;
-                background-repeat: no-repeat;
-            `;
-            card.appendChild(preview);
+            // 检测是否为视频文件
+            const videoExtensions = ['mp4', 'webm', 'ogg', 'mov', 'avi', 'mkv'];
+            const isVideo = videoExtensions.some(ext => background.path.toLowerCase().endsWith('.' + ext));
+            
+            // 预览图/视频
+            if (isVideo) {
+                // 视频文件，使用 video 标签
+                const preview = document.createElement('video');
+                preview.src = previewUrl;
+                preview.style.cssText = `
+                    width: 100%;
+                    height: 120px;
+                    object-fit: cover;
+                    background: rgba(139, 92, 246, 0.1);
+                `;
+                preview.muted = true;
+                preview.loop = true;
+                preview.playsInline = true;
+                preview.play().catch(() => {});
+                card.appendChild(preview);
+            } else {
+                // 图片文件，使用背景图片
+                const preview = document.createElement('div');
+                preview.style.cssText = `
+                    width: 100%;
+                    height: 120px;
+                    background: rgba(139, 92, 246, 0.1);
+                    background-image: url('${previewUrl}');
+                    background-size: cover;
+                    background-position: center;
+                    background-repeat: no-repeat;
+                `;
+                card.appendChild(preview);
+            }
             
             // 背景名称
             const name = document.createElement('div');
@@ -2960,9 +3001,11 @@
                 }
                 
                 // 生成锁屏背景文件名（基于原文件名和背景ID，确保唯一性）
+                // 安全处理：移除 background.id 中的特殊字符
+                const safeId = (background.id || 'bg').replace(/[^a-zA-Z0-9_-]/g, '_').substring(0, 50);
                 const originalFileName = background.path.split(/[/\\]/).pop() || 'background';
                 const fileNameWithoutExt = originalFileName.replace(/\.[^/.]+$/, '');
-                const lockscreenFileName = `lockscreen_${background.id}_${fileNameWithoutExt}.${fileExtension}`;
+                const lockscreenFileName = `lockscreen_${safeId}_${fileNameWithoutExt}.${fileExtension}`;
                 const lockscreenFilePath = `D:/cache/lockscreen/${lockscreenFileName}`;
                 
                 // 检查是否已经发送过（去重）
@@ -2970,7 +3013,7 @@
                 const alreadyExists = lockscreenBackgrounds.some(bg => {
                     // 检查路径或ID是否已存在
                     return bg.path === lockscreenFilePath || 
-                           bg.id === `lockscreen_${background.id}` ||
+                           bg.id === `lockscreen_${safeId}` ||
                            (bg.originalBackgroundId && bg.originalBackgroundId === background.id);
                 });
                 
@@ -3080,13 +3123,27 @@
                 createDirUrl.searchParams.set('path', 'D:/cache/');
                 createDirUrl.searchParams.set('name', 'lockscreen');
                 
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.debug('ThemeAnimator', `创建锁屏目录: ${createDirUrl.toString()}`);
+                }
+                
                 try {
                     const createDirResponse = await fetch(createDirUrl.toString());
+                    let dirResult = null;
+                    try {
+                        dirResult = await createDirResponse.json();
+                    } catch (e) {
+                        dirResult = { status: 'error', message: '无法解析响应' };
+                    }
+                    
                     // 409 表示目录已存在，这是正常情况
                     if (!createDirResponse.ok && createDirResponse.status !== 409) {
-                        const errorResult = await createDirResponse.json().catch(() => ({}));
                         if (typeof KernelLogger !== 'undefined') {
-                            KernelLogger.warn('ThemeAnimator', `创建锁屏缓存目录失败: ${errorResult.message || `HTTP ${createDirResponse.status}`}`);
+                            KernelLogger.warn('ThemeAnimator', `创建锁屏缓存目录失败: HTTP ${createDirResponse.status}, ${dirResult.message || ''}`);
+                        }
+                    } else if (dirResult && dirResult.status === 'success') {
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.debug('ThemeAnimator', `创建锁屏缓存目录成功: ${dirResult.message || ''}`);
                         }
                     }
                 } catch (e) {
@@ -3108,6 +3165,10 @@
                 saveUrl.searchParams.set('fileName', lockscreenFileName);
                 saveUrl.searchParams.set('writeMod', 'overwrite');
                 
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.debug('ThemeAnimator', `保存锁屏背景: path=D:/cache/lockscreen/, fileName=${lockscreenFileName}, content长度=${fileContent ? fileContent.length : 0}, isBase64=${isBase64}`);
+                }
+                
                 const saveResponse = await fetch(saveUrl.toString(), {
                     method: 'POST',
                     headers: {
@@ -3120,17 +3181,23 @@
                 });
                 
                 if (!saveResponse.ok) {
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.error('ThemeAnimator', `保存锁屏背景失败: HTTP ${saveResponse.status}`);
+                    }
                     throw new Error(this._getText('THEMEANIM_SAVE_FILE_FAILED_MSG', '保存文件失败: {0}').replace('{0}', 'HTTP ' + saveResponse.status));
                 }
                 
                 const saveResult = await saveResponse.json();
                 if (saveResult.status !== 'success') {
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.error('ThemeAnimator', `保存锁屏背景失败: ${saveResult.message || '未知错误'}`);
+                    }
                     throw new Error(this._getText('THEMEANIM_SAVE_FILE_FAILED_MSG', '保存文件失败: {0}').replace('{0}', saveResult.message || this._getText('THEMEANIM_UNKNOWN_ERROR', '未知错误')));
                 }
                 
                 // 添加到锁屏背景列表
                 await this._addToLockscreenBackgroundsList({
-                    id: `lockscreen_${background.id}`,
+                    id: `lockscreen_${safeId}`,
                     name: background.name || `锁屏: ${background.name || background.id}`,
                     path: lockscreenFilePath,
                     description: `来自桌面背景: ${background.name || background.id}`,
@@ -3141,8 +3208,14 @@
                 // 刷新锁屏背景列表
                 this._updateLockscreenBackgroundsList();
                 
+                // 关闭随机背景，设置为用户选择的背景
+                if (typeof LStorage !== 'undefined') {
+                    await LStorage.setSystemStorage('system.lockscreenRandomBg', false);
+                    await LStorage.setSystemStorage('system.lockscreenBackground', lockscreenFilePath);
+                }
+                
                 if (typeof KernelLogger !== 'undefined') {
-                    KernelLogger.debug('ThemeAnimator', `背景已发送到锁屏: ${lockscreenFileName}`);
+                    KernelLogger.debug('ThemeAnimator', `背景已发送到锁屏并应用: ${lockscreenFileName}`);
                 }
                 
                 // 成功时静默完成，不显示弹窗
@@ -3162,8 +3235,14 @@
             if (typeof LStorage !== 'undefined') {
                 try {
                     const list = await LStorage.getSystemStorage('system.lockscreenBackgrounds');
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.debug('ThemeAnimator', `获取锁屏背景列表: ${JSON.stringify(list)}`);
+                    }
                     return Array.isArray(list) ? list : [];
                 } catch (e) {
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.error('ThemeAnimator', `获取锁屏背景列表失败: ${e.message}`);
+                    }
                     return [];
                 }
             }

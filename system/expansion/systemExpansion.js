@@ -90,6 +90,16 @@
     let _resolvePromise = null;
     let _errorMessageElement = null;
 
+    let _patchState = {
+        url: null,
+        description: null,
+        version: null,
+        status: 'pending',
+        progress: 0,
+        message: '',
+        result: null
+    };
+
     function _getLogoPath() {
         if (typeof SystemInformation !== 'undefined' && SystemInformation.getLogoPath) {
             return SystemInformation.getLogoPath();
@@ -270,11 +280,18 @@
             }
         }
 
+        if (!isLastStep && _currentStep < totalSteps) {
+            _currentStep++;
+            _clearErrorMessage();
+            _renderContent();
+            return;
+        }
+
         const result = {
             action: isLastStep ? 'done' : 'next',
             step: _currentStep,
             totalSteps: totalSteps,
-            isLastStep: isLastStep,
+            isLastStep: true,
             type: _currentType,
             data: _collectFormData()
         };
@@ -503,6 +520,279 @@
         }
     }
 
+    function _renderPatchProgress() {
+        const status = _patchState.status;
+        const progress = _patchState.progress;
+        const message = _patchState.message || '';
+
+        let statusText = '';
+        let progressBar = '';
+
+        switch (status) {
+            case 'downloading':
+                statusText = '正在下载更新...';
+                progressBar = `<div style="width: 100%; height: 8px; background: #e5e5e5; border-radius: 4px; overflow: hidden;">
+                    <div style="width: ${progress}%; height: 100%; background: #0078d4; transition: width 0.3s;"></div>
+                </div>`;
+                break;
+            case 'extracting':
+                statusText = '正在解压更新包...';
+                progressBar = `<div style="width: 100%; height: 8px; background: #e5e5e5; border-radius: 4px; overflow: hidden;">
+                    <div style="width: ${progress}%; height: 100%; background: #107c10; transition: width 0.3s;"></div>
+                </div>`;
+                break;
+            case 'installing':
+                statusText = '正在安装更新...';
+                progressBar = `<div style="width: 100%; height: 8px; background: #e5e5e5; border-radius: 4px; overflow: hidden;">
+                    <div style="width: ${progress}%; height: 100%; background: #ff8c00; transition: width 0.3s;"></div>
+                </div>`;
+                break;
+            case 'completed':
+                statusText = '更新安装完成！';
+                progressBar = `<div style="width: 100%; height: 8px; background: #107c10; border-radius: 4px;">
+                    <div style="width: 100%; height: 100%; background: #107c10;"></div>
+                </div>`;
+                break;
+            case 'failed':
+                statusText = '更新安装失败';
+                progressBar = `<div style="color: #c42b1c; font-size: 14px;">${message}</div>`;
+                break;
+            default:
+                statusText = '准备中...';
+                progressBar = '';
+        }
+
+        return `
+            <div style="padding: 24px; color: #1a1a1a; text-align: center;">
+                <div style="width: 64px; height: 64px; margin: 0 auto 24px; background: ${status === 'completed' ? '#107c10' : status === 'failed' ? '#c42b1c' : '#0078d4'}; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+                    ${status === 'completed'
+                        ? '<svg width="32" height="32" viewBox="0 0 24 24" fill="#fff"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>'
+                        : status === 'failed'
+                        ? '<svg width="32" height="32" viewBox="0 0 24 24" fill="#fff"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>'
+                        : '<svg width="32" height="32" viewBox="0 0 24 24" fill="#fff"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>'
+                    }
+                </div>
+                <h2 style="margin: 0 0 8px 0; font-size: 20px;">${statusText}</h2>
+                ${progressBar}
+                ${message && status !== 'failed' ? `<p style="color: #666; font-size: 14px; margin: 16px 0 0 0;">${message}</p>` : ''}
+            </div>
+        `;
+    }
+
+    function _renderPatchStep1() {
+        const version = _patchState.version || '1.0.0';
+        const description = _patchState.description || '';
+        return `
+            <div style="padding: 24px; color: #1a1a1a;">
+                <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 20px;">
+                    <div style="width: 48px; height: 48px; background: #0078d4; border-radius: 8px; display: flex; align-items: center; justify-content: center;">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="#fff">
+                            <path d="M21 2H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h7v2H8v2h8v-2h-2v-2h7c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H3V4h18v12zM7 7h10v2H7V7zm0 4h10v2H7v-2z"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <h2 style="margin: 0 0 4px 0; font-size: 20px;">系统更新</h2>
+                        <span style="color: #666; font-size: 14px;">版本 ${version}</span>
+                    </div>
+                </div>
+                <div style="background: #f5f5f5; border-radius: 8px; padding: 16px; margin-bottom: 16px; max-height: 200px; overflow-y: auto;">
+                    <h3 style="margin: 0 0 12px 0; font-size: 14px; color: #666;">本次更新内容：</h3>
+                    <div style="white-space: pre-wrap; line-height: 1.6;">${description}</div>
+                </div>
+                <p style="color: #666; font-size: 13px; margin: 0;">
+                    点击「开始安装」将下载并安装更新，安装过程中请勿关闭系统。
+                </p>
+            </div>
+        `;
+    }
+
+    async function _startPatchInstall() {
+        _patchState.status = 'downloading';
+        _patchState.progress = 0;
+        _patchState.message = '正在连接服务器...';
+        _renderContent();
+
+        try {
+            _patchState.message = '正在下载补丁...';
+            _patchState.progress = 10;
+            _renderContent();
+
+            const tempPath = 'D/cache/temp';
+            const fileName = 'patch_' + Date.now() + '.zip';
+
+            const downloadResult = await _downloadPatchFile(_patchState.url, tempPath, fileName, function(progress) {
+                _patchState.progress = 10 + Math.floor(progress * 40);
+                _patchState.message = `下载中... ${_patchState.progress}%`;
+                _renderContent();
+            });
+
+            if (!downloadResult.success) {
+                throw new Error(downloadResult.message || '下载失败');
+            }
+
+            _patchState.status = 'extracting';
+            _patchState.progress = 50;
+            _patchState.message = '正在解压补丁...';
+            _renderContent();
+
+            const extractResult = await _extractPatchFile(downloadResult.path, tempPath, function(progress) {
+                _patchState.progress = 50 + Math.floor(progress * 20);
+                _patchState.message = `解压中... ${_patchState.progress}%`;
+                _renderContent();
+            });
+
+            if (!extractResult.success) {
+                throw new Error(extractResult.message || '解压失败');
+            }
+
+            _patchState.status = 'installing';
+            _patchState.progress = 70;
+            _patchState.message = '正在安装补丁...';
+            _renderContent();
+
+            const installResult = await _installPatchFiles(extractResult.extractedPath, function(progress) {
+                _patchState.progress = 70 + Math.floor(progress * 30);
+                _patchState.message = `安装中... ${_patchState.progress}%`;
+                _renderContent();
+            });
+
+            _patchState.status = 'completed';
+            _patchState.progress = 100;
+            _patchState.message = '更新已安装完成';
+            _patchState.result = installResult;
+            _renderContent();
+
+            if (typeof KernelLogger !== 'undefined') {
+                KernelLogger.info("SystemExpansion", '补丁安装完成', installResult);
+            }
+
+        } catch (error) {
+            _patchState.status = 'failed';
+            _patchState.message = error.message || '安装失败';
+            _renderContent();
+
+            if (typeof KernelLogger !== 'undefined') {
+                KernelLogger.error("SystemExpansion", '补丁安装失败', error);
+            }
+        }
+    }
+
+    async function _downloadPatchFile(url, targetDir, fileName, onProgress) {
+        return new Promise(function(resolve) {
+            if (typeof KernelAPI !== 'undefined') {
+                KernelAPI.call('FileFramework.download', [url, targetDir, fileName, function(progress) {
+                    if (onProgress) onProgress(progress);
+                }]).then(function(result) {
+                    if (result && result.success) {
+                        resolve({ success: true, path: targetDir + '/' + fileName });
+                    } else {
+                        resolve({ success: false, message: result ? result.message : '下载失败' });
+                    }
+                }).catch(function(err) {
+                    resolve({ success: false, message: err.message });
+                });
+            } else {
+                resolve({ success: false, message: 'FileFramework 不可用' });
+            }
+        });
+    }
+
+    async function _extractPatchFile(zipPath, targetDir, onProgress) {
+        return new Promise(function(resolve) {
+            if (typeof KernelAPI !== 'undefined') {
+                const services = ['ziper', 'zipService', 'compression'];
+                let tried = 0;
+
+                const tryNextService = function(index) {
+                    if (index >= services.length) {
+                        resolve({ success: false, message: '未找到可用的解压服务' });
+                        return;
+                    }
+
+                    const serviceName = services[index];
+                    KernelAPI.call(serviceName + '.extract', [zipPath, targetDir, function(progress) {
+                        if (onProgress) onProgress(progress);
+                    }]).then(function(result) {
+                        if (result && result.success) {
+                            resolve({ success: true, extractedPath: targetDir });
+                        } else {
+                            tried++;
+                            tryNextService(index + 1);
+                        }
+                    }).catch(function() {
+                        tried++;
+                        tryNextService(index + 1);
+                    });
+                };
+
+                tryNextService(0);
+            } else {
+                resolve({ success: false, message: '解压服务不可用' });
+            }
+        });
+    }
+
+    async function _installPatchFiles(sourceDir, onProgress) {
+        return new Promise(function(resolve) {
+            if (typeof KernelAPI !== 'undefined') {
+                const services = ['FileFramework', 'FileSystem', 'FSDrive'];
+                let tried = 0;
+
+                const tryNextService = function(index) {
+                    if (index >= services.length) {
+                        resolve({ success: false, message: '未找到可用的文件系统服务' });
+                        return;
+                    }
+
+                    const serviceName = services[index];
+                    const copyMethod = serviceName === 'FileFramework' ? 'copyDirectoryToPhysical' : 'copyDirectory';
+
+                    if (serviceName === 'FileFramework') {
+                        KernelAPI.call('FileFramework.copyDirectoryToPhysical', [sourceDir, '/', true, function(progress) {
+                            if (onProgress) onProgress(progress);
+                        }]).then(function(result) {
+                            if (result && result.success) {
+                                resolve({
+                                    success: true,
+                                    updatedFiles: result && result.files ? result.files : [],
+                                    message: result && result.message
+                                });
+                            } else {
+                                tried++;
+                                tryNextService(index + 1);
+                            }
+                        }).catch(function() {
+                            tried++;
+                            tryNextService(index + 1);
+                        });
+                    } else {
+                        KernelAPI.call(serviceName + '.' + copyMethod, [sourceDir, '/', true, function(progress) {
+                            if (onProgress) onProgress(progress);
+                        }]).then(function(result) {
+                            if (result && result.success) {
+                                resolve({
+                                    success: true,
+                                    updatedFiles: result && result.files ? result.files : [],
+                                    message: result && result.message
+                                });
+                            } else {
+                                tried++;
+                                tryNextService(index + 1);
+                            }
+                        }).catch(function() {
+                            tried++;
+                            tryNextService(index + 1);
+                        });
+                    }
+                };
+
+                tryNextService(0);
+            } else {
+                resolve({ success: false, message: '文件系统服务不可用' });
+            }
+        });
+    }
+
     function _renderContent() {
         if (!_overlayContainer) return;
 
@@ -569,8 +859,21 @@
             background: #fafafa;
         `;
 
-        if (typeof _currentAssets === 'string') {
+        const isPatchWithUrl = _currentType === 'SystemPatch' && _patchState.url;
+
+        if (isPatchWithUrl && _currentStep === 1) {
+            contentArea.innerHTML = _renderPatchStep1();
+        } else if (typeof _currentAssets === 'string') {
             contentArea.innerHTML = _currentAssets;
+        } else if (typeof _currentAssets === 'function') {
+            const stepContent = _currentAssets(_currentStep, _currentMeta);
+            if (typeof stepContent === 'string') {
+                contentArea.innerHTML = stepContent;
+            } else if (stepContent && typeof stepContent.render === 'function') {
+                stepContent.render(contentArea, _currentMeta, _currentStep);
+            } else {
+                contentArea.textContent = JSON.stringify(stepContent, null, 2);
+            }
         } else if (_currentAssets && typeof _currentAssets.render === 'function') {
             _currentAssets.render(contentArea, _currentMeta, _currentStep);
         } else {
@@ -598,7 +901,159 @@
         const isLastStep = totalSteps === 1 || _currentStep >= totalSteps;
         const showCancel = buttonLabels.cancel !== null && buttonLabels.cancel !== undefined;
 
-        if (isLastStep) {
+        const isPatchStep1 = isPatchWithUrl && _currentStep === 1 && _patchState.status === 'pending';
+        const isPatchCompleted = isPatchWithUrl && _patchState.status === 'completed';
+        const isPatchFailed = isPatchWithUrl && _patchState.status === 'failed';
+
+        if (isPatchStep1) {
+            const cancelBtn = document.createElement('button');
+            cancelBtn.textContent = '取消';
+            cancelBtn.style.cssText = `
+                padding: 8px 20px;
+                font-size: 14px;
+                font-weight: 500;
+                cursor: pointer;
+                background: transparent;
+                color: #1a1a1a;
+                border: 1px solid #e5e5e5;
+                border-radius: 4px;
+                transition: all 0.15s ease;
+            `;
+            cancelBtn.onmouseenter = function() {
+                cancelBtn.style.background = '#f5f5f5';
+            };
+            cancelBtn.onmouseleave = function() {
+                cancelBtn.style.background = 'transparent';
+            };
+            cancelBtn.onclick = function() {
+                _exitOverlay();
+            };
+            footerArea.appendChild(cancelBtn);
+
+            const installBtn = document.createElement('button');
+            installBtn.textContent = '开始安装';
+            installBtn.style.cssText = `
+                padding: 8px 20px;
+                font-size: 14px;
+                font-weight: 500;
+                cursor: pointer;
+                background: #0078d4;
+                color: #fff;
+                border: none;
+                border-radius: 4px;
+                transition: background 0.15s ease;
+            `;
+            installBtn.onmouseenter = function() {
+                installBtn.style.background = '#106ebe';
+            };
+            installBtn.onmouseleave = function() {
+                installBtn.style.background = '#0078d4';
+            };
+            installBtn.onclick = function() {
+                _startPatchInstall();
+            };
+            footerArea.appendChild(installBtn);
+        } else if (isPatchCompleted) {
+            const okBtn = document.createElement('button');
+            okBtn.textContent = '完成';
+            okBtn.style.cssText = `
+                padding: 8px 20px;
+                font-size: 14px;
+                font-weight: 500;
+                cursor: pointer;
+                background: #0078d4;
+                color: #fff;
+                border: none;
+                border-radius: 4px;
+                transition: background 0.15s ease;
+            `;
+            okBtn.onmouseenter = function() {
+                okBtn.style.background = '#106ebe';
+            };
+            okBtn.onmouseleave = function() {
+                okBtn.style.background = '#0078d4';
+            };
+            okBtn.onclick = function() {
+                const result = {
+                    action: 'done',
+                    step: _currentStep,
+                    totalSteps: totalSteps,
+                    isLastStep: true,
+                    type: _currentType,
+                    patchResult: _patchState.result
+                };
+                _exitOverlay();
+                if (_resolvePromise) {
+                    _resolvePromise(result);
+                    _resolvePromise = null;
+                }
+            };
+            footerArea.appendChild(okBtn);
+        } else if (isPatchFailed) {
+            const retryBtn = document.createElement('button');
+            retryBtn.textContent = '重试';
+            retryBtn.style.cssText = `
+                padding: 8px 20px;
+                font-size: 14px;
+                font-weight: 500;
+                cursor: pointer;
+                background: transparent;
+                color: #1a1a1a;
+                border: 1px solid #e5e5e5;
+                border-radius: 4px;
+                transition: all 0.15s ease;
+            `;
+            retryBtn.onmouseenter = function() {
+                retryBtn.style.background = '#f5f5f5';
+            };
+            retryBtn.onmouseleave = function() {
+                retryBtn.style.background = 'transparent';
+            };
+            retryBtn.onclick = function() {
+                _patchState.status = 'pending';
+                _patchState.progress = 0;
+                _patchState.message = '';
+                _renderContent();
+            };
+            footerArea.appendChild(retryBtn);
+
+            const closeBtn = document.createElement('button');
+            closeBtn.textContent = '关闭';
+            closeBtn.style.cssText = `
+                padding: 8px 20px;
+                font-size: 14px;
+                font-weight: 500;
+                cursor: pointer;
+                background: #0078d4;
+                color: #fff;
+                border: none;
+                border-radius: 4px;
+                transition: background 0.15s ease;
+            `;
+            closeBtn.onmouseenter = function() {
+                closeBtn.style.background = '#106ebe';
+            };
+            closeBtn.onmouseleave = function() {
+                closeBtn.style.background = '#0078d4';
+            };
+            closeBtn.onclick = function() {
+                const result = {
+                    action: 'cancel',
+                    step: _currentStep,
+                    totalSteps: totalSteps,
+                    isLastStep: true,
+                    type: _currentType,
+                    patchResult: null
+                };
+                _exitOverlay();
+                if (_resolvePromise) {
+                    _resolvePromise(result);
+                    _resolvePromise = null;
+                }
+            };
+            footerArea.appendChild(closeBtn);
+        } else if (isPatchWithUrl && (_patchState.status === 'downloading' || _patchState.status === 'extracting' || _patchState.status === 'installing')) {
+        } else if (isLastStep) {
             if (showCancel) {
                 const cancelBtn = document.createElement('button');
                 cancelBtn.textContent = buttonLabels.cancel;
@@ -709,17 +1164,22 @@
         /**
          * 进入全屏覆盖模式
          * @param {string} type 类型：SystemProtocol | SystemPatch | SystemConfiguration
-         * @param {*} assets 渲染内容
+         * @param {*} assets 渲染内容（string/object/function）
          * @param {Object} meta 元数据
          *   - title: 标题 (String)
          *   - step: 步骤总数 (Number)
          *   - check: 检查数组 (Array<Object>) - 仅 SystemConfiguration 有效
+         *   - patchUrl: 补丁下载地址 (String) - 仅 SystemPatch 有效
+         *   - patchDescription: 补丁描述 (String) - 必填，仅 SystemPatch 有效
+         *   - patchVersion: 补丁版本 (String) - 默认 1.0.0
          * @returns {Promise<Object>} 用户操作后的结果
-         *   - action: 'next' | 'done'
+         *   - action: 'next' | 'done' | 'cancel'
          *   - step: 当前步骤
          *   - totalSteps: 总步骤数
          *   - isLastStep: 是否最后一步
          *   - type: 类型
+         *   - data: 表单数据（仅 SystemConfiguration）
+         *   - patchResult: 补丁结果（仅 SystemPatch with patchUrl）
          */
         enterOverlay: function(type, assets, meta) {
             return new Promise(function(resolve, reject) {
@@ -737,6 +1197,32 @@
                     if (_isActive) {
                         resolve({ success: false, message: '覆盖层已激活' });
                         return;
+                    }
+
+                    if (type === 'SystemPatch' && meta && meta.patchUrl) {
+                        if (!meta.patchDescription) {
+                            resolve({ success: false, message: 'SystemPatch 模式需要提供 patchDescription（补丁描述）' });
+                            return;
+                        }
+                        _patchState = {
+                            url: meta.patchUrl,
+                            description: meta.patchDescription,
+                            version: meta.patchVersion || '1.0.0',
+                            status: 'pending',
+                            progress: 0,
+                            message: '',
+                            result: null
+                        };
+                    } else {
+                        _patchState = {
+                            url: null,
+                            description: null,
+                            version: null,
+                            status: 'pending',
+                            progress: 0,
+                            message: '',
+                            result: null
+                        };
                     }
 
                     _currentType = type;

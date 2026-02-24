@@ -1955,6 +1955,13 @@ this.fileCountText.textContent = this._getText('FM_ITEMS_COUNT_FOUND', '找到 {
                 if (typeof KernelLogger !== 'undefined') {
                     KernelLogger.error('FileManager', '加载属性失败', error);
                 }
+                if (typeof ExceptionHandler !== 'undefined') {
+                    ExceptionHandler.reportException(
+                        ExceptionHandler.ExceptionLevel.SERVICE,
+                        'FileManager 加载属性失败',
+                        { error: error.message, stack: error.stack }
+                    );
+                }
                 this.propertiesContent.innerHTML = '<div style="color: #ff4444;">' + this._getText('FM_LOAD_PROP_FAILED', '加载属性失败: {0}').replace('{0}', error.message) + '</div>';
             }
         },
@@ -2021,6 +2028,13 @@ this.fileCountText.textContent = this._getText('FM_ITEMS_COUNT_FOUND', '找到 {
             } catch (error) {
                 if (typeof KernelLogger !== 'undefined') {
                     KernelLogger.error('FileManager', '获取文件信息失败', error);
+                }
+                if (typeof ExceptionHandler !== 'undefined') {
+                    ExceptionHandler.reportException(
+                        ExceptionHandler.ExceptionLevel.SERVICE,
+                        'FileManager 获取文件信息失败',
+                        { error: error.message, stack: error.stack, path: filePath }
+                    );
                 }
                 return null;
             }
@@ -2228,6 +2242,13 @@ this.fileCountText.textContent = this._getText('FM_ITEMS_COUNT_FOUND', '找到 {
             } catch (error) {
                 if (typeof KernelLogger !== 'undefined') {
                     KernelLogger.error('FileManager', '加载根目录失败', error);
+                }
+                if (typeof ExceptionHandler !== 'undefined') {
+                    ExceptionHandler.reportException(
+                        ExceptionHandler.ExceptionLevel.SERVICE,
+                        'FileManager 加载根目录失败',
+                        { error: error.message, stack: error.stack }
+                    );
                 }
                 // 加载根目录失败，使用通知提示（不打断用户）
                 if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
@@ -4589,9 +4610,9 @@ this.fileCountText.textContent = this._getText('FM_ITEMS_COUNT_FOUND', '找到 {
                     let addressInputEl = null;
                     if (this.addressInput) {
                         this.addressInput.value = currentPath;
-                    } else {
-                        // 尝试通过类名查找
-                        addressInputEl = document.querySelector('.filemanager-address-input');
+                    } else if (this.window) {
+                        // 尝试通过类名查找（仅在当前实例窗口内查找）
+                        addressInputEl = this.window.querySelector('.filemanager-address-input');
                         if (addressInputEl) {
                             addressInputEl.value = currentPath;
                         }

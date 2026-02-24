@@ -128,6 +128,13 @@
                 if (typeof KernelLogger !== 'undefined') {
                     KernelLogger.error('ImageViewer', '图片查看器初始化失败', error);
                 }
+                if (typeof ExceptionHandler !== 'undefined') {
+                    ExceptionHandler.reportException(
+                        ExceptionHandler.ExceptionLevel.SERVICE,
+                        'ImageViewer 图片查看器初始化失败',
+                        { error: error.message, stack: error.stack }
+                    );
+                }
                 if (this.window && this.window.parentElement) {
                     this.window.parentElement.removeChild(this.window);
                 }

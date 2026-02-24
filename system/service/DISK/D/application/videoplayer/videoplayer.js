@@ -135,10 +135,16 @@
                 // 记录错误日志
                 if (typeof KernelLogger !== 'undefined') {
                     KernelLogger.error('VideoPlayer', `视频播放器初始化失败: ${error.message}`, error);
-                } else {
-                    if (typeof KernelLogger !== 'undefined') {
-                        KernelLogger.error('VideoPlayer', '视频播放器初始化失败', error);
-                    }
+                }
+                if (typeof ExceptionHandler !== 'undefined') {
+                    ExceptionHandler.reportException(
+                        ExceptionHandler.ExceptionLevel.SERVICE,
+                        'VideoPlayer 视频播放器初始化失败',
+                        { error: error.message, stack: error.stack }
+                    );
+                }
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('VideoPlayer', '视频播放器初始化失败', error);
                 }
                 if (this.window && this.window.parentElement) {
                     this.window.parentElement.removeChild(this.window);
@@ -987,10 +993,16 @@
             // 记录错误日志
             if (typeof KernelLogger !== 'undefined') {
                 KernelLogger.error('VideoPlayer', `视频加载失败: ${errorMsg}`, errorInfo);
-            } else {
-                if (typeof KernelLogger !== 'undefined') {
-                    KernelLogger.error('VideoPlayer', '视频加载失败', errorInfo);
-                }
+            }
+            if (typeof ExceptionHandler !== 'undefined') {
+                ExceptionHandler.reportException(
+                    ExceptionHandler.ExceptionLevel.SERVICE,
+                    'VideoPlayer 视频加载失败',
+                    { error: errorMsg, path: this.currentVideoPath, url: this.currentVideoUrl }
+                );
+            }
+            if (typeof KernelLogger !== 'undefined') {
+                KernelLogger.error('VideoPlayer', '视频加载失败', errorInfo);
             }
             
             if (this.fileInfo) {
