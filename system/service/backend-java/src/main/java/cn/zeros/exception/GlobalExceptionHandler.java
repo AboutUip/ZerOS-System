@@ -7,6 +7,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.servlet.NoHandlerFoundException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.io.IOException;
 
@@ -102,6 +104,26 @@ public class GlobalExceptionHandler {
     }
     
     /**
+     * 处理静态资源未找到异常
+     */
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<ApiResponse<?>> handleNoResourceFound(NoResourceFoundException e) {
+        log.info("资源未找到: {}", e.getMessage());
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(ApiResponse.error("404", "资源未找到: " + e.getResourcePath()));
+    }
+
+    /**
+     * 处理无匹配 Controller 的请求（路径未找到）
+     */
+    @ExceptionHandler(NoHandlerFoundException.class)
+    public ResponseEntity<ApiResponse<?>> handleNoHandlerFound(NoHandlerFoundException e) {
+        log.info("路径未找到: {} {}", e.getHttpMethod(), e.getRequestURL());
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(ApiResponse.error("404", "路径未找到: " + e.getRequestURL()));
+    }
+
+    /**
      * 处理其他异常
      */
     @ExceptionHandler(Exception.class)
@@ -143,6 +165,14 @@ public class GlobalExceptionHandler {
                 return HttpStatus.CONFLICT;
             }
             return HttpStatus.INTERNAL_SERVER_ERROR;
+        }
+        // 401x - 认证错误
+        if (errorCode.startsWith("401")) {
+            return HttpStatus.UNAUTHORIZED;
+        }
+        // 403x - 授权错误
+        if (errorCode.startsWith("403")) {
+            return HttpStatus.FORBIDDEN;
         }
         // 4xxx - 代理服务错误
         if (errorCode.startsWith("4")) {

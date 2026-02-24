@@ -35,7 +35,7 @@ public class AudioProxyController {
     public Mono<ResponseEntity<byte[]>> proxyAudio(
             @RequestParam String url,
             @RequestHeader(value = "Range", required = false) String rangeHeader) {
-        
+        log.info("[AudioProxy] url={}", url);
         try {
             URI uri = URI.create(url);
             String scheme = uri.getScheme();

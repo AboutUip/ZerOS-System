@@ -6,6 +6,11 @@ server:
 spring:
   application:
     name: zeros-backend
+  web:
+    resources:
+      add-mappings: false
+  mvc:
+    throw-exception-if-no-handler-found: true
   servlet:
     multipart:
       max-file-size: 1GB
@@ -21,11 +26,36 @@ disk:
   system-partition: D
   system-resource-zip: ../test/assets/SYSTEMRESOURCE.zip
 
+# JWT 配置
+jwt:
+  secret: zeros-default-secret-change-in-production-min-256-bits
+  expiration-seconds: 7200
+  issuer: zeros-system
+  exclude-paths:
+    - /api/auth/**
+    - /DISK/**
+    - /randomSecurity
+    - /randomSecurity/**
+    - /module-proxy
+    - /module-proxy/**
+    - /ImageProxy
+    - /ImageProxy/**
+    - /audio-proxy
+    - /audio-proxy/**
+    - /spark-ai-proxy
+    - /spark-ai-proxy/**
+    - /dashscope-ai-proxy
+    - /dashscope-ai-proxy/**
+    - /BrowserProxy
+    - /BrowserProxy/**
+    - /test
+    - /test/**
+    - /error
+    - /actuator/**
+    - /swagger-ui/**
+    - /v3/api-docs/**
+
 logging:
   level:
     cn.zeros: info
     org.springframework.web: info
-
-
-
-

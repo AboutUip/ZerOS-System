@@ -40,6 +40,7 @@ public class FSDirveServiceImpl implements IFSDirveService {
     // ============ 目录操作 ============
 
     public Map<String, Object> createDirectory(String path, String name) throws IOException {
+        log.info("[FSDirve] createDir path={} name={}", path, name);
         Path dirPath = PathUtil.convertVirtualPath(path, diskConfig);
         Path newDirPath = dirPath.resolve(name).normalize();
         
@@ -65,6 +66,7 @@ public class FSDirveServiceImpl implements IFSDirveService {
     }
     
     public Map<String, Object> deleteDirectory(String path) throws IOException {
+        log.info("[FSDirve] deleteDir path={}", path);
         Path dirPath = PathUtil.convertVirtualPath(path, diskConfig);
         
         if (!Files.exists(dirPath) || !Files.isDirectory(dirPath)) {
@@ -85,6 +87,7 @@ public class FSDirveServiceImpl implements IFSDirveService {
     }
     
     public Map<String, Object> deleteDirectoryRecursive(String path) throws IOException {
+        log.info("[FSDirve] deleteDirRecursive path={}", path);
         Path dirPath = PathUtil.convertVirtualPath(path, diskConfig);
         
         if (!Files.exists(dirPath) || !Files.isDirectory(dirPath)) {
@@ -111,6 +114,7 @@ public class FSDirveServiceImpl implements IFSDirveService {
     }
     
     public Map<String, Object> listDirectory(String path) throws IOException {
+        log.info("[FSDirve] listDir path={}", path);
         Path dirPath = PathUtil.convertVirtualPath(path, diskConfig);
         if (!Files.exists(dirPath) || !Files.isDirectory(dirPath)) {
             throw new IOException("目录不存在: " + path);
@@ -169,6 +173,7 @@ public class FSDirveServiceImpl implements IFSDirveService {
     }
     
     public Map<String, Object> renameDirectory(String path, String oldName, String newName) throws IOException {
+        log.info("[FSDirve] renameDir path={} {} -> {}", path, oldName, newName);
         Path dirPath = PathUtil.convertVirtualPath(path, diskConfig);
         Path oldDirPath = dirPath.resolve(oldName).normalize();
         Path newDirPath = dirPath.resolve(newName).normalize();
@@ -191,6 +196,7 @@ public class FSDirveServiceImpl implements IFSDirveService {
     }
     
     public Map<String, Object> moveDirectory(String sourcePath, String targetPath) throws IOException {
+        log.info("[FSDirve] moveDir {} -> {}", sourcePath, targetPath);
         Path sourceDirPath = PathUtil.convertVirtualPath(sourcePath, diskConfig);
         Path targetDirPath = PathUtil.convertVirtualPath(targetPath, diskConfig);
         
@@ -218,6 +224,7 @@ public class FSDirveServiceImpl implements IFSDirveService {
     }
     
     public Map<String, Object> copyDirectory(String sourcePath, String targetPath) throws IOException {
+        log.info("[FSDirve] copyDir {} -> {}", sourcePath, targetPath);
         Path sourceDirPath = PathUtil.convertVirtualPath(sourcePath, diskConfig);
         Path targetDirPath = PathUtil.convertVirtualPath(targetPath, diskConfig);
         
@@ -265,6 +272,7 @@ public class FSDirveServiceImpl implements IFSDirveService {
     // ============ 文件操作 ============
     
     public Map<String, Object> createFile(String path, String fileName, String content) throws IOException {
+        log.info("[FSDirve] createFile path={} fileName={}", path, fileName);
         Path dirPath = PathUtil.convertVirtualPath(path, diskConfig);
         Path filePath = dirPath.resolve(fileName).normalize();
         
@@ -282,7 +290,6 @@ public class FSDirveServiceImpl implements IFSDirveService {
         }
         
         Files.writeString(filePath, content != null ? content : "", StandardCharsets.UTF_8);
-        log.debug("创建文件: {}, 大小: {}", filePath, content != null ? content.length() : 0);
         
         Map<String, Object> result = new HashMap<>();
         result.put("path", path + "/" + fileName);
@@ -292,6 +299,7 @@ public class FSDirveServiceImpl implements IFSDirveService {
     }
     
     public Map<String, Object> readFile(String path, String fileName, boolean asBase64) throws IOException {
+        log.info("[FSDirve] readFile path={} fileName={}", path, fileName);
         Path dirPath = PathUtil.convertVirtualPath(path, diskConfig);
         Path filePath = dirPath.resolve(fileName).normalize();
         
@@ -333,6 +341,7 @@ public class FSDirveServiceImpl implements IFSDirveService {
     }
     
     public Map<String, Object> writeFile(String path, String fileName, String content, String writeMod, boolean isBase64) throws IOException {
+        log.info("[FSDirve] writeFile path={} fileName={} mode={}", path, fileName, writeMod);
         Path dirPath = PathUtil.convertVirtualPath(path, diskConfig);
         Path filePath = dirPath.resolve(fileName).normalize();
         
@@ -394,6 +403,7 @@ public class FSDirveServiceImpl implements IFSDirveService {
     }
     
     public Map<String, Object> deleteFile(String path, String fileName) throws IOException {
+        log.info("[FSDirve] deleteFile path={} fileName={}", path, fileName);
         Path dirPath = PathUtil.convertVirtualPath(path, diskConfig);
         Path filePath = dirPath.resolve(fileName).normalize();
         
@@ -410,6 +420,7 @@ public class FSDirveServiceImpl implements IFSDirveService {
     }
     
     public Map<String, Object> renameFile(String path, String oldFileName, String newFileName) throws IOException {
+        log.info("[FSDirve] renameFile path={} {} -> {}", path, oldFileName, newFileName);
         Path dirPath = PathUtil.convertVirtualPath(path, diskConfig);
         Path oldFilePath = dirPath.resolve(oldFileName).normalize();
         Path newFilePath = dirPath.resolve(newFileName).normalize();
@@ -432,6 +443,7 @@ public class FSDirveServiceImpl implements IFSDirveService {
     }
     
     public Map<String, Object> moveFile(String sourcePath, String sourceFileName, String targetPath, String targetFileName) throws IOException {
+        log.info("[FSDirve] moveFile {}/{} -> {}/{}", sourcePath, sourceFileName, targetPath, targetFileName);
         Path sourceDirPath = PathUtil.convertVirtualPath(sourcePath, diskConfig);
         Path targetDirPath = PathUtil.convertVirtualPath(targetPath, diskConfig);
         
@@ -460,6 +472,7 @@ public class FSDirveServiceImpl implements IFSDirveService {
     }
     
     public Map<String, Object> copyFile(String sourcePath, String sourceFileName, String targetPath, String targetFileName) throws IOException {
+        log.info("[FSDirve] copyFile {}/{} -> {}/{}", sourcePath, sourceFileName, targetPath, targetFileName);
         Path sourceDirPath = PathUtil.convertVirtualPath(sourcePath, diskConfig);
         Path targetDirPath = PathUtil.convertVirtualPath(targetPath, diskConfig);
         
@@ -488,6 +501,7 @@ public class FSDirveServiceImpl implements IFSDirveService {
     }
     
     public Map<String, Object> getFileInfo(String path, String fileName) throws IOException {
+        log.info("[FSDirve] getFileInfo path={} fileName={}", path, fileName);
         Path dirPath = PathUtil.convertVirtualPath(path, diskConfig);
         Path filePath = dirPath.resolve(fileName).normalize();
         
@@ -511,6 +525,7 @@ public class FSDirveServiceImpl implements IFSDirveService {
     // ============ 其他操作 ============
     
     public Map<String, Object> checkPathExists(String path) {
+        log.info("[FSDirve] checkPathExists path={}", path);
         try {
             Path realPath = PathUtil.convertVirtualPath(path, diskConfig);
             boolean exists = Files.exists(realPath);
@@ -547,6 +562,7 @@ public class FSDirveServiceImpl implements IFSDirveService {
     }
     
     public Map<String, Object> getDiskInfo(String disk) throws IOException {
+        log.info("[FSDirve] getDiskInfo disk={}", disk);
         Path diskPath = diskConfig.getPartitionPath(disk);
         
         if (!Files.exists(diskPath) || !Files.isDirectory(diskPath)) {

@@ -44,6 +44,17 @@ public enum ErrorCode {
     PROXY_ONLY_HTTPS("4002", "仅允许HTTPS URL"),
     PROXY_FETCH_FAILED("4003", "代理请求失败"),
     
+    // 认证/授权错误 40xx
+    UNAUTHORIZED("4010", "未认证"),
+    TOKEN_EXPIRED("4011", "令牌已过期"),
+    TOKEN_INVALID("4012", "令牌无效"),
+    FORBIDDEN("4030", "权限不足"),
+    UPID_REQUIRED("4013", "UserToken 需在 URL 中传入 upid 参数"),
+    UPID_NOT_REGISTERED("4014", "upid 未在程序权限映射中注册或已失效"),
+    PERMISSION_DENIED("4015", "程序未声明该操作所需的权限"),
+    USER_CANNOT_GRANT("4016", "当前用户无法授权该权限"),
+    JWT_LIMIT_REACHED("4017", "JWT 数量已达上限"),
+
     // 服务器错误 5xxx
     INTERNAL_ERROR("5000", "服务器内部错误"),
     SYSTEM_ERROR("5001", "系统错误"),

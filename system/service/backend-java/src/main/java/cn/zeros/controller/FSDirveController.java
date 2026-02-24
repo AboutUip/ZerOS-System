@@ -91,7 +91,7 @@ public class FSDirveController {
             throw new BusinessException(ErrorCode.UNKNOWN_ACTION);
         }
         
-        log.debug("执行文件系统操作: {}", actionType.getDescription());
+        log.info("执行文件系统操作: {}", actionType.getDescription());
         
         // 验证参数
         actionType.validate(context);
@@ -103,8 +103,4 @@ public class FSDirveController {
         return ResponseEntity.ok(ApiResponse.success(actionType.getSuccessMessage(), result));
     }
     
-    @RequestMapping(method = RequestMethod.OPTIONS)
-    public ResponseEntity<Void> handleOptions() {
-        return ResponseEntity.ok().build();
-    }
 }

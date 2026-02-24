@@ -1,13 +1,22 @@
 package cn.zeros;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.ApplicationListener;
 import org.springframework.core.env.Environment;
 
+/**
+ * ZerOS 后端服务启动入口
+ *
+ * @author zeros
+ * @date 2026-01-16
+ */
+@Slf4j
 @SpringBootApplication
 public class ZerosBackendApplication implements ApplicationListener<ApplicationReadyEvent> {
+
     public static void main(String[] args) {
         SpringApplication.run(ZerosBackendApplication.class, args);
     }
@@ -24,28 +33,20 @@ public class ZerosBackendApplication implements ApplicationListener<ApplicationR
             String port = env.getProperty("server.port", "8888");
             String contextPath = env.getProperty("server.servlet.context-path", "/");
 
-            // 格式化contextPath（确保以/开头，不以/结尾）
+            // 格式化 contextPath（确保以 / 开头，不以 / 结尾）
             if (!contextPath.startsWith("/")) {
                 contextPath = "/" + contextPath;
             }
             if (contextPath.endsWith("/") && contextPath.length() > 1) {
                 contextPath = contextPath.substring(0, contextPath.length() - 1);
             }
-            // 本地可以保留,服务器不行
-            System.out.println("\n" + "=".repeat(60));
-            System.out.println("  系统启动成功！");
-            System.out.println("=".repeat(60));
-            System.out.println("  本地后端服务访问地址：");
-            System.out.println("    http://localhost:" + port + contextPath);
-            System.out.println("    http://127.0.0.1:" + port + contextPath);
-            System.out.println("  本地前端服务访问地址：");
-            System.out.println("    http://localhost:8089" + "/test/index.html");
-            System.out.println("    http://127.0.0.1:8089" + "/test/index.html");
-            System.out.println("=".repeat(60) + "\n");
+
+            String separator = "=".repeat(60);
+            log.info("\n{}\n  系统启动成功！\n{}\n  本地后端服务访问地址：\n    http://localhost:{}{}\n    http://127.0.0.1:{}{}\n  本地前端服务访问地址：\n    http://localhost:8089/test/index.html\n    http://127.0.0.1:8089/test/index.html\n{}",
+                    separator, separator, port, contextPath, port, contextPath, separator);
         } catch (Exception e) {
-            System.err.println("获取访问地址失败：" + e.getMessage());
+            log.error("获取访问地址失败：{}", e.getMessage(), e);
         }
     }
-
 }
 

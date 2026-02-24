@@ -17,6 +17,7 @@ import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.apache.commons.compress.compressors.gzip.GzipCompressorInputStream;
 import org.apache.commons.compress.compressors.gzip.GzipCompressorOutputStream;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.io.*;
@@ -41,6 +42,7 @@ import java.util.zip.ZipOutputStream;
  * @author zeros
  * @date 2026-01-16
  */
+@Slf4j
 @Service
 public class CompressionDirveServiceImpl implements ICompressionDirveService {
 
@@ -55,6 +57,7 @@ public class CompressionDirveServiceImpl implements ICompressionDirveService {
     @Override
     public Map<String, Object> compressZip(String targetPath, String sourcePath,
                                            List<String> sourcePaths, Map<String, Object> options) throws IOException {
+        log.info("[Compress] compressZip target={}", targetPath);
         Path targetRealPath = PathUtil.convertVirtualPath(targetPath, diskConfig);
         List<String> finalSourcePaths = CompressionUtil.getFinalSourcePaths(sourcePath, sourcePaths);
         List<Path> sourceRealPaths = CompressionUtil.resolveSourcePaths(sourcePath, sourcePaths, diskConfig);
@@ -118,6 +121,7 @@ public class CompressionDirveServiceImpl implements ICompressionDirveService {
 
     @Override
     public Map<String, Object> extractZip(String sourcePath, String targetPath, Map<String, Object> options) throws IOException {
+        log.info("[Compress] extractZip {} -> {}", sourcePath, targetPath);
         Path sourceRealPath = CompressionUtil.validateSourceFile(sourcePath, diskConfig);
         Path targetRealPath = PathUtil.convertVirtualPath(targetPath, diskConfig);
         Files.createDirectories(targetRealPath);
@@ -166,6 +170,7 @@ public class CompressionDirveServiceImpl implements ICompressionDirveService {
 
     @Override
     public Map<String, Object> listZip(String sourcePath) throws IOException {
+        log.info("[Compress] listZip {}", sourcePath);
         Path sourceRealPath = CompressionUtil.validateSourceFile(sourcePath, diskConfig);
         List<Map<String, Object>> files = new ArrayList<>();
 
@@ -190,6 +195,7 @@ public class CompressionDirveServiceImpl implements ICompressionDirveService {
 
     @Override
     public Map<String, Object> checkSupport() {
+        log.info("[Compress] checkSupport");
         Map<String, Object> result = new HashMap<>();
         result.put("zip", true);
         result.put("zip_encrypted", true);
@@ -202,16 +208,19 @@ public class CompressionDirveServiceImpl implements ICompressionDirveService {
 
     @Override
     public Map<String, Object> extractRar(String sourcePath, String targetPath, Map<String, Object> options) throws IOException {
+        log.info("[Compress] extractRar {} -> {}", sourcePath, targetPath);
         throw new IOException("RAR 解压功能需要使用 junrar 库，暂未完全实现");
     }
 
     @Override
     public Map<String, Object> compressRar(String sourcePath, String targetPath, Map<String, Object> options) throws IOException {
+        log.info("[Compress] compressRar {} -> {}", sourcePath, targetPath);
         throw new IOException("RAR 压缩功能需要外部工具，暂未实现");
     }
 
     @Override
     public Map<String, Object> listRar(String sourcePath) throws IOException {
+        log.info("[Compress] listRar {}", sourcePath);
         throw new IOException("RAR 列表功能需要使用 junrar 库，暂未完全实现");
     }
 
@@ -219,6 +228,7 @@ public class CompressionDirveServiceImpl implements ICompressionDirveService {
 
     @Override
     public Map<String, Object> compressTar(String targetPath, String sourcePath, List<String> sourcePaths, Map<String, Object> options) throws IOException {
+        log.info("[Compress] compressTar target={}", targetPath);
         Path targetRealPath = PathUtil.convertVirtualPath(targetPath, diskConfig);
         List<String> finalSourcePaths = CompressionUtil.getFinalSourcePaths(sourcePath, sourcePaths);
         List<Path> sourceRealPaths = CompressionUtil.resolveSourcePaths(sourcePath, sourcePaths, diskConfig);
@@ -281,6 +291,7 @@ public class CompressionDirveServiceImpl implements ICompressionDirveService {
 
     @Override
     public Map<String, Object> extractTar(String sourcePath, String targetPath, Map<String, Object> options) throws IOException {
+        log.info("[Compress] extractTar {} -> {}", sourcePath, targetPath);
         Path sourceRealPath = CompressionUtil.validateSourceFile(sourcePath, diskConfig);
         Path targetRealPath = PathUtil.convertVirtualPath(targetPath, diskConfig);
         Files.createDirectories(targetRealPath);
@@ -330,6 +341,7 @@ public class CompressionDirveServiceImpl implements ICompressionDirveService {
 
     @Override
     public Map<String, Object> listTar(String sourcePath) throws IOException {
+        log.info("[Compress] listTar {}", sourcePath);
         Path sourceRealPath = CompressionUtil.validateSourceFile(sourcePath, diskConfig);
         List<Map<String, Object>> files = new ArrayList<>();
 
@@ -352,6 +364,7 @@ public class CompressionDirveServiceImpl implements ICompressionDirveService {
 
     @Override
     public Map<String, Object> compressTarGz(String targetPath, String sourcePath, List<String> sourcePaths, Map<String, Object> options) throws IOException {
+        log.info("[Compress] compressTarGz target={}", targetPath);
         Path targetRealPath = PathUtil.convertVirtualPath(targetPath, diskConfig);
         List<String> finalSourcePaths = CompressionUtil.getFinalSourcePaths(sourcePath, sourcePaths);
         List<Path> sourceRealPaths = CompressionUtil.resolveSourcePaths(sourcePath, sourcePaths, diskConfig);
@@ -375,6 +388,7 @@ public class CompressionDirveServiceImpl implements ICompressionDirveService {
 
     @Override
     public Map<String, Object> extractTarGz(String sourcePath, String targetPath, Map<String, Object> options) throws IOException {
+        log.info("[Compress] extractTarGz {} -> {}", sourcePath, targetPath);
         Path sourceRealPath = CompressionUtil.validateSourceFile(sourcePath, diskConfig);
         Path targetRealPath = PathUtil.convertVirtualPath(targetPath, diskConfig);
         Files.createDirectories(targetRealPath);
@@ -394,6 +408,7 @@ public class CompressionDirveServiceImpl implements ICompressionDirveService {
 
     @Override
     public Map<String, Object> listTarGz(String sourcePath) throws IOException {
+        log.info("[Compress] listTarGz {}", sourcePath);
         Path sourceRealPath = CompressionUtil.validateSourceFile(sourcePath, diskConfig);
         List<Map<String, Object>> files = new ArrayList<>();
 
@@ -417,6 +432,7 @@ public class CompressionDirveServiceImpl implements ICompressionDirveService {
 
     @Override
     public Map<String, Object> compress7z(String targetPath, String sourcePath, List<String> sourcePaths, Map<String, Object> options) throws IOException {
+        log.info("[Compress] compress7z target={}", targetPath);
         Path targetRealPath = PathUtil.convertVirtualPath(targetPath, diskConfig);
         List<String> finalSourcePaths = CompressionUtil.getFinalSourcePaths(sourcePath, sourcePaths);
         List<Path> sourceRealPaths = CompressionUtil.resolveSourcePaths(sourcePath, sourcePaths, diskConfig);
@@ -482,6 +498,7 @@ public class CompressionDirveServiceImpl implements ICompressionDirveService {
 
     @Override
     public Map<String, Object> extract7z(String sourcePath, String targetPath, Map<String, Object> options) throws IOException {
+        log.info("[Compress] extract7z {} -> {}", sourcePath, targetPath);
         Path sourceRealPath = CompressionUtil.validateSourceFile(sourcePath, diskConfig);
         Path targetRealPath = PathUtil.convertVirtualPath(targetPath, diskConfig);
         Files.createDirectories(targetRealPath);
@@ -532,6 +549,7 @@ public class CompressionDirveServiceImpl implements ICompressionDirveService {
 
     @Override
     public Map<String, Object> list7z(String sourcePath) throws IOException {
+        log.info("[Compress] list7z {}", sourcePath);
         Path sourceRealPath = CompressionUtil.validateSourceFile(sourcePath, diskConfig);
         List<Map<String, Object>> files = new ArrayList<>();
 
@@ -554,6 +572,7 @@ public class CompressionDirveServiceImpl implements ICompressionDirveService {
 
     @Override
     public Map<String, Object> compressZipEncrypted(String targetPath, String sourcePath, List<String> sourcePaths, Map<String, Object> options) throws IOException {
+        log.info("[Compress] compressZipEncrypted target={}", targetPath);
         Path targetRealPath = PathUtil.convertVirtualPath(targetPath, diskConfig);
         List<String> finalSourcePaths = CompressionUtil.getFinalSourcePaths(sourcePath, sourcePaths);
         List<Path> sourceRealPaths = CompressionUtil.resolveSourcePaths(sourcePath, sourcePaths, diskConfig);
@@ -591,6 +610,7 @@ public class CompressionDirveServiceImpl implements ICompressionDirveService {
 
     @Override
     public Map<String, Object> extractZipEncrypted(String sourcePath, String targetPath, Map<String, Object> options) throws IOException {
+        log.info("[Compress] extractZipEncrypted {} -> {}", sourcePath, targetPath);
         Path sourceRealPath = CompressionUtil.validateSourceFile(sourcePath, diskConfig);
         Path targetRealPath = PathUtil.convertVirtualPath(targetPath, diskConfig);
 

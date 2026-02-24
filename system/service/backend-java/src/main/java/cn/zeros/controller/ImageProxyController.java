@@ -33,6 +33,7 @@ public class ImageProxyController {
     
     @GetMapping
     public Mono<ResponseEntity<byte[]>> proxyImage(@RequestParam String url) {
+        log.info("[ImageProxy] url={}", url);
         try {
             URI uri = URI.create(url);
             String scheme = uri.getScheme();
