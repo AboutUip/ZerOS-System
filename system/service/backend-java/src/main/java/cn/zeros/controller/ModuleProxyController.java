@@ -1,5 +1,6 @@
 package cn.zeros.controller;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
 
@@ -10,20 +11,28 @@ import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.Map;
 
+/**
+ * ES 模块代理控制器
+ * 用于伺服项目根目录下的 ES 模块（.js/.mjs）及其他静态资源，供浏览器直接 import 使用
+ *
+ * @author zeros
+ * @date 2026-01-16
+ */
+@Slf4j
 @RestController
 @RequestMapping("/module-proxy")
 public class ModuleProxyController {
-    
-    // 定义自定义 MediaType 常量
+
     private static final MediaType APPLICATION_JAVASCRIPT = MediaType.parseMediaType("application/javascript");
     private static final MediaType TEXT_CSS = MediaType.parseMediaType("text/css");
     private static final MediaType TEXT_HTML = MediaType.parseMediaType("text/html");
     private static final MediaType TEXT_PLAIN = MediaType.parseMediaType("text/plain");
-    
+
+    /** 文件扩展名 → MediaType 映射表 */
     private static final Map<String, MediaType> MIME_TYPES;
-    
+
     static {
-        Map<String, MediaType> map = new HashMap<>();
+        Map<String, MediaType> map = new HashMap<>(16);
         map.put("js", APPLICATION_JAVASCRIPT);
         map.put("mjs", APPLICATION_JAVASCRIPT);
         map.put("cjs", APPLICATION_JAVASCRIPT);
@@ -44,6 +53,7 @@ public class ModuleProxyController {
     
     @GetMapping
     public ResponseEntity<?> proxyModule(@RequestParam String path) {
+        log.info("[ModuleProxy] path={}", path);
         try {
             // 移除开头的斜杠
             String filePath = path.startsWith("/") ? path.substring(1) : path;
@@ -93,17 +103,12 @@ public class ModuleProxyController {
             }
             
             // 禁止缓存
-            headers.setCacheControl(CacheControl.noCache().noStore().mustRevalidate());
+            headers.setCacheControl("no-cache, no-store, must-revalidate");
             headers.setPragma("no-cache");
             headers.setExpires(0);
             
             // 读取文件内容
-            byte[] fileContent;
-            if ("wasm".equals(extension)) {
-                fileContent = Files.readAllBytes(fullPath);
-            } else {
-                fileContent = Files.readAllBytes(fullPath);
-            }
+            byte[] fileContent = Files.readAllBytes(fullPath);
             
             return ResponseEntity.ok()
                     .headers(headers)

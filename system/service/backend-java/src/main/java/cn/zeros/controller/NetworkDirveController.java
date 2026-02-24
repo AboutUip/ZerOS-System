@@ -63,6 +63,7 @@ public class NetworkDirveController {
             @RequestParam(required = false) String programName,
             @RequestParam(required = false) String host,
             @RequestParam(required = false) String data) {
+        log.info("[NetworkDirve] action={} port={}", action, port);
 
         return switch (action) {
             case "register" -> {

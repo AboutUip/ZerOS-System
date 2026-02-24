@@ -55,6 +55,7 @@ public class SparkAiProxyController {
     @PostMapping
     @SuppressWarnings("unchecked")
     public Mono<ResponseEntity<byte[]>> proxy(@RequestBody Map<String, Object> body) {
+        log.info("[SparkAiProxy] proxy request");
         // 从请求体中提取鉴权信息
         Map<String, Object> auth = null;
         if (body.containsKey("_auth") && body.get("_auth") instanceof Map) {

@@ -82,6 +82,7 @@ public class BrowserProxyController {
             @RequestParam String url,
             @RequestBody(required = false) byte[] requestBody,
             @RequestHeader HttpHeaders requestHeaders) {
+        log.info("[BrowserProxy] url={}", url);
 
         // 自动解码多层 URL 编码（最多 5 层）
         String targetUrl = decodeUrl(url);
@@ -223,7 +224,7 @@ public class BrowserProxyController {
 
             return doc.html();
         } catch (Exception e) {
-            log.debug("HTML 重写失败，返回原始内容: {}", e.getMessage());
+            log.info("HTML 重写失败，返回原始内容: {}", e.getMessage());
             return html;
         }
     }

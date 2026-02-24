@@ -31,7 +31,9 @@ import java.util.Map;
  */
 public final class PermissionConstants {
 
-    private PermissionConstants() {}
+    private PermissionConstants() {
+        throw new UnsupportedOperationException("工具类不允许实例化");
+    }
 
     /**
      * 高风险权限列表

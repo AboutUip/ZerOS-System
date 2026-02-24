@@ -4,6 +4,7 @@ import cn.zeros.enums.DiskManagerActionType;
 import cn.zeros.model.ActionContext;
 import cn.zeros.model.ApiResponse;
 import cn.zeros.service.IDiskManagerService;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -18,6 +19,7 @@ import java.util.function.Function;
  * @author zeros
  * @date 2026-01-16
  */
+@Slf4j
 @RestController
 @RequestMapping("/DISKMANAGER")
 public class DiskManagerController {
@@ -85,6 +87,7 @@ public class DiskManagerController {
         }
 
         try {
+            log.info("执行磁盘管理操作: {}", actionType.getDescription());
             // 执行操作
             Function<ActionContext, Map<String, Object>> executor = executors.get(actionType);
             Map<String, Object> result = executor.apply(ctx);
@@ -94,13 +97,16 @@ public class DiskManagerController {
             return ResponseEntity.ok(ApiResponse.success(message, result));
 
         } catch (IllegalArgumentException e) {
+            log.warn("磁盘管理参数异常: {}", e.getMessage());
             return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
         } catch (RuntimeException e) {
             // 处理包装的 IOException
             Throwable cause = e.getCause();
             if (cause instanceof IOException) {
+                log.error("磁盘管理 IO 异常: {}", cause.getMessage(), cause);
                 return ResponseEntity.internalServerError().body(ApiResponse.error(cause.getMessage()));
             }
+            log.error("磁盘管理系统异常: {}", e.getMessage(), e);
             return ResponseEntity.internalServerError().body(ApiResponse.error(e.getMessage()));
         }
     }

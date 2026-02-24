@@ -75,6 +75,7 @@ public class DiskStaticFileController {
         // 提取 /DISK 之后的相对路径
         String fullPath = request.getServletPath();
         String relativePath = fullPath.replaceFirst("^/DISK/", "");
+        log.info("[DISK] serveFile {}", relativePath);
 
         if (relativePath.isBlank() || relativePath.contains("..")) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();

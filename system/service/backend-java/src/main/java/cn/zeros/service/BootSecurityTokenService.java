@@ -11,8 +11,11 @@ import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.*;
 import java.util.function.Consumer;
 
@@ -304,21 +307,21 @@ public class BootSecurityTokenService {
 
     private String sha256(String input) {
         try {
-            java.security.MessageDigest digest = java.security.MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest(input.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(input.getBytes(StandardCharsets.UTF_8));
             return bytesToHex(hash);
-        } catch (Exception e) {
-            throw new RuntimeException("SHA-256 not available", e);
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 算法不可用", e);
         }
     }
 
     private String md5(String input) {
         try {
-            java.security.MessageDigest digest = java.security.MessageDigest.getInstance("MD5");
-            byte[] hash = digest.digest(input.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            MessageDigest digest = MessageDigest.getInstance("MD5");
+            byte[] hash = digest.digest(input.getBytes(StandardCharsets.UTF_8));
             return bytesToHex(hash);
-        } catch (Exception e) {
-            throw new RuntimeException("MD5 not available", e);
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("MD5 算法不可用", e);
         }
     }
 

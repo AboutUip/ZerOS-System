@@ -269,13 +269,13 @@ public enum ActionType {
             Object value = paramsAndNames[i];
             String name = (String) paramsAndNames[i + 1];
             if (value == null || (value instanceof String && ((String) value).isEmpty())) {
-                if (missing.length() > 0) {
+                if (!missing.isEmpty()) {
                     missing.append(", ");
                 }
                 missing.append(name);
             }
         }
-        if (missing.length() > 0) {
+        if (!missing.isEmpty()) {
             throw new BusinessException(ErrorCode.PARAM_MISSING, "缺少必要参数: " + missing);
         }
     }

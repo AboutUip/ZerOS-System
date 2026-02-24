@@ -3,11 +3,10 @@ package cn.zeros.controller;
 import cn.zeros.model.Announcement;
 import cn.zeros.model.ApiResponse;
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -16,7 +15,6 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.text.SimpleDateFormat;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -24,16 +22,18 @@ import java.util.Map;
 /**
  * 测试控制器
  * 用于验证 Spring 服务是否正常运行
- * 访问地址: http://localhost:8089/system/service/test
- * 
+ * 访问地址：http://localhost:8089/system/service/test
+ *
  * @author zeros
  * @date 2026-01-16
  */
+@Slf4j
 @RestController
 @RequestMapping("/test")
-@Slf4j
+@RequiredArgsConstructor
 public class TestController {
 
+    private final ObjectMapper objectMapper;
 
     private static final String ANNOUNCEMENT_FILE_PATH = "announcement/post.json";
 
@@ -92,8 +92,11 @@ public class TestController {
         }
     }
     
+    /**
+     * 处理 /test/handle 的 POST 请求（预留占位）
+     */
     @PostMapping("/handle")
-    public ResponseEntity<Void> handleOptions() {
+    public ResponseEntity<Void> handlePost() {
         return ResponseEntity.ok().build();
     }
 
@@ -113,12 +116,10 @@ public class TestController {
                 return ResponseEntity.ok(ApiResponse.success("无公告", empty));
             }
 
-            // 2. 读取并解析JSON
+            // 2. 读取并解析 JSON
             String jsonContent = Files.readString(file.toPath(), StandardCharsets.UTF_8);
-            ObjectMapper mapper = new ObjectMapper();
-            mapper.setDateFormat(new SimpleDateFormat("yyyy-MM-dd HH:mm:ss"));
-
-            Announcement announcement = mapper.readValue(jsonContent, Announcement.class);
+            objectMapper.setDateFormat(new SimpleDateFormat("yyyy-MM-dd HH:mm:ss"));
+            Announcement announcement = objectMapper.readValue(jsonContent, Announcement.class);
 
             // 3. 直接构建您需要的data结构
             Map<String, Object> data = getStringObjectMap(announcement, file);

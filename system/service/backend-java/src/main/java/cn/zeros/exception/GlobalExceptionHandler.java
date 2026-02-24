@@ -108,7 +108,7 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(NoResourceFoundException.class)
     public ResponseEntity<ApiResponse<?>> handleNoResourceFound(NoResourceFoundException e) {
-        log.debug("资源未找到: {}", e.getMessage());
+        log.info("资源未找到: {}", e.getMessage());
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(ApiResponse.error("404", "资源未找到: " + e.getResourcePath()));
     }
@@ -118,7 +118,7 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(NoHandlerFoundException.class)
     public ResponseEntity<ApiResponse<?>> handleNoHandlerFound(NoHandlerFoundException e) {
-        log.debug("路径未找到: {} {}", e.getHttpMethod(), e.getRequestURL());
+        log.info("路径未找到: {} {}", e.getHttpMethod(), e.getRequestURL());
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(ApiResponse.error("404", "路径未找到: " + e.getRequestURL()));
     }

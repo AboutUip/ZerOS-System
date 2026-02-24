@@ -7,6 +7,7 @@ import cn.zeros.service.IDiskManagerService;
 import cn.zeros.util.DiskUtil;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -25,6 +26,7 @@ import java.util.zip.ZipInputStream;
  * @author zeros
  * @date 2026-01-16
  */
+@Slf4j
 @Service
 public class DiskManagerServiceImpl implements IDiskManagerService {
 
@@ -38,6 +40,7 @@ public class DiskManagerServiceImpl implements IDiskManagerService {
 
     @Override
     public Map<String, Object> checkPartition(String partition) {
+        log.info("[DiskMgr] checkPartition {}", partition);
         String diskLetter = DiskUtil.requireValidDiskLetter(partition);
         Path partitionPath = diskConfig.getPartitionPath(diskLetter);
 
@@ -81,6 +84,7 @@ public class DiskManagerServiceImpl implements IDiskManagerService {
 
     @Override
     public Map<String, Object> createPartition(String partition) throws IOException {
+        log.info("[DiskMgr] createPartition {}", partition);
         String diskLetter = DiskUtil.requireValidDiskLetter(partition);
         Path partitionPath = diskConfig.getPartitionPath(diskLetter);
 
@@ -116,6 +120,7 @@ public class DiskManagerServiceImpl implements IDiskManagerService {
 
     @Override
     public Map<String, Object> deletePartition(String partition, boolean force) throws IOException {
+        log.info("[DiskMgr] deletePartition {} force={}", partition, force);
         String diskLetter = DiskUtil.requireValidDiskLetter(partition);
         DiskUtil.requireNotSystemPartition(diskLetter, "删除");
 
@@ -155,6 +160,7 @@ public class DiskManagerServiceImpl implements IDiskManagerService {
 
     @Override
     public Map<String, Object> mergePartitions(String source, String target, boolean deleteSource) throws IOException {
+        log.info("[DiskMgr] mergePartitions {} -> {} deleteSource={}", source, target, deleteSource);
         String sourceLetter = DiskUtil.requireValidDiskLetter(source);
         String targetLetter = DiskUtil.requireValidDiskLetter(target);
 
@@ -215,6 +221,7 @@ public class DiskManagerServiceImpl implements IDiskManagerService {
 
     @Override
     public Map<String, Object> listPartitions() {
+        log.info("[DiskMgr] listPartitions");
         Path basePath = diskConfig.getDiskBasePath();
 
         if (!Files.isDirectory(basePath)) {
@@ -297,11 +304,13 @@ public class DiskManagerServiceImpl implements IDiskManagerService {
 
     @Override
     public Map<String, Object> readDiskData() throws IOException {
+        log.info("[DiskMgr] readDiskData");
         return readDiskDataInternal();
     }
 
     @Override
     public Map<String, Object> syncDiskData() throws IOException {
+        log.info("[DiskMgr] syncDiskData");
         Path diskDataFile = getDiskDataFilePath();
 
         // 读取现有配置
@@ -608,6 +617,7 @@ public class DiskManagerServiceImpl implements IDiskManagerService {
 
     @Override
     public Map<String, Object> formatPartition(String partition, boolean quick) throws IOException {
+        log.info("[DiskMgr] formatPartition {} quick={}", partition, quick);
         String diskLetter = DiskUtil.requireValidDiskLetter(partition);
         DiskUtil.requireNotSystemPartition(diskLetter, "格式化");
 
@@ -642,6 +652,7 @@ public class DiskManagerServiceImpl implements IDiskManagerService {
 
     @Override
     public Map<String, Object> resizePartition(String partition, long newSize) throws IOException {
+        log.info("[DiskMgr] resizePartition {} newSize={}", partition, newSize);
         String diskLetter = DiskUtil.requireValidDiskLetter(partition);
         Path partitionPath = diskConfig.getPartitionPath(diskLetter);
 
@@ -714,6 +725,7 @@ public class DiskManagerServiceImpl implements IDiskManagerService {
 
     @Override
     public Map<String, Object> checkHealth() {
+        log.info("[DiskMgr] checkHealth");
         Path basePath = diskConfig.getDiskBasePath();
 
         Map<String, Object> result = new LinkedHashMap<>();
@@ -823,6 +835,7 @@ public class DiskManagerServiceImpl implements IDiskManagerService {
 
     @Override
     public Map<String, Object> clonePartition(String source, String target) throws IOException {
+        log.info("[DiskMgr] clonePartition {} -> {}", source, target);
         String sourceLetter = DiskUtil.requireValidDiskLetter(source);
         String targetLetter = DiskUtil.requireValidDiskLetter(target);
 

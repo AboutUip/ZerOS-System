@@ -57,6 +57,7 @@ public class ProgramPermissionsController {
             @RequestParam(required = false) String upid,
             @RequestBody(required = false) Map<String, Object> body) {
 
+        log.info("[ProgramPermissions] action={}", action);
         // POST body 作为参数补充
         if (body != null) {
             if (action == null) action = (String) body.get("action");

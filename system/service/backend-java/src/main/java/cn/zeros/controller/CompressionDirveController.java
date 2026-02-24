@@ -73,8 +73,7 @@ public class CompressionDirveController {
         );
     }
 
-    @GetMapping
-    @PostMapping
+    @RequestMapping(method = {RequestMethod.GET, RequestMethod.POST})
     public ResponseEntity<ApiResponse<?>> handleRequest(
             @RequestParam String action,
             @RequestParam(required = false) String sourcePath,
@@ -90,7 +89,7 @@ public class CompressionDirveController {
             throw new BusinessException(ErrorCode.UNKNOWN_ACTION);
         }
 
-        log.debug("执行压缩操作: {}", actionType.getDescription());
+        log.info("执行压缩操作: {}", actionType.getDescription());
 
         // 验证参数
         actionType.validate(ctx);

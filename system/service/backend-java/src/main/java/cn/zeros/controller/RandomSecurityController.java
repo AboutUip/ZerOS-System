@@ -64,6 +64,7 @@ public class RandomSecurityController {
             @RequestParam(required = false) List<String> permissions,
             @RequestBody(required = false) Map<String, Object> body) {
 
+        log.info("[RandomSecurity] action={} type={}", action, type);
         // POST 请求体中的参数作为补充（URL 参数优先）
         if (body != null) {
             if (action == null) action = (String) body.get("action");

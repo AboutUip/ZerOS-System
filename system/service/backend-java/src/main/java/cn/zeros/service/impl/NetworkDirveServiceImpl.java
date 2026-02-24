@@ -242,7 +242,7 @@ public class NetworkDirveServiceImpl implements INetworkDirveService {
                 client.close();
             }
         } catch (IOException e) {
-            log.debug("检查端口 {} 时出错: {}", port, e.getMessage());
+            log.info("检查端口 {} 时出错: {}", port, e.getMessage());
         }
 
         Map<String, Object> data = new LinkedHashMap<>();
@@ -337,7 +337,7 @@ public class NetworkDirveServiceImpl implements INetworkDirveService {
                                     ports.add(info);
                                 }
                             } catch (IOException e) {
-                                log.debug("读取端口配置失败: {}", p, e);
+                                log.info("读取端口配置失败: {}", p, e);
                             }
                         });
             }
@@ -382,7 +382,7 @@ public class NetworkDirveServiceImpl implements INetworkDirveService {
         try {
             Files.deleteIfExists(path);
         } catch (IOException e) {
-            log.debug("删除文件失败: {}", path, e);
+            log.info("删除文件失败: {}", path, e);
         }
     }
 
