@@ -428,6 +428,9 @@ PermissionManager.clearAuditLog(true);
 - `DRAG_ELEMENT` - 拖拽元素
 - `DRAG_FILE` - 拖拽文件
 - `DRAG_WINDOW` - 拖拽窗口
+- `MULTITHREADING_CREATE` - 创建线程
+- `MULTITHREADING_EXECUTE` - 执行多线程任务
+- `PROCESS_BACKGROUND` - 申请转为后台进程
 
 ### 特殊权限（需要用户确认）
 
@@ -444,20 +447,18 @@ PermissionManager.clearAuditLog(true);
 - `THEME_WRITE` - 修改主题
 - `DESKTOP_MANAGE` - 管理桌面
 - `DESKTOP_SHORTCUT` - 创建/删除桌面快捷方式（普通权限，自动授予）
-- `MULTITHREADING_CREATE` - 创建线程
-- `MULTITHREADING_EXECUTE` - 执行多线程任务
 - `GEOGRAPHY_LOCATION` - 获取地理位置
 - `CRYPT_GENERATE_KEY` - 生成密钥对
 - `CRYPT_IMPORT_KEY` - 导入密钥对
 - `CRYPT_DELETE_KEY` - 删除密钥
 - `CRYPT_ENCRYPT` - 加密数据
 - `CRYPT_DECRYPT` - 解密数据
+- `PROCESS_MANAGE` - 管理进程（启动/终止其他程序）
 
 ### 危险权限（需要明确授权，仅管理员可授予）
 
 危险权限每次使用时都可能需要用户确认，需要用户明确授权。**只有管理员用户才能授权危险权限给程序，普通用户无法授权。**
 
-- `PROCESS_MANAGE` - 管理进程（启动/终止其他程序）
 - `SYSTEM_STORAGE_WRITE_USER_CONTROL` - 写入用户控制相关存储（`userControl.*` 键，**注意：`userControl.users` 键只能由内核模块写入，用户程序即使获得此权限也无法写入该键**）
 - `SYSTEM_STORAGE_WRITE_PERMISSION_CONTROL` - 写入权限控制相关存储（`permissionControl.*`、`permissionManager.permissions` 键）
 

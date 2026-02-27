@@ -110443,7 +110443,26 @@ const getLikeMusicListIds = (uid2) => request(
 const getUserPlayList = (uid2) => request(`/user/playlist?uid=${uid2}`, "get");
 const getMusicUrl = (id) => request(`/song/url/v1?id=${id}&level=lossless`, "get");
 const getPlayListDetail = (id) => request(`/playlist/detail?id=${id}`, "get");
-const getMusicDetail = (ids) => request(`/song/detail?ids=${ids}`, "get");
+const getMusicDetail = async (ids) => {
+  const maxBatchSize = 500;
+  const idArray = ids.split(",").filter(Boolean);
+  
+  if (idArray.length <= maxBatchSize) {
+    return request(`/song/detail?ids=${ids}`, "get");
+  }
+  
+  const batches = [];
+  for (let i = 0; i < idArray.length; i += maxBatchSize) {
+    batches.push(idArray.slice(i, i + maxBatchSize).join(","));
+  }
+  
+  const results = await Promise.all(
+    batches.map(batchIds => request(`/song/detail?ids=${batchIds}`, "get"))
+  );
+  
+  const combinedSongs = results.flatMap(result => result.songs || []);
+  return { songs: combinedSongs };
+};
 const likeMusicApi = (id, like = true) => request("/like", { id, like }, "get");
 const getLyric = (id) => request(`/lyric/new?id=${id}`, "get");
 const getUserCloud = (limit, offset2) => request("/user/cloud", "get", {
@@ -116867,12 +116886,20 @@ const _sfc_main$e = /* @__PURE__ */ defineComponent$1({
     const props2 = __props;
     const music = useMusicAction();
     const flags2 = useFlags();
+    const getDuration = () => {
+      const dur = window.$audio?.el?.duration;
+      return (typeof dur === 'number' && isFinite(dur)) ? dur : 0;
+    };
     const model = computed({
       get() {
-        return music.state.currentTime / window.$audio?.el.duration * 100;
+        const dur = getDuration();
+        return dur > 0 ? (music.state.currentTime / dur * 100) : 0;
       },
       set(val) {
-        window.$audio.time = val * window.$audio?.el.duration / 100;
+        const dur = getDuration();
+        if (dur > 0) {
+          window.$audio.time = val * dur / 100;
+        }
       }
     });
     return (_ctx, _cache) => {
@@ -117099,15 +117126,6 @@ const _sfc_main$d = /* @__PURE__ */ defineComponent$1({
               }), 256))
             ])
           ]),
-          isLike.value ? (openBlock(), createElementBlock("i", {
-            key: 0,
-            onClick: _cache[0] || (_cache[0] = ($event) => unref(likeMusic)(id.value, false)),
-            class: "iconfont icon-xihuan1"
-          })) : (openBlock(), createElementBlock("i", {
-            key: 1,
-            onClick: _cache[1] || (_cache[1] = ($event) => unref(likeMusic)(id.value)),
-            class: "iconfont icon-xihuan"
-          }))
         ], 512), [
           [vShow, !unref(flags2).isOpenDetail]
         ]),
@@ -117165,25 +117183,34 @@ const _sfc_main$c = /* @__PURE__ */ defineComponent$1({
   props: {
     isPlay: { type: Boolean },
     orderStatusVal: {},
-    orderStatus: {}
+    orderStatus: {},
+    isLike: { type: Boolean },
+    songId: {}
   },
-  emits: ["setOrderHandler", "cutSong", "pause", "play"],
+  emits: ["setOrderHandler", "cutSong", "pause", "play", "like"],
   setup(__props, { emit: __emit }) {
     const props2 = __props;
     const emit2 = __emit;
+    const store = useUserInfo();
+    const isLike = computed(() => {
+      return store.userLikeIds.includes(props2.songId);
+    });
+    const id = computed(() => {
+      return props2.songId;
+    });
+    const { likeMusic } = useMusic();
     return (_ctx, _cache) => {
       return openBlock(), createElementBlock("div", _hoisted_1$9, [
         createBaseVNode("div", _hoisted_2$7, [
-          (openBlock(), createElementBlock("svg", {
-            onClick: _cache[0] || (_cache[0] = ($event) => emit2("setOrderHandler")),
-            style: { "width": "20px" },
-            class: normalizeClass(["icon", "iconfont", props2.orderStatus[__props.orderStatusVal]]),
-            "aria-hidden": "true"
-          }, [
-            createBaseVNode("use", {
-              "xlink:href": "#" + props2.orderStatus[__props.orderStatusVal]
-            }, null, 8, _hoisted_3$6)
-          ], 2)),
+          isLike.value ? (openBlock(), createElementBlock("i", {
+            key: 0,
+            onClick: _cache[5] || (_cache[5] = ($event) => unref(likeMusic)(id.value, false)),
+            class: "iconfont icon-xihuan1"
+          })) : (openBlock(), createElementBlock("i", {
+            key: 1,
+            onClick: _cache[6] || (_cache[6] = ($event) => unref(likeMusic)(id.value)),
+            class: "iconfont icon-xihuan"
+          })),
           createBaseVNode("i", {
             onClick: _cache[1] || (_cache[1] = ($event) => emit2("cutSong", false)),
             class: "iconfont cut icon-shangyishou"
@@ -117203,7 +117230,17 @@ const _sfc_main$c = /* @__PURE__ */ defineComponent$1({
           createBaseVNode("i", {
             onClick: _cache[4] || (_cache[4] = ($event) => emit2("cutSong", true)),
             class: "iconfont cut icon-xiayishou"
-          })
+          }),
+          (openBlock(), createElementBlock("svg", {
+            onClick: _cache[0] || (_cache[0] = ($event) => emit2("setOrderHandler")),
+            style: { "width": "20px" },
+            class: normalizeClass(["icon", "iconfont", props2.orderStatus[__props.orderStatusVal]]),
+            "aria-hidden": "true"
+          }, [
+            createBaseVNode("use", {
+              "xlink:href": "#" + props2.orderStatus[__props.orderStatusVal]
+            }, null, 8, _hoisted_3$6)
+          ], 2))
         ])
       ]);
     };
@@ -118163,7 +118200,7 @@ const _sfc_main$9 = /* @__PURE__ */ defineComponent$1({
     const isPlay = ref(false);
     const audio = ref();
     const music = useMusicAction();
-    useFlags();
+    const flags2 = useFlags();
     const transitionIsPlay = ref(false);
     const { addListener, executeListener } = useListener(audio);
     const { getPlayListDetailFn } = usePlayList();
@@ -118172,6 +118209,9 @@ const _sfc_main$9 = /* @__PURE__ */ defineComponent$1({
     });
     function click(time, index) {
       audio.value.currentTime = time;
+      if (!isPlay.value) {
+        play();
+      }
     }
     function seeked() {
       player.syncIndex();
@@ -118310,8 +118350,15 @@ const _sfc_main$9 = /* @__PURE__ */ defineComponent$1({
     __expose(exposeObj);
     return (_ctx, _cache) => {
       return openBlock(), createElementBlock(Fragment, null, [
-        createBaseVNode("div", _hoisted_1$6, [
+        createBaseVNode("div", {
+          class: "bottom-container",
+          onClick: (e) => {
+            if (e.target.closest('.iconfont') || e.target.closest('.el-icon') || e.target.closest('.v-slider')) return;
+            flags2.isOpenDetail = !flags2.isOpenDetail;
+          }
+        }, [
           createBaseVNode("audio", {
+            onClick: (e) => e.stopPropagation(),
             onTimeupdate: timeupdate,
             onEnded: end,
             onSeeked: seeked,
@@ -118328,11 +118375,12 @@ const _sfc_main$9 = /* @__PURE__ */ defineComponent$1({
             orderStatus,
             isPlay: isPlay.value,
             orderStatusVal: unref(music).state.orderStatusVal,
+            songId: props2.songs?.id,
             onPlay: play,
             onPause: pause,
             onCutSong: _cache[0] || (_cache[0] = (val) => emit2("cutSong", val)),
             onSetOrderHandler: setOrderHandler
-          }, null, 8, ["isPlay", "orderStatusVal"]),
+          }, null, 8, ["isPlay", "orderStatusVal", "songId"]),
           createVNode(DetailRight, {
             currentTime: unref(music).state.currentTime,
             songs: props2.songs,

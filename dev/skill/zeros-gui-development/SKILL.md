@@ -1,6 +1,6 @@
 ---
 name: zeros-gui-development
-description: Guide for developing GUI (Graphical User Interface) programs in ZerOS. Covers window management, event handling, theme compatibility, background mode, and best practices.
+description: Guide for developing GUI (Graphical User Interface) programs in ZerOS. Use when creating GUI applications, managing windows with GUIManager, handling events with EventManager, developing graphical interfaces in ZerOS. Covers singleton pattern issues, event cleanup, responsive layout with ResizeObserver, touch support for mobile devices, window lifecycle, theme compatibility, and resource management.
 ---
 
 # ZerOS GUI Program Development Guide
@@ -57,6 +57,14 @@ GUI programs in ZerOS are graphical applications that create windows managed by 
         },
 
         __init__: async function(pid, initArgs) {
+            // Re-initialize all instance properties (required for singleton programs)
+            this.pid = null;
+            this.window = null;
+            this.windowId = null;
+            this._kernelAPI = null;
+            this.eventHandlers = [];
+            this._resizeObserver = null;
+            
             this.pid = pid;
             this._kernelAPI = (initArgs && initArgs.kernelAPI) || null;
 
@@ -1081,7 +1089,43 @@ this._buildUI();
 - Cancel any timers (`setInterval`, `setTimeout`)
 - Unsubscribe from theme changes, language changes, etc.
 
-### 5. Error Handling
+### 5. Singleton Pattern Issue (IMPORTANT)
+
+GUI programs that export as singletons (e.g., `window.MYAPP = MYAPP`) have a critical issue: when the program is closed and reopened, the previous instance's properties may cause errors.
+
+**Problem:**
+```javascript
+// Program exports as singleton
+window.MYAPP = MYAPP;
+
+// First launch: works fine
+// After close and reopen: _eventHandlers is null, push() fails
+```
+
+**Solution:** Re-initialize essential properties at the beginning of `__init__`:
+
+```javascript
+__init__: async function(pid, initArgs) {
+    // Re-initialize all instance properties (required for singleton programs)
+    this.pid = null;
+    this.window = null;
+    this.windowId = null;
+    this._eventHandlers = [];
+    this._resizeObserver = null;
+    this._currentCellSize = 16;
+    // ... other properties
+    
+    this.pid = pid;
+    // ... rest of initialization
+}
+```
+
+**Key Points:**
+- Always re-initialize `_eventHandlers = []` at the start of `__init__`
+- Re-initialize any other array/object properties that were set to `null` in `__exit__`
+- This ensures the program works correctly even after being closed and reopened
+
+### 6. Error Handling
 
 - Always wrap kernel API calls in `try-catch`
 - Use `KernelLogger` for logging (never use `console.log`)
@@ -1108,6 +1152,134 @@ this._buildUI();
 - Use `requestAnimationFrame` for animations
 - Debounce/throttle frequent events (scroll, resize, etc.)
 - Lazy load heavy content
+
+### 10. Responsive Layout & Mobile Support
+
+GUI programs should support responsive layout and mobile touch events.
+
+#### ResizeObserver for Responsive Layout
+
+Use `ResizeObserver` to detect container size changes (e.g., window maximize/restore):
+
+```javascript
+// In __init__
+_setupResizeHandler: function() {
+    // Use ResizeObserver to observe container size changes
+    // This is important for window maximize/restore
+    if (typeof ResizeObserver !== 'undefined') {
+        const container = this.window.querySelector('.myapp-content');
+        if (container) {
+            this._resizeObserver = new ResizeObserver((entries) => {
+                for (const entry of entries) {
+                    this._handleResize();
+                    break;
+                }
+            });
+            this._resizeObserver.observe(container);
+        }
+    }
+    
+    // Also listen to window transitionend for smooth animations
+    if (this.window) {
+        this._addEventHandler(this.window, 'transitionend', (e) => {
+            if (e.propertyName === 'width' || e.propertyName === 'height') {
+                this._handleResize();
+            }
+        });
+    }
+},
+
+_handleResize: function() {
+    // Handle resize - recalculate layouts, update cell sizes, etc.
+    const container = this.window.querySelector('.myapp-content');
+    if (!container) return;
+    
+    const newWidth = container.clientWidth;
+    const newHeight = container.clientHeight;
+    
+    // Update UI based on new size
+    this._updateLayout(newWidth, newHeight);
+},
+```
+
+#### Mobile Touch Support
+
+For programs that need touch input (e.g., drawing apps):
+
+```javascript
+_getTouchPos: function(e) {
+    const rect = this.canvas.getBoundingClientRect();
+    let clientX, clientY;
+    
+    // Handle both touch and mouse events
+    if (e.touches && e.touches.length > 0) {
+        clientX = e.touches[0].clientX;
+        clientY = e.touches[0].clientY;
+    } else if (e.changedTouches && e.changedTouches.length > 0) {
+        clientX = e.changedTouches[0].clientX;
+        clientY = e.changedTouches[0].clientY;
+    } else {
+        clientX = e.clientX;
+        clientY = e.clientY;
+    }
+    
+    return {
+        x: clientX - rect.left,
+        y: clientY - rect.top
+    };
+},
+
+_bindEvents: function() {
+    // Pointer events (handles both mouse and touch)
+    this._addEventHandler(this.canvas, 'pointerdown', (e) => {
+        e.preventDefault();
+        this._handlePointerDown(e);
+    });
+    
+    this._addEventHandler(this.canvas, 'pointermove', (e) => {
+        e.preventDefault();
+        this._handlePointerMove(e);
+    });
+    
+    this._addEventHandler(this.canvas, 'pointerup', (e) => {
+        this._handlePointerUp(e);
+    });
+    
+    // Touch events for better mobile support
+    this._addEventHandler(this.canvas, 'touchstart', (e) => e.preventDefault(), { passive: false });
+    this._addEventHandler(this.canvas, 'touchmove', (e) => e.preventDefault(), { passive: false });
+    this._addEventHandler(this.canvas, 'touchend', (e) => e.preventDefault(), { passive: false });
+},
+
+_addEventHandler: function(element, event, handler, options = {}) {
+    element.addEventListener(event, handler, options);
+    this._eventHandlers.push({ element, event, handler, options });
+},
+```
+
+#### Cleanup in __exit__
+
+```javascript
+__exit__: async function() {
+    // Clean up event handlers
+    if (this._eventHandlers && Array.isArray(this._eventHandlers)) {
+        this._eventHandlers.forEach(({ element, event, handler, options }) => {
+            if (element && typeof element.removeEventListener === 'function') {
+                element.removeEventListener(event, handler, options);
+            }
+        });
+        this._eventHandlers = null;
+    }
+    
+    // Clean up ResizeObserver
+    if (this._resizeObserver) {
+        this._resizeObserver.disconnect();
+        this._resizeObserver = null;
+    }
+    
+    // ... other cleanup
+}
+```
 
 ### 11. Accessibility
 

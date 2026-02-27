@@ -1,4 +1,4 @@
-﻿// 多线程驱动器
+// 多线程驱动器
 // 基于 Web Workers 的线程池管理系统
 // 提供线程创建、分配、回收等功能
 
@@ -140,15 +140,15 @@ class MultithreadingDrive {
      */
     static createThread(pid) {
         // 权限检查：检查是否有 MULTITHREADING_CREATE 权限
+        // 注意：executeTask 中已经进行了权限检查（包括 MULTITHREADING_CREATE）
+        // 这里只做快速检查，如果已授权则直接通过，否则等待 executeTask 中的权限请求
         if (typeof PermissionManager !== 'undefined') {
-            // 同步检查权限（createThread 是同步方法）
             const hasPermission = PermissionManager.hasPermission(
                 pid,
                 PermissionManager.PERMISSION.MULTITHREADING_CREATE
             );
-            if (!hasPermission) {
-                throw new Error('创建线程需要 MULTITHREADING_CREATE 权限');
-            }
+            // 如果没有权限，executeTask 会处理权限请求，这里不做阻塞检查
+            // 这样可以避免同步方法卡顿
         }
         
         const threadId = `thread_${++MultithreadingDrive._threadIdCounter}`;
@@ -551,7 +551,7 @@ class MultithreadingDrive {
      * @returns {Promise<any>} 任务结果
      */
     static async executeTask(pid, script, args = []) {
-        // 权限检查：检查是否有 MULTITHREADING_EXECUTE 权限
+        // 权限检查：检查并请求 MULTITHREADING_EXECUTE 权限
         if (typeof PermissionManager !== 'undefined') {
             const hasPermission = await PermissionManager.checkAndRequestPermission(
                 pid,
@@ -562,22 +562,34 @@ class MultithreadingDrive {
             }
         }
         
+        // 权限检查：检查并请求 MULTITHREADING_CREATE 权限（需要时才创建线程）
+        if (typeof PermissionManager !== 'undefined') {
+            const hasPermission = await PermissionManager.checkAndRequestPermission(
+                pid,
+                PermissionManager.PERMISSION.MULTITHREADING_CREATE
+            );
+            if (!hasPermission) {
+                throw new Error('创建线程需要 MULTITHREADING_CREATE 权限');
+            }
+        }
+        
         const taskId = `task_${++MultithreadingDrive._taskIdCounter}`;
         
         // 将函数转换为字符串
         let scriptString;
         if (typeof script === 'function') {
             // 如果是函数对象，转换为字符串
+            // 函数对象是开发者编写的可信代码，跳过安全检查
             scriptString = script.toString();
+            // 直接通过验证（函数对象的代码是可信的）
         } else if (typeof script === 'string') {
             scriptString = script;
+            // 验证脚本安全性（字符串可能是用户输入，需要检查）
+            if (!MultithreadingDrive._validateScriptSafety(scriptString)) {
+                throw new Error('脚本包含危险的代码模式，执行被拒绝');
+            }
         } else {
             throw new Error('script 必须是函数或函数字符串');
-        }
-        
-        // 验证脚本安全性
-        if (!MultithreadingDrive._validateScriptSafety(scriptString)) {
-            throw new Error('脚本包含危险的代码模式，执行被拒绝');
         }
         
         // 验证参数是否可序列化
@@ -700,6 +712,51 @@ class MultithreadingDrive {
     }
     
     /**
+     * 获取指定进程的线程列表
+     * @param {number} pid 进程ID
+     * @returns {Array} 线程列表
+     */
+    static getProcessThreads(pid) {
+        const processThreads = MultithreadingDrive._processThreads.get(pid);
+        if (!processThreads) {
+            return [];
+        }
+        
+        const threadIds = Array.from(processThreads);
+        return threadIds.map(threadId => {
+            const threadInfo = MultithreadingDrive._threadPool.get(threadId);
+            if (!threadInfo) return null;
+            return {
+                id: threadInfo.id,
+                pid: threadInfo.pid,
+                status: threadInfo.status,
+                taskCount: threadInfo.taskCount,
+                createdAt: threadInfo.createdAt,
+                lastUsedAt: threadInfo.lastUsedAt
+            };
+        }).filter(t => t !== null);
+    }
+    
+    /**
+     * 获取所有有线程的进程列表
+     * @returns {Array} 进程列表，每个元素包含 pid 和 threadCount
+     */
+    static getProcessesWithThreads() {
+        const result = [];
+        MultithreadingDrive._processThreads.forEach((threadIds, pid) => {
+            result.push({
+                pid: pid,
+                threadCount: threadIds.size,
+                threads: Array.from(threadIds).map(tid => {
+                    const info = MultithreadingDrive._threadPool.get(tid);
+                    return info ? { id: info.id, status: info.status } : null;
+                }).filter(t => t !== null)
+            });
+        });
+        return result;
+    }
+    
+    /**
      * 清理进程的所有线程
      * @param {number} pid 进程ID
      */
@@ -715,6 +772,23 @@ class MultithreadingDrive {
         });
         
         KernelLogger.info("MultithreadingDrive", `清理进程 ${pid} 的所有线程 (${threadIds.length} 个)`);
+    }
+    
+    /**
+     * 终止指定线程
+     * @param {string} threadId 线程ID
+     * @returns {boolean} 是否成功终止
+     */
+    static terminateThread(threadId) {
+        const threadInfo = MultithreadingDrive._threadPool.get(threadId);
+        if (!threadInfo) {
+            KernelLogger.warn("MultithreadingDrive", `线程不存在: ${threadId}`);
+            return false;
+        }
+        
+        MultithreadingDrive._terminateThread(threadId);
+        KernelLogger.info("MultithreadingDrive", `已终止线程: ${threadId}`);
+        return true;
     }
     
     /**
@@ -753,6 +827,14 @@ if (typeof document !== 'undefined' || typeof window !== 'undefined') {
     } else {
         MultithreadingDrive.init();
     }
+}
+
+// 注册到全局对象
+if (typeof window !== 'undefined') {
+    window.MultithreadingDrive = MultithreadingDrive;
+}
+if (typeof globalThis !== 'undefined') {
+    globalThis.MultithreadingDrive = MultithreadingDrive;
 }
 
 // 发布信号

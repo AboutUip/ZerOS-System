@@ -622,11 +622,13 @@
             const tabResources = this._createTab(this._getText('TASKMANAGER_TAB_RESOURCES', '资源监控'), false);
             const tabSystem = this._createTab(this._getText('TASKMANAGER_TAB_SYSTEM', '系统信息'), false);
             const tabLogs = this._createTab(this._getText('TASKMANAGER_TAB_LOGS', 'API 调用记录'), false);
+            const tabThreads = this._createTab(this._getText('TASKMANAGER_TAB_THREADS', '线程监控'), false);
             
             tabs.appendChild(tabProcess);
             tabs.appendChild(tabResources);
             tabs.appendChild(tabSystem);
             tabs.appendChild(tabLogs);
+            tabs.appendChild(tabThreads);
             
             panel.appendChild(tabs);
             
@@ -655,18 +657,23 @@
             const processLogs = this._createProcessLogs();
             content.appendChild(processLogs);
             
+            // 线程监控面板
+            const threadMonitor = this._createThreadMonitor();
+            content.appendChild(threadMonitor);
+            
             panel.appendChild(content);
             
             // 存储引用
             this.detailContent = content;
-            this.tabs = { process: tabProcess, resources: tabResources, system: tabSystem, logs: tabLogs };
-            this.panels = { process: processDetail, resources: resourceMonitor, system: systemInfo, logs: processLogs };
+            this.tabs = { process: tabProcess, resources: tabResources, system: tabSystem, logs: tabLogs, threads: tabThreads };
+            this.panels = { process: processDetail, resources: resourceMonitor, system: systemInfo, logs: processLogs, threads: threadMonitor };
             
             // 标签页切换
             tabProcess.addEventListener('click', () => this._switchTab('process'));
             tabResources.addEventListener('click', () => this._switchTab('resources'));
             tabSystem.addEventListener('click', () => this._switchTab('system'));
             tabLogs.addEventListener('click', () => this._switchTab('logs'));
+            tabThreads.addEventListener('click', () => this._switchTab('threads'));
             
             return panel;
         },
@@ -728,6 +735,10 @@
                     // 如果切换到系统信息标签页，更新系统信息
                     if (key === 'system') {
                         this._updateSystemInfo();
+                    }
+                    // 如果切换到线程监控标签页，更新线程监控
+                    if (key === 'threads') {
+                        this._updateThreadMonitor();
                     }
                 } else {
                     panel.style.display = 'none';
@@ -846,6 +857,224 @@
             this.systemInfoContent = infoContainer;
             
             return panel;
+        },
+        
+        _createThreadMonitor: function() {
+            const panel = document.createElement('div');
+            panel.className = 'taskmanager-thread-monitor';
+            panel.style.cssText = `
+                display: none;
+                flex-direction: column;
+                height: 100%;
+            `;
+            
+            const toolbar = document.createElement('div');
+            toolbar.style.cssText = `
+                padding: 12px 16px;
+                border-bottom: 1px solid rgba(108, 142, 255, 0.2);
+                display: flex;
+                gap: 12px;
+                align-items: center;
+                flex-shrink: 0;
+            `;
+            
+            const refreshBtn = document.createElement('button');
+            refreshBtn.textContent = this._getText('TASKMANAGER_THREAD_REFRESH', '刷新');
+            refreshBtn.style.cssText = `
+                padding: 6px 16px;
+                border: 1px solid rgba(108, 142, 255, 0.3);
+                background: rgba(108, 142, 255, 0.1);
+                color: #e8ecf0;
+                border-radius: 4px;
+                cursor: pointer;
+                font-size: 12px;
+                transition: all 0.2s;
+            `;
+            refreshBtn.addEventListener('mouseenter', () => {
+                refreshBtn.style.background = 'rgba(108, 142, 255, 0.2)';
+            });
+            refreshBtn.addEventListener('mouseleave', () => {
+                refreshBtn.style.background = 'rgba(108, 142, 255, 0.1)';
+            });
+            refreshBtn.addEventListener('click', () => {
+                this._updateThreadMonitor();
+            });
+            toolbar.appendChild(refreshBtn);
+            
+            const statusLabel = document.createElement('span');
+            statusLabel.className = 'thread-status-label';
+            statusLabel.style.cssText = `
+                font-size: 12px;
+                color: #aab2c0;
+                margin-left: auto;
+            `;
+            toolbar.appendChild(statusLabel);
+            
+            panel.appendChild(toolbar);
+            
+            const content = document.createElement('div');
+            content.className = 'taskmanager-thread-content';
+            content.style.cssText = `
+                flex: 1;
+                overflow-y: auto;
+                padding: 16px;
+            `;
+            panel.appendChild(content);
+            
+            this.threadMonitorPanel = panel;
+            this.threadMonitorContent = content;
+            this.threadStatusLabel = statusLabel;
+            
+            return panel;
+        },
+        
+        _updateThreadMonitor: function() {
+            if (!this.threadMonitorContent) return;
+            
+            const content = this.threadMonitorContent;
+            content.innerHTML = '';
+            
+            let threadStatus = null;
+            
+            if (typeof MultithreadingDrive !== 'undefined') {
+                try {
+                    threadStatus = MultithreadingDrive.getPoolStatus();
+                } catch (e) {
+                    console.error('获取线程池状态失败:', e);
+                }
+            } else if (typeof ProcessManager !== 'undefined') {
+                try {
+                    threadStatus = ProcessManager.callKernelAPI(this.pid, 'Multithreading.getPoolStatus', []);
+                } catch (e) {
+                    console.error('通过 ProcessManager 获取线程池状态失败:', e);
+                }
+            }
+            
+            if (!threadStatus) {
+                const noData = document.createElement('div');
+                noData.style.cssText = `
+                    padding: 40px;
+                    text-align: center;
+                    color: #aab2c0;
+                `;
+                noData.innerHTML = `
+                    <div style="font-size: 24px; margin-bottom: 12px;">🧵</div>
+                    <div>${this._getText('TASKMANAGER_THREAD_UNAVAILABLE', '多线程模块不可用')}</div>
+                    <div style="font-size: 12px; margin-top: 8px; color: #71717a;">请确保 MultithreadingDrive 已加载</div>
+                `;
+                content.appendChild(noData);
+                
+                if (this.threadStatusLabel) {
+                    this.threadStatusLabel.textContent = '';
+                }
+                return;
+            }
+            
+            if (this.threadStatusLabel) {
+                this.threadStatusLabel.textContent = 
+                    `总线程: ${threadStatus.total} | 空闲: ${threadStatus.idle} | 忙碌: ${threadStatus.busy} | 队列: ${threadStatus.queueLength}`;
+            }
+            
+            const statsSection = document.createElement('div');
+            statsSection.style.cssText = `
+                display: grid;
+                grid-template-columns: repeat(4, 1fr);
+                gap: 12px;
+                margin-bottom: 20px;
+            `;
+            
+            const createStatCard = (title, value, color) => {
+                const card = document.createElement('div');
+                card.style.cssText = `
+                    background: rgba(108, 142, 255, 0.1);
+                    border: 1px solid rgba(108, 142, 255, 0.2);
+                    border-radius: 8px;
+                    padding: 16px;
+                    text-align: center;
+                `;
+                card.innerHTML = `
+                    <div style="font-size: 24px; font-weight: 600; color: ${color};">${value}</div>
+                    <div style="font-size: 12px; color: #aab2c0; margin-top: 4px;">${title}</div>
+                `;
+                return card;
+            };
+            
+            statsSection.appendChild(createStatCard('总线程', threadStatus.total, '#6c8eff'));
+            statsSection.appendChild(createStatCard('空闲', threadStatus.idle, '#4ade80'));
+            statsSection.appendChild(createStatCard('忙碌', threadStatus.busy, '#f59e0b'));
+            statsSection.appendChild(createStatCard('队列', threadStatus.queueLength, '#a78bfa'));
+            
+            content.appendChild(statsSection);
+            
+            const threadsTitle = document.createElement('h3');
+            threadsTitle.textContent = this._getText('TASKMANAGER_THREAD_LIST', '线程详情');
+            threadsTitle.style.cssText = `
+                color: #e8ecf0;
+                font-size: 14px;
+                margin-bottom: 12px;
+            `;
+            content.appendChild(threadsTitle);
+            
+            if (!threadStatus.threads || threadStatus.threads.length === 0) {
+                const noThreads = document.createElement('div');
+                noThreads.style.cssText = `
+                    padding: 20px;
+                    text-align: center;
+                    color: #aab2c0;
+                    font-size: 13px;
+                `;
+                noThreads.textContent = this._getText('TASKMANAGER_NO_THREADS', '暂无活动线程');
+                content.appendChild(noThreads);
+                return;
+            }
+            
+            const threadTable = document.createElement('table');
+            threadTable.style.cssText = `
+                width: 100%;
+                border-collapse: collapse;
+                font-size: 12px;
+            `;
+            threadTable.innerHTML = `
+                <thead>
+                    <tr style="border-bottom: 1px solid rgba(108, 142, 255, 0.2);">
+                        <th style="text-align: left; padding: 8px; color: #aab2c0;">线程 ID</th>
+                        <th style="text-align: left; padding: 8px; color: #aab2c0;">进程 PID</th>
+                        <th style="text-align: left; padding: 8px; color: #aab2c0;">状态</th>
+                        <th style="text-align: left; padding: 8px; color: #aab2c0;">任务数</th>
+                        <th style="text-align: left; padding: 8px; color: #aab2c0;">创建时间</th>
+                        <th style="text-align: left; padding: 8px; color: #aab2c0;">最后使用</th>
+                    </tr>
+                </thead>
+            `;
+            
+            const tbody = document.createElement('tbody');
+            
+            threadStatus.threads.forEach(thread => {
+                const row = document.createElement('tr');
+                row.style.borderBottom = '1px solid rgba(108, 142, 255, 0.1)';
+                
+                const statusColor = thread.status === 'idle' ? '#4ade80' : (thread.status === 'busy' ? '#f59e0b' : '#71717a');
+                const statusText = thread.status === 'idle' ? '空闲' : (thread.status === 'busy' ? '忙碌' : '已终止');
+                
+                const formatTime = (timestamp) => {
+                    if (!timestamp) return '-';
+                    const date = new Date(timestamp);
+                    return date.toLocaleTimeString();
+                };
+                
+                row.innerHTML = `
+                    <td style="padding: 8px; color: #e8ecf0;">${thread.id}</td>
+                    <td style="padding: 8px; color: #e8ecf0;">${thread.pid || '-'}</td>
+                    <td style="padding: 8px;"><span style="color: ${statusColor};">${statusText}</span></td>
+                    <td style="padding: 8px; color: #e8ecf0;">${thread.taskCount || 0}</td>
+                    <td style="padding: 8px; color: #aab2c0;">${formatTime(thread.createdAt)}</td>
+                    <td style="padding: 8px; color: #aab2c0;">${formatTime(thread.lastUsedAt)}</td>
+                `;
+                tbody.appendChild(row);
+            });
+            
+            threadTable.appendChild(tbody);
+            content.appendChild(threadTable);
         },
         
         _updateProcessList: function() {

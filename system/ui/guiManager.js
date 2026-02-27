@@ -137,6 +137,78 @@ class GUIManager {
         const random = Math.random().toString(36).substr(2, 9);
         return `window_${pid}_${timestamp}_${random}`;
     }
+
+    /**
+     * 检测窗口内容是否为弹性内容（iframe 或具有弹性布局的元素）
+     * @param {HTMLElement} windowElement 窗口元素
+     * @returns {Object} { isFlexible: boolean, types: string[] }
+     */
+    static _detectFlexibleContent(windowElement) {
+        const result = {
+            isFlexible: false,
+            types: [],
+            hasIframe: false,
+            hasFlexContainer: false,
+            hasGridContainer: false
+        };
+        
+        if (!windowElement) return result;
+        
+        // 只检测 iframe（会真正撑开窗口的弹性内容）
+        const iframes = windowElement.querySelectorAll('iframe');
+        if (iframes.length > 0) {
+            result.hasIframe = true;
+            result.types.push('iframe');
+            result.isFlexible = true;
+        }
+        
+        // 注意：不再检测 flex/grid 布局，因为普通应用的 flex 布局不一定会撑开窗口
+        // 扫雷等普通应用使用 flex 布局但不会导致窗口被撑开
+        
+        return result;
+    }
+
+    /**
+     * 获取窗口的可靠尺寸（处理弹性内容）
+     * @param {HTMLElement} windowElement 窗口元素
+     * @returns {Object} { width: number, height: number }
+     */
+    static _getReliableWindowSize(windowElement) {
+        if (!windowElement) {
+            return { width: 600, height: 450 };
+        }
+        
+        // 首先尝试 offsetWidth/offsetHeight
+        let width = windowElement.offsetWidth;
+        let height = windowElement.offsetHeight;
+        
+        // 如果为 0，尝试 getBoundingClientRect
+        if (!width || !height) {
+            const rect = windowElement.getBoundingClientRect();
+            width = rect.width;
+            height = rect.height;
+        }
+        
+        // 如果仍然是 0，使用样式或默认值
+        if (!width) {
+            const style = window.getComputedStyle(windowElement);
+            width = parseInt(style.width) || 600;
+        }
+        if (!height) {
+            const style = window.getComputedStyle(windowElement);
+            height = parseInt(style.height) || 450;
+        }
+        
+        // 对于弹性内容（仅 iframe），提供最小尺寸
+        const flexInfo = GUIManager._detectFlexibleContent(windowElement);
+        if (flexInfo.isFlexible) {
+            // 弹性内容使用 600x450 作为最小值
+            width = Math.max(width, 600);
+            height = Math.max(height, 450);
+        }
+        
+        return { width, height };
+    }
     
     /**
      * 记录窗口日志
@@ -213,6 +285,33 @@ class GUIManager {
         }
         if (typeof ProcessManager !== 'undefined' && typeof ProcessManager.recordKernelModuleCall === 'function') {
             ProcessManager.recordKernelModuleCall(pid, 'GUIManager.registerWindow', { title: options.title || '' });
+        }
+
+        // 检测是否是弹性内容（iframe 或具有弹性布局的元素）
+        const isFlexibleContent = GUIManager._detectFlexibleContent(windowElement);
+        
+        // 弹性内容固定初始尺寸
+        const FLEXIBLE_INITIAL_WIDTH = 600;
+        const FLEXIBLE_INITIAL_HEIGHT = 450;
+        
+        // 如果是弹性内容，设置初始尺寸（允许用户拉伸）
+        if (isFlexibleContent.isFlexible) {
+            // 强制设置初始宽高（仅初始，之后用户可以拉伸）
+            windowElement.style.setProperty('width', `${FLEXIBLE_INITIAL_WIDTH}px`, 'important');
+            windowElement.style.setProperty('height', `${FLEXIBLE_INITIAL_HEIGHT}px`, 'important');
+            // 设置最小尺寸（不允许小于初始尺寸）
+            windowElement.style.minWidth = `${FLEXIBLE_INITIAL_WIDTH}px`;
+            windowElement.style.minHeight = `${FLEXIBLE_INITIAL_HEIGHT}px`;
+            // 确保使用 box-sizing
+            windowElement.style.boxSizing = 'border-box';
+            
+            // 使用 requestAnimationFrame 延迟设置初始尺寸，确保不被内容撑开
+            const enforceSize = () => {
+                windowElement.style.setProperty('width', `${FLEXIBLE_INITIAL_WIDTH}px`, 'important');
+                windowElement.style.setProperty('height', `${FLEXIBLE_INITIAL_HEIGHT}px`, 'important');
+            };
+            requestAnimationFrame(enforceSize);
+            requestAnimationFrame(() => requestAnimationFrame(enforceSize));
         }
         
         // 生成或使用提供的窗口ID
@@ -479,8 +578,8 @@ class GUIManager {
                                 (windowElement.style.top && windowElement.style.top.includes('calc(50%'));
         
         if (hasTransformCenter || hasPercentCenter) {
-            // 获取窗口当前的实际位置（考虑transform）
-            const rect = windowElement.getBoundingClientRect();
+            // 使用可靠尺寸方法获取窗口尺寸（处理弹性内容）
+            const size = GUIManager._getReliableWindowSize(windowElement);
             const guiContainer = document.getElementById('gui-container');
             let containerRect = null;
             if (guiContainer) {
@@ -494,10 +593,11 @@ class GUIManager {
             windowElement.style.right = '';
             windowElement.style.bottom = '';
             
-            // 如果窗口已经在屏幕上，调整位置确保在屏幕内
-            if (rect.width > 0 && rect.height > 0) {
-                const winWidth = rect.width;
-                const winHeight = rect.height;
+            // 使用可靠尺寸计算位置
+            const rect = windowElement.getBoundingClientRect();
+            if (size.width > 0 && size.height > 0) {
+                const winWidth = size.width;
+                const winHeight = size.height;
                 
                 if (containerRect) {
                     // 相对于gui-container的位置
@@ -547,10 +647,10 @@ class GUIManager {
         const viewportWidth = window.innerWidth || document.documentElement.clientWidth;
         const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
         
-        // 获取窗口实际尺寸
-        const rect = windowElement.getBoundingClientRect();
-        const winWidth = rect.width || windowElement.offsetWidth || 800;
-        const winHeight = rect.height || windowElement.offsetHeight || 600;
+        // 使用可靠尺寸方法获取窗口尺寸（处理弹性内容）
+        const size = GUIManager._getReliableWindowSize(windowElement);
+        const winWidth = size.width;
+        const winHeight = size.height;
         
         // 获取任务栏位置和尺寸
         let taskbarPosition = 'bottom';
@@ -797,6 +897,8 @@ class GUIManager {
         // 重要：先保存并清除onClose回调，避免递归调用（onClose回调可能调用_closeWindow）
         const onCloseCallback = !forceClose ? windowInfo.onClose : null;
         let windowClosedByCallback = false; // 标记窗口是否已被 onClose 回调关闭
+        let savedPidForKill = null; // 保存 PID 用于可能的 kill 操作
+        
         if (onCloseCallback) {
             windowInfo.onClose = null; // 清除回调，避免递归
             try {
@@ -804,6 +906,13 @@ class GUIManager {
                 // 检查窗口是否已被 onClose 回调关闭（通过检查窗口是否还在 _windows 中）
                 if (!GUIManager._windows.has(windowId)) {
                     windowClosedByCallback = true;
+                } else {
+                    // 窗口仍然存在，检查是否是最后一个窗口，如果是则 kill 进程
+                    // 注意：这里需要重新获取 windowInfo，因为回调可能修改了它
+                    const currentWindowInfo = GUIManager._windows.get(windowId);
+                    if (currentWindowInfo) {
+                        savedPidForKill = currentWindowInfo.pid;
+                    }
                 }
             } catch (e) {
                 KernelLogger.warn("GUIManager", `窗口onClose回调执行失败: ${e.message}`, e);
@@ -812,6 +921,17 @@ class GUIManager {
         
         // 如果窗口已被 onClose 回调关闭，直接返回
         if (windowClosedByCallback) {
+            // 如果 onClose 回调没有 kill 进程（因为窗口已经不在了），这里需要手动 kill
+            if (savedPidForKill && !isExploit && typeof ProcessManager !== 'undefined') {
+                // 检查是否还有其他窗口
+                const remainingWindows = GUIManager.getWindowsByPid(savedPidForKill);
+                if (remainingWindows.length === 0) {
+                    KernelLogger.debug("GUIManager", `窗口 ${windowId} 在 onClose 回调中关闭，PID ${savedPidForKill} 没有其他窗口，kill 进程`);
+                    ProcessManager.killProgram(savedPidForKill).catch(e => {
+                        KernelLogger.warn("GUIManager", `kill 进程 ${savedPidForKill} 失败: ${e.message}`, e);
+                    });
+                }
+            }
             return;
         }
         
@@ -3222,11 +3342,9 @@ class GUIManager {
             const deltaX = coords.x - windowInfo.windowState.dragStartX;
             const deltaY = coords.y - windowInfo.windowState.dragStartY;
             
-            // 获取容器边界
+            // 使用可靠尺寸方法获取窗口尺寸（处理弹性内容）
+            const size = GUIManager._getReliableWindowSize(windowElement);
             const guiContainer = document.getElementById('gui-container');
-            const rect = windowElement.getBoundingClientRect();
-            const winWidth = rect.width || windowElement.offsetWidth;
-            const winHeight = rect.height || windowElement.offsetHeight;
             
             let newLeft = windowInfo.windowState.dragStartLeft + deltaX;
             let newTop = windowInfo.windowState.dragStartTop + deltaY;
@@ -3238,8 +3356,8 @@ class GUIManager {
                 const relativeTop = newTop - containerRect.top;
                 
                 // 限制在容器内
-                const maxLeft = Math.max(0, containerRect.width - winWidth);
-                const maxTop = Math.max(0, containerRect.height - winHeight);
+                const maxLeft = Math.max(0, containerRect.width - size.width);
+                const maxTop = Math.max(0, containerRect.height - size.height);
                 const finalLeft = Math.max(0, Math.min(relativeLeft, maxLeft));
                 const finalTop = Math.max(0, Math.min(relativeTop, maxTop));
                 
@@ -3251,8 +3369,8 @@ class GUIManager {
                 const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
                 
                 // 限制在视口内
-                const maxLeft = Math.max(0, viewportWidth - winWidth);
-                const maxTop = Math.max(0, viewportHeight - winHeight);
+                const maxLeft = Math.max(0, viewportWidth - size.width);
+                const maxTop = Math.max(0, viewportHeight - size.height);
                 const finalLeft = Math.max(0, Math.min(newLeft, maxLeft));
                 const finalTop = Math.max(0, Math.min(newTop, maxTop));
                 
@@ -3567,17 +3685,22 @@ class GUIManager {
                         e.preventDefault();
                     }
                     
-                    const minWidth = 300;
-                    const minHeight = 200;
+                    // 根据弹性内容类型设置不同的最小尺寸
+                    const flexInfo = GUIManager._detectFlexibleContent(windowElement);
+                    const minWidth = flexInfo.isFlexible ? 600 : 300;
+                    const minHeight = flexInfo.isFlexible ? 450 : 200;
+                    
                     let newWidth = Math.max(minWidth, windowInfo.windowState.resizeStartWidth + deltaX);
                     let newHeight = Math.max(minHeight, windowInfo.windowState.resizeStartHeight + deltaY);
                     
-                    // 获取容器边界
+                    // 使用可靠尺寸方法获取窗口尺寸
+                    const size = GUIManager._getReliableWindowSize(windowElement);
                     const guiContainer = document.getElementById('gui-container');
-                    const rect = windowElement.getBoundingClientRect();
                     
                     if (guiContainer) {
                         const containerRect = guiContainer.getBoundingClientRect();
+                        // 获取窗口当前位置
+                        const rect = windowElement.getBoundingClientRect();
                         // 相对于容器的位置
                         const relativeLeft = rect.left - containerRect.left;
                         const relativeTop = rect.top - containerRect.top;
@@ -3596,6 +3719,7 @@ class GUIManager {
                         const viewportWidth = window.innerWidth || document.documentElement.clientWidth;
                         const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
                         
+                        const rect = windowElement.getBoundingClientRect();
                         // 计算最大尺寸（确保窗口不超出视口）
                         const maxWidth = Math.max(minWidth, viewportWidth - rect.left);
                         const maxHeight = Math.max(minHeight, viewportHeight - rect.top);
@@ -3671,8 +3795,11 @@ class GUIManager {
                         e.preventDefault();
                     }
                     
-                    const minWidth = 300;
-                    const minHeight = 200;
+                    // 根据弹性内容类型设置不同的最小尺寸
+                    const flexInfo = GUIManager._detectFlexibleContent(windowElement);
+                    const minWidth = flexInfo.isFlexible ? 600 : 300;
+                    const minHeight = flexInfo.isFlexible ? 450 : 200;
+                    
                     let newWidth = Math.max(minWidth, windowInfo.windowState.resizeStartWidth + deltaX);
                     let newHeight = Math.max(minHeight, windowInfo.windowState.resizeStartHeight - deltaY);
                     
@@ -3798,8 +3925,11 @@ class GUIManager {
                         e.preventDefault();
                     }
                     
-                    const minWidth = 300;
-                    const minHeight = 200;
+                    // 根据弹性内容类型设置不同的最小尺寸
+                    const flexInfo = GUIManager._detectFlexibleContent(windowElement);
+                    const minWidth = flexInfo.isFlexible ? 600 : 300;
+                    const minHeight = flexInfo.isFlexible ? 450 : 200;
+                    
                     // 向左上拉伸：宽度和高度增加，left和top减小
                     let newWidth = Math.max(minWidth, windowInfo.windowState.resizeStartWidth - deltaX);
                     let newHeight = Math.max(minHeight, windowInfo.windowState.resizeStartHeight - deltaY);
@@ -3934,8 +4064,11 @@ class GUIManager {
                         e.preventDefault();
                     }
                     
-                    const minWidth = 300;
-                    const minHeight = 200;
+                    // 根据弹性内容类型设置不同的最小尺寸
+                    const flexInfo = GUIManager._detectFlexibleContent(windowElement);
+                    const minWidth = flexInfo.isFlexible ? 600 : 300;
+                    const minHeight = flexInfo.isFlexible ? 450 : 200;
+                    
                     // 向左下拉伸：宽度增加（left减小），高度增加（top不变）
                     let newWidth = Math.max(minWidth, windowInfo.windowState.resizeStartWidth - deltaX);
                     let newHeight = Math.max(minHeight, windowInfo.windowState.resizeStartHeight + deltaY);

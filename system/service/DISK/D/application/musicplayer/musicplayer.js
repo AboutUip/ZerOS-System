@@ -17,8 +17,21 @@
         _desktopLyricsEnabled: false,
         _desktopLyricsComponentId: null,
         _lyricsSyncTimer: null,
+        _cacheHelper: null,
 
         __init__: async function(pid, initArgs) {
+            this._isExiting = false;
+            this._kitemusicState = { name: '', artist: '', isPlaying: false, cover: '', lyrics: [], currentIndex: -1, progress: 0 };
+            this._messageHandler = null;
+            this._previewElement = null;
+            this._desktopLyricsEnabled = false;
+            this._desktopLyricsComponentId = null;
+            this._lyricsSyncTimer = null;
+            this.windowId = null;
+            
+            // 初始化缓存辅助函数
+            this._initCacheHelper(initArgs);
+            
             this.pid = pid;
 
             const guiContainer = initArgs.guiContainer || document.getElementById('gui-container');
@@ -76,6 +89,14 @@
             var origin = (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) ? SystemInformation.getOrigin() : (window.location.origin || '');
             this.iframe.src = origin + (htmlPath.startsWith('/') ? htmlPath : '/' + htmlPath);
 
+            this.iframe.addEventListener('load', () => {
+                if (!this._isExiting && this._cacheHelper && this._cacheHelper.syncAllToParent) {
+                    setTimeout(() => {
+                        this._cacheHelper.syncAllToParent();
+                    }, 1000);
+                }
+            });
+
             this._messageHandler = (e) => {
                 if (this._isExiting || !e.data) return;
                 if (e.data.type === 'kitemusic-state') {
@@ -107,6 +128,28 @@
                 }
                 if (e.data.type === 'kitemusic-lyrics-toggle') {
                     this._toggleDesktopLyrics();
+                }
+                if (e.data.type === 'kitemusic-cache-get') {
+                    var cacheKey = e.data.key;
+                    var cacheDefault = e.data.defaultValue;
+                    if (this._cacheHelper) {
+                        this._cacheHelper.get(cacheKey, cacheDefault).then(function(value) {
+                            if (self.iframe && self.iframe.contentWindow) {
+                                self.iframe.contentWindow.postMessage({
+                                    type: 'kitemusic-cache-result',
+                                    key: cacheKey,
+                                    value: value
+                                }, '*');
+                            }
+                        });
+                    }
+                }
+                if (e.data.type === 'kitemusic-cache-set') {
+                    var cacheKey = e.data.key;
+                    var cacheValue = e.data.value;
+                    if (this._cacheHelper) {
+                        this._cacheHelper.set(cacheKey, cacheValue);
+                    }
                 }
             };
             window.addEventListener('message', this._messageHandler);
@@ -437,19 +480,122 @@
             }
         },
 
-        _cleanup: function() {
+        _cleanup: async function() {
             try {
                 this._isExiting = true;
                 this._disableDesktopLyrics();
+                this._stopLyricsSync();
                 this._previewElement = null;
+                
+                if (this.iframe) {
+                    if (this.iframe.parentElement) {
+                        this.iframe.parentElement.removeChild(this.iframe);
+                    }
+                    this.iframe.src = 'about:blank';
+                    this.iframe = null;
+                }
+                
+                if (this.window && this.window.parentElement) {
+                    this.window.parentElement.removeChild(this.window);
+                }
+                
                 if (this._messageHandler) {
                     window.removeEventListener('message', this._messageHandler);
                     this._messageHandler = null;
                 }
-                this.iframe = null;
+                
+                this.window = null;
+                this.windowId = null;
+                this._kitemusicState = { name: '', artist: '', isPlaying: false, cover: '', lyrics: [], currentIndex: -1, progress: 0 };
+                this._desktopLyricsEnabled = false;
+                this._desktopLyricsComponentId = null;
+                
+                if (this._cacheHelper) {
+                    await this._cacheHelper.clear();
+                    this._cacheHelper = null;
+                }
             } catch (e) {
                 if (typeof KernelLogger !== 'undefined') KernelLogger.warn('MusicPlayer', '清理失败', e);
             }
+        },
+
+        _initCacheHelper: function(initArgs) {
+            var self = this;
+            var cachePrefix = 'kitemusic.';
+            this._cacheHelper = {
+                set: async function(key, value) {
+                    if (!initArgs.kernelAPI || typeof initArgs.kernelAPI.call !== 'function') return;
+                    try {
+                        await initArgs.kernelAPI.call('Cache.set', [
+                            'kitemusic.' + key,
+                            value,
+                            { ttl: 30 * 60 * 1000, fileCache: true }
+                        ]);
+                    } catch (e) {}
+                },
+                get: async function(key, defaultValue) {
+                    if (!initArgs.kernelAPI || typeof initArgs.kernelAPI.call !== 'function') return defaultValue;
+                    try {
+                        var result = await initArgs.kernelAPI.call('Cache.get', [
+                            'kitemusic.' + key,
+                            defaultValue
+                        ]);
+                        return result;
+                    } catch (e) {
+                        return defaultValue;
+                    }
+                },
+                clear: async function() {
+                    if (!initArgs.kernelAPI || typeof initArgs.kernelAPI.call !== 'function') return;
+                    try {
+                        var pid = initArgs.pid || 0;
+                        await initArgs.kernelAPI.call('Cache.clear', [{ pid: pid }]);
+                    } catch (e) {}
+                },
+                saveToParent: function(key, value) {
+                    if (!key || !value) return;
+                    try {
+                        parent.postMessage({
+                            type: 'kitemusic-cache-set',
+                            key: cachePrefix + key,
+                            value: value
+                        }, '*');
+                    } catch (e) {}
+                },
+                syncAllToParent: async function() {
+                    if (!initArgs.kernelAPI || typeof initArgs.kernelAPI.call !== 'function') return;
+                    try {
+                        var pid = initArgs.pid || 0;
+                        var stats = await initArgs.kernelAPI.call('Cache.getStats', [{ pid: pid }]);
+                        if (stats && stats.validCount > 0) {
+                            var allKeys = self._getAllCacheKeys();
+                            for (var i = 0; i < allKeys.length; i++) {
+                                var key = allKeys[i];
+                                var value = await initArgs.kernelAPI.call('Cache.get', [
+                                    key,
+                                    null
+                                ]);
+                                if (value && typeof value === 'object' && value.code === 200) {
+                                    parent.postMessage({
+                                        type: 'kitemusic-cache-set',
+                                        key: key,
+                                        value: value
+                                    }, '*');
+                                }
+                            }
+                        }
+                    } catch (e) {}
+                },
+                _getAllCacheKeys: function() {
+                    return [
+                        'kitemusic./user/playlist',
+                        'kitemusic./user/playlist&uid=',
+                        'kitemusic./likelist',
+                        'kitemusic./playlist/detail&id=',
+                        'kitemusic./song/detail&ids='
+                    ];
+                }
+            };
         },
 
         __info__: function() {
@@ -463,13 +609,16 @@
                 category: 'other',
                 permissions: typeof PermissionManager !== 'undefined' ? [
                     PermissionManager.PERMISSION.GUI_WINDOW_CREATE,
-                    PermissionManager.PERMISSION.NETWORK_ACCESS
+                    PermissionManager.PERMISSION.NETWORK_ACCESS,
+                    PermissionManager.PERMISSION.CACHE_READ,
+                    PermissionManager.PERMISSION.CACHE_WRITE,
+                    PermissionManager.PERMISSION.KERNEL_DISK_DELETE
                 ] : []
             };
         },
 
-        __exit__: function() {
-            this._cleanup();
+        __exit__: async function() {
+            await this._cleanup();
         }
     };
 

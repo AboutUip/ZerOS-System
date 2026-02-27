@@ -19,7 +19,20 @@
 
 ## 获取实例
 
-MultithreadingDrive 通过 `ProcessManager.callKernelAPI` 暴露 API，不直接获取实例：
+MultithreadingDrive 可通过以下方式获取：
+
+### 方式一：全局对象（推荐）
+
+```javascript
+// 直接从全局对象获取
+const MultithreadingDrive = window.MultithreadingDrive || globalThis.MultithreadingDrive;
+
+// 使用 API
+const status = MultithreadingDrive.getPoolStatus();
+const threads = MultithreadingDrive.getProcessThreads(pid);
+```
+
+### 方式二：通过 ProcessManager
 
 ```javascript
 // 通过 ProcessManager 调用
@@ -28,19 +41,26 @@ const ProcessManager = POOL.__GET__("KERNEL_GLOBAL_POOL", "ProcessManager");
 // 创建线程
 const threadId = await ProcessManager.callKernelAPI(
     this.pid,
-    'Thread.create',
-    [{ script: 'worker.js', name: 'MyWorker' }]
+    'Multithreading.createThread',
+    []
 );
 
 // 执行任务
 const result = await ProcessManager.callKernelAPI(
     this.pid,
-    'Thread.postMessage',
-    [threadId, { type: 'task', data: 'Hello' }]
+    'Multithreading.executeTask',
+    [script, args]
+);
+
+// 获取线程池状态
+const status = await ProcessManager.callKernelAPI(
+    this.pid,
+    'Multithreading.getPoolStatus',
+    []
 );
 ```
 
-**注意**：多线程功能需要 `MULTITHREADING` 权限，详细调用方式见「通过 ProcessManager 使用」章节。
+**注意**：多线程功能需要 `MULTITHREADING_CREATE` 或 `MULTITHREADING_EXECUTE` 权限。
 
 ## 初始化
 
@@ -172,6 +192,64 @@ console.log(`平方: ${result2}`);
 ```javascript
 const status = MultithreadingDrive.getPoolStatus();
 console.log(`线程池状态: ${status.idle} 空闲, ${status.busy} 忙碌, ${status.queueLength} 等待`);
+```
+
+---
+
+#### `getProcessThreads(pid)`
+
+获取指定进程的线程列表。
+
+**参数**:
+- `pid` (number): 进程ID
+
+**返回**:
+- `Array`: 线程列表
+  ```javascript
+  [
+      {
+          id: string,       // 线程ID
+          pid: number,      // 所属进程ID
+          status: string,   // 线程状态: 'idle' | 'busy' | 'terminated'
+          taskCount: number,// 执行的任务数
+          createdAt: number,// 创建时间戳
+          lastUsedAt: number// 最后使用时间戳
+      },
+      ...
+  ]
+  ```
+
+**示例**:
+```javascript
+const threads = MultithreadingDrive.getProcessThreads(1234);
+console.log(`进程 1234 有 ${threads.length} 个线程`);
+threads.forEach(t => console.log(`线程 ${t.id}: ${t.status}`));
+```
+
+---
+
+#### `getProcessesWithThreads()`
+
+获取所有有线程的进程列表。
+
+**返回**:
+- `Array`: 进程列表
+  ```javascript
+  [
+      {
+          pid: number,           // 进程ID
+          threadCount: number,   // 线程数量
+          threads: Array         // 线程详情
+      },
+      ...
+  ]
+  ```
+
+**示例**:
+```javascript
+const processes = MultithreadingDrive.getProcessesWithThreads();
+console.log(`当前有 ${processes.length} 个进程在使用线程`);
+processes.forEach(p => console.log(`进程 ${p.pid}: ${p.threadCount} 个线程`));
 ```
 
 ---

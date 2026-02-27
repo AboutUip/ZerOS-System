@@ -1,14 +1,6 @@
 {
   "system": {
     "permissionManager.permissions": {
-      "zominstall": [
-        "KERNEL_DISK_READ",
-        "APPLICATION_INSTALL"
-      ],
-      "packetcap": [
-        "GUI_WINDOW_CREATE",
-        "EVENT_LISTENER"
-      ],
       "settings": [
         "GUI_WINDOW_CREATE",
         "EVENT_LISTENER",
@@ -19,9 +11,7 @@
         "THEME_READ",
         "LANGUAGES_READ",
         "LANGUAGES_WRITE",
-        "KERNEL_DISK_READ",
-        "APPLICATION_UNINSTALL",
-        "SYSTEM_NOTIFICATION"
+        "KERNEL_DISK_READ"
       ]
     },
     "system.style": "macos",
@@ -297,7 +287,7 @@
         "password": "61b249bf6d604d14120821f43625e84e",
         "avatar": "avatar_root_1766272534753.jpg",
         "createdAt": 1766271155991,
-        "lastLogin": 1771955227433
+        "lastLogin": 1772234785254
       },
       "TestUser": {
         "level": "USER",
@@ -349,9 +339,9 @@
         "triggerConfig": {},
         "enabled": true,
         "createdAt": 1771942626583,
-        "updatedAt": 1771955228561,
-        "lastRunAt": 1771955228561,
-        "runCount": 30,
+        "updatedAt": 1772234786113,
+        "lastRunAt": 1772234786113,
+        "runCount": 98,
         "createdBy": "servicemanager",
         "requiresStartupPermission": true,
         "serviceId": "notice",

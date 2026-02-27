@@ -9,9 +9,6 @@ class ProcessManager {
     /** D/server 目录下服务调用内核 API 时使用的 PID（与 EXPLOIT_PID 同值，内核权限对该 PID 放行） */
     static SERVER_SERVICE_PID = 10000;
 
-    /** 进程绑定 API 的合法令牌（仅内核在 __init__ 注入时使用，不可伪造，方案三） */
-    static _boundCallSymbol = Symbol('ProcessManager.boundCallKernelAPI');
-
     /** ServerExpansion 内核专用令牌，仅进程管理器持有；传入 ServerExpansion 以拒绝直接调用、防止绕过权限 */
     static _serverExpansionToken = Symbol('ServerExpansion.kernel');
 
@@ -1932,10 +1929,10 @@ class ProcessManager {
                         cwd: initArgs.cwd || defaultCwd,  // 当前工作目录（默认使用系统盘 D: 或第一个可用分区）
                         terminal: terminalInstance,  // 终端实例（CLI程序，已自动获取或启动）
                         metadata: initArgs.metadata || {},  // 元数据
-                        /** 进程绑定内核 API：call(apiName, args) 使用本进程 pid，无需传 pid，可防 PID 伪造（CVS_ZEROS_009 方案三） */
+                        /** 进程绑定内核 API：call(apiName, args) 使用本进程 pid，无需传 pid，可防 PID 伪造（CVS_ZEROS_009 方案三，CVS-ZEROS-010 修复：内联实现，消除内部入口暴露） */
                         kernelAPI: {
                             call(apiName, args) {
-                                return ProcessManager._internalCallKernelAPI(pid, apiName, args || [], ProcessManager._boundCallSymbol);
+                                return ProcessManager._callKernelAPICore(pid, apiName, args || [], { skipCallerCheck: true });
                             }
                         },
                         ...initArgs  // 保留其他自定义参数
@@ -2418,6 +2415,38 @@ class ProcessManager {
                     ProcessManager._log(2, `已清理程序 PID ${pid} 的多线程资源`);
                 } catch (e) {
                     ProcessManager._log(1, `清理程序 PID ${pid} 的多线程资源失败: ${e.message}`);
+                }
+            }
+
+            // 清理程序注册在 window/globalThis 上的引用
+            const programNameUpper = processInfo.programNameUpper;
+            if (programNameUpper) {
+                try {
+                    let cleaned = false;
+                    if (typeof window !== 'undefined' && window[programNameUpper] !== undefined) {
+                        delete window[programNameUpper];
+                        cleaned = true;
+                    }
+                    if (typeof globalThis !== 'undefined' && globalThis[programNameUpper] !== undefined) {
+                        delete globalThis[programNameUpper];
+                        cleaned = true;
+                    }
+                    if (cleaned) {
+                        ProcessManager._log(2, `已清理程序 PID ${pid} 的全局引用 (${programNameUpper})`);
+                    }
+                } catch (e) {
+                    ProcessManager._log(1, `清理程序 PID ${pid} 的全局引用失败: ${e.message}`);
+                }
+            }
+
+            // 清理程序在 POOL 中的注册
+            if (typeof POOL !== 'undefined' && typeof POOL.__REMOVE__ === 'function') {
+                try {
+                    POOL.__REMOVE__('APPLICATION_POOL', programNameUpper);
+                    POOL.__REMOVE__('APPLICATION_SHARED_POOL', programNameUpper);
+                    ProcessManager._log(2, `已清理程序 PID ${pid} 在 POOL 中的注册`);
+                } catch (e) {
+                    ProcessManager._log(1, `清理程序 PID ${pid} 在 POOL 中的注册失败: ${e.message}`);
                 }
             }
 
@@ -3279,25 +3308,6 @@ class ProcessManager {
     }
 
     /**
-     * 进程绑定内核 API 调用（方案三：由 __init__ 注入的 kernelAPI.call 使用，跳过调用栈校验）
-     * 仅当 boundToken 与内核注入的 _boundCallSymbol 一致时允许调用，防止伪造。
-     * @param {number} pid 进程ID（由注入时的闭包绑定）
-     * @param {string} apiName API名称
-     * @param {Array} args 参数数组
-     * @param {Symbol} boundToken 绑定令牌（必须为 ProcessManager._boundCallSymbol）
-     * @returns {Promise<any>} API调用结果
-     */
-    static async _internalCallKernelAPI(pid, apiName, args, boundToken) {
-        if (boundToken !== ProcessManager._boundCallSymbol) {
-            const err = new Error('进程绑定 API 调用失败：令牌无效，仅允许通过 __init__ 注入的 kernelAPI.call(apiName, args) 调用。');
-            ProcessManager._log(1, err.message);
-            KernelLogger.error("ProcessManager", "API调用拒绝(绑定令牌无效)", err);
-            throw err;
-        }
-        return await ProcessManager._callKernelAPICore(pid, apiName, args || [], { skipCallerCheck: true });
-    }
-
-    /**
      * 内核API代理：所有程序调用内核API必须通过此方法
      * @param {number} pid 进程ID
      * @param {string} apiName API名称
@@ -3415,6 +3425,8 @@ class ProcessManager {
             'Multithreading.createThread': PermissionManager.PERMISSION.MULTITHREADING_CREATE,
             'Multithreading.executeTask': PermissionManager.PERMISSION.MULTITHREADING_EXECUTE,
             'Multithreading.getPoolStatus': PermissionManager.PERMISSION.MULTITHREADING_EXECUTE,
+            'Multithreading.getProcessThreads': PermissionManager.PERMISSION.MULTITHREADING_EXECUTE,
+            'Multithreading.getProcessesWithThreads': PermissionManager.PERMISSION.MULTITHREADING_EXECUTE,
 
             // 加密API
             'Crypt.generateKeyPair': PermissionManager.PERMISSION.CRYPT_GENERATE_KEY,
@@ -5562,6 +5574,18 @@ class ProcessManager {
                     throw new Error('MultithreadingDrive 模块未加载');
                 }
                 return MultithreadingDrive.getPoolStatus();
+            },
+            'Multithreading.getProcessThreads': async (pid) => {
+                if (typeof MultithreadingDrive === 'undefined') {
+                    throw new Error('MultithreadingDrive 模块未加载');
+                }
+                return MultithreadingDrive.getProcessThreads(pid);
+            },
+            'Multithreading.getProcessesWithThreads': async () => {
+                if (typeof MultithreadingDrive === 'undefined') {
+                    throw new Error('MultithreadingDrive 模块未加载');
+                }
+                return MultithreadingDrive.getProcessesWithThreads();
             },
 
             // 拖拽API

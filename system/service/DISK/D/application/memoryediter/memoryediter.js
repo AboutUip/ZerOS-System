@@ -8,8 +8,8 @@
     const BYTES_PER_ROW = 16;
     const PAGE_SIZE = 256;
     const INITIAL_LOAD_SIZE = 1024;
-    const ROWS_PER_FRAME = 12;
-
+    const ROWS_PER_FRAME = 256;
+    
     const MEMORYEDITER = {
         pid: null,
         window: null,
@@ -34,6 +34,15 @@
         _kernelAPI: null,
         /** 当前内存区域类型：heap | stack */
         _memoryType: 'heap',
+        
+        /** 性能优化：缓存 */
+        _hexCache: new Map(),
+        _cacheMaxSize: 50,
+        _lastLoadTime: 0,
+        _loadThrottleMs: 100,
+        _isRendering: false,
+        _pendingRender: null,
+        _threadPoolReady: false,
 
         /** 获取 POOL > SERVER 的 ProcessMemory 服务；若未启动则在恰当时候询问用户是否由程序拉起服务（通过 kernelAPI 调用 Server.start，需 SERVER_SERVICE_MANAGE 权限） */
         _getProcessMemoryService: async function() {
@@ -181,6 +190,7 @@
 
             guiContainer.appendChild(this.window);
 
+            this._initThreadPool();
             await this._loadProcessList();
             this._bindToolbarEvents(refreshBtn);
             this._refreshTimer = setInterval(() => this._loadProcessList(), 5000);
@@ -189,6 +199,149 @@
             setTimeout(function() {
                 self._getProcessMemoryService().catch(function() {});
             }, 400);
+        },
+        
+        _initThreadPool: function() {
+            if (typeof MultithreadingDrive === 'undefined') {
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.debug('MEMORYEDITER', 'MultithreadingDrive 不可用，使用主线程渲染');
+                }
+                return;
+            }
+            this._threadPoolReady = true;
+            if (typeof KernelLogger !== 'undefined') {
+                KernelLogger.info('MEMORYEDITER', '多线程池已就绪');
+            }
+        },
+        
+        _renderInBackground: async function(rows, targetPid, heapId, baseOffset, append) {
+            if (!this._threadPoolReady || typeof MultithreadingDrive === 'undefined') {
+                this._renderHexRowsChunked(rows, targetPid, heapId, baseOffset, append);
+                return;
+            }
+            
+            var self = this;
+            try {
+                var result = await MultithreadingDrive.executeTask(
+                    this.pid,
+                    function(rows) {
+                        var BYTES_PER_ROW = 16;
+                        var result = [];
+                        for (var rowStart = 0; rowStart < rows.length; rowStart += BYTES_PER_ROW) {
+                            var rowCells = rows.slice(rowStart, rowStart + BYTES_PER_ROW);
+                            var hexStr = '';
+                            var asciiStr = '';
+                            for (var i = 0; i < BYTES_PER_ROW; i++) {
+                                var cell = rowCells[i];
+                                var v = cell ? cell.data : null;
+                                if (v === null || v === undefined) {
+                                    hexStr += '-- ';
+                                    asciiStr += ' ';
+                                } else if (typeof v === 'number' && !isNaN(v)) {
+                                    hexStr += ((v & 0xFF) + 0x100).toString(16).toUpperCase().slice(-2) + ' ';
+                                    asciiStr += (v >= 32 && v <= 126) ? String.fromCharCode(v) : '.';
+                                } else {
+                                    hexStr += '?? ';
+                                    asciiStr += '.';
+                                }
+                            }
+                            result.push({ hex: hexStr.trim(), ascii: asciiStr });
+                        }
+                        return result;
+                    },
+                    [rows]
+                );
+                this._renderFromThread(rows, result, targetPid, heapId, baseOffset, append);
+            } catch (e) {
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.warn('MEMORYEDITER', '后台渲染失败，回退到主线程', e);
+                }
+                this._renderHexRowsChunked(rows, targetPid, heapId, baseOffset, append);
+            }
+        },
+        
+        _renderFromThread: function(originalRows, processedResult, targetPid, heapId, baseOffset, append) {
+            if (!append) {
+                this.hexContainer.innerHTML = '';
+                if (!processedResult || processedResult.length === 0) {
+                    this.hexContainer.innerHTML = '<div class="memoryediter-placeholder">' + this._getText('MEMORYEDITER_EMPTY', '无数据') + '</div>';
+                    return;
+                }
+                var header = this._createHexHeader();
+                this.hexContainer.appendChild(header);
+            }
+            
+            var self = this;
+            processedResult.forEach(function(rowData, idx) {
+                var rowOffset = baseOffset + idx * 16;
+                var rowEl = document.createElement('div');
+                rowEl.className = 'memoryediter-hex-row';
+                rowEl.setAttribute('role', 'row');
+                
+                var addrSpan = document.createElement('span');
+                addrSpan.className = 'memoryediter-addr';
+                addrSpan.textContent = '0x' + rowOffset.toString(16);
+                rowEl.appendChild(addrSpan);
+                
+                var hexSpan = document.createElement('span');
+                hexSpan.className = 'memoryediter-hex-bytes';
+                var asciiSpan = document.createElement('span');
+                asciiSpan.className = 'memoryediter-ascii';
+                
+                var hexParts = rowData.hex.split(' ');
+                for (var i = 0; i < 16; i++) {
+                    var byteEl = document.createElement('span');
+                    byteEl.className = 'memoryediter-byte';
+                    byteEl.dataset.offset = String(rowOffset + i);
+                    byteEl.textContent = (hexParts[i] || '--') + ' ';
+                    byteEl.setAttribute('role', 'gridcell');
+                    byteEl.title = self._getText('MEMORYEDITER_CLICK_TO_EDIT', '点击编辑');
+                    hexSpan.appendChild(byteEl);
+                }
+                
+                asciiSpan.textContent = rowData.ascii;
+                rowEl.appendChild(hexSpan);
+                rowEl.appendChild(asciiSpan);
+                self.hexContainer.appendChild(rowEl);
+                
+                var offset = rowOffset;
+                hexSpan.querySelectorAll('.memoryediter-byte').forEach(function(el, byteIdx) {
+                    var finalOffset = offset + byteIdx;
+                    if (typeof EventManager !== 'undefined') {
+                        EventManager.registerElementEvent(self.pid, el, 'click', function() {
+                            self._editByte(targetPid, heapId, finalOffset, el, asciiSpan.childNodes[byteIdx]);
+                        });
+                    } else {
+                        el.addEventListener('click', function() {
+                            self._editByte(targetPid, heapId, finalOffset, el, asciiSpan.childNodes[byteIdx]);
+                        });
+                    }
+                });
+            });
+        },
+        
+        _createHexHeader: function() {
+            var header = document.createElement('div');
+            header.className = 'memoryediter-hex-header';
+            header.setAttribute('role', 'row');
+            
+            var addrH = document.createElement('span');
+            addrH.className = 'memoryediter-header-addr';
+            addrH.textContent = this._getText('MEMORYEDITER_HEADER_ADDR', '地址');
+            
+            var hexH = document.createElement('span');
+            hexH.className = 'memoryediter-header-hex';
+            hexH.textContent = this._getText('MEMORYEDITER_HEADER_HEX', '十六进制');
+            hexH.title = this._getText('MEMORYEDITER_LEGEND_HEX', '-- 表示空闲槽位（未分配），非截断；向下滚动可继续加载');
+            
+            var asciiH = document.createElement('span');
+            asciiH.className = 'memoryediter-header-ascii';
+            asciiH.textContent = 'ASCII';
+            
+            header.appendChild(addrH);
+            header.appendChild(hexH);
+            header.appendChild(asciiH);
+            return header;
         },
 
         _loadProcessList: async function() {
@@ -328,7 +481,15 @@
             var pidStr = this.processSelect.value;
             var heapIdStr = this.heapSelect.value;
             if (!pidStr || !heapIdStr) return;
+            
+            if (!append) {
+                this._hexCache.clear();
+            }
+            
+            var tStart = Date.now();
             var svc = await this._getProcessMemoryService();
+            console.log('[MEMORYEDITER] 服务获取:', Date.now() - tStart, 'ms');
+            
             if (!svc || typeof svc.readProcessHeap !== 'function') {
                 if (!append) this.hexContainer.innerHTML = '<div class="memoryediter-placeholder">' + this._getText('MEMORYEDITER_SERVICE_REQUIRED', '请先在服务管理器中启动 ProcessMemory 服务') + '</div>';
                 this._setStatus(this._getText('MEMORYEDITER_STATUS_READY', '就绪'));
@@ -338,18 +499,52 @@
             var heapId = heapIdStr;
             var self = this;
             if (!append) this._setStatus(this._getText('MEMORYEDITER_STATUS_LOADING', '加载中...'));
+            
             try {
+                var t0 = Date.now();
                 var rows = svc.readProcessHeap(targetPid, heapId, startOffset, length);
+                console.log('[MEMORYEDITER] 读取数据:', Date.now() - t0, 'ms, 行数:', rows ? rows.length : 0);
+                
                 if (append && (!rows || rows.length === 0)) {
                     this._setStatus(this._getText('MEMORYEDITER_STATUS_READY', '就绪'));
                     return;
                 }
+                
+                var cacheKey = targetPid + '_' + heapId + '_' + startOffset;
+                if (this._hexCache.has(cacheKey)) {
+                    var cached = this._hexCache.get(cacheKey);
+                    this._renderHexRowsChunked(cached, targetPid, heapId, startOffset, append, function() {
+                        var total = startOffset + (cached ? cached.length : 0);
+                        self._loadedEndOffset = total;
+                        self._setStatus(self._getText('MEMORYEDITER_STATUS_LOADED', '已加载') + ' ' + total + ' ' + (self._getText('MEMORYEDITER_BYTES', '字节')));
+                    });
+                    return;
+                }
+                
                 if (!append) this._setStatus(this._getText('MEMORYEDITER_STATUS_RENDERING', '正在渲染...'));
-                this._renderHexRowsChunked(rows, targetPid, heapId, startOffset, append, function() {
-                    var total = startOffset + (rows ? rows.length : 0);
-                    self._loadedEndOffset = total;
-                    self._setStatus(self._getText('MEMORYEDITER_STATUS_LOADED', '已加载') + ' ' + total + ' ' + (self._getText('MEMORYEDITER_BYTES', '字节')) + (append ? ' (' + self._getText('MEMORYEDITER_APPEND', '追加') + ')' : ''));
-                });
+                
+                if (rows && rows.length > 0) {
+                    var cacheKey = targetPid + '_' + heapId + '_' + startOffset;
+                    this._hexCache.set(cacheKey, rows);
+                    if (this._hexCache.size > this._cacheMaxSize) {
+                        var firstKey = this._hexCache.keys().next().value;
+                        this._hexCache.delete(firstKey);
+                    }
+                    
+                    if (false && this._threadPoolReady && typeof MultithreadingDrive !== 'undefined') {
+                        this._renderInBackground(rows, targetPid, heapId, startOffset, append).then(function() {
+                            var total = startOffset + (rows ? rows.length : 0);
+                            self._loadedEndOffset = total;
+                            self._setStatus(self._getText('MEMORYEDITER_STATUS_LOADED', '已加载') + ' ' + total + ' ' + (self._getText('MEMORYEDITER_BYTES', '字节')) + (append ? ' (' + self._getText('MEMORYEDITER_APPEND', '追加') + ')' : ''));
+                        });
+                    } else {
+                        this._renderHexRowsChunked(rows, targetPid, heapId, startOffset, append, function() {
+                            var total = startOffset + (rows ? rows.length : 0);
+                            self._loadedEndOffset = total;
+                            self._setStatus(self._getText('MEMORYEDITER_STATUS_LOADED', '已加载') + ' ' + total + ' ' + (self._getText('MEMORYEDITER_BYTES', '字节')) + (append ? ' (' + self._getText('MEMORYEDITER_APPEND', '追加') + ')' : ''));
+                        });
+                    }
+                }
             } catch (e) {
                 if (typeof KernelLogger !== 'undefined') KernelLogger.error('MEMORYEDITER', 'readProcessHeap', e);
                 if (!append) this.hexContainer.innerHTML = '<div class="memoryediter-placeholder">' + (e.message || '读取失败') + '</div>';
@@ -373,7 +568,7 @@
                 var heapId = this.heapSelect.value;
                 var rows = svc.readProcessHeap(targetPid, heapId, this._loadedEndOffset, PAGE_SIZE);
                 if (rows && rows.length > 0) {
-                    this._renderHexRows(rows, targetPid, heapId, this._loadedEndOffset, true);
+                    this._renderHexRowsChunked(rows, targetPid, heapId, this._loadedEndOffset, true);
                     this._loadedEndOffset += rows.length;
                     this._setStatus(this._getText('MEMORYEDITER_STATUS_LOADED', '已加载') + ' ' + this._loadedEndOffset + ' ' + this._getText('MEMORYEDITER_BYTES', '字节'));
                 } else {
@@ -418,6 +613,7 @@
             this.hexContainer.appendChild(header);
 
             var rowStart = 0;
+            var fragment = document.createDocumentFragment();
             function renderChunk() {
                 var end = Math.min(rowStart + ROWS_PER_FRAME * BYTES_PER_ROW, rows.length);
                 for (; rowStart < end; rowStart += BYTES_PER_ROW) {
@@ -449,24 +645,27 @@
                     }
                     rowEl.appendChild(hexSpan);
                     rowEl.appendChild(asciiSpan);
-                    self.hexContainer.appendChild(rowEl);
-                    (function(rStart, hSpan, aSpan) {
-                        hSpan.querySelectorAll('.memoryediter-byte').forEach(function(el, idx) {
-                            var offset = baseOffset + rStart + idx;
-                            var asciiNode = aSpan.childNodes[idx];
-                            if (typeof EventManager !== 'undefined') {
-                                EventManager.registerElementEvent(self.pid, el, 'click', function() {
-                                    self._editByte(targetPid, heapId, offset, el, asciiNode);
-                                });
-                            } else {
-                                el.addEventListener('click', function() { self._editByte(targetPid, heapId, offset, el, asciiNode); });
-                            }
-                        });
-                    })(rowStart, hexSpan, asciiSpan);
+                    fragment.appendChild(rowEl);
                 }
                 if (rowStart < rows.length) {
+                    self.hexContainer.appendChild(fragment);
+                    fragment = document.createDocumentFragment();
                     requestAnimationFrame(renderChunk);
                 } else {
+                    self.hexContainer.appendChild(fragment);
+                    if (!self._byteClickHandler) {
+                        self._byteClickHandler = function(e) {
+                            var el = e.target;
+                            if (el.classList.contains('memoryediter-byte')) {
+                                var offset = parseInt(el.dataset.offset, 10);
+                                var asciiSpan = el.parentElement.nextElementSibling;
+                                var idx = Array.from(el.parentElement.children).indexOf(el);
+                                var asciiNode = asciiSpan.childNodes[idx];
+                                self._editByte(targetPid, heapId, offset, el, asciiNode);
+                            }
+                        };
+                        self.hexContainer.addEventListener('click', self._byteClickHandler);
+                    }
                     if (callback) callback();
                 }
             }
@@ -676,6 +875,11 @@
                 clearInterval(this._refreshTimer);
                 this._refreshTimer = null;
             }
+            if (this._byteClickHandler && this.hexContainer) {
+                this.hexContainer.removeEventListener('click', this._byteClickHandler);
+                this._byteClickHandler = null;
+            }
+            this._hexCache.clear();
             if (typeof EventManager !== 'undefined' && this.pid) EventManager.unregisterAllHandlersForPid(this.pid);
             if (typeof GUIManager !== 'undefined') {
                 if (this.windowId) await GUIManager.unregisterWindow(this.windowId);
@@ -716,7 +920,9 @@
                 permissions: typeof PermissionManager !== 'undefined' ? [
                     PermissionManager.PERMISSION.GUI_WINDOW_CREATE,
                     PermissionManager.PERMISSION.EVENT_LISTENER,
-                    PermissionManager.PERMISSION.SERVER_SERVICE_MANAGE  // 通过 kernelAPI 启动/停止 ProcessMemory 服务（最高等级）
+                    PermissionManager.PERMISSION.SERVER_SERVICE_MANAGE,
+                    PermissionManager.PERMISSION.MULTITHREADING_CREATE,
+                    PermissionManager.PERMISSION.MULTITHREADING_EXECUTE
                 ] : [],
                 metadata: { allowMultipleInstances: true }
             };

@@ -160,8 +160,8 @@ class PermissionManager {
         [PermissionManager.PERMISSION.THEME_WRITE]: PermissionManager.PERMISSION_LEVEL.SPECIAL,
         [PermissionManager.PERMISSION.DESKTOP_MANAGE]: PermissionManager.PERMISSION_LEVEL.SPECIAL,
         [PermissionManager.PERMISSION.DESKTOP_SHORTCUT]: PermissionManager.PERMISSION_LEVEL.NORMAL, // 桌面快捷方式为普通权限
-        [PermissionManager.PERMISSION.MULTITHREADING_CREATE]: PermissionManager.PERMISSION_LEVEL.SPECIAL,
-        [PermissionManager.PERMISSION.MULTITHREADING_EXECUTE]: PermissionManager.PERMISSION_LEVEL.SPECIAL,
+        [PermissionManager.PERMISSION.MULTITHREADING_CREATE]: PermissionManager.PERMISSION_LEVEL.NORMAL,
+        [PermissionManager.PERMISSION.MULTITHREADING_EXECUTE]: PermissionManager.PERMISSION_LEVEL.NORMAL,
         
         // 拖拽权限（普通权限，自动授予）
         [PermissionManager.PERMISSION.DRAG_ELEMENT]: PermissionManager.PERMISSION_LEVEL.NORMAL,
@@ -198,7 +198,7 @@ class PermissionManager {
         [PermissionManager.PERMISSION.SCHEDULE_TASK_MANAGE]: PermissionManager.PERMISSION_LEVEL.SPECIAL,
         
         // 危险权限（需要明确授权）
-        [PermissionManager.PERMISSION.PROCESS_MANAGE]: PermissionManager.PERMISSION_LEVEL.DANGEROUS,
+        [PermissionManager.PERMISSION.PROCESS_MANAGE]: PermissionManager.PERMISSION_LEVEL.SPECIAL,
         [PermissionManager.PERMISSION.PROCESS_BACKGROUND]: PermissionManager.PERMISSION_LEVEL.NORMAL,  // 申请转为后台进程为普通权限（仅自身）
         [PermissionManager.PERMISSION.SCHEDULE_TASK_STARTUP]: PermissionManager.PERMISSION_LEVEL.DANGEROUS,  // 系统启动后的计划任务需要危险权限
         
@@ -242,6 +242,16 @@ class PermissionManager {
      * Map<requestId, {pid, permission, resolve, reject, timestamp}>
      */
     static _pendingRequests = new Map();
+    
+    /**
+     * 请求超时时间（毫秒）
+     */
+    static REQUEST_TIMEOUT = 60000;
+    
+    /**
+     * 清理过期请求的定时器
+     */
+    static _cleanupTimer = null;
     
     /**
      * 请求ID计数器
@@ -383,6 +393,9 @@ class PermissionManager {
                 });
                 
                 KernelLogger.info("PermissionManager", "权限管理器初始化完成");
+                
+                // 启动过期请求清理定时器
+                PermissionManager._startCleanupTimer();
             } catch (e) {
                 KernelLogger.error("PermissionManager", `初始化失败: ${e.message}`, e);
                 // 即使初始化失败，也标记为已初始化，避免阻塞系统
@@ -1385,10 +1398,28 @@ class PermissionManager {
      * @param {boolean} granted 是否授予
      */
     static _handlePermissionResponse(requestId, granted) {
-        const request = PermissionManager._pendingRequests.get(requestId);
+        let request = PermissionManager._pendingRequests.get(requestId);
+        
+        // 如果精确匹配不存在，尝试查找匹配 PID 和权限的请求
         if (!request) {
-            KernelLogger.warn("PermissionManager", `权限请求 ${requestId} 不存在`);
-            return;
+            const requestParts = requestId.split('_');
+            if (requestParts.length >= 4) {
+                const requestPid = parseInt(requestParts[1], 10);
+                const requestPerm = requestParts.slice(2, -1).join('_');
+                
+                for (const [id, req] of PermissionManager._pendingRequests) {
+                    if (req.pid === requestPid && req.permission === requestPerm) {
+                        request = req;
+                        requestId = id;
+                        break;
+                    }
+                }
+            }
+            
+            if (!request) {
+                KernelLogger.warn("PermissionManager", `权限请求 ${requestId} 不存在，可能已超时`);
+                return;
+            }
         }
         
         // 移除弹窗
@@ -1693,6 +1724,36 @@ class PermissionManager {
         if (PermissionManager._auditLog.length > PermissionManager.MAX_AUDIT_LOG_SIZE) {
             PermissionManager._auditLog.shift(); // 移除最旧的条目
         }
+    }
+    
+    /**
+     * 启动清理过期请求的定时器
+     * @private
+     */
+    static _startCleanupTimer() {
+        if (PermissionManager._cleanupTimer) {
+            return;
+        }
+        
+        PermissionManager._cleanupTimer = setInterval(() => {
+            const now = Date.now();
+            const expiredRequests = [];
+            
+            for (const [requestId, request] of PermissionManager._pendingRequests) {
+                if (now - request.timestamp > PermissionManager.REQUEST_TIMEOUT) {
+                    expiredRequests.push(requestId);
+                }
+            }
+            
+            expiredRequests.forEach(requestId => {
+                const request = PermissionManager._pendingRequests.get(requestId);
+                if (request) {
+                    request.resolve(false);
+                    PermissionManager._pendingRequests.delete(requestId);
+                    KernelLogger.warn("PermissionManager", `权限请求 ${requestId} 已超时`);
+                }
+            });
+        }, 10000);
     }
     
     /**

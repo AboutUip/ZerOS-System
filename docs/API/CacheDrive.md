@@ -13,6 +13,7 @@
 - **隔离存储**：系统缓存和程序缓存相互隔离，互不干扰
 - **自动清理**：自动清理过期缓存，保持缓存数据的新鲜度
 - **程序名称标识**：程序缓存使用程序名称（而非 PID）作为标识，确保缓存在程序重启后仍然有效
+- **文件缓存支持**：大值缓存可存储到独立文件，避免占用过多内存
 
 ## 依赖
 
@@ -46,6 +47,21 @@ const CacheDrive = window.CacheDrive;
 - **缓存元数据文件**：`D:/LocalCache.json`（始终使用系统盘 D:）
 
 缓存数据存储在 `LocalCache.json` 文件中，不在 `LocalSData.json` 中存放。**所有系统资源（包括缓存）都必须从系统磁盘 D: 加载**，CacheDrive 始终使用 D: 分区，不会使用其他分区。
+
+### 文件缓存配置
+
+CacheDrive 支持将大值缓存存储到独立文件中，避免占用过多内存。
+
+| 配置项 | 默认值 | 说明 |
+|--------|--------|------|
+| `CacheDrive.FILE_CACHE_ENABLED` | `true` | 是否启用文件缓存 |
+| `CacheDrive.FILE_CACHE_THRESHOLD` | `1024` | 超过此大小（字节）时使用文件缓存，默认 1KB |
+
+**文件缓存工作原理**：
+- 当缓存值大小超过 `FILE_CACHE_THRESHOLD` 时，自动存储到独立文件
+- 文件缓存路径：`D:/cache/sys_<key>.cache`（系统缓存）或 `D:/cache/prog_<programName>_<key>.cache`（程序缓存）
+- 元数据文件中只存储 `{ value: null, isFileBacked: true }`，实际值从文件读取
+- 可以通过 `set` 方法的 `fileCache` 选项强制指定是否使用文件缓存
 
 ## 权限要求
 
@@ -94,6 +110,10 @@ const value = await ProcessManager.callKernelAPI(
   - `ttl` (number, 默认 `0`): 生存时间（毫秒），`0` 表示永不过期
   - `pid` (number, 可选): 程序 PID（会自动转换为程序名称）
   - `programName` (string, 可选): 程序名称（优先级高于 pid），不提供则为系统缓存
+  - `fileCache` (boolean, 可选): 是否强制使用文件缓存
+    - `true`: 强制使用文件缓存
+    - `false`: 强制不使用文件缓存
+    - `undefined`: 根据值大小自动判断（默认行为）
 
 **返回值**: `Promise<void>`
 
@@ -113,6 +133,20 @@ await ProcessManager.callKernelAPI(
     this.pid,
     'Cache.set',
     ['user.data', { name: 'John' }, { ttl: 0 }]
+);
+
+// 强制使用文件缓存（用于大值数据）
+await ProcessManager.callKernelAPI(
+    this.pid,
+    'Cache.set',
+    ['largeData', largeObject, { fileCache: true }]
+);
+
+// 强制不使用文件缓存（即使值很大）
+await ProcessManager.callKernelAPI(
+    this.pid,
+    'Cache.set',
+    ['smallData', smallObject, { fileCache: false }]
 );
 ```
 
@@ -385,6 +419,41 @@ if (stats.expiredCount > 10) {
 }
 ```
 
+### 示例 5: 使用文件缓存
+
+```javascript
+// 大数据自动使用文件缓存（超过 1KB）
+const largeData = { items: Array(1000).fill({ id: 1, name: 'test' }) };
+await ProcessManager.callKernelAPI(
+    this.pid,
+    'Cache.set',
+    ['largeList', largeData]
+);
+// 自动存储到 D:/cache/prog_myapp_largeList.cache
+
+// 强制使用文件缓存（即使数据较小）
+await ProcessManager.callKernelAPI(
+    this.pid,
+    'Cache.set',
+    ['smallButLarge', { a: 1 }, { fileCache: true }]
+);
+
+// 强制不使用文件缓存（即使数据较大）
+const mediumData = { items: Array(100).fill({ id: 1 }) };
+await ProcessManager.callKernelAPI(
+    this.pid,
+    'Cache.set',
+    ['mediumData', mediumData, { fileCache: false }]
+);
+
+// 获取文件缓存
+const cached = await ProcessManager.callKernelAPI(
+    this.pid,
+    'Cache.get',
+    ['largeList', null]
+);
+```
+
 ## 缓存数据结构
 
 缓存元数据存储在 `D:/LocalCache.json` 文件中，结构如下：
@@ -397,7 +466,16 @@ if (stats.expiredCount > 10) {
       "expiresAt": 1234567890000,
       "createdAt": 1234567890000,
       "updatedAt": 1234567890000,
-      "size": 1024
+      "size": 1024,
+      "isFileBacked": false
+    },
+    "large.cache.key": {
+      "value": null,
+      "expiresAt": 1234567890000,
+      "createdAt": 1234567890000,
+      "updatedAt": 1234567890000,
+      "size": 102400,
+      "isFileBacked": true
     }
   },
   "programs": {
@@ -407,12 +485,21 @@ if (stats.expiredCount > 10) {
         "expiresAt": 0,
         "createdAt": 1234567890000,
         "updatedAt": 1234567890000,
-        "size": 512
+        "size": 512,
+        "isFileBacked": false
       }
     }
   }
 }
 ```
+
+**字段说明**：
+- `value`: 缓存值（小值存储在内存中，文件缓存时为 `null`）
+- `expiresAt`: 过期时间戳（毫秒），`0` 表示永不过期
+- `createdAt`: 创建时间戳
+- `updatedAt`: 更新时间戳
+- `size`: 缓存大小（字节）
+- `isFileBacked`: 是否使用文件缓存（`true` 时值存储在 `D:/cache/` 目录下的独立文件中）
 
 ## 注意事项
 
@@ -434,10 +521,13 @@ if (stats.expiredCount > 10) {
    - 缓存元数据有 1 秒的请求缓存，避免频繁读取文件
    - 过期缓存会在加载元数据时自动清理
    - 建议合理设置 `ttl`，避免缓存占用过多空间
+   - **文件缓存**：大值数据会自动存储到独立文件，不占用内存
+   - 文件缓存路径：`D:/cache/sys_<key>.cache`（系统）或 `D:/cache/prog_<programName>_<key>.cache`（程序）
 
 5. **错误处理**：
    - 所有方法都返回 Promise，需要使用 `try-catch` 处理错误
    - 如果缓存文件损坏或无法读取，会使用空数据结构
+   - 文件缓存写入失败时会回退到内存缓存
 
 6. **权限要求**：
    - 读取操作需要 `CACHE_READ` 权限

@@ -43,6 +43,11 @@
         __init__: async function(pid, initArgs) {
             this.pid = pid;
             
+            // 重新初始化事件处理器数组（因为程序是单例，可能被多次启动）
+            this._eventHandlers = [];
+            this._resizeObserver = null;
+            this._currentCellSize = 16;
+            
             try {
                 // 获取 GUI 容器
                 const guiContainer = initArgs.guiContainer || document.getElementById('gui-container');
@@ -162,11 +167,9 @@
                 this._registerContextMenuInterceptor();
             } catch (error) {
                 if (typeof KernelLogger !== 'undefined') {
-                    KernelLogger.error("MINESWEEPER", `初始化失败: ${error.message}`, error);
-                } else {
-                    if (typeof KernelLogger !== 'undefined') {
-                        KernelLogger.error('Minesweeper', '扫雷游戏初始化失败', error);
-                    }
+                    const errorMsg = error?.message || error?.toString() || String(error);
+                    const errorStack = error?.stack || '';
+                    KernelLogger.error('Minesweeper', `扫雷游戏初始化失败: ${errorMsg}`, { error: errorMsg, stack: errorStack });
                 }
             }
         },
@@ -413,10 +416,124 @@
         _initGame: function() {
             const config = this.difficulties[this.difficulty];
             this._initBoard(config.rows, config.cols, config.mines);
+            this._currentCellSize = 16;
             this._renderBoard();
             this._updateMineCount();
             this._updateFace('ready');
             this._updateTimer(0);
+            this._setupResizeHandler();
+        },
+        
+        /**
+         * 计算自适应格子大小
+         */
+        _calculateCellSize: function(rows, cols) {
+            if (!this.window) return 16;
+            
+            const boardContainer = this.window.querySelector('.minesweeper-board-container');
+            if (!boardContainer) return 16;
+            
+            const containerWidth = boardContainer.clientWidth - 16;
+            const containerHeight = boardContainer.clientHeight - 16;
+            
+            const cellWidth = Math.floor(containerWidth / cols);
+            const cellHeight = Math.floor(containerHeight / rows);
+            
+            const cellSize = Math.min(cellWidth, cellHeight, 72);
+            return Math.max(cellSize, 10);
+        },
+        
+        /**
+         * 设置窗口 resize 监听（自适应调整格子大小）
+         */
+        _setupResizeHandler: function() {
+            if (this._resizeHandler) {
+                if (typeof EventManager !== 'undefined') {
+                    EventManager.unregisterEventHandler(this.pid, this._resizeHandler);
+                }
+            }
+            
+            if (typeof EventManager !== 'undefined') {
+                this._resizeHandler = EventManager.registerEventHandler(this.pid, 'resize', () => {
+                    this._handleResize();
+                }, { priority: 0 });
+            } else {
+                this._resizeHandler = true;
+                window.addEventListener('resize', () => this._handleResize());
+            }
+            
+            // 监听窗口的 transitionend 事件，确保动画完成后更新
+            // 这对窗口最大化/还原的平滑过渡很重要
+            if (this.window && typeof this.window.addEventListener === 'function') {
+                this._addEventHandler(this.window, 'transitionend', (e) => {
+                    if (e.propertyName === 'width' || e.propertyName === 'height') {
+                        this._handleResize();
+                    }
+                });
+            }
+            
+            // 使用 ResizeObserver 观察游戏板容器的大小变化
+            if (typeof ResizeObserver !== 'undefined') {
+                if (this._resizeObserver) {
+                    this._resizeObserver.disconnect();
+                }
+                
+                // 找到 boardContainer
+                const boardContainer = this.window ? this.window.querySelector('.minesweeper-board-container') : null;
+                if (boardContainer) {
+                    this._resizeObserver = new ResizeObserver((entries) => {
+                        for (const entry of entries) {
+                            this._handleResize();
+                            break;
+                        }
+                    });
+                    this._resizeObserver.observe(boardContainer);
+                }
+            }
+        },
+        
+        /**
+         * 处理窗口大小变化
+         */
+        _handleResize: function() {
+            if (!this.window || this.gameState === 'lost') return;
+            
+            const config = this.difficulties[this.difficulty];
+            const newCellSize = this._calculateCellSize(config.rows, config.cols);
+            
+            if (newCellSize !== this._currentCellSize) {
+                this._renderBoard(newCellSize);
+                this._updateAllCells();
+            }
+        },
+        
+        /**
+         * 更新所有格子显示
+         */
+        _updateAllCells: function() {
+            if (!this.gameBoard) return;
+            
+            const config = this.difficulties[this.difficulty];
+            const cellSize = this._currentCellSize || 16;
+            const fontSize = Math.max(8, Math.floor(cellSize * 0.7));
+            
+            const cells = this.gameBoard.querySelectorAll('.minesweeper-cell');
+            cells.forEach(cell => {
+                const row = parseInt(cell.dataset.row);
+                const col = parseInt(cell.dataset.col);
+                
+                cell.style.width = `${cellSize}px`;
+                cell.style.height = `${cellSize}px`;
+                cell.style.fontSize = `${fontSize}px`;
+                
+                if (this.flagged[row][col]) {
+                    cell.style.border = '1px outset #ffffff';
+                } else if (this.revealed[row][col]) {
+                    cell.style.border = '1px inset #808080';
+                } else {
+                    cell.style.border = '1px outset #ffffff';
+                }
+            });
         },
         
         /**
@@ -488,15 +605,22 @@
         
         /**
          * 渲染游戏板（优化：使用文档片段批量添加，提高性能）
+         * @param {number} cellSize - 格子大小（可选，默认16）
          */
-        _renderBoard: function() {
+        _renderBoard: function(cellSize) {
             this.gameBoard.innerHTML = '';
             const config = this.difficulties[this.difficulty];
             const rows = config.rows;
             const cols = config.cols;
             
-            this.gameBoard.style.gridTemplateColumns = `repeat(${cols}, 16px)`;
-            this.gameBoard.style.gridTemplateRows = `repeat(${rows}, 16px)`;
+            // 计算格子大小：如果未指定，则根据窗口大小自动计算
+            if (!cellSize) {
+                cellSize = this._calculateCellSize(rows, cols);
+            }
+            this._currentCellSize = cellSize;
+            
+            this.gameBoard.style.gridTemplateColumns = `repeat(${cols}, ${cellSize}px)`;
+            this.gameBoard.style.gridTemplateRows = `repeat(${rows}, ${cellSize}px)`;
             
             // 使用文档片段批量添加，减少重排
             const fragment = document.createDocumentFragment();
@@ -507,19 +631,23 @@
                     cell.className = 'minesweeper-cell';
                     cell.dataset.row = i;
                     cell.dataset.col = j;
+                    
+                    // 根据格子大小动态设置样式
+                    const fontSize = Math.max(8, Math.floor(cellSize * 0.7));
                     cell.style.cssText = `
-                        width: 16px;
-                        height: 16px;
+                        width: ${cellSize}px;
+                        height: ${cellSize}px;
                         background: #c0c0c0;
                         border: 1px outset #ffffff;
                         display: flex;
                         align-items: center;
                         justify-content: center;
-                        font-size: 11px;
+                        font-size: ${fontSize}px;
                         font-weight: bold;
                         font-family: 'Courier New', monospace;
                         cursor: pointer;
                         user-select: none;
+                        box-sizing: border-box;
                     `;
                     
                     // 事件监听器（统一使用 _addEventHandler 管理）
@@ -649,6 +777,13 @@
         _updateCell: function(row, col) {
             const cell = this.gameBoard.querySelector(`[data-row="${row}"][data-col="${col}"]`);
             if (!cell) return;
+            
+            const cellSize = this._currentCellSize || 16;
+            const fontSize = Math.max(8, Math.floor(cellSize * 0.7));
+            
+            cell.style.width = `${cellSize}px`;
+            cell.style.height = `${cellSize}px`;
+            cell.style.fontSize = `${fontSize}px`;
             
             if (this.flagged[row][col]) {
                 cell.textContent = '🚩';
@@ -839,6 +974,22 @@
                 // 停止计时器
                 this._stopTimer();
                 
+                // 清理 resize 监听器
+                if (this._resizeHandler) {
+                    if (typeof EventManager !== 'undefined') {
+                        EventManager.unregisterEventHandler(this.pid, this._resizeHandler);
+                    } else if (typeof window !== 'undefined') {
+                        window.removeEventListener('resize', () => this._handleResize());
+                    }
+                    this._resizeHandler = null;
+                }
+                
+                // 清理 ResizeObserver
+                if (this._resizeObserver) {
+                    this._resizeObserver.disconnect();
+                    this._resizeObserver = null;
+                }
+                
                 // 注销上下文菜单拦截器
                 if (typeof ContextMenuManager !== 'undefined') {
                     if (this.contextMenuId) {
@@ -865,18 +1016,20 @@
                     this._eventHandlers = null;
                 }
                 
-                // 取消注册 GUI 窗口
-                if (this.windowId && typeof GUIManager !== 'undefined') {
-                    await GUIManager.unregisterWindow(this.windowId);
-                } else if (this.pid && typeof GUIManager !== 'undefined') {
-                    await GUIManager.unregisterWindow(this.pid);
+                // 注销窗口
+                if (typeof GUIManager !== 'undefined') {
+                    if (this.windowId) {
+                        GUIManager.unregisterWindow(this.windowId);
+                    } else if (this.pid) {
+                        GUIManager.unregisterWindow(this.pid);
+                    }
                 }
-                
-                // 清理 DOM 元素
+
+                // 清理 DOM 元素（在注销窗口之后）
                 if (this.window && this.window.parentElement) {
                     this.window.parentElement.removeChild(this.window);
                 }
-                
+
                 // 清理所有对象引用
                 this.window = null;
                 this.windowId = null;
@@ -887,14 +1040,11 @@
                 this.board = null;
                 this.revealed = null;
                 this.flagged = null;
+                this._currentCellSize = null;
                 
             } catch (error) {
                 if (typeof KernelLogger !== 'undefined') {
-                    KernelLogger.error("MINESWEEPER", `清理资源失败: ${error.message}`, error);
-                } else {
-                    if (typeof KernelLogger !== 'undefined') {
-                        KernelLogger.error('Minesweeper', '扫雷游戏清理失败', error);
-                    }
+                    KernelLogger.error('Minesweeper', '扫雷游戏清理失败', error);
                 }
             }
         },

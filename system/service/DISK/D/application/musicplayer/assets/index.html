@@ -5,6 +5,173 @@
     <!-- 图标由壳子程序 musicplayer.svg 提供，此处不引用避免 404 -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>音乐</title>
+    <script>
+      (function() {
+        var cacheTTL = 30 * 60 * 1000;
+        var cachePrefix = 'kitemusic.';
+        var cacheStorage = {};
+        var cacheExpiry = {};
+
+        var cacheablePatterns = [
+          '/user/playlist',
+          '/likelist',
+          '/playlist/detail',
+          '/song/detail'
+        ];
+
+        function isCacheableUrl(url) {
+          if (!url) return false;
+          var urlStr = String(url);
+          for (var i = 0; i < cacheablePatterns.length; i++) {
+            if (urlStr.includes(cacheablePatterns[i])) {
+              return true;
+            }
+          }
+          return false;
+        }
+
+        function getCacheKey(url) {
+          try {
+            var urlStr = String(url);
+            if (urlStr.startsWith('http://') || urlStr.startsWith('https://')) {
+              var urlObj = new URL(urlStr);
+              var path = urlObj.pathname;
+              var params = urlObj.searchParams;
+              var keyParams = ['ids', 'id', 'uid'];
+              var keyParts = [path];
+              keyParams.forEach(function(p) {
+                if (params.get(p)) {
+                  keyParts.push(p + '=' + params.get(p));
+                }
+              });
+              return cachePrefix + keyParts.join('&');
+            } else {
+              var parts = urlStr.split('?');
+              var path = parts[0];
+              var keyParts = [path];
+              if (parts[1]) {
+                var searchParams = new URLSearchParams(parts[1]);
+                var keyParams = ['ids', 'id', 'uid'];
+                keyParams.forEach(function(p) {
+                  if (searchParams.get(p)) {
+                    keyParts.push(p + '=' + searchParams.get(p));
+                  }
+                });
+              }
+              return cachePrefix + keyParts.join('&');
+            }
+          } catch (e) {
+            return cachePrefix + String(url);
+          }
+        }
+
+        function getFromCache(url) {
+          var key = getCacheKey(url);
+          if (cacheStorage[key] && cacheExpiry[key] && Date.now() < cacheExpiry[key]) {
+            var data = cacheStorage[key];
+            if (data && data.code === 200) {
+              return data;
+            }
+          }
+          return null;
+        }
+
+        function setCache(url, data) {
+          if (!isCacheableUrl(url)) return;
+          if (!data || typeof data !== 'object') return;
+          if (data.code !== undefined && data.code !== 200) return;
+          var key = getCacheKey(url);
+          cacheStorage[key] = data;
+          cacheExpiry[key] = Date.now() + cacheTTL;
+          try {
+            parent.postMessage({
+              type: 'kitemusic-cache-set',
+              key: key,
+              value: data
+            }, '*');
+          } catch (e) {}
+        }
+
+        window.addEventListener('message', function(e) {
+          if (e.data && e.data.type === 'kitemusic-cache-result') {
+            var key = e.data.key;
+            var value = e.data.value;
+            if (value && typeof value === 'object' && value.code === 200) {
+              cacheStorage[key] = value;
+              cacheExpiry[key] = Date.now() + cacheTTL;
+            }
+          }
+        });
+
+        var originalXHROpen = XMLHttpRequest.prototype.open;
+        var originalXHRSend = XMLHttpRequest.prototype.send;
+
+        XMLHttpRequest.prototype.open = function(method, url) {
+          this._kitemusic_url = url;
+          this._kitemusic_cacheable = isCacheableUrl(url);
+          return originalXHROpen.apply(this, arguments);
+        };
+
+        XMLHttpRequest.prototype.send = function(body) {
+          var self = this;
+          
+          if (this._kitemusic_cacheable) {
+            var cached = getFromCache(this._kitemusic_url);
+            if (cached) {
+              Object.defineProperty(this, 'readyState', { get: function() { return 4; } });
+              Object.defineProperty(this, 'status', { get: function() { return 200; } });
+              Object.defineProperty(this, 'responseText', {
+                get: function() { return JSON.stringify(cached); },
+                configurable: true
+              });
+              Object.defineProperty(this, 'response', {
+                get: function() { return JSON.stringify(cached); },
+                configurable: true
+              });
+              Object.defineProperty(this, 'responseJSON', {
+                get: function() { return cached; },
+                configurable: true
+              });
+              
+              var originalOnReadyStateChange = this.onreadystatechange;
+              this.onreadystatechange = function() {
+                if (originalOnReadyStateChange) {
+                  originalOnReadyStateChange.apply(self, arguments);
+                }
+              };
+              
+              setTimeout(function() {
+                self.dispatchEvent(new Event('readystatechange'));
+                self.dispatchEvent(new Event('load'));
+                self.dispatchEvent(new Event('loadend'));
+              }, 0);
+              
+              return;
+            }
+          }
+          
+          var originalOnReadyStateChange = this.onreadystatechange;
+          var self2 = this;
+          
+          this.addEventListener('loadend', function() {
+            if (self2._kitemusic_cacheable && self2.status === 200) {
+              try {
+                var data = JSON.parse(self2.responseText);
+                setCache(self2._kitemusic_url, data);
+              } catch (e) {}
+            }
+          }, { once: true });
+          
+          if (originalOnReadyStateChange) {
+            this.onreadystatechange = function() {
+              originalOnReadyStateChange.apply(self2, arguments);
+            };
+          }
+          
+          return originalXHRSend.apply(this, arguments);
+        };
+      })();
+    </script>
     <script type="module" crossorigin src="./assets/index-DUNGDuLl.js"></script>
     <link rel="stylesheet" crossorigin href="./assets/index-CNIKra-V.css">
   </head>

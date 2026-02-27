@@ -34,6 +34,15 @@
         __init__: async function(pid, initArgs = {}) {
             this._upid = initArgs && initArgs.upid;
             try {
+                // 重新初始化必要变量（因为程序是单例，可能被多次启动）
+                this.toolButtons = {};
+                this.currentTool = 'pencil';
+                this.currentColor = '#ff9f0a';
+                this.currentWidth = 3;
+                this.isDrawing = false;
+                this._resizeObserver = null;
+                this._eventHandlers = [];
+                
                 this.pid = pid;
                 GUIManager.init();
                 // 优先使用 GUI 容器，避免窗口脱离容器导致与任务栏的 z-index 失衡
@@ -216,25 +225,24 @@
 
         _bindEvents: function() {
             const onPointerDown = (e) => {
+                e.preventDefault();
                 this.isDrawing = true;
                 const { x, y } = this._getPos(e);
                 this.lastX = x;
                 this.lastY = y;
                 this._applyToolStyle();
-                // 在离屏 canvas 上绘制
                 this.offCtx.beginPath();
                 this.offCtx.moveTo(x, y);
             };
 
             const onPointerMove = (e) => {
                 if (!this.isDrawing) return;
+                e.preventDefault();
                 const { x, y } = this._getPos(e);
-                // 在离屏 canvas 上绘制
                 this.offCtx.lineTo(x, y);
                 this.offCtx.stroke();
                 this.lastX = x;
                 this.lastY = y;
-                // 实时同步到显示 canvas
                 this._syncDisplay();
             };
 
@@ -245,17 +253,41 @@
                 this._syncDisplay();
             };
 
-            this.canvas.addEventListener('pointerdown', onPointerDown);
-            this.canvas.addEventListener('pointermove', onPointerMove);
-            this.canvas.addEventListener('pointerup', endDrawing);
-            this.canvas.addEventListener('pointerleave', endDrawing);
+            this._addEventHandler(this.canvas, 'pointerdown', onPointerDown);
+            this._addEventHandler(this.canvas, 'pointermove', onPointerMove);
+            this._addEventHandler(this.canvas, 'pointerup', endDrawing);
+            this._addEventHandler(this.canvas, 'pointerleave', endDrawing);
+            this._addEventHandler(this.canvas, 'pointercancel', endDrawing);
+            
+            // 触摸事件支持（防止默认触摸行为如滚动）
+            this._addEventHandler(this.canvas, 'touchstart', (e) => e.preventDefault(), { passive: false });
+            this._addEventHandler(this.canvas, 'touchmove', (e) => e.preventDefault(), { passive: false });
+            this._addEventHandler(this.canvas, 'touchend', (e) => e.preventDefault(), { passive: false });
+        },
+        
+        _addEventHandler: function(element, event, handler, options = {}) {
+            element.addEventListener(event, handler, options);
+            this._eventHandlers.push({ element, event, handler, options });
         },
 
         _getPos: function(e) {
             const rect = this.canvas.getBoundingClientRect();
+            let clientX, clientY;
+            
+            if (e.touches && e.touches.length > 0) {
+                clientX = e.touches[0].clientX;
+                clientY = e.touches[0].clientY;
+            } else if (e.changedTouches && e.changedTouches.length > 0) {
+                clientX = e.changedTouches[0].clientX;
+                clientY = e.changedTouches[0].clientY;
+            } else {
+                clientX = e.clientX;
+                clientY = e.clientY;
+            }
+            
             return {
-                x: (e.clientX - rect.left),
-                y: (e.clientY - rect.top)
+                x: (clientX - rect.left),
+                y: (clientY - rect.top)
             };
         },
 
@@ -437,11 +469,21 @@
          * 退出清理
          */
         __exit__: async function() {
+            // 清理事件监听器
+            if (this._eventHandlers && Array.isArray(this._eventHandlers)) {
+                this._eventHandlers.forEach(({ element, event, handler, options }) => {
+                    if (element && typeof element.removeEventListener === 'function') {
+                        element.removeEventListener(event, handler, options);
+                    }
+                });
+                this._eventHandlers = null;
+            }
+            
             try {
                 if (this.windowId && GUIManager) {
-                    await GUIManager.unregisterWindow(this.windowId);
+                    GUIManager.unregisterWindow(this.windowId);
                 } else if (this.pid) {
-                    await GUIManager.unregisterWindow(this.pid);
+                    GUIManager.unregisterWindow(this.pid);
                 }
             } catch (e) {
                 KernelLogger.warn('PAINT', `窗口注销失败: ${e.message}`);

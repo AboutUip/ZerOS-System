@@ -14,6 +14,7 @@
         _selectedApp: null,
         _apps: [],
         _selectedFolder: null,
+        _loadAppsCallCount: 0,
 
         _getText: function(key, fallback) {
             if (typeof LanguagesExpansion !== 'undefined' && typeof LanguagesExpansion.getText === 'function') {
@@ -24,6 +25,11 @@
         },
 
         __init__: async function(pid, initArgs) {
+            this._apps = [];
+            this._selectedApp = null;
+            this._selectedFolder = null;
+            this._loadAppsCallCount = 0;
+            
             this.pid = pid;
             this._upid = initArgs && initArgs.upid;
             const guiContainer = initArgs.guiContainer || document.getElementById('gui-container');
@@ -238,6 +244,7 @@
         },
 
         _createAppCard: function(app) {
+            const baseUrl = 'http://60.205.142.158:80';
             const card = document.createElement('div');
             card.className = 'store-app-card';
             card.dataset.id = app.id;
@@ -284,7 +291,8 @@
                 flex-shrink: 0;
             `;
             if (app.iconUrl) {
-                icon.innerHTML = `<img src="${app.iconUrl}" alt="${app.name}" style="width:100%;height:100%;object-fit:cover;">`;
+                const iconUrl = app.iconUrl.startsWith('http') ? app.iconUrl : `${baseUrl}${app.iconUrl}`;
+                icon.innerHTML = `<img src="${iconUrl}" alt="${app.name}" style="width:100%;height:100%;object-fit:cover;">`;
             } else {
                 icon.innerHTML = `
                     <svg width="32" height="32" viewBox="0 0 24 24" fill="white">
@@ -373,11 +381,12 @@
         _showAppDetail: async function(app) {
             if (!this._detailContainer) return;
 
+            const baseUrl = 'http://60.205.142.158:80';
+
             this._detailContainer.innerHTML = '';
             this._detailContainer.appendChild(this._createLoading());
 
             try {
-                const baseUrl = 'http://60.205.142.158:80';
                 const response = await fetch(`${baseUrl}/api/application/${app.id}`);
 
                 if (!response.ok) {
@@ -428,7 +437,8 @@
                 flex-shrink: 0;
             `;
             if (app.iconUrl) {
-                icon.innerHTML = `<img src="${app.iconUrl}" alt="${app.name}" style="width:100%;height:100%;object-fit:cover;">`;
+                const iconUrl = app.iconUrl.startsWith('http') ? app.iconUrl : `${baseUrl}${app.iconUrl}`;
+                icon.innerHTML = `<img src="${iconUrl}" alt="${app.name}" style="width:100%;height:100%;object-fit:cover;">`;
             } else {
                 icon.innerHTML = `
                     <svg width="50" height="50" viewBox="0 0 24 24" fill="white" style="margin:25px;">
@@ -797,7 +807,12 @@
         },
 
         _renderAppList: function() {
-            if (!this._appListContainer || !this._apps) return;
+            if (!this._appListContainer || !this._apps) {
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.warn('STORE', `_renderAppList: _appListContainer=${!!this._appListContainer}, _apps=${this._apps}`);
+                }
+                return;
+            }
 
             this._appListContainer.innerHTML = '';
 
@@ -810,8 +825,15 @@
             }
 
             if (this._apps.length === 0) {
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.warn('STORE', `应用列表为空, length=${this._apps.length}`);
+                }
                 this._appListContainer.appendChild(this._createEmpty(this._getText('STORE_NO_APPS', '暂无应用')));
                 return;
+            }
+
+            if (typeof KernelLogger !== 'undefined') {
+                KernelLogger.info('STORE', `渲染应用列表, 共${this._apps.length}个应用`);
             }
 
             const grid = document.createElement('div');
@@ -896,6 +918,11 @@
         },
 
         _loadApps: async function() {
+            this._loadAppsCallCount = (this._loadAppsCallCount || 0) + 1;
+            if (typeof KernelLogger !== 'undefined') {
+                KernelLogger.info('STORE', `_loadApps 第${this._loadAppsCallCount}次调用`);
+            }
+            
             if (!this._appListContainer) return;
 
             this._appListContainer.innerHTML = '';
@@ -903,6 +930,9 @@
 
             try {
                 const baseUrl = 'http://60.205.142.158:80';
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.info('STORE', '开始加载应用列表...');
+                }
                 const response = await fetch(`${baseUrl}/api/application/list`);
 
                 if (!response.ok) {
@@ -911,13 +941,33 @@
 
                 const result = await response.json();
 
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.info('STORE', `API响应: code=${result.code}, data类型=${typeof result.data}, data长度=${Array.isArray(result.data) ? result.data.length : '非数组'}`);
+                }
+
                 if (result.code === 200 && result.data) {
-                    const appsData = Array.isArray(result.data) ? result.data : [];
+                    let appsData = [];
+                    if (Array.isArray(result.data)) {
+                        appsData = result.data;
+                    } else if (result.data.list && Array.isArray(result.data.list)) {
+                        appsData = result.data.list;
+                    } else if (typeof result.data === 'object') {
+                        const listKey = Object.keys(result.data).find(k => Array.isArray(result.data[k]));
+                        if (listKey) {
+                            appsData = result.data[listKey];
+                        }
+                    }
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.info('STORE', `设置应用列表, 共${appsData.length}个应用`);
+                    }
                     this._apps = appsData;
                     this._selectedApp = null;
                     this._renderAppList();
                     this._showWelcomeDetail();
                 } else {
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.warn('STORE', `API返回失败: code=${result.code}, msg=${result.msg}`);
+                    }
                     this._appListContainer.innerHTML = '';
                     this._appListContainer.appendChild(this._createEmpty(result.msg || '加载失败'));
                 }
@@ -942,7 +992,7 @@
             this._appListContainer.appendChild(this._createLoading());
 
             try {
-                const baseUrl = 'http://localhost:8088';
+                const baseUrl = 'http://60.205.142.158:80';
                 const response = await fetch(`${baseUrl}/api/application/search?keyword=${encodeURIComponent(keyword)}`);
 
                 if (!response.ok) {
@@ -952,7 +1002,17 @@
                 const result = await response.json();
 
                 if (result.code === 200 && result.data) {
-                    const appsData = Array.isArray(result.data) ? result.data : [];
+                    let appsData = [];
+                    if (Array.isArray(result.data)) {
+                        appsData = result.data;
+                    } else if (result.data.list && Array.isArray(result.data.list)) {
+                        appsData = result.data.list;
+                    } else if (typeof result.data === 'object') {
+                        const listKey = Object.keys(result.data).find(k => Array.isArray(result.data[k]));
+                        if (listKey) {
+                            appsData = result.data[listKey];
+                        }
+                    }
                     this._apps = appsData;
                     this._selectedApp = null;
                     this._renderAppList();
@@ -972,7 +1032,7 @@
 
         _downloadApp: async function(app, onProgress) {
             try {
-                const baseUrl = 'http://localhost:8088';
+                const baseUrl = 'http://60.205.142.158:80';
                 const cacheDir = 'D:/cache/store';
                 const fileName = app.name.replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/g, '_') + '.zom';
 
