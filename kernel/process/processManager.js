@@ -881,12 +881,11 @@ class ProcessManager {
             // 转换虚拟路径为实际 URL
             const actualUrl = ProcessManager.convertVirtualPathToUrl(path);
 
-            // 检查是否已经加载过
+            // 检查是否已经加载过，如果加载过则移除旧的，重新加载
             const existingScript = document.querySelector(`script[src="${actualUrl}"]`);
             if (existingScript) {
-                ProcessManager._log(3, `脚本已加载: ${path} (${actualUrl})`);
-                resolve();
-                return;
+                ProcessManager._log(3, `脚本已存在，移除旧的: ${path} (${actualUrl})`);
+                existingScript.remove();
             }
 
             const script = document.createElement('script');

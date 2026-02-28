@@ -24,22 +24,22 @@
       }
     },
     "TaskbarManager": {
-      "weather:小店": {
+      "weather:神池县": {
         "value": null,
-        "expiresAt": 1772270477559,
-        "createdAt": 1772227277559,
-        "updatedAt": 1772227277559,
-        "size": 2697,
+        "expiresAt": 1772332002613,
+        "createdAt": 1772288802613,
+        "updatedAt": 1772288802613,
+        "size": 2740,
         "isFileBacked": true
       }
     },
     "exploit": {
       "system.dailyQuote": {
-        "value": "记忆不是一整团的，而是一个一个的抽屉，抽掉的便忘掉了。",
+        "value": "也许我们都没有长大，只是世界变小了。",
         "expiresAt": 0,
-        "createdAt": 1772234783254,
-        "updatedAt": 1772234783254,
-        "size": 83,
+        "createdAt": 1772290285917,
+        "updatedAt": 1772290285917,
+        "size": 56,
         "isFileBacked": false
       }
     }

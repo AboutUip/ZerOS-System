@@ -92,7 +92,10 @@ const pid = await ProcessManager.startProgram('vim', {
 2. 从 ApplicationAssetManager 获取程序资源（或使用 `tempAsset`）
 3. 加载样式表
 4. 加载资源文件
-5. 加载程序脚本（如果 `tempAsset.script` 是文件内容，直接执行；如果是路径，从路径加载）
+5. 加载程序脚本：
+   - 如果 `tempAsset.script` 是文件内容，直接执行
+   - 如果是路径，从路径加载
+   - **注意**：如果脚本已存在，会先移除旧的 script 元素再重新加载，确保程序对象被正确注册
 6. 等待程序对象出现
 7. 检查程序类型（CLI/GUI）
 8. 如果是 CLI 程序且没有终端，自动启动终端
@@ -145,9 +148,24 @@ await ProcessManager.killProgram(pid, true);
 ```
 
 **程序终止流程**:
-1. 调用程序的 `__exit__` 方法
+
+1. 调用程序的 `__exit__` 方法（程序自定义清理）
 2. 如果是 CLI 程序，关闭关联的终端
-3. 清理 GUI 元素（后台进程同样按此流程清理）
+3. 清理 GUI 元素（窗口、DOM）
+4. 清理任务栏/托盘图标
+5. 清理内核资源：
+   - 拖拽会话 (DragDrive)
+   - 通知 (NotificationManager)
+   - 事件处理器 (EventManager)
+   - 权限 (PermissionManager)
+   - 多线程资源 (MultithreadingDrive)
+   - 语音识别会话 (SpeechDrive)
+6. 清理全局引用：
+   - 删除 `window[programNameUpper]`
+   - 删除 `globalThis[programNameUpper]`
+   - 从 POOL 移除 (`APPLICATION_POOL`, `APPLICATION_SHARED_POOL`)
+7. 回收 upid（后端权限映射）
+8. 从进程表移除
 
 ### 后台进程
 

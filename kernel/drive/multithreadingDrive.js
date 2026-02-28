@@ -771,6 +771,9 @@ class MultithreadingDrive {
             MultithreadingDrive._terminateThread(threadId);
         });
         
+        // 清理进程线程映射
+        MultithreadingDrive._processThreads.delete(pid);
+        
         KernelLogger.info("MultithreadingDrive", `清理进程 ${pid} 的所有线程 (${threadIds.length} 个)`);
     }
     

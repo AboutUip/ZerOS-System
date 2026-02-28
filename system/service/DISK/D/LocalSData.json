@@ -274,7 +274,7 @@
         "password": "61b249bf6d604d14120821f43625e84e",
         "avatar": "avatar_root_1766272534753.jpg",
         "createdAt": 1766271155991,
-        "lastLogin": 1772234785254
+        "lastLogin": 1772290287845
       },
       "TestUser": {
         "level": "USER",
@@ -326,9 +326,9 @@
         "triggerConfig": {},
         "enabled": true,
         "createdAt": 1771942626583,
-        "updatedAt": 1772234786113,
-        "lastRunAt": 1772234786113,
-        "runCount": 98,
+        "updatedAt": 1772290288562,
+        "lastRunAt": 1772290288562,
+        "runCount": 105,
         "createdBy": "servicemanager",
         "requiresStartupPermission": true,
         "serviceId": "notice",
