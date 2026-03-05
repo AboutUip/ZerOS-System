@@ -3524,8 +3524,8 @@ class GUIManager {
             position: absolute;
             right: 0;
             bottom: 0;
-            width: 30px;
-            height: 30px;
+            width: 20px;
+            height: 20px;
             cursor: se-resize;
             z-index: 9999;
             background: transparent;
@@ -3547,8 +3547,8 @@ class GUIManager {
             position: absolute;
             right: 0;
             top: 0;
-            width: 30px;
-            height: 30px;
+            width: 20px;
+            height: 20px;
             cursor: ne-resize;
             z-index: 9999;
             background: transparent;
@@ -3570,8 +3570,8 @@ class GUIManager {
             position: absolute;
             left: 0;
             top: 0;
-            width: 30px;
-            height: 30px;
+            width: 20px;
+            height: 20px;
             cursor: nw-resize;
             z-index: 9999;
             background: transparent;
@@ -3594,8 +3594,8 @@ class GUIManager {
             position: absolute;
             left: 0;
             bottom: 0;
-            width: 30px;
-            height: 30px;
+            width: 20px;
+            height: 20px;
             cursor: sw-resize;
             z-index: 9999;
             background: transparent;

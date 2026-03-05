@@ -1,6 +1,47 @@
 {
   "system": {
-    "permissionManager.permissions": {},
+    "permissionManager.permissions": {
+      "settings": [
+        "SYSTEM_NOTIFICATION",
+        "APPLICATION_UNINSTALL",
+        "GUI_WINDOW_CREATE",
+        "EVENT_LISTENER",
+        "SYSTEM_STORAGE_READ",
+        "SYSTEM_STORAGE_WRITE",
+        "ENVIRONMENT_READ",
+        "ENVIRONMENT_WRITE",
+        "THEME_READ",
+        "LANGUAGES_READ",
+        "LANGUAGES_WRITE",
+        "KERNEL_DISK_READ"
+      ],
+      "wallpaperengine": [
+        "SYSTEM_NOTIFICATION",
+        "SERVER_SERVICE_MANAGE",
+        "SCHEDULE_TASK_MANAGE",
+        "SCHEDULE_TASK_STARTUP",
+        "GUI_WINDOW_CREATE",
+        "EVENT_LISTENER",
+        "PROCESS_BACKGROUND",
+        "KERNEL_DISK_READ",
+        "KERNEL_DISK_DELETE",
+        "KERNEL_DISK_LIST",
+        "KERNEL_DISK_CREATE",
+        "KERNEL_DISK_WRITE"
+      ],
+      "zominstall": [
+        "KERNEL_DISK_READ",
+        "KERNEL_DISK_DELETE",
+        "APPLICATION_INSTALL"
+      ],
+      "uninstall": [
+        "SCHEDULE_TASK_MANAGE",
+        "SYSTEM_STORAGE_WRITE"
+      ],
+      "servicemanager": [
+        "SERVER_SERVICE_MANAGE"
+      ]
+    },
     "system.style": "macos",
     "desktop.icons": [
       {
@@ -20,6 +61,24 @@
         "description": "WebViewer",
         "position": null,
         "createdAt": 1770525751934
+      },
+      {
+        "id": 11,
+        "programName": "kiteengine",
+        "name": "KiteEngine 3D 游戏引擎",
+        "icon": "D:/application/kiteengine/kiteengine.svg",
+        "description": "KiteEngine 3D 游戏引擎",
+        "position": null,
+        "createdAt": 1772381779617
+      },
+      {
+        "id": 12,
+        "programName": "servicemanager",
+        "name": "系统服务管理",
+        "icon": "D:/application/servicemanager/servicemanager.svg",
+        "description": "系统服务管理",
+        "position": null,
+        "createdAt": 1772382156071
       }
     ],
     "musicplayer.settings": {
@@ -252,7 +311,8 @@
       }
     ],
     "taskbar.pinnedPrograms": [
-      "terminal"
+      "terminal",
+      "musicplayer"
     ],
     "system.randomAnimeBgStatus": "success",
     "cryptDrive.keys": {
@@ -274,7 +334,7 @@
         "password": "61b249bf6d604d14120821f43625e84e",
         "avatar": "avatar_root_1766272534753.jpg",
         "createdAt": 1766271155991,
-        "lastLogin": 1772290287845
+        "lastLogin": 1772742955162
       },
       "TestUser": {
         "level": "USER",
@@ -326,9 +386,9 @@
         "triggerConfig": {},
         "enabled": true,
         "createdAt": 1771942626583,
-        "updatedAt": 1772290288562,
-        "lastRunAt": 1772290288562,
-        "runCount": 105,
+        "updatedAt": 1772742956037,
+        "lastRunAt": 1772742956037,
+        "runCount": 261,
         "createdBy": "servicemanager",
         "requiresStartupPermission": true,
         "serviceId": "notice",
@@ -364,7 +424,38 @@
       "2026-02-23T12:36:00.303667",
       "2026-02-24 22:03:54"
     ],
-    "bios.memoryAllocation": true
+    "bios.memoryAllocation": true,
+    "system.volume": 1
   },
-  "programs": {}
+  "programs": {
+    "program:wallpaperengine": {
+      "wallpaperengine.library": {
+        "version": 1,
+        "items": [
+          {
+            "id": "mmdvsq3b_mc7yukoo",
+            "path": "D:/cache/wallpaper/mmdvsq3b_mc7yukoo",
+            "sourceFile": "C:/papers/particle-mouse.paper",
+            "name": "particle-mouse",
+            "addedAt": 1772740290319
+          },
+          {
+            "id": "mmdwgxbc_sdr9cit3",
+            "path": "D:/cache/wallpaper/mmdwgxbc_sdr9cit3",
+            "sourceFile": "C:/papers/particle-nebula.paper",
+            "name": "particle-nebula",
+            "addedAt": 1772741419285
+          },
+          {
+            "id": "mmdwoi21_k9f4lmxa",
+            "path": "D:/cache/wallpaper/mmdwoi21_k9f4lmxa",
+            "sourceFile": "C:/papers/clock-mini.paper",
+            "name": "clock-mini",
+            "addedAt": 1772741772714
+          }
+        ],
+        "enabledId": null
+      }
+    }
+  }
 }

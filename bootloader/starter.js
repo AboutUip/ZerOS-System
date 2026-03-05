@@ -57,7 +57,8 @@
         // 第七层：GUI 和菜单管理模块（依赖进程管理器和事件管理器）
         "../system/ui/guiManager.js": ["../kernel/process/processManager.js", "../system/ui/eventManager.js"],
         "../system/ui/contextMenuManager.js": ["../kernel/process/processManager.js", "../system/ui/eventManager.js"],
-        "../system/ui/taskbarManager.js": ["../kernel/process/processManager.js", "../kernel/process/applicationAssetManager.js", "../system/ui/contextMenuManager.js", "../system/ui/eventManager.js", "../kernel/process/programCategories.js", "../system/ui/themeManager.js"],
+        "../system/ui/volumeManager.js": ["../kernel/drive/LStorage.js"],
+        "../system/ui/taskbarManager.js": ["../kernel/process/processManager.js", "../kernel/process/applicationAssetManager.js", "../system/ui/contextMenuManager.js", "../system/ui/eventManager.js", "../kernel/process/programCategories.js", "../system/ui/themeManager.js", "../system/ui/volumeManager.js"],
         "../system/ui/notificationManager.js": ["../system/ui/taskbarManager.js", "../kernel/process/processManager.js", "../system/ui/eventManager.js"],
         "../system/ui/desktop.js": ["../kernel/process/processManager.js", "../kernel/process/applicationAssetManager.js", "../system/ui/contextMenuManager.js", "../system/ui/themeManager.js", "../system/ui/guiManager.js", "../system/ui/eventManager.js"],
         

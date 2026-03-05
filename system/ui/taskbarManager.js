@@ -126,6 +126,9 @@ class TaskbarManager {
         // 亮度组件 title（会重新从 LStorage 读亮度并设置文案）
         const brightnessDisplays = document.querySelectorAll('.taskbar-brightness-display');
         brightnessDisplays.forEach(function (el) { TaskbarManager._updateBrightnessDisplay(el); });
+        // 音量组件 tooltip 与图标
+        const volumeDisplays = document.querySelectorAll('.taskbar-volume-display');
+        volumeDisplays.forEach(function (el) { TaskbarManager._updateVolumeDisplay(el); });
         // 电池组件 title
         const batteryDisplays = document.querySelectorAll('.taskbar-battery-display');
         batteryDisplays.forEach(function (el) { TaskbarManager._updateBatteryDisplay(el); });
@@ -148,6 +151,9 @@ class TaskbarManager {
         // 亮度面板标题
         const brightnessPanelTitle = document.querySelector('#taskbar-brightness-panel .brightness-panel-title');
         if (brightnessPanelTitle) brightnessPanelTitle.textContent = TaskbarManager._getText('TASKBAR_BRIGHTNESS', '屏幕亮度');
+        // 音量面板标题
+        const volumePanelTitle = document.querySelector('#taskbar-volume-panel .volume-panel-title');
+        if (volumePanelTitle) volumePanelTitle.textContent = TaskbarManager._getText('TASKBAR_VOLUME', '音量');
         // 电池面板标题与内容
         const batteryPanelTitle = document.querySelector('#taskbar-battery-panel .battery-panel-title');
         if (batteryPanelTitle) batteryPanelTitle.textContent = TaskbarManager._getText('TASKBAR_BATTERY_STATUS', '电池状态');
@@ -231,6 +237,11 @@ class TaskbarManager {
         if (!taskbar) {
             KernelLogger.warn("TaskbarManager", "任务栏元素不存在");
             return;
+        }
+        
+        // 在任务栏初始化阶段注入 Web Audio 拦截，使系统音量（0-1）作用于所有经 AudioContext 输出的音频
+        if (typeof VolumeManager !== 'undefined' && typeof VolumeManager.init === 'function') {
+            VolumeManager.init();
         }
         
         // document 级 contextmenu 监听（仅注册一次）：右击在后台进程项上时直接在此处理并弹出菜单（避免依赖 panel 上的监听，因事件可能未到达 panel）
@@ -1276,6 +1287,10 @@ class TaskbarManager {
         const brightnessDisplay = TaskbarManager._createBrightnessDisplay();
         rightContainer.appendChild(brightnessDisplay);
         
+        // 添加音量组件（在亮度之后、天气之前）
+        const volumeDisplay = TaskbarManager._createVolumeDisplay();
+        rightContainer.appendChild(volumeDisplay);
+        
         // 添加天气组件（在时间之前，根据设置决定是否显示）
         const weatherEnabled = await TaskbarManager._isWeatherComponentEnabled();
         if (weatherEnabled) {
@@ -1354,6 +1369,7 @@ class TaskbarManager {
             { id: 'taskbar-network-panel', method: '_hideNetworkPanel', hasParam: false },
             { id: 'taskbar-battery-panel', method: '_hideBatteryPanel', hasParam: false },
             { id: 'taskbar-brightness-panel', method: '_hideBrightnessPanel', hasParam: false },
+            { id: 'taskbar-volume-panel', method: '_hideVolumePanel', hasParam: false },
             { id: 'taskbar-background-processes-panel', method: '_hideBackgroundProcessesPanel', hasParam: true },
             { id: 'taskbar-power-menu', method: '_hidePowerMenu', hasParam: true }
         ];
@@ -7581,6 +7597,385 @@ class TaskbarManager {
     }
     
     /**
+     * 创建音量显示组件（图标 + 工具提示，点击打开音量面板）
+     * @returns {HTMLElement}
+     */
+    static _createVolumeDisplay() {
+        const volumeContainer = document.createElement('div');
+        volumeContainer.className = 'taskbar-volume-display';
+        
+        const position = TaskbarManager._taskbarPosition || 'bottom';
+        let baseStyle = `
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            user-select: none;
+            position: relative;
+            flex-shrink: 0;
+        `;
+        if (position === 'left' || position === 'right') {
+            baseStyle += `
+                padding: 4px 2px;
+                min-width: 36px;
+                width: 100%;
+                height: 48px;
+            `;
+        } else {
+            baseStyle += `
+                padding: 0 6px;
+                min-width: 38px;
+                height: 48px;
+            `;
+        }
+        volumeContainer.style.cssText = baseStyle;
+        
+        const volumeIcon = document.createElement('div');
+        volumeIcon.className = 'taskbar-volume-icon';
+        TaskbarManager._setVolumeIconSVG(volumeIcon, typeof VolumeManager !== 'undefined' ? VolumeManager.getSystemVolume() : 1);
+        volumeIcon.style.cssText = `
+            width: var(--style-icon-size-medium, 24px);
+            height: var(--style-icon-size-medium, 24px);
+            color: rgba(215, 224, 221, 0.9);
+            transition: var(--style-icon-transition, all 0.3s ease);
+        `;
+        volumeContainer.appendChild(volumeIcon);
+        
+        const tooltip = document.createElement('div');
+        tooltip.className = 'taskbar-icon-tooltip';
+        tooltip.textContent = TaskbarManager._getText('TASKBAR_VOLUME', '音量');
+        volumeContainer.appendChild(tooltip);
+        
+        volumeContainer.addEventListener('mouseenter', () => {
+            volumeContainer.style.background = 'rgba(139, 92, 246, 0.15)';
+            volumeIcon.style.color = 'rgba(139, 92, 246, 1)';
+            volumeIcon.style.transform = 'scale(1.1)';
+        });
+        volumeContainer.addEventListener('mouseleave', () => {
+            volumeContainer.style.background = 'transparent';
+            volumeIcon.style.color = 'rgba(215, 224, 221, 0.9)';
+            volumeIcon.style.transform = 'scale(1)';
+        });
+        
+        volumeContainer.addEventListener('click', (e) => {
+            e.stopPropagation();
+            TaskbarManager._toggleVolumePanel(volumeContainer);
+        });
+        
+        TaskbarManager._updateVolumeDisplay(volumeContainer);
+        return volumeContainer;
+    }
+    
+    /**
+     * 根据音量 0-1 设置图标 SVG（静音 / 低 / 中 / 高）
+     * @param {HTMLElement} iconEl 图标容器
+     * @param {number} volume 0-1
+     */
+    static _setVolumeIconSVG(iconEl, volume) {
+        if (!iconEl) return;
+        const v = Number(volume);
+        // 先设置内联 SVG 保证立即显示，再尝试加载多主题图标（覆盖）
+        if (v <= 0) {
+            iconEl.innerHTML = `
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M11 5L6 9H2v6h4l5 4V5z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>
+                    <path d="M23 9l-6 6M17 9l6 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" opacity="0.9"/>
+                </svg>
+            `;
+        } else if (v < 0.34) {
+            iconEl.innerHTML = `
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M11 5L6 9H2v6h4l5 4V5z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>
+                    <path d="M15.5 8.5c.5.5.5 1.5.5 2.5s0 2-.5 2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" opacity="0.9"/>
+                </svg>
+            `;
+        } else if (v < 0.67) {
+            iconEl.innerHTML = `
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M11 5L6 9H2v6h4l5 4V5z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>
+                    <path d="M15.5 8.5c.5.5.5 1.5.5 2.5s0 2-.5 2.5M18 6c1.2 1.2 2 3 2 5s-.8 3.8-2 5M18 6c-1.2 1.2-2 3-2 5s.8 3.8 2 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" opacity="0.9"/>
+                </svg>
+            `;
+        } else {
+            iconEl.innerHTML = `
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M11 5L6 9H2v6h4l5 4V5z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>
+                    <path d="M15.5 8.5c.5.5.5 1.5.5 2.5s0 2-.5 2.5M18 6c1.2 1.2 2 3 2 5s-.8 3.8-2 5M18 6c-1.2 1.2-2 3-2 5s.8 3.8 2 5M20.5 3.5c1.8 1.8 3 4.5 3 7.5s-1.2 5.7-3 7.5M20.5 3.5c-1.8 1.8-3 4.5-3 7.5s1.2 5.7 3 7.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" opacity="0.9"/>
+                </svg>
+            `;
+        }
+        const iconName = v <= 0 ? 'volume-mute' : 'volume';
+        TaskbarManager._loadSystemIconWithRetry(iconName, iconEl).catch(function() { /* 保持内联 SVG */ });
+    }
+    
+    /**
+     * 更新音量显示（工具提示与图标状态，从 VolumeManager 读取并持久化值）
+     * @param {HTMLElement} volumeContainer
+     */
+    static _updateVolumeDisplay(volumeContainer) {
+        if (!volumeContainer) return;
+        const volume = typeof VolumeManager !== 'undefined' ? VolumeManager.getSystemVolume() : 1;
+        const pct = Math.round(volume * 100);
+        volumeContainer.title = TaskbarManager._getText('TASKBAR_VOLUME_TITLE', '音量: {0}%').replace('{0}', String(pct));
+        const icon = volumeContainer.querySelector('.taskbar-volume-icon');
+        if (icon) TaskbarManager._setVolumeIconSVG(icon, volume);
+        const tooltip = volumeContainer.querySelector('.taskbar-icon-tooltip');
+        if (tooltip) tooltip.textContent = TaskbarManager._getText('TASKBAR_VOLUME', '音量');
+    }
+    
+    /**
+     * 切换音量面板显示/隐藏
+     * @param {HTMLElement} volumeContainer 音量显示容器
+     */
+    static _toggleVolumePanel(volumeContainer) {
+        let panel = document.getElementById('taskbar-volume-panel');
+        if (panel && panel.classList.contains('visible')) {
+            TaskbarManager._hideVolumePanel(panel);
+        } else {
+            TaskbarManager._closeAllTaskbarPopups('taskbar-volume-panel');
+            if (!panel) panel = TaskbarManager._createVolumePanel();
+            TaskbarManager._showVolumePanel(panel, volumeContainer);
+        }
+    }
+    
+    /**
+     * 创建音量面板（滑块 0-100%，静音按钮，持久化由 VolumeManager 负责）
+     * @returns {HTMLElement}
+     */
+    static _createVolumePanel() {
+        const panel = document.createElement('div');
+        panel.id = 'taskbar-volume-panel';
+        panel.className = 'taskbar-volume-panel';
+        
+        const themeManager = typeof POOL !== 'undefined' && typeof POOL.__GET__ === 'function'
+            ? POOL.__GET__("KERNEL_GLOBAL_POOL", "ThemeManager")
+            : (typeof ThemeManager !== 'undefined' ? ThemeManager : null);
+        if (themeManager) {
+            try {
+                const currentTheme = themeManager.getCurrentTheme();
+                if (currentTheme && currentTheme.colors) {
+                    panel.style.backgroundColor = currentTheme.colors.backgroundElevated || currentTheme.colors.backgroundSecondary || currentTheme.colors.background;
+                    panel.style.borderColor = currentTheme.colors.border || (currentTheme.colors.primary ? currentTheme.colors.primary + '33' : 'rgba(108, 142, 255, 0.2)');
+                }
+            } catch (e) {
+                KernelLogger.warn("TaskbarManager", `应用主题到音量面板失败: ${e.message}`);
+            }
+        }
+        
+        const content = document.createElement('div');
+        content.className = 'taskbar-volume-panel-content';
+        
+        const title = document.createElement('div');
+        title.className = 'volume-panel-title';
+        title.textContent = TaskbarManager._getText('TASKBAR_VOLUME', '音量');
+        content.appendChild(title);
+        
+        const sliderContainer = document.createElement('div');
+        sliderContainer.className = 'volume-slider-container';
+        
+        const iconContainer = document.createElement('div');
+        iconContainer.className = 'volume-icon-container';
+        const panelIcon = document.createElement('div');
+        panelIcon.className = 'volume-panel-icon';
+        TaskbarManager._setVolumeIconSVG(panelIcon, typeof VolumeManager !== 'undefined' ? VolumeManager.getSystemVolume() : 1);
+        iconContainer.appendChild(panelIcon);
+        sliderContainer.appendChild(iconContainer);
+        
+        const sliderWrapper = document.createElement('div');
+        sliderWrapper.className = 'volume-slider-wrapper';
+        const slider = document.createElement('input');
+        slider.type = 'range';
+        slider.min = '0';
+        slider.max = '100';
+        slider.value = String(Math.round((typeof VolumeManager !== 'undefined' ? VolumeManager.getSystemVolume() : 1) * 100));
+        slider.step = '1';
+        slider.className = 'volume-slider';
+        slider.id = 'volume-slider';
+        const valueDisplay = document.createElement('div');
+        valueDisplay.className = 'volume-value-display';
+        valueDisplay.textContent = slider.value + '%';
+        valueDisplay.id = 'volume-value-display';
+        sliderWrapper.appendChild(slider);
+        sliderWrapper.appendChild(valueDisplay);
+        sliderContainer.appendChild(sliderWrapper);
+        content.appendChild(sliderContainer);
+        
+        const muteBtn = document.createElement('button');
+        muteBtn.type = 'button';
+        muteBtn.className = 'volume-mute-btn';
+        muteBtn.textContent = TaskbarManager._getText('TASKBAR_VOLUME_MUTE', '静音');
+        muteBtn.addEventListener('click', () => {
+            if (typeof VolumeManager !== 'undefined') {
+                VolumeManager.setSystemVolume(0);
+                slider.value = '0';
+                valueDisplay.textContent = '0%';
+                TaskbarManager._setVolumeIconSVG(panelIcon, 0);
+                const displays = document.querySelectorAll('.taskbar-volume-display .taskbar-volume-icon');
+                displays.forEach(el => TaskbarManager._setVolumeIconSVG(el, 0));
+            }
+        });
+        content.appendChild(muteBtn);
+        
+        panel.appendChild(content);
+        document.body.appendChild(panel);
+        
+        let updateTimeout = null;
+        slider.addEventListener('input', (e) => {
+            const value = parseInt(e.target.value, 10);
+            const norm = value / 100;
+            valueDisplay.textContent = value + '%';
+            if (typeof VolumeManager !== 'undefined') {
+                VolumeManager.setSystemVolume(norm);
+                TaskbarManager._setVolumeIconSVG(panelIcon, norm);
+                const displays = document.querySelectorAll('.taskbar-volume-display .taskbar-volume-icon');
+                displays.forEach(el => TaskbarManager._setVolumeIconSVG(el, norm));
+            }
+            if (updateTimeout) clearTimeout(updateTimeout);
+            updateTimeout = setTimeout(() => {
+                const allDisplays = document.querySelectorAll('.taskbar-volume-display');
+                allDisplays.forEach(el => TaskbarManager._updateVolumeDisplay(el));
+            }, 100);
+        });
+        
+        return panel;
+    }
+    
+    /**
+     * 显示音量面板
+     * @param {HTMLElement} panel 音量面板元素
+     * @param {HTMLElement} volumeContainer 音量显示容器
+     */
+    static _showVolumePanel(panel, volumeContainer) {
+        if (!panel || !volumeContainer) return;
+        if (typeof NotificationManager !== 'undefined' && typeof NotificationManager._hideNotificationContainer === 'function') {
+            NotificationManager._hideNotificationContainer();
+        }
+        if (panel._hideTimeout) {
+            clearTimeout(panel._hideTimeout);
+            panel._hideTimeout = null;
+        }
+        panel.style.display = '';
+        panel.style.opacity = '';
+        panel.style.visibility = '';
+        const position = TaskbarManager._taskbarPosition || 'bottom';
+        const containerRect = volumeContainer.getBoundingClientRect();
+        const viewportWidth = window.innerWidth;
+        const viewportHeight = window.innerHeight;
+        const padding = 20;
+        const panelWidth = 320;
+        const panelHeight = 180;
+        panel.style.left = '';
+        panel.style.right = '';
+        panel.style.top = '';
+        panel.style.bottom = '';
+        panel.classList.add('visible');
+        setTimeout(() => {
+            const panelRect = panel.getBoundingClientRect();
+            const actualWidth = panelRect.width || panelWidth;
+            const actualHeight = panelRect.height || panelHeight;
+            let panelLeft, panelTop;
+            switch (position) {
+                case 'top':
+                    panelLeft = containerRect.right - actualWidth;
+                    if (panelLeft < padding) panelLeft = padding;
+                    if (panelLeft + actualWidth > viewportWidth - padding) panelLeft = viewportWidth - actualWidth - padding;
+                    panelTop = containerRect.bottom + 10;
+                    if (panelTop + actualHeight > viewportHeight - padding) panelTop = Math.max(padding, viewportHeight - actualHeight - padding);
+                    panel.style.left = panelLeft + 'px';
+                    panel.style.top = panelTop + 'px';
+                    break;
+                case 'bottom':
+                    panelLeft = containerRect.right - actualWidth;
+                    if (panelLeft < padding) panelLeft = padding;
+                    if (panelLeft + actualWidth > viewportWidth - padding) panelLeft = viewportWidth - actualWidth - padding;
+                    panel.style.left = panelLeft + 'px';
+                    panel.style.bottom = (viewportHeight - containerRect.top + 10) + 'px';
+                    break;
+                case 'left':
+                    panelTop = containerRect.top;
+                    if (panelTop < padding) panelTop = padding;
+                    if (panelTop + actualHeight > viewportHeight - padding) panelTop = Math.max(padding, viewportHeight - actualHeight - padding);
+                    panelLeft = containerRect.right + 10;
+                    if (panelLeft + actualWidth > viewportWidth - padding) panelLeft = viewportWidth - actualWidth - padding;
+                    panel.style.left = panelLeft + 'px';
+                    panel.style.top = panelTop + 'px';
+                    break;
+                case 'right':
+                    panelTop = containerRect.top;
+                    if (panelTop < padding) panelTop = padding;
+                    if (panelTop + actualHeight > viewportHeight - padding) panelTop = Math.max(padding, viewportHeight - actualHeight - padding);
+                    panelLeft = containerRect.left - actualWidth - 10;
+                    if (panelLeft < padding) panelLeft = padding;
+                    panel.style.left = panelLeft + 'px';
+                    panel.style.top = panelTop + 'px';
+                    break;
+            }
+        }, 0);
+        if (typeof AnimateManager !== 'undefined') {
+            AnimateManager.addAnimationClasses(panel, 'PANEL', 'OPEN');
+        }
+        if (typeof EventManager !== 'undefined' && typeof EventManager.registerMenu === 'function') {
+            EventManager.registerMenu('volume-panel', panel, () => TaskbarManager._hideVolumePanel(panel), ['.taskbar-volume-display']);
+        } else {
+            const closeOnClickOutside = (e) => {
+                if (!panel.contains(e.target) && !volumeContainer.contains(e.target)) {
+                    TaskbarManager._hideVolumePanel(panel);
+                    document.removeEventListener('click', closeOnClickOutside, true);
+                    document.removeEventListener('mousedown', closeOnClickOutside, true);
+                }
+            };
+            setTimeout(() => {
+                document.addEventListener('click', closeOnClickOutside, true);
+                document.addEventListener('mousedown', closeOnClickOutside, true);
+            }, 0);
+            panel._closeOnClickOutside = closeOnClickOutside;
+        }
+    }
+    
+    /**
+     * 隐藏音量面板
+     * @param {HTMLElement} panel 音量面板元素
+     */
+    static _hideVolumePanel(panel, immediate = false) {
+        if (!panel) return;
+        if (panel._hideTimeout) {
+            clearTimeout(panel._hideTimeout);
+            panel._hideTimeout = null;
+        }
+        if (panel._closeOnClickOutside) {
+            document.removeEventListener('click', panel._closeOnClickOutside, true);
+            document.removeEventListener('mousedown', panel._closeOnClickOutside, true);
+            panel._closeOnClickOutside = null;
+        }
+        if (immediate) {
+            panel.classList.remove('visible');
+            panel.style.display = 'none';
+            panel.style.opacity = '0';
+            panel.style.visibility = 'hidden';
+            if (typeof AnimateManager !== 'undefined') {
+                AnimateManager.stopAnimation(panel);
+                AnimateManager.removeAnimationClasses(panel);
+            }
+        } else {
+            if (typeof AnimateManager !== 'undefined') {
+                AnimateManager.addAnimationClasses(panel, 'PANEL', 'CLOSE');
+                panel._hideTimeout = setTimeout(() => {
+                    panel.classList.remove('visible');
+                    panel.style.display = 'none';
+                    panel.style.opacity = '0';
+                    panel.style.visibility = 'hidden';
+                    AnimateManager.removeAnimationClasses(panel);
+                }, 300);
+            } else {
+                panel.classList.remove('visible');
+                panel.style.display = 'none';
+            }
+        }
+    }
+    
+    /**
      * 更新电池状态显示
      * @param {HTMLElement} batteryContainer 电池容器元素
      */
@@ -9594,6 +9989,21 @@ class TaskbarManager {
         if (typeof KernelLogger !== 'undefined') {
             KernelLogger.debug('TaskbarManager', `[${LOG_TAG}] 菜单已 appendChild 到 body, left=${menu.style.left} top=${menu.style.top} zIndex=${menu.style.zIndex}`);
         }
+        // 根据视口边界修正位置，避免菜单溢出屏幕下方或右侧导致无法点击
+        requestAnimationFrame(() => {
+            const rect = menu.getBoundingClientRect();
+            const vw = window.innerWidth;
+            const vh = window.innerHeight;
+            const pad = 8;
+            let left = rect.left;
+            let top = rect.top;
+            if (left + rect.width > vw - pad) left = vw - rect.width - pad;
+            if (left < pad) left = pad;
+            if (top + rect.height > vh - pad) top = vh - rect.height - pad;
+            if (top < pad) top = pad;
+            menu.style.left = left + 'px';
+            menu.style.top = top + 'px';
+        });
         setTimeout(() => document.addEventListener('click', closeMenu, true), 0);
     }
     
@@ -11702,6 +12112,10 @@ class TaskbarManager {
         if (!taskbar) {
             return;
         }
+        // 通知面板打开时由 NotificationManager 控制任务栏位置（紧贴桌面下缘），此处不覆盖
+        if (typeof NotificationManager !== 'undefined' && NotificationManager._isShowing) {
+            return;
+        }
         
         const position = TaskbarManager._taskbarPosition || 'bottom';
         
@@ -12024,6 +12438,25 @@ class TaskbarManager {
             }
         }
         
+        // 更新亮度图标（托盘与面板）
+        const brightnessIcons = document.querySelectorAll('.taskbar-brightness-icon, .brightness-panel-icon');
+        for (const brightnessIcon of brightnessIcons) {
+            try {
+                await TaskbarManager._loadSystemIcon('brightness', brightnessIcon);
+            } catch (e) {
+                KernelLogger.warn("TaskbarManager", `更新亮度图标失败: ${e.message}`);
+            }
+        }
+        // 更新音量图标（托盘与面板，按当前系统音量选 volume / volume-mute）
+        const volumeIconName = (typeof VolumeManager !== 'undefined' && VolumeManager.getSystemVolume() <= 0) ? 'volume-mute' : 'volume';
+        const volumeIcons = document.querySelectorAll('.taskbar-volume-icon, .volume-panel-icon');
+        for (const volIcon of volumeIcons) {
+            try {
+                await TaskbarManager._loadSystemIcon(volumeIconName, volIcon);
+            } catch (e) {
+                KernelLogger.warn("TaskbarManager", `更新音量图标失败: ${e.message}`);
+            }
+        }
         // 更新网络图标
         const networkIcon = document.querySelector('.taskbar-network-icon');
         if (networkIcon) {

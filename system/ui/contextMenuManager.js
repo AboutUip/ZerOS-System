@@ -116,15 +116,15 @@ class ContextMenuManager {
         
         // 阻止默认右键菜单（如果还没有被阻止）
         if (eventContext) {
-            if (!eventContext.prevented) {
+            if (!eventContext.prevented && typeof eventContext.preventDefault === 'function') {
                 eventContext.preventDefault();
             }
-            if (!eventContext.stopped) {
+            if (!eventContext.stopped && typeof eventContext.stopPropagation === 'function') {
                 eventContext.stopPropagation();
             }
         } else {
-            e.preventDefault();
-            e.stopPropagation();
+            if (typeof e.preventDefault === 'function') e.preventDefault();
+            if (typeof e.stopPropagation === 'function') e.stopPropagation();
         }
         
         // 确定上下文

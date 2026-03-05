@@ -23,6 +23,8 @@ const ContextMenuManager = window.ContextMenuManager;
 
 **注意**：在内核初始化完成后，ContextMenuManager 已加载，可以直接使用。
 
+**合成事件**：`_handleContextMenu` 可接受非 DOM 的合成事件对象（如壁纸 iframe 通过 postMessage 传入的 `{ clientX, clientY, target, preventDefault, stopPropagation }`）；调用前会检查 `preventDefault` / `stopPropagation` 是否为函数再执行，避免报错。
+
 ## 初始化
 
 上下文菜单管理器在系统启动时自动初始化：

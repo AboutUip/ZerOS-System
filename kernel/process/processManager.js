@@ -2929,7 +2929,24 @@ class ProcessManager {
     }
 
     /**
-     * 设置进程的前台/后台状态（前端转后台或后台转前端）
+     * 根据程序名获取所有未退出的进程 PID（含前台与后台，用于卸载时统一终止）
+     * @param {string} programName 程序名称（大小写不敏感）
+     * @returns {number[]} 该程序的所有进程 PID 列表
+     */
+    static getPidsByProgramName(programName) {
+        if (!programName || typeof programName !== 'string') return [];
+        const name = programName.toLowerCase();
+        const pids = [];
+        ProcessManager.PROCESS_TABLE.forEach((processInfo, pid) => {
+            if (processInfo.programName && processInfo.programName.toLowerCase() === name && processInfo.status !== 'exited') {
+                pids.push(pid);
+            }
+        });
+        return pids;
+    }
+
+    /**
+     * 设置进程的前台/后台状态（前端转后台或后台转前台）
      * @param {number} pid 进程 ID
      * @param {boolean} isBackground 是否为后台（true=后台，false=前台）
      * @returns {boolean} 是否设置成功
@@ -3254,8 +3271,15 @@ class ProcessManager {
         }
 
         // 普通程序需要通过进程管理器代理
-        // 特殊处理：允许 loading/starting 状态调用 requestSelfTermination；允许 loading/starting 时调用 FileSystem.read（便于 Notepad 等在 __init__ 中打开文件）
-        if (processInfo.status !== 'running' && apiName !== 'Process.requestSelfTermination' && apiName !== 'FileSystem.read') {
+        // 特殊处理：loading/starting 状态下允许调用以下 API，便于卸载脚本等在 __init__ 中完成清理（删除服务、移除自启动等）
+        const loadingAllowedAPIs = [
+            'Process.requestSelfTermination',
+            'FileSystem.read',
+            'FileSystem.delete',
+            'ScheduleTask.getAll',
+            'ScheduleTask.delete'
+        ];
+        if (processInfo.status !== 'running' && loadingAllowedAPIs.indexOf(apiName) === -1) {
             if (processInfo.status === 'loading' || processInfo.status === 'starting') {
                 throw new Error(`Process ${pid} is not running (status: ${processInfo.status})`);
             }
@@ -3546,10 +3570,11 @@ class ProcessManager {
         // 新增内核模块只需在此 kernelAPIs 中注册即可，无需单独添加记录逻辑
         const kernelAPIs = {
             // 文件系统API
-            'FileSystem.read': async (path) => {
+            'FileSystem.read': async (path, asBase64) => {
                 if (!path || typeof path !== 'string') {
                     throw new Error('FileSystem.read: 路径必须是字符串');
                 }
+                const wantBase64 = asBase64 === true || asBase64 === 'true' || asBase64 === 1;
 
                 try {
                     // 解析路径：格式为 "盘符/路径/文件名"（盘符支持 C: 或 C，多分区 A-Z）
@@ -3643,6 +3668,7 @@ class ProcessManager {
                         url.searchParams.set('action', 'read_file');
                         url.searchParams.set('path', ProcessManager._normalizePath(actualDirPath));
                         url.searchParams.set('fileName', fileName);
+                        if (wantBase64) url.searchParams.set('asBase64', 'true');
 
                         const response = await fetch(url.toString());
                         if (!response.ok) {
@@ -3680,6 +3706,7 @@ class ProcessManager {
                         url.searchParams.set('action', 'read_file');
                         url.searchParams.set('path', ProcessManager._normalizePath(phpDirPath));
                         url.searchParams.set('fileName', fileName);
+                        if (wantBase64) url.searchParams.set('asBase64', 'true');
                         const response = await fetch(url.toString());
                         if (!response.ok) {
                             throw new Error(`FileSystem.read: 从 PHP 服务读取文件失败: ${path}`);
@@ -6450,7 +6477,11 @@ class ProcessManager {
                 apiName === 'ScheduleTask.update' ||
                 apiName === 'ScheduleTask.setEnabled' ||
                 apiName === 'GUI.registerTaskbarPreviewProvider' ||
-                apiName === 'GUI.unregisterTaskbarPreviewProvider'
+                apiName === 'GUI.unregisterTaskbarPreviewProvider' ||
+                apiName === 'LocalStorage.register' ||
+                apiName === 'LocalStorage.get' ||
+                apiName === 'LocalStorage.set' ||
+                apiName === 'LocalStorage.delete'
             )) {
                 // 这些 API 需要 pid 作为第一个参数
                 return await apiHandler(pid, ...args);
@@ -6557,17 +6588,20 @@ class ProcessManager {
         // 记录程序行为
         ProcessManager._logProgramAction(pid, 'requestLocalStorage', { operation, key });
 
+        // 有 programName 时按程序名持久化存储，重启后同一程序仍能读到；无则按 pid（兼容）
+        const storageSlot = (processInfo.programName ? 'program:' + processInfo.programName : pid);
+
         // 执行操作
         try {
             switch (operation) {
                 case 'register':
-                    return await LStorageRef.registerProgramStorage(pid, key, value);
+                    return await LStorageRef.registerProgramStorage(storageSlot, key, value);
                 case 'get':
-                    return await LStorageRef.getProgramStorage(pid, key);
+                    return await LStorageRef.getProgramStorage(storageSlot, key);
                 case 'set':
-                    return await LStorageRef.setProgramStorage(pid, key, value);
+                    return await LStorageRef.setProgramStorage(storageSlot, key, value);
                 case 'delete':
-                    return await LStorageRef.deleteProgramStorage(pid, key);
+                    return await LStorageRef.deleteProgramStorage(storageSlot, key);
                 default:
                     throw new Error(`Unknown operation: ${operation}`);
             }

@@ -104,7 +104,7 @@ const DYNAMIC_MODULES = {
         }
     },
 
-    // three.js
+    // three.js (WebGPU 构建)
     "three.js": {
         script: "../kernel/dynamicModule/libs/threejs/three.webgpu.min.js",
         metadata: {
@@ -115,6 +115,19 @@ const DYNAMIC_MODULES = {
             autoLoad: false,
             dependencies: [],
             moduleType: "esm"  // ES 模块格式
+        }
+    },
+    // three.webgl (WebGL 完整构建，含 WebGLRenderer；three.core 不导出 WebGLRenderer，故用 three.module.min.js)
+    "three.webgl": {
+        script: "../kernel/dynamicModule/libs/threejs/three.module.min.js",
+        metadata: {
+            name: "three.webgl",
+            version: "0.172.0",
+            description: "Three.js - 3D渲染引擎 (WebGL)",
+            globalName: "THREE",
+            autoLoad: false,
+            dependencies: [],
+            moduleType: "esm"
         }
     },
 
@@ -257,8 +270,24 @@ const DYNAMIC_MODULES = {
             autoLoad: false,
             dependencies: []
         }
-    }
-    
+    },
+
+    // Swiper - 触摸滑动库（垂直/水平轮播，可用于短视频上下滑等）
+    "swiper": {
+        script: "../kernel/dynamicModule/libs/swiper/swiper-bundle.js",
+        styles: [
+            "../kernel/dynamicModule/libs/swiper/swiper-bundle.css"
+        ],
+        metadata: {
+            name: "swiper",
+            version: "11.2.8",
+            description: "Swiper - 现代触摸滑动库，支持垂直/水平轮播",
+            globalName: "Swiper",
+            autoLoad: false,
+            dependencies: []
+        }
+    },
+
     // 纯 CSS 模块示例
     // "bootstrap-css": {
     //     styles: "../kernel/dynamicModule/libs/bootstrap.min.css",

@@ -353,9 +353,14 @@ function createFile($path, $fileName, $content = '') {
     
     $filePath = $dirPath . '/' . $fileName;
     
-    // 检查文件是否已存在
-    if (file_exists($filePath)) {
-        sendResponse(false, '文件已存在: ' . $fileName, null, 409);
+    // 文件已存在时返回成功，由后续 write_file 负责覆盖（避免 409 导致壁纸保存配置等流程失败）
+    if (file_exists($filePath) && is_file($filePath)) {
+        sendResponse(true, '文件已存在', [
+            'path' => normalizePath($path) . '/' . $fileName,
+            'fileName' => $fileName,
+            'size' => filesize($filePath)
+        ]);
+        return;
     }
     
     // 创建文件

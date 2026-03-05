@@ -1,0 +1,99 @@
+{
+  "constants": {
+    "paperFormatVersion": 1,
+    "name": "粒子追随鼠标"
+  },
+  "options": [
+    {
+      "key": "particleCount",
+      "type": "number",
+      "label": "粒子数量",
+      "default": 10,
+      "min": 10,
+      "max": 300,
+      "step": 5,
+      "description": "画面上显示的粒子个数"
+    },
+    {
+      "key": "particleSizeMin",
+      "type": "number",
+      "label": "粒子最小半径",
+      "default": 1,
+      "min": 0.5,
+      "max": 8,
+      "step": 0.5,
+      "description": "粒子半径下限（像素）"
+    },
+    {
+      "key": "particleSizeMax",
+      "type": "number",
+      "label": "粒子最大半径",
+      "default": 4,
+      "min": 1,
+      "max": 16,
+      "step": 0.5,
+      "description": "粒子半径上限（像素）"
+    },
+    {
+      "key": "followSpeed",
+      "type": "number",
+      "label": "追随速度",
+      "default": 0.08,
+      "min": 0.01,
+      "max": 0.3,
+      "step": 0.01,
+      "description": "粒子向鼠标移动的插值系数，越大跟随越快"
+    },
+    {
+      "key": "smoothness",
+      "type": "number",
+      "label": "平滑度",
+      "default": 0.85,
+      "min": 0.5,
+      "max": 0.99,
+      "step": 0.01,
+      "description": "鼠标目标位置平滑系数"
+    },
+    {
+      "key": "particleOpacity",
+      "type": "number",
+      "label": "粒子不透明度",
+      "default": 0.85,
+      "min": 0.1,
+      "max": 1,
+      "step": 0.05,
+      "description": "粒子填充透明度"
+    },
+    {
+      "key": "backgroundColor",
+      "type": "string",
+      "label": "背景色",
+      "default": "#0f0f1a",
+      "description": "Canvas 背景色（如 #0f0f1a）"
+    },
+    {
+      "key": "particleColor",
+      "type": "string",
+      "label": "粒子颜色",
+      "default": "#7c3aed",
+      "description": "粒子填充色（如 #7c3aed）"
+    },
+    {
+      "key": "showTrail",
+      "type": "boolean",
+      "label": "启用拖尾",
+      "default": true,
+      "description": "是否用半透明清屏实现拖尾效果"
+    },
+    {
+      "key": "trailAlpha",
+      "type": "number",
+      "label": "拖尾衰减",
+      "default": 0.14,
+      "min": 0.08,
+      "max": 0.35,
+      "step": 0.01,
+      "description": "每帧用背景覆盖的比例，越大拖尾消失越快（0.14 约半秒内淡出）"
+    }
+  ]
+}

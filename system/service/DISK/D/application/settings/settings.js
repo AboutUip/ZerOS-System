@@ -2374,28 +2374,15 @@
             `;
             
             if (avatarFileName) {
-                // 使用FSDirve读取本地文件并转换为base64 data URL
+                // 通过内核 FileSystem.read(path, asBase64) 读取头像，避免直接请求 FSDirve 导致 401（programPermissionsMap 未注册时）
+                const pid = this.pid;
                 (async () => {
                     try {
-                        const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject) 
-                            ? SystemInformation.buildServiceUrlObject(SystemInformation.SERVICE_NAMES.FSDIRVE, { upid: this._upid })
-                                : new URL(SystemInformation.getFSDirvePath(), (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin)
-                                ? SystemInformation.getOrigin()
-                                : window.location.origin);
-                        if (this._upid != null) url.searchParams.set('upid', this._upid);
-                        url.searchParams.set('action', 'read_file');
-                        url.searchParams.set('path', 'D:/cache/');
-                        url.searchParams.set('fileName', avatarFileName);
-                        url.searchParams.set('asBase64', 'true');
-                        
-                        const response = await fetch(url.toString());
-                        if (!response.ok) {
-                            throw new Error(`HTTP ${response.status}`);
+                        if (typeof ProcessManager === 'undefined' || typeof ProcessManager.callKernelAPI !== 'function' || pid == null) {
+                            throw new Error('内核 API 不可用');
                         }
-                        
-                        const result = await response.json();
-                        if (result.status === 'success' && result.data && result.data.content) {
-                            // 确定MIME类型
+                        const content = await ProcessManager.callKernelAPI(pid, 'FileSystem.read', ['D:/cache/' + avatarFileName, true]);
+                        if (content && typeof content === 'string') {
                             const fileExt = avatarFileName.split('.').pop()?.toLowerCase() || 'jpg';
                             const mimeType = fileExt === 'jpg' || fileExt === 'jpeg' ? 'image/jpeg' :
                                             fileExt === 'png' ? 'image/png' :
@@ -2403,19 +2390,15 @@
                                             fileExt === 'webp' ? 'image/webp' :
                                             fileExt === 'svg' ? 'image/svg+xml' :
                                             fileExt === 'bmp' ? 'image/bmp' : 'image/jpeg';
-                            
-                            // 转换为data URL
-                            avatarImg.src = `data:${mimeType};base64,${result.data.content}`;
+                            avatarImg.src = `data:${mimeType};base64,${content}`;
                             avatarImg.onload = () => {
-                                // 图片加载成功，隐藏默认头像
                                 defaultAvatarSvg.style.display = 'none';
                                 avatarImg.style.display = 'block';
                             };
                         } else {
-                            throw new Error(result.message || '读取文件失败');
+                            throw new Error('读取文件失败');
                         }
                     } catch (error) {
-                        // 如果读取失败，显示默认头像
                         if (typeof KernelLogger !== 'undefined') {
                             KernelLogger.warn('SETTINGS', `头像加载失败: ${avatarFileName}, 错误: ${error.message}`);
                         }

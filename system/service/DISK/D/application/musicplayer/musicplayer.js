@@ -95,6 +95,26 @@
                         this._cacheHelper.syncAllToParent();
                     }, 1000);
                 }
+                if (this.iframe.contentWindow) {
+                    try {
+                        if (typeof VolumeManager !== 'undefined') {
+                            this.iframe.contentWindow.postMessage({
+                                type: 'kitemusic-system-volume',
+                                value: VolumeManager.getSystemVolume()
+                            }, '*');
+                        }
+                        if (typeof SystemInformation !== 'undefined' && SystemInformation.getAudioProxyUrl) {
+                            this.iframe.contentWindow.postMessage({
+                                type: 'kitemusic-audio-proxy',
+                                url: SystemInformation.getAudioProxyUrl()
+                            }, '*');
+                        }
+                    } catch (e) {
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.debug('MusicPlayer', '发送消息到 iframe 失败: ' + (e && e.message));
+                        }
+                    }
+                }
             });
 
             this._messageHandler = (e) => {
@@ -153,6 +173,22 @@
                 }
             };
             window.addEventListener('message', this._messageHandler);
+            this._volumeChangeHandler = (e) => {
+                if (this._isExiting || !this.iframe || !this.iframe.contentWindow || !e || e.detail == null) return;
+                try {
+                    this.iframe.contentWindow.postMessage({
+                        type: 'kitemusic-system-volume',
+                        value: typeof e.detail.value === 'number' ? e.detail.value : (typeof VolumeManager !== 'undefined' ? VolumeManager.getSystemVolume() : 1)
+                    }, '*');
+                } catch (err) {
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.debug('MusicPlayer', '转发系统音量到 iframe 失败: ' + (err && err.message));
+                    }
+                }
+            };
+            if (typeof document !== 'undefined') {
+                document.addEventListener('zeros-system-volume-change', this._volumeChangeHandler);
+            }
 
             if (initArgs.kernelAPI && typeof initArgs.kernelAPI.call === 'function') {
                 var kernelAPI = initArgs.kernelAPI;
@@ -502,6 +538,10 @@
                 if (this._messageHandler) {
                     window.removeEventListener('message', this._messageHandler);
                     this._messageHandler = null;
+                }
+                if (this._volumeChangeHandler && typeof document !== 'undefined') {
+                    document.removeEventListener('zeros-system-volume-change', this._volumeChangeHandler);
+                    this._volumeChangeHandler = null;
                 }
                 
                 this.window = null;

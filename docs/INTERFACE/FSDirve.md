@@ -304,7 +304,7 @@ const response = await fetch(url.toString(), {
 const result = await response.json();
 ```
 
-**响应**:
+**响应**（创建成功）:
 ```json
 {
     "status": "success",
@@ -316,6 +316,8 @@ const result = await response.json();
     }
 }
 ```
+
+**文件已存在时**（PHP 后端）：若目标文件已存在，返回 `200` 且 `status: "success"`、`message: "文件已存在"`，不覆盖内容；便于与后续 `write_file` 配合（如壁纸保存配置），避免 409 导致保存失败。
 
 ### 读取文件
 

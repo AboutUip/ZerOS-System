@@ -41,10 +41,10 @@ await NotificationManager.init();
 
 ```javascript
 NotificationManager.CONFIG = {
-    // 容器配置
-    CONTAINER_WIDTH: 380,
-    CONTAINER_TOP: 20,
-    CONTAINER_SIDE: 20,
+    // 容器配置（宽度 400，左右留白 12px）
+    CONTAINER_WIDTH: 400,
+    CONTAINER_TOP: 60,
+    CONTAINER_SIDE: 12,   // 通知面板与屏幕边缘的留白
     CONTAINER_MIN_HEIGHT: 100,
     CONTAINER_Z_INDEX: 10000,
     
@@ -85,6 +85,17 @@ NotificationManager.CONFIG = {
     }
 };
 ```
+
+## 通知栏布局与交互
+
+打开通知栏时，界面会进入“通知模式”：
+
+- **通知面板**：固定宽度 400px，全高（100vh），根据任务栏位置显示在屏幕右侧或左侧；与屏幕边缘保留 12px 留白（`CONTAINER_SIDE`），与桌面内容区之间也有空隙。面板不强制设置背景，由样式或透明处理。
+- **蒙版层**：全屏半透明蒙版，点击任意处（含桌面区域）可关闭通知栏，防止误操作。
+- **桌面与任务栏**：
+  - 桌面区域（`#kernel-content`）与任务栏作为整体缩小并垂直居中，宽度为视口减去通知占位宽度与左侧留白，高度按比例缩小以保持比例。
+  - 任务栏在通知打开时改为 `position: absolute` 并贴紧系统桌面（`#gui-container`）下缘，随桌面块一起移动；关闭通知后恢复为 `position: fixed` 并带有恢复动画。
+- **与 TaskbarManager 的协调**：通知打开期间 `TaskbarManager._applyTaskbarPosition` 会跳过执行，由 NotificationManager 控制任务栏位置；关闭后由 TaskbarManager 恢复。
 
 ## 通知类型
 
@@ -447,6 +458,12 @@ __exit__: async function() {
 - 使用 AnimateManager（anime.js）实现
 - 支持降级到 CSS 动画
 
+### 桌面与任务栏恢复动画
+
+关闭通知栏时：
+- `#kernel-content` 的宽度、高度、位置、transform 在 `HIDE_DURATION` 内过渡回全屏。
+- 任务栏在过渡期间保持 `position: absolute`，随 kernel-content 一起做恢复动画；动画结束后再恢复为 `position: fixed` 并由 TaskbarManager 应用正常位置。
+
 ### 依赖通知动画
 
 依赖类型通知使用水滴展开动画：
@@ -461,6 +478,7 @@ __exit__: async function() {
 - 任务栏显示通知图标和数量徽章
 - 点击图标打开/关闭通知栏
 - 徽章数量实时更新（通过 `_triggerBadgeUpdate()` 方法）
+- 通知栏打开时，任务栏位置由 NotificationManager 接管（贴紧桌面下缘），关闭后由 TaskbarManager 恢复并带恢复动画
 
 ## 注意事项
 

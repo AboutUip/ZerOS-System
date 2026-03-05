@@ -7,7 +7,7 @@
 一个完整的虚拟操作系统开发文档集合
 
 [![Documentation](https://img.shields.io/badge/docs-complete-brightgreen.svg)](./README.md)
-[![API](https://img.shields.io/badge/API-40+-blue.svg)](./API/README.md) [![后端接口](https://img.shields.io/badge/INTERFACE-12-green.svg)](./INTERFACE/README.md)
+[![API](https://img.shields.io/badge/API-40+-blue.svg)](./API/README.md) [![后端接口](https://img.shields.io/badge/INTERFACE-13-green.svg)](./INTERFACE/README.md)
 [![Guide](https://img.shields.io/badge/guide-complete-yellow.svg)](./DEVELOPER_GUIDE.md)
 
 </div>
@@ -110,6 +110,7 @@
 |-----|------|------|
 | [DesktopManager](./API/DesktopManager.md) | 桌面图标、组件、背景管理 | ✅ |
 | [TaskbarManager](./API/TaskbarManager.md) | 任务栏管理、程序固定、多任务切换、自定义图标 | ✅ |
+| [VolumeManager](./API/VolumeManager.md) | 音量管理（Web Audio 拦截、系统音量 0–1、任务栏音量 UI） | ✅ |
 | [ContextMenuManager](./API/ContextMenuManager.md) | 右键菜单管理 | ✅ |
 | [TerminalAPI](./API/TerminalAPI.md) | 终端 API（CLI 程序使用） | ✅ |
 | [NotificationManager](./API/NotificationManager.md) | 系统通知管理 | ✅ |

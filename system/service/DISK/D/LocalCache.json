@@ -24,22 +24,38 @@
       }
     },
     "TaskbarManager": {
-      "weather:神池县": {
+      "weather:中国 江苏省 南京市 江宁区": {
         "value": null,
-        "expiresAt": 1772332002613,
-        "createdAt": 1772288802613,
-        "updatedAt": 1772288802613,
-        "size": 2740,
+        "expiresAt": 1772743011837,
+        "createdAt": 1772699811837,
+        "updatedAt": 1772699811837,
+        "size": 2790,
+        "isFileBacked": true
+      },
+      "weather:江宁区": {
+        "value": null,
+        "expiresAt": 1772767997049,
+        "createdAt": 1772724797049,
+        "updatedAt": 1772724797049,
+        "size": 2728,
+        "isFileBacked": true
+      },
+      "weather:江宁": {
+        "value": null,
+        "expiresAt": 1772770071679,
+        "createdAt": 1772726871679,
+        "updatedAt": 1772726871679,
+        "size": 2726,
         "isFileBacked": true
       }
     },
     "exploit": {
       "system.dailyQuote": {
-        "value": "也许我们都没有长大，只是世界变小了。",
+        "value": "你永远也看不到我最寂寞时候的样子，因为只有你不在我身边的时候，我才最寂寞。",
         "expiresAt": 0,
-        "createdAt": 1772290285917,
-        "updatedAt": 1772290285917,
-        "size": 56,
+        "createdAt": 1772742953777,
+        "updatedAt": 1772742953777,
+        "size": 113,
         "isFileBacked": false
       }
     }

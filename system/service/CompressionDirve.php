@@ -361,10 +361,10 @@ function extractZip($sourcePath, $targetPath, $options = []) {
         sendResponse(false, '压缩文件不存在: ' . $sourcePath, null, 404);
     }
     
-    // 检查是否为 ZIP 文件（支持 .zip 和 .zom 扩展名）
+    // 检查是否为 ZIP 文件（支持 .zip、.zom、.paper 扩展名，.paper 为壁纸包格式）
     $fileExt = getFileExtension($sourceRealPath);
-    if ($fileExt !== 'zip' && $fileExt !== 'zom') {
-        sendResponse(false, '文件不是 ZIP 格式（支持 .zip 和 .zom）: ' . $sourcePath, null, 400);
+    if ($fileExt !== 'zip' && $fileExt !== 'zom' && $fileExt !== 'paper') {
+        sendResponse(false, '文件不是 ZIP 格式（支持 .zip、.zom、.paper）: ' . $sourcePath, null, 400);
     }
     
     // 检查目标目录是否存在
@@ -452,10 +452,10 @@ function listZip($sourcePath) {
         sendResponse(false, '压缩文件不存在: ' . $sourcePath, null, 404);
     }
     
-    // 检查是否为 ZIP 文件（支持 .zip 和 .zom 扩展名）
+    // 检查是否为 ZIP 文件（支持 .zip、.zom、.paper 扩展名）
     $fileExt = getFileExtension($sourceRealPath);
-    if ($fileExt !== 'zip' && $fileExt !== 'zom') {
-        sendResponse(false, '文件不是 ZIP 格式（支持 .zip 和 .zom）: ' . $sourcePath, null, 400);
+    if ($fileExt !== 'zip' && $fileExt !== 'zom' && $fileExt !== 'paper') {
+        sendResponse(false, '文件不是 ZIP 格式（支持 .zip、.zom、.paper）: ' . $sourcePath, null, 400);
     }
     
     $zip = new ZipArchive();

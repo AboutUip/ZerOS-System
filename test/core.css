@@ -20,7 +20,7 @@ html, body {
     color: var(--theme-text, #d7e0dd);
 }
 
-/* 沙盒容器 */
+/* 沙盒容器：动态渐变背景（高级感），可与 --theme-background 融合 */
 #sandbox-container,
 .sandbox-container {
     position: fixed;
@@ -29,11 +29,33 @@ html, body {
     width: 100vw;
     height: 100vh;
     overflow: hidden;
-    background: var(--theme-background, #0a0e1a);
+    --sandbox-base: var(--theme-background, #0a0e1a);
+    background: linear-gradient(
+        135deg,
+        var(--sandbox-base) 0%,
+        var(--sandbox-gradient-mid, #12162a) 25%,
+        var(--sandbox-gradient-accent, #0d1326) 50%,
+        var(--sandbox-gradient-mid, #161b33) 75%,
+        var(--sandbox-base) 100%
+    );
+    background-size: 400% 400%;
+    background-color: var(--sandbox-base);
     z-index: 1;
-    /* 应用屏幕亮度（通过 CSS 变量控制） */
     filter: brightness(var(--screen-brightness, 1));
-    transition: filter 0.2s ease;
+    transition: filter 0.2s ease, background-color 0.25s ease, background 0.25s ease;
+    animation: sandbox-gradient-drift 20s ease infinite;
+}
+
+@keyframes sandbox-gradient-drift {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+}
+
+/* 通知面板打开时：沙盒容器使用毛玻璃+渐变暗化（由 NotificationManager 内联设置，此处为后备与过渡） */
+#sandbox-container.zeros-notification-open,
+.sandbox-container.zeros-notification-open {
+    /* 背景与 backdrop-filter 由 JS 设置，此处仅保证过渡与隔离 */
+    isolation: isolate;
 }
 
 /* 内核加载界面 - 重构：现代科技风格 */
@@ -914,11 +936,17 @@ html, body {
     transition: filter 0.2s ease;
 }
 
-/* 桌面视频背景 - 确保亮度效果也应用到视频 */
+/* 桌面视频背景 - 确保亮度效果也应用到视频，z-index:0 在壁纸层之下 */
 .desktop-background-video {
     /* 应用屏幕亮度（通过 CSS 变量控制） */
     filter: brightness(var(--screen-brightness, 1));
     transition: filter 0.2s ease;
+}
+
+/* 桌面图标容器 - 在壁纸层(z-index:1)之上，确保图标可点击 */
+.desktop-icons-container {
+    position: relative;
+    z-index: 2;
 }
 
 /* 任务栏 - 使用主题和风格变量 */
@@ -1038,6 +1066,12 @@ html, body {
     padding: 8px 4px;
 }
 
+.taskbar-left .taskbar-volume-display,
+.taskbar-right .taskbar-volume-display {
+    width: 100%;
+    padding: 8px 4px;
+}
+
 /* 亮度显示组件样式 */
 .taskbar-brightness-display {
     display: flex;
@@ -1064,6 +1098,36 @@ html, body {
 }
 
 .taskbar-brightness-display:hover .taskbar-brightness-icon {
+    color: var(--theme-primary, rgba(139, 92, 246, 1));
+    transform: scale(1.1);
+}
+
+/* 音量显示组件样式 */
+.taskbar-volume-display {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 12px;
+    min-width: 48px;
+    height: 48px;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    user-select: none;
+}
+
+.taskbar-volume-display:hover {
+    background: var(--theme-primary-light, rgba(139, 92, 246, 0.15));
+}
+
+.taskbar-volume-icon {
+    width: 24px;
+    height: 24px;
+    color: var(--theme-text, rgba(215, 224, 221, 0.9));
+    transition: all 0.3s ease;
+}
+
+.taskbar-volume-display:hover .taskbar-volume-icon {
     color: var(--theme-primary, rgba(139, 92, 246, 1));
     transform: scale(1.1);
 }
@@ -3244,6 +3308,25 @@ html, body {
     background: var(--theme-primary-dark, rgba(139, 92, 246, 0.5));
 }
 
+/* 天气面板滚动条样式（与网络/电池面板一致，避免默认粗滚动条） */
+.taskbar-weather-panel::-webkit-scrollbar {
+    width: 6px;
+}
+
+.taskbar-weather-panel::-webkit-scrollbar-track {
+    background: var(--theme-primary-light, rgba(139, 92, 246, 0.05));
+    border-radius: 3px;
+}
+
+.taskbar-weather-panel::-webkit-scrollbar-thumb {
+    background: var(--theme-primary, rgba(139, 92, 246, 0.3));
+    border-radius: 3px;
+}
+
+.taskbar-weather-panel::-webkit-scrollbar-thumb:hover {
+    background: var(--theme-primary-dark, rgba(139, 92, 246, 0.5));
+}
+
 /* 电池脉冲动画 */
 @keyframes batteryPulse {
     0%, 100% {
@@ -3388,6 +3471,155 @@ html, body {
     font-weight: 600;
     color: var(--theme-primary, rgba(139, 92, 246, 0.9));
     min-width: 50px;
+}
+
+/* ========== 音量面板样式 ========== */
+
+.taskbar-volume-panel {
+    position: fixed;
+    width: 320px;
+    background: var(--theme-background-elevated, linear-gradient(180deg, rgba(26, 31, 46, 0.98) 0%, rgba(22, 33, 62, 0.98) 100%));
+    border: 1px solid var(--theme-border, rgba(139, 92, 246, 0.2));
+    border-radius: 16px;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5), 0 6px 20px rgba(0, 0, 0, 0.3);
+    backdrop-filter: blur(30px) saturate(180%);
+    -webkit-backdrop-filter: blur(30px) saturate(180%);
+    overflow: hidden;
+    opacity: 0;
+    transform: translateY(10px) scale(0.95);
+    pointer-events: none;
+    transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+                transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 99998;
+}
+
+.taskbar-volume-panel.visible {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    pointer-events: auto;
+}
+
+.taskbar-volume-panel-content {
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.volume-panel-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--theme-text, rgba(215, 224, 221, 0.95));
+    text-align: center;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.volume-slider-container {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.volume-icon-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 48px;
+    height: 48px;
+    flex-shrink: 0;
+}
+
+.volume-panel-icon {
+    width: 32px;
+    height: 32px;
+    color: var(--theme-primary, rgba(139, 92, 246, 0.9));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.volume-panel-icon svg {
+    width: 100%;
+    height: 100%;
+    stroke: currentColor;
+    fill: none;
+}
+
+.volume-slider-wrapper {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.volume-slider {
+    width: 100%;
+    height: 6px;
+    border-radius: 3px;
+    background: var(--theme-primary-light, rgba(139, 92, 246, 0.1));
+    outline: none;
+    -webkit-appearance: none;
+    appearance: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.volume-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--theme-primary, rgba(139, 92, 246, 0.9));
+    border: 2px solid var(--theme-background-elevated, rgba(26, 31, 46, 0.98));
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(139, 92, 246, 0.4);
+    transition: all 0.2s ease;
+}
+
+.volume-slider::-webkit-slider-thumb:hover {
+    transform: scale(1.2);
+    box-shadow: 0 4px 12px rgba(139, 92, 246, 0.6);
+}
+
+.volume-slider::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--theme-primary, rgba(139, 92, 246, 0.9));
+    border: 2px solid var(--theme-background-elevated, rgba(26, 31, 46, 0.98));
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(139, 92, 246, 0.4);
+    transition: all 0.2s ease;
+}
+
+.volume-slider::-moz-range-thumb:hover {
+    transform: scale(1.2);
+    box-shadow: 0 4px 12px rgba(139, 92, 246, 0.6);
+}
+
+.volume-value-display {
+    text-align: center;
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--theme-primary, rgba(139, 92, 246, 0.9));
+    min-width: 50px;
+}
+
+.volume-mute-btn {
+    padding: 8px 16px;
+    font-size: 14px;
+    border-radius: 8px;
+    border: 1px solid var(--theme-border, rgba(139, 92, 246, 0.3));
+    background: var(--theme-primary-light, rgba(139, 92, 246, 0.15));
+    color: var(--theme-text, rgba(215, 224, 221, 0.95));
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.volume-mute-btn:hover {
+    background: var(--theme-primary, rgba(139, 92, 246, 0.3));
 }
 
 /* ========== 任务栏弹出组件蒙版层样式 ========== */

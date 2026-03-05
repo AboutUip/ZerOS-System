@@ -380,12 +380,23 @@
                     KernelLogger.debug("NetworkService", `[拦截] ${options.method || 'GET'} ${url}`, { url, method: options.method || 'GET' });
                 }
 
-                // 若请求未携带 JWT，则注入用户 JWT（用户 JWT 未准备好时临时使用系统 JWT）；已有 JWT 则直接放行
+                // 跨域请求不注入 JWT，避免第三方 API 的 CORS 预检因不允许 Authorization 头而失败
+                let isCrossOrigin = false;
                 try {
-                    self._ensureRequestHasJWT(args, url, 'fetch');
+                    const reqOrigin = new URL(url).origin;
+                    if (typeof window !== 'undefined' && window.location && reqOrigin !== window.location.origin) {
+                        isCrossOrigin = true;
+                    }
                 } catch (e) {
-                    if (typeof KernelLogger !== 'undefined') {
-                        KernelLogger.debug("NetworkManager", `[JWT] fetch 注入异常: ${e.message}`, { url });
+                    // URL 解析失败时仍按原逻辑注入
+                }
+                if (!isCrossOrigin) {
+                    try {
+                        self._ensureRequestHasJWT(args, url, 'fetch');
+                    } catch (e) {
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.debug("NetworkManager", `[JWT] fetch 注入异常: ${e.message}`, { url });
+                        }
                     }
                 }
 
@@ -520,40 +531,49 @@
                         KernelLogger.debug("NetworkService", `[拦截] XHR ${requestMethod} ${requestUrl}`, { url: requestUrl, method: requestMethod });
                     }
 
-                    // 若请求未携带 JWT，则按调用来源自动注入：DISK/ 之外 + DISK/D/server/ → 系统 JWT；其余 → 用户 JWT
+                    // 跨域请求不注入 JWT，避免第三方 API 的 CORS 预检因不允许 Authorization 头而失败
+                    let xhrCrossOrigin = false;
                     try {
-                        const hasJwt = self._headersHasJWT(requestHeaders);
-                        if (hasJwt) {
-                            if (typeof KernelLogger !== 'undefined') {
-                                KernelLogger.debug("NetworkManager", "[JWT] XHR 直接放行: 请求已携带 JWT", { url: requestUrl });
-                            }
-                        } else if (typeof RandomSecurity !== 'undefined') {
-                            const jwtType = self._getJWTTypeForCaller();
-                            let jwt = null;
-                            if (jwtType === 'system' && typeof RandomSecurity.getSystemJWT === 'function') {
-                                jwt = RandomSecurity.getSystemJWT();
-                            } else if (jwtType === 'user' && typeof RandomSecurity.getUserJWT === 'function') {
-                                jwt = RandomSecurity.getUserJWT();
-                            }
-                            if (jwt) {
-                                xhr.setRequestHeader('Authorization', 'Bearer ' + jwt);
-                                const tokenLabel = jwtType === 'system' ? 'SystemToken' : 'UserToken';
+                        const xhrReqOrigin = new URL(requestUrl).origin;
+                        if (typeof window !== 'undefined' && window.location && xhrReqOrigin !== window.location.origin) {
+                            xhrCrossOrigin = true;
+                        }
+                    } catch (e) {}
+                    if (!xhrCrossOrigin) {
+                        try {
+                            const hasJwt = self._headersHasJWT(requestHeaders);
+                            if (hasJwt) {
                                 if (typeof KernelLogger !== 'undefined') {
-                                    KernelLogger.debug("NetworkManager", `[JWT] XHR 已注入 ${tokenLabel}`, { url: requestUrl });
+                                    KernelLogger.debug("NetworkManager", "[JWT] XHR 直接放行: 请求已携带 JWT", { url: requestUrl });
+                                }
+                            } else if (typeof RandomSecurity !== 'undefined') {
+                                const jwtType = self._getJWTTypeForCaller();
+                                let jwt = null;
+                                if (jwtType === 'system' && typeof RandomSecurity.getSystemJWT === 'function') {
+                                    jwt = RandomSecurity.getSystemJWT();
+                                } else if (jwtType === 'user' && typeof RandomSecurity.getUserJWT === 'function') {
+                                    jwt = RandomSecurity.getUserJWT();
+                                }
+                                if (jwt) {
+                                    xhr.setRequestHeader('Authorization', 'Bearer ' + jwt);
+                                    const tokenLabel = jwtType === 'system' ? 'SystemToken' : 'UserToken';
+                                    if (typeof KernelLogger !== 'undefined') {
+                                        KernelLogger.debug("NetworkManager", `[JWT] XHR 已注入 ${tokenLabel}`, { url: requestUrl });
+                                    }
+                                } else {
+                                    if (typeof KernelLogger !== 'undefined') {
+                                        KernelLogger.debug("NetworkManager", `[JWT] XHR 未注入: 无可用 JWT (类型=${jwtType || '?'})`, { url: requestUrl });
+                                    }
                                 }
                             } else {
                                 if (typeof KernelLogger !== 'undefined') {
-                                    KernelLogger.debug("NetworkManager", `[JWT] XHR 未注入: 无可用 JWT (类型=${jwtType || '?'})`, { url: requestUrl });
+                                    KernelLogger.debug("NetworkManager", "[JWT] XHR 未注入: RandomSecurity 不可用", { url: requestUrl });
                                 }
                             }
-                        } else {
+                        } catch (e) {
                             if (typeof KernelLogger !== 'undefined') {
-                                KernelLogger.debug("NetworkManager", "[JWT] XHR 未注入: RandomSecurity 不可用", { url: requestUrl });
+                                KernelLogger.debug("NetworkManager", `[JWT] XHR 注入异常: ${e.message}`, { url: requestUrl });
                             }
-                        }
-                    } catch (e) {
-                        if (typeof KernelLogger !== 'undefined') {
-                            KernelLogger.debug("NetworkManager", `[JWT] XHR 注入异常: ${e.message}`, { url: requestUrl });
                         }
                     }
 

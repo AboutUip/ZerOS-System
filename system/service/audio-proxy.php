@@ -92,11 +92,15 @@ try {
     curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
     curl_setopt($ch, CURLOPT_TIMEOUT, 30);  // 30秒超时
     curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);  // 10秒连接超时
-    curl_setopt($ch, CURLOPT_USERAGENT, 'ZerOS-AudioProxy/1.0');
     curl_setopt($ch, CURLOPT_HEADER, true);  // 包含响应头
     
-    // 支持 Range 请求（用于音频流式播放）
-    $headers = ['Accept: audio/*', 'Accept-Encoding: identity'];
+    // 网易云 music.126.net 需要 Referer 和浏览器 UA 绕过防盗链
+    $isNetEase = (strpos($audioUrl, 'music.126.net') !== false);
+    $userAgent = $isNetEase ? 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' : 'ZerOS-AudioProxy/1.0';
+    $headers = ['Accept: audio/*', 'Accept-Encoding: identity', 'User-Agent: ' . $userAgent];
+    if ($isNetEase) {
+        $headers[] = 'Referer: https://music.163.com/';
+    }
     if (isset($_SERVER['HTTP_RANGE'])) {
         $headers[] = 'Range: ' . $_SERVER['HTTP_RANGE'];
     }

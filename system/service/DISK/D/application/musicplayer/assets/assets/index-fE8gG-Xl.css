@@ -134,3 +134,128 @@ img[data-v-e42a9458] {
   font-size: 13px;
   margin-right: 20px;
 }
+/* 歌手页根容器 */
+[data-v-e42a9458] .singer-page-root {
+  padding-bottom: 40px;
+}
+[data-v-e42a9458] .singer-page-root .list-container {
+  width: calc(87vw - 180px);
+  margin: 24px auto 0;
+  padding: 0 4px;
+}
+/* 四个切换栏：专辑 / MV / 歌手详情 / 相似歌手 - 明显样式与间距 */
+[data-v-e42a9458] .singer-tabs-nav {
+  display: flex;
+  align-items: stretch;
+  gap: 16px;
+  margin-bottom: 0;
+  padding: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  cursor: default;
+  min-height: 48px;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 10px 10px 0 0;
+  padding: 12px 20px 0 20px;
+}
+[data-v-e42a9458] .singer-tab-item {
+  padding: 14px 26px;
+  cursor: pointer !important;
+  font-size: 15px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.7);
+  user-select: none;
+  transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease;
+  border: 1px solid transparent;
+  border-bottom: none;
+  border-radius: 8px 8px 0 0;
+  margin-bottom: -1px;
+  background: rgba(255, 255, 255, 0.05);
+}
+[data-v-e42a9458] .singer-tab-item:hover {
+  color: rgba(255, 255, 255, 0.95);
+  background: rgba(255, 255, 255, 0.08);
+}
+[data-v-e42a9458] .singer-tab-item.is-active {
+  color: #fff;
+  font-weight: 600;
+  background: rgba(236, 65, 65, 0.35);
+  border-color: rgba(236, 65, 65, 0.5);
+  border-bottom-color: transparent;
+  box-shadow: 0 -2px 8px rgba(236, 65, 65, 0.2);
+}
+[data-v-e42a9458] .singer-tabs-content {
+  min-height: 160px;
+  padding-top: 28px;
+}
+/* 分类内容网格 - 专辑/MV/相似歌手：拉大间距，避免紧贴 */
+[data-v-e42a9458] .singer-tab-panel {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 32px 28px;
+  align-content: start;
+}
+[data-v-e42a9458] .singer-tab-panel.singer-desc-wrap {
+  display: block;
+  grid-template-columns: unset;
+  gap: unset;
+}
+/* 每个卡片项增加内边距，与相邻卡片、标题留出呼吸感 */
+[data-v-e42a9458] .singer-tab-panel > *:not(.empty-tip) {
+  padding: 10px;
+  margin: 0;
+  border-radius: 12px;
+  transition: transform 0.22s ease, box-shadow 0.22s ease, background-color 0.2s ease;
+  background: rgba(255, 255, 255, 0.03);
+}
+[data-v-e42a9458] .singer-tab-panel > *:not(.empty-tip):hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  background: rgba(255, 255, 255, 0.06);
+}
+/* 专辑/MV/相似歌手卡片标题：最多两行省略，与封面留出间距 */
+[data-v-e42a9458] .singer-tab-panel .text {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 12px;
+  padding: 0 2px;
+  font-size: 14px;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.9);
+}
+[data-v-e42a9458] .singer-desc-wrap {
+  padding: 16px 0 24px;
+  color: rgba(255, 255, 255, 0.85);
+}
+[data-v-e42a9458] .singer-desc-wrap .brief-desc {
+  font-size: 14px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  margin-bottom: 20px;
+}
+[data-v-e42a9458] .singer-desc-wrap .intro-item {
+  margin-bottom: 16px;
+}
+[data-v-e42a9458] .singer-desc-wrap .intro-item h4 {
+  font-size: 14px;
+  margin-bottom: 6px;
+  color: rgba(255, 255, 255, 0.9);
+}
+[data-v-e42a9458] .singer-desc-wrap .intro-txt {
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  color: rgba(255, 255, 255, 0.75);
+}
+[data-v-e42a9458] .empty-tip {
+  padding: 40px 16px;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 14px;
+  grid-column: 1 / -1;
+}
+[data-v-e42a9458] .singer-desc-wrap .empty-tip {
+  grid-column: unset;
+}

@@ -3603,6 +3603,19 @@ class LStorage {
             // 获取应用程序资源对象（用于删除文件）
             const asset = applicationTable[programName];
 
+            // 0. 终止该程序的所有运行中进程（含前台与后台），避免卸载后进程仍残留
+            if (typeof ProcessManager !== 'undefined' && typeof ProcessManager.getPidsByProgramName === 'function' && typeof ProcessManager.killProgram === 'function') {
+                const pidsToKill = ProcessManager.getPidsByProgramName(programName);
+                for (const pid of pidsToKill) {
+                    try {
+                        await ProcessManager.killProgram(pid, true);
+                        KernelLogger.info("LStorage", `卸载时已终止程序 ${programName} 的进程 (PID: ${pid})`);
+                    } catch (e) {
+                        KernelLogger.warn("LStorage", `终止进程 PID ${pid} 时出错: ${e.message}`);
+                    }
+                }
+            }
+
             // 1. 删除桌面图标（如果存在）
             try {
                 if (typeof ProcessManager !== 'undefined' && typeof ProcessManager._executeKernelAPI === 'function') {

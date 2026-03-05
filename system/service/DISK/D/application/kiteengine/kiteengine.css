@@ -1,0 +1,92 @@
+/* KiteEngine - ZerOS 3D 游戏引擎 样式 */
+.kiteengine-window {
+    background: var(--theme-background-elevated, rgba(37, 43, 53, 0.98));
+    border: 1px solid var(--theme-border, rgba(139, 92, 246, 0.3));
+    color: var(--theme-text, #d7e0dd);
+}
+
+/* 四个角拉伸触发区统一缩小，减少误触（默认 20px，此处改为 8px） */
+.kiteengine-window .zos-window-resizer {
+    width: 8px;
+    height: 8px;
+}
+/* 顶部两角下移，避免盖住标题栏按钮 */
+.kiteengine-window .zos-window-resizer-top-right,
+.kiteengine-window .zos-window-resizer-top-left {
+    top: 28px;
+    height: 8px;
+    width: 8px;
+}
+.kiteengine-window .zos-window-resizer-top-right {
+    right: 0;
+}
+.kiteengine-window .zos-window-resizer-top-left {
+    left: 0;
+}
+
+.kiteengine-content {
+    background: var(--theme-background-elevated, rgba(37, 43, 53, 0.98));
+}
+
+.kiteengine-title {
+    color: var(--theme-text, #d7e0dd);
+}
+
+.kiteengine-desc {
+    color: var(--theme-text-secondary, #a0aec0);
+}
+
+/* 标题栏：左侧标题 + 右侧窗口控制按钮 */
+.kiteengine-drag-strip {
+    justify-content: space-between;
+}
+.kiteengine-titlebar-controls {
+    cursor: default;
+}
+.kiteengine-btn-min,
+.kiteengine-btn-max,
+.kiteengine-btn-close {
+    -webkit-appearance: none;
+    appearance: none;
+}
+.kiteengine-btn-close:hover {
+    color: #ff5f57;
+}
+
+/* 菜单栏：固定高度 */
+.kiteengine-menubar {
+    user-select: none;
+}
+.kiteengine-menuitem:hover {
+    color: var(--theme-text-primary, #e2e8f0);
+}
+
+/* 工具栏：固定高度 */
+.kiteengine-toolbar {
+    flex-shrink: 0;
+}
+.kiteengine-toolbtn,
+.kiteengine-toolbtn-delete {
+    flex-shrink: 0;
+}
+.kiteengine-toolbtn:hover,
+.kiteengine-toolbtn-delete:hover {
+    filter: brightness(1.1);
+}
+
+/* 主体三栏：层级 | 视口 | 检查器 */
+.kiteengine-body {
+    flex: 1;
+    min-height: 0;
+}
+.kiteengine-panel {
+    flex-shrink: 0;
+    overflow: hidden;
+}
+.kiteengine-hierarchy-list,
+.kiteengine-inspector-content {
+    overflow: auto;
+}
+.kiteengine-hierarchy-item:hover {
+    background: rgba(255, 255, 255, 0.06);
+}

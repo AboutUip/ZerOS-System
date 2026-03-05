@@ -2624,7 +2624,9 @@ this.fileCountText.textContent = this._getText('FM_ITEMS_COUNT_FOUND', '找到 {
                     } else if (this._isFileSelectorMode && item.type === 'file') {
                         // 在文件选择器模式下，单击文件触发选择
                         if (this._onFileSelected && typeof this._onFileSelected === 'function') {
-                            this._onFileSelected(item).then(() => {
+                            var result = this._onFileSelected(item);
+                            var p = (result != null && typeof result.then === 'function') ? result : Promise.resolve();
+                            p.then(() => {
                                 // 选择完成后关闭文件管理器
                                 if (typeof ProcessManager !== 'undefined') {
                                     ProcessManager.killProgram(this.pid);

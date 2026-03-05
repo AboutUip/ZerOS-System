@@ -110471,6 +110471,9 @@ const getUserCloud = (limit, offset2) => request("/user/cloud", "get", {
 const getArtistAlbum = (id, limit) => request("/artist/album", "get", {
   params: { id, limit }
 });
+const getArtistMv = (id, limit) => request("/artist/mv", "get", { params: { id, limit } });
+const getArtistDesc = (id) => request(`/artist/desc?id=${id}`, "get");
+const getSimiArtist = (id) => request(`/simi/artist?id=${id}`, "get");
 const getAlbumContent = (id) => request(`/album?id=${id}`, "get");
 const getCommentMusic = (id, type4, pageNo, pageSize, sortType, cursor) => request("/comment/new", "get", { params: { id, type: type4, pageNo, pageSize, sortType, cursor } });
 const getRecordSong = (limit = 200) => request("/record/recent/song", {
@@ -110720,29 +110723,62 @@ const useMusicAction = /* @__PURE__ */ defineStore("musicActionId", () => {
   };
   const getMusicUrlHandler = async (item, i2) => {
     try {
+      console.log("[KiteMusic] getMusicUrlHandler 开始", { songId: item?.id, songName: item?.name });
       state.songs = item;
       getLyricHandler(item.id);
       getDynamicCoverHandler(item.id);
       updateScrobble(item.id, state.runtimeList?.id);
-      const [{ data }, { songs }] = await Promise.all([
+      const [urlRes, detailRes] = await Promise.all([
         getMusicUrl(item.id),
         getMusicDetail(item.id.toString())
       ]);
+      const { data } = urlRes;
+      const { songs } = detailRes;
+      console.log("[KiteMusic] getMusicUrl API 返回", { songId: item.id, data, hasData0: !!data?.[0], url: data?.[0]?.url });
+      let musicUrl = (data && data[0] && data[0].url) ? data[0].url : "";
+      if (musicUrl && typeof window !== "undefined" && window.__ZEROS_AUDIO_PROXY__ && !window.__ZEROS_AUDIO_PROXY_DISABLE__) {
+        try {
+          musicUrl = window.__ZEROS_AUDIO_PROXY__ + "?url=" + encodeURIComponent(musicUrl);
+          console.log("[KiteMusic] 已通过音频代理", { proxy: window.__ZEROS_AUDIO_PROXY__ });
+        } catch (e2) {
+          console.warn("[KiteMusic] 代理 URL 失败，使用原地址", e2);
+        }
+      } else if (musicUrl && window.__ZEROS_AUDIO_PROXY_DISABLE__) {
+        console.log("[KiteMusic] 代理已禁用，使用直连", { url: musicUrl.slice(0, 60) + "..." });
+      }
+      if (!musicUrl) {
+        console.warn("[KiteMusic] 无可用音源", { songId: item.id, songName: item?.name });
+        ElMessage.warning("该歌曲暂无可用音源，可能为会员专享或版权限制");
+      }
       state.index = i2 === void 0 ? state.index : i2;
-      $audio.reset(true);
-      await $audio.pause(false);
-      state.musicUrl = data[0].url || "";
+      state.musicUrl = musicUrl;
+      console.log("[KiteMusic] state.musicUrl 已设置", { musicUrl: musicUrl ? musicUrl.slice(0, 80) + "..." : "" });
+      try {
+        $audio.reset(true);
+        Promise.race([
+          $audio.pause(false),
+          new Promise((_, rej) => setTimeout(() => rej(new Error("pause timeout")), 1500))
+        ]).catch(() => {});
+      } catch (e3) {
+        console.warn("[KiteMusic] reset/pause 跳过", e3?.message);
+      }
       $audio.cutSongHandler();
       localStorage.setItem("MUSIC_CONFIG", JSON.stringify({ ...state, load: true }));
-      $audio.el.oncanplay = async () => {
-        try {
-          await $audio.play();
-        } catch (error2) {
-          console.error("播放失败:", error2);
-        }
-      };
+      const audioEl = $audio.el;
+      if (audioEl) {
+        audioEl.oncanplay = async () => {
+          console.log("[KiteMusic] oncanplay 触发", { elSrc: audioEl.src?.slice(0, 80) });
+          try {
+            await $audio.play();
+          } catch (error2) {
+            console.error("[KiteMusic] oncanplay 内 play 失败", error2);
+          }
+        };
+      } else {
+        console.warn("[KiteMusic] $audio.el 为空，无法绑定 oncanplay");
+      }
     } catch (e2) {
-      console.log("getMusicUrlHandler函数错误：", e2);
+      console.error("[KiteMusic] getMusicUrlHandler 异常", { songId: item?.id, error: e2?.message, stack: e2?.stack });
     }
   };
   const orderTarget = (i2) => {
@@ -111181,7 +111217,11 @@ const useUserInfo = /* @__PURE__ */ defineStore("userInfoId", {
       const music = useMusicAction();
       const musicConfig = localStorage.getItem("MUSIC_CONFIG");
       if (musicConfig) {
-        music.updateState(JSON.parse(musicConfig));
+        const parsed = JSON.parse(musicConfig);
+        if (parsed && parsed.load && (!parsed.musicUrl || String(parsed.musicUrl).trim() === "")) {
+          parsed.load = false;
+        }
+        music.updateState(parsed);
       }
     }
   }
@@ -118225,10 +118265,17 @@ const _sfc_main$9 = /* @__PURE__ */ defineComponent$1({
       audio.value.play = play;
       audio.value.pause = pause;
       audio.value?.addEventListener("error", (event) => {
-        if (event.target.error.code === 4) ;
+        const err = event.target?.error;
+        if (err) console.error("[KiteMusic] audio error", { code: err.code, message: err.message, src: event.target?.src?.slice(0, 80) });
       });
     });
     function play(lengthen = false) {
+      const src = audio.value?.src || "";
+      if (!audio.value || !src || String(src).trim() === "") {
+        console.warn("[KiteMusic] play 跳过：无有效音源", { hasAudio: !!audio.value, src: src ? src.slice(0, 60) + "..." : "(空)" });
+        return;
+      }
+      console.log("[KiteMusic] play 执行", { src: src.slice(0, 80) + "..." });
       let volume = store.volume;
       if (music.state.load) {
         cutSongHandler();
@@ -118237,7 +118284,7 @@ const _sfc_main$9 = /* @__PURE__ */ defineComponent$1({
       player.play();
       audio.value.volume = 0;
       originPlay.call(audio.value).catch((err) => {
-        console.error("调用origin.play方法时抛出了错误：", err);
+        console.error("[KiteMusic] origin.play 失败", { name: err?.name, message: err?.message });
       });
       isPlay.value = true;
       timeState.stop = false;
@@ -118247,21 +118294,36 @@ const _sfc_main$9 = /* @__PURE__ */ defineComponent$1({
       });
     }
     function pause(isNeed = true, lengthen = false) {
-      let volume = store.volume;
       isNeed && (isPlay.value = false);
-      return transitionVolume(volume, false, lengthen).then(() => {
-        player.pause();
-        transitionIsPlay.value = false;
-      });
+      if (audio.value) {
+        try {
+          originPause.call(audio.value);
+        } catch (e) {}
+      }
+      player.pause();
+      transitionIsPlay.value = false;
+      let volume = store.volume;
+      if (audio.value) {
+        audio.value.volume = volume;
+      }
+      return Promise.resolve();
     }
     let timer;
     function transitionVolume(volume, target = true, lengthen = false) {
       clearInterval(timer);
+      if (!audio.value) {
+        return Promise.resolve();
+      }
       const playVolume = lengthen ? 40 : 15;
       const pauseVolume = lengthen ? 20 : 10;
       return new Promise((resolve2) => {
         if (target) {
           timer = setInterval(() => {
+            if (!audio.value) {
+              clearInterval(timer);
+              resolve2(void 0);
+              return;
+            }
             audio.value.volume = Math.min(audio.value.volume + volume / playVolume, volume);
             if (audio.value.volume >= volume) {
               resolve2(void 0);
@@ -118271,11 +118333,18 @@ const _sfc_main$9 = /* @__PURE__ */ defineComponent$1({
           return;
         }
         timer = setInterval(() => {
+          if (!audio.value) {
+            clearInterval(timer);
+            resolve2(void 0);
+            return;
+          }
           audio.value.volume = Math.max(audio.value.volume - volume / pauseVolume, 0);
           if (audio.value.volume <= 0) {
             clearInterval(timer);
-            originPause.call(audio.value);
-            audio.value.volume = volume;
+            try {
+              originPause.call(audio.value);
+            } catch (e) {}
+            if (audio.value) audio.value.volume = volume;
             resolve2(void 0);
           }
         }, 50);
@@ -118321,7 +118390,6 @@ const _sfc_main$9 = /* @__PURE__ */ defineComponent$1({
       executeListener("cutSong");
     };
     const exposeObj = {
-      el: audio,
       isPlay,
       reset,
       play,
@@ -118330,6 +118398,13 @@ const _sfc_main$9 = /* @__PURE__ */ defineComponent$1({
       addListener,
       cutSongHandler
     };
+    Object.defineProperty(exposeObj, "el", {
+      get() {
+        return audio.value;
+      },
+      configurable: true,
+      enumerable: true
+    });
     Object.defineProperty(exposeObj, "time", {
       get() {
         return audio.value.currentTime;
@@ -119627,6 +119702,9 @@ export {
   getUserCloud as a0,
   getArtistDetail as a1,
   getArtistAlbum as a2,
+  getArtistMv as a1mv,
+  getArtistDesc as a1desc,
+  getSimiArtist as a1simi,
   useFlags as a3,
   onMounted as a4,
   withModifiers as a5,

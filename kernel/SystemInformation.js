@@ -5,13 +5,13 @@ KernelLogger.info("SystemInformation", "模块初始化");
 
 class SystemInformation {
     // 系统版本
-    static SYSTEM_VERSION = '0.7.0';
+    static SYSTEM_VERSION = '0.7.2';
     
     // 内核版本
-    static KERNEL_VERSION = '0.6.7';
+    static KERNEL_VERSION = '0.6.8';
     
     // 构建日期
-    static BUILD_DATE = new Date('2025-11-28');
+    static BUILD_DATE = new Date('2026-03-05');
     
     // 系统名称
     static SYSTEM_NAME = 'ZerOS';
@@ -95,6 +95,7 @@ class SystemInformation {
         COMPRESSION_DIRVE: 'CompressionDirve',
         IMAGE_PROXY: 'ImageProxy',
         AUDIO_PROXY: 'audio-proxy',
+        VIDEO_PROXY: 'video-proxy',
         MODULE_PROXY: 'module-proxy',
         BROWSER_PROXY: 'BrowserProxy',
         DISKMANAGER: 'DISKMANAGER',
@@ -265,6 +266,22 @@ class SystemInformation {
      */
     static getAudioProxyUrl() {
         return new URL(SystemInformation.getAudioProxyPath(), SystemInformation.getOrigin()).toString();
+    }
+    
+    /**
+     * 获取视频代理服务路径（多后端：PHP 为 video-proxy.php，SpringBoot 为 video-proxy）
+     * @returns {string} 服务路径（不含 origin）
+     */
+    static getVideoProxyPath() {
+        return SystemInformation.getServicePath(SystemInformation.SERVICE_NAMES.VIDEO_PROXY);
+    }
+    
+    /**
+     * 获取视频代理服务完整 URL（用于代理第三方视频链接，绕过 CORS/Referer 限制）
+     * @returns {string} 完整的视频代理服务 URL
+     */
+    static getVideoProxyUrl() {
+        return new URL(SystemInformation.getVideoProxyPath(), SystemInformation.getOrigin()).toString();
     }
     
     /**

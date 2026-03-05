@@ -17,8 +17,6 @@
         backBtn: null,
         forwardBtn: null,
         bookmarks: [], // 书签列表
-        _navToken: 0,
-        _navTimeoutId: null,
 
         /**
          * 获取当前语言下的本地化文本
@@ -96,6 +94,20 @@
                     this.windowId = windowInfo.windowId;
                 }
             }
+            
+            // 先等待代理 Service Worker 激活，再加载首屏，确保 iframe 文档被 SW 控制（脚本/XHR 经代理，避免 ERR_CONNECTION_RESET、CORS）
+            await this._registerProxyServiceWorker();
+            
+            // 拦截 F5/刷新：在浏览器窗口内只刷新 iframe，不刷新整个应用
+            this.window.addEventListener('keydown', (e) => {
+                if (e.key === 'F5' || e.keyCode === 116) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (this.iframe && this.currentUrl) {
+                        this._navigateTo(this.currentUrl, false);
+                    }
+                }
+            }, true);
             
             // 创建工具栏
             const toolbar = this._createToolbar();
@@ -233,46 +245,67 @@
         },
         
         /**
-         * 获取 NetworkManager 实例（辅助函数）
-         */
-        _getNetworkManager: function() {
-            if (typeof POOL !== 'undefined' && typeof POOL.__GET__ === 'function') {
-                try {
-                    return POOL.__GET__("KERNEL_GLOBAL_POOL", "NetworkManager");
-                } catch (e) {
-                    // 忽略错误
-                }
-            }
-            // 降级：尝试从全局对象获取
-            if (typeof window !== 'undefined' && window.NetworkManager) {
-                return window.NetworkManager;
-            } else if (typeof globalThis !== 'undefined' && globalThis.NetworkManager) {
-                return globalThis.NetworkManager;
-            }
-            return null;
-        },
-        
-        /**
-         * 构建代理 URL（用于绕过 X-Frame-Options、CSP 等 iframe 限制）
+         * 构建代理 URL（后端代理去掉禁止嵌入头并设置 frame-ancestors，允许 iframe 显示）
          * @param {string} targetUrl - 目标网页 URL
          * @returns {string} 代理服务 URL
          */
+        /** 始终使用浏览器程序内 proxy.php 与同目录 browser-proxy-sw.js，不与 PHP 同目录 */
+        _getProxyBase: function() {
+            const origin = (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) ? SystemInformation.getOrigin() : (window.location && window.location.origin || '');
+            try {
+                if (document.currentScript && document.currentScript.src) {
+                    const base = document.currentScript.src.replace(/\/[^/]*$/, '/');
+                    if (base.indexOf('application/browser') !== -1 || base.indexOf('browser') !== -1) {
+                        return base + 'proxy.php';
+                    }
+                }
+            } catch (e) {}
+            // 脚本非从 browser 路径加载时，使用浏览器程序固定路径（与 applicationAssets 中 D:/application/browser 对应）
+            return origin + '/system/service/DISK/D/application/browser/proxy.php';
+        },
         _buildProxyUrl: function(targetUrl) {
-            const proxyBase = (typeof SystemInformation !== 'undefined' && SystemInformation.getBrowserProxyUrl)
-                ? SystemInformation.getBrowserProxyUrl()
-                : ((typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) ? SystemInformation.getOrigin() : (window.location && window.location.origin || '')) + ((typeof SystemInformation !== 'undefined' && SystemInformation.getBrowserProxyPath) ? SystemInformation.getBrowserProxyPath() : '/system/service/BrowserProxy.php');
+            const proxyBase = this._getProxyBase();
             return proxyBase + (proxyBase.indexOf('?') >= 0 ? '&' : '?') + 'url=' + encodeURIComponent(targetUrl);
         },
-        
-        _getProxyBaseUrl: function() {
-            const proxyBase = (typeof SystemInformation !== 'undefined' && SystemInformation.getBrowserProxyUrl)
-                ? SystemInformation.getBrowserProxyUrl()
-                : ((typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) ? SystemInformation.getOrigin() : (window.location && window.location.origin || '')) + ((typeof SystemInformation !== 'undefined' && SystemInformation.getBrowserProxyPath) ? SystemInformation.getBrowserProxyPath() : '/system/service/BrowserProxy.php');
-            return proxyBase + '?url=';
-        },
-        
         /**
-         * 判断是否应使用代理加载（外部 http/https 经代理以绕过 CORS 与 iframe 限制）
+         * 注册代理 Service Worker，并返回 Promise，在 SW 激活后 resolve，确保首次导航的文档被 SW 控制（脚本/XHR 经代理）
+         */
+        _registerProxyServiceWorker: function() {
+            if (!navigator.serviceWorker || !navigator.serviceWorker.register) {
+                return Promise.resolve();
+            }
+            const proxyBase = this._getProxyBase();
+            const swUrl = proxyBase.replace(/(proxy|BrowserProxy)\.php(\?.*)?$/i, 'browser-proxy-sw.js');
+            let scope = '/system/service/';
+            try {
+                const pathname = new URL(proxyBase).pathname;
+                if (pathname) scope = pathname.replace(/\/[^/]*$/, '/') || scope;
+            } catch (e) {}
+            return navigator.serviceWorker.register(swUrl, { scope: scope }).then(function(reg) {
+                if (typeof KernelLogger !== 'undefined') KernelLogger.debug('Browser', '代理 Service Worker 已注册', reg.scope);
+                if (reg.installing) {
+                    return new Promise(function(resolve) {
+                        reg.installing.addEventListener('statechange', function() {
+                            if (reg.active) resolve();
+                        });
+                    });
+                }
+                if (reg.waiting) {
+                    return new Promise(function(resolve) {
+                        reg.waiting.addEventListener('statechange', function() {
+                            if (reg.active) resolve();
+                        });
+                        reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+                    });
+                }
+                return reg.active ? Promise.resolve() : navigator.serviceWorker.ready;
+            }).catch(function(err) {
+                if (typeof KernelLogger !== 'undefined') KernelLogger.warn('Browser', '代理 Service Worker 注册失败', err);
+            });
+        },
+
+        /**
+         * 是否为目标可代理的 URL（仅 http/https）
          */
         _shouldUseProxy: function(url) {
             try {
@@ -291,7 +324,8 @@
         _extractUrlFromProxy: function(href) {
             try {
                 const u = new URL(href, window.location.origin);
-                if (u.pathname.indexOf('BrowserProxy') !== -1 && u.searchParams.has('url')) {
+                const isProxyPath = u.pathname.indexOf('BrowserProxy') !== -1 || (u.pathname.indexOf('browser') !== -1 && u.pathname.indexOf('proxy.php') !== -1);
+                if (isProxyPath && u.searchParams.has('url')) {
                     return u.searchParams.get('url');
                 }
             } catch (e) {
@@ -301,12 +335,11 @@
         },
         
         /**
-         * 导航到指定URL
+         * 导航到指定 URL。外部 http(s) 一律经代理加载（后端去掉禁止嵌入头并设置 frame-ancestors）。
          */
         _navigateTo: function(url, addToHistory = true) {
             if (!this.iframe) return;
-            
-            // 验证URL
+
             try {
                 new URL(url);
             } catch (e) {
@@ -316,74 +349,35 @@
                 this._showError('无效的URL: ' + url);
                 return;
             }
-            
-            // 添加到历史记录
+
             if (addToHistory) {
-                // 如果当前不在历史记录末尾，删除后面的记录
                 if (this.historyIndex < this.history.length - 1) {
                     this.history = this.history.slice(0, this.historyIndex + 1);
                 }
-                // 添加到历史记录
                 this.history.push(url);
                 this.historyIndex = this.history.length - 1;
                 this._updateNavigationButtons();
             }
-            
+
             this.currentUrl = url;
             if (this.addressBar) {
                 this.addressBar.value = url;
             }
-            
-            // 添加加载动画
+
             this.iframe.classList.add('loading');
             this._showLoading(true);
-            
-            // 使用 x-frame-bypass 或 PHP 代理绕过 X-Frame-Options、CSP frame-ancestors 等 iframe 限制
-            const shouldProxy = this._shouldUseProxy(url);
-            const useBypass = shouldProxy && this._supportsXFrameBypass() && typeof this.iframe.load === 'function';
-            const iframeSrc = shouldProxy ? this._buildProxyUrl(url) : url;
-            if (this._navTimeoutId) {
-                clearTimeout(this._navTimeoutId);
-                this._navTimeoutId = null;
-            }
-            const navToken = (this._navToken || 0) + 1;
-            this._navToken = navToken;
-            if (useBypass) {
-                try {
-                    const proxyBase = this._getProxyBaseUrl();
-                    this.iframe.load(url, { proxies: [proxyBase] });
-                } catch (e) {
-                    this.iframe.src = iframeSrc;
-                }
-            } else {
-                this.iframe.src = iframeSrc;
-            }
-            if (useBypass) {
-                this._navTimeoutId = setTimeout(() => {
-                    if (this._navToken === navToken) {
-                        this._forceProxyLoad(url);
-                    }
-                }, 12000);
-            }
-            
-            // 监听加载完成
+
+            const useProxy = this._shouldUseProxy(url);
+            const iframeSrc = useProxy ? this._buildProxyUrl(url) : url;
+            this.iframe.src = iframeSrc;
+
             this.iframe.onload = () => {
-                if (this._navTimeoutId) {
-                    clearTimeout(this._navTimeoutId);
-                    this._navTimeoutId = null;
-                }
                 this.iframe.classList.remove('loading');
                 this._showLoading(false);
-                
                 if (this.addressBar) {
-                    // 使用代理时 iframe.location 为代理 URL，地址栏显示真实 URL（this.currentUrl）
-                    // 直接加载时尝试从 iframe 获取（可能因跨域失败）
-                    if (this._shouldUseProxy(url)) {
+                    if (useProxy) {
                         this.addressBar.value = this.currentUrl;
-                        // 代理加载的页面与父页面同源，可注入导航拦截
-                        setTimeout(() => {
-                            this._injectNavigationInterceptor();
-                        }, 100);
+                        this._injectNavigationInterceptor();
                     } else {
                         try {
                             const iframeUrl = this.iframe.contentWindow.location.href;
@@ -392,37 +386,19 @@
                             if (addToHistory && this.historyIndex >= 0) {
                                 this.history[this.historyIndex] = iframeUrl;
                             }
-                            setTimeout(() => {
-                                this._injectNavigationInterceptor();
-                            }, 100);
+                            this._injectNavigationInterceptor();
                         } catch (e) {
                             this.addressBar.value = url;
                         }
                     }
                 }
             };
-            
+
             this.iframe.onerror = () => {
-                if (this._navTimeoutId) {
-                    clearTimeout(this._navTimeoutId);
-                    this._navTimeoutId = null;
-                }
-                if (useBypass && this._navToken === navToken) {
-                    this._forceProxyLoad(url);
-                    return;
-                }
                 this.iframe.classList.remove('loading');
                 this._showLoading(false);
                 this._showError('加载失败: ' + url);
             };
-        },
-
-        _forceProxyLoad: function(url) {
-            if (!this.iframe || !this._shouldUseProxy(url)) return;
-            const proxyUrl = this._buildProxyUrl(url);
-            this.iframe.classList.add('loading');
-            this._showLoading(true);
-            this.iframe.src = proxyUrl;
         },
         
         /**
@@ -689,42 +665,18 @@
         },
         
         /**
-         * 检测是否支持 x-frame-bypass（Customized Built-in Element，Chrome/Firefox 支持）
-         */
-        _supportsXFrameBypass: function() {
-            try {
-                const test = document.createElement('iframe', { is: 'x-frame-bypass' });
-                return typeof test.load === 'function';
-            } catch (e) {
-                return false;
-            }
-        },
-        
-        /**
-         * 创建内容区域（iframe）
+         * 创建内容区域（普通 iframe，外部页经代理加载故可嵌入）
          */
         _createContent: function() {
             const content = document.createElement('div');
             content.className = 'browser-content';
-            
-            const useXFrameBypass = this._supportsXFrameBypass();
-            const iframe = useXFrameBypass
-                ? document.createElement('iframe', { is: 'x-frame-bypass' })
-                : document.createElement('iframe');
+
+            const iframe = document.createElement('iframe');
             iframe.className = 'browser-iframe';
             iframe.frameBorder = '0';
             iframe.allow = 'fullscreen';
-            // 使用 sandbox 属性限制导航，但允许必要的功能
-            // allow-scripts: 允许脚本执行
-            // allow-same-origin: 允许同源访问（必需，否则网站无法使用 cookie 和 localStorage）
-            //   注意：虽然 allow-same-origin + allow-scripts 理论上允许沙箱逃逸，
-            //   但我们通过以下方式增强安全性：
-            //   1. 不设置 allow-top-navigation（禁止顶级导航，防止跳出）
-            //   2. 注入脚本拦截 window.top 访问
-            //   3. 拦截危险的导航操作
-            // allow-forms: 允许表单提交
-            // allow-popups: 允许弹窗（但我们会拦截）
-            // 注意：不设置 allow-top-navigation，防止 iframe 内容导航到父窗口
+            // sandbox：allow-scripts + allow-same-origin 为嵌入代理页所必需（脚本、cookie、父页注入拦截）；
+            // 控制台 “escape its sandboxing” 为浏览器对二者同用时给出的提示，无法消除，实际通过不设 allow-top-navigation 与注入拦截限制跳出
             iframe.sandbox = 'allow-scripts allow-same-origin allow-forms allow-popups';
             iframe.referrerPolicy = 'no-referrer-when-downgrade';
             iframe.style.cssText = `
@@ -737,20 +689,50 @@
             this.iframe = iframe;
             iframe.name = 'browser-content-frame';
             content.appendChild(iframe);
-            
-            // 加载指示器
-            const loadingIndicator = document.createElement('div');
-            loadingIndicator.className = 'browser-loading-indicator';
-            loadingIndicator.style.display = 'none';
-            loadingIndicator.innerHTML = `
-                <div class="browser-loading-spinner"></div>
-                <div class="browser-loading-text">正在加载...</div>
-            `;
-            content.appendChild(loadingIndicator);
-            
+            // 已移除加载弹窗（browser-loading-indicator）
             return content;
         },
         
+        /**
+         * 注入 fetch/XHR 代理：仅把请求基础地址改为代理（与 base 一致），其余不处理，绕过 CORS
+         */
+        _injectFetchXHRProxy: function(win, doc) {
+            const script = doc.createElement('script');
+            script.textContent = '(' + function() {
+                var proxyBase = location.origin + location.pathname;
+                function toProxyUrl(url) {
+                    if (typeof url !== 'string') return url;
+                    if (url.startsWith('http://') || url.startsWith('https://')) {
+                        if (url.indexOf(proxyBase) === 0) return url;
+                        return proxyBase + (proxyBase.indexOf('?') >= 0 ? '&' : '?') + 'url=' + encodeURIComponent(url);
+                    }
+                    return url;
+                }
+                var f = window.fetch;
+                if (f) {
+                    window.fetch = function(input, init) {
+                        if (typeof input === 'string') input = toProxyUrl(input);
+                        return f.call(this, input, init);
+                    };
+                }
+                var X = window.XMLHttpRequest;
+                if (X) {
+                    window.XMLHttpRequest = function() {
+                        var xhr = new X();
+                        var open = xhr.open;
+                        xhr.open = function(method, url, async, user, pass) {
+                            return open.apply(this, [method, toProxyUrl(url), async !== false, user, pass]);
+                        };
+                        return xhr;
+                    };
+                }
+            } + ')();';
+            try {
+                (doc.head || doc.documentElement).appendChild(script);
+                script.remove();
+            } catch (e) {}
+        },
+
         /**
          * 注入脚本拦截链接和导航，并增强安全性
          * 注意：此方法仅对同源页面有效（跨域页面无法访问）
@@ -775,7 +757,7 @@
                 
                 // 同源，可以注入脚本
                 const self = this;
-                
+                this._injectFetchXHRProxy(iframeWindow, iframeDocument);
                 // 从点击目标向上查找最近的 <a href>
                 const findLink = (el) => {
                     while (el && el !== iframeDocument.body) {
@@ -800,31 +782,29 @@
                     }
                 };
                 
-                // 仅拦截会“离开当前视图”的链接：target=_blank/_top/_parent、Ctrl+点击、中键
+                // 拦截所有 http(s) 链接，在本窗口内打开（含 target=_blank/_top/_parent、Ctrl/中键），与代理注入逻辑一致
                 const captureHandler = (e) => {
                     const link = findLink(e.target);
                     if (!link) return;
                     const href = link.getAttribute('href');
                     if (!href) return;
                     if (href.startsWith('javascript:') || href.startsWith('mailto:') || href.startsWith('tel:')) return;
-                    
-                    const target = (link.getAttribute('target') || '_self').toLowerCase();
-                    const wouldLeaveView = target === '_blank' || target === '_top' || target === '_parent' || e.ctrlKey || e.metaKey || e.button === 1;
-                    if (!wouldLeaveView) return;
-                    
-                    e.preventDefault();
-                    e.stopPropagation();
-                    e.stopImmediatePropagation();
-                    
                     if (href.startsWith('#')) {
                         try {
                             const anchor = iframeDocument.querySelector(href);
-                            if (anchor) anchor.scrollIntoView({ behavior: 'smooth' });
+                            if (anchor) {
+                                e.preventDefault();
+                                anchor.scrollIntoView({ behavior: 'smooth' });
+                            }
                         } catch (err) {}
                         return;
                     }
                     const targetUrl = resolveLinkUrl(href, link);
-                    if (targetUrl) self._navigateTo(targetUrl);
+                    if (!targetUrl || !/^https?:\/\//i.test(targetUrl)) return;
+                    e.preventDefault();
+                    e.stopPropagation();
+                    e.stopImmediatePropagation();
+                    self._navigateTo(targetUrl);
                 };
                 
                 ['click', 'auxclick'].forEach(ev => {
@@ -841,88 +821,110 @@
                     return originalOpen.apply(this, arguments);
                 };
                 
-                // 拦截 location 赋值（使用代理）
+                // 严格拦截 location：href 赋值、replace、assign、reload 均经代理，防止跳出标签页
                 try {
-                    const locationProxy = new Proxy(iframeWindow.location, {
+                    const loc = iframeWindow.location;
+                    const locationProxy = new Proxy(loc, {
                         set: function(target, property, value) {
                             if (property === 'href' && value && typeof value === 'string') {
                                 self._navigateTo(value);
                                 return true;
                             }
+                            if (property === 'assign' || property === 'replace') return true;
                             target[property] = value;
                             return true;
+                        },
+                        get: function(target, property) {
+                            if (property === 'replace') {
+                                return function(url) {
+                                    if (url && typeof url === 'string' && /^https?:\/\//i.test(url)) {
+                                        self._navigateTo(url);
+                                    } else {
+                                        target.replace.apply(target, arguments);
+                                    }
+                                };
+                            }
+                            if (property === 'assign') {
+                                return function(url) {
+                                    if (url && typeof url === 'string' && /^https?:\/\//i.test(url)) {
+                                        self._navigateTo(url);
+                                    } else {
+                                        target.assign.apply(target, arguments);
+                                    }
+                                };
+                            }
+                            if (property === 'reload') {
+                                return function() {
+                                    if (self.currentUrl) self._navigateTo(self.currentUrl, false);
+                                    else target.reload.apply(target, arguments);
+                                };
+                            }
+                            return target[property];
                         }
                     });
-                    
-                    // 尝试替换 location（可能因为安全限制失败）
                     try {
                         Object.defineProperty(iframeWindow, 'location', {
-                            get: function() {
-                                return locationProxy;
-                            },
+                            get: function() { return locationProxy; },
                             configurable: true
                         });
                     } catch (e) {
-                        // location 属性不可配置，跳过
                         if (typeof KernelLogger !== 'undefined') {
                             KernelLogger.debug('Browser', '无法拦截 location 属性');
                         }
                     }
                 } catch (e) {
-                    // Proxy 不可用或 location 不可代理
                     if (typeof KernelLogger !== 'undefined') {
                         KernelLogger.debug('Browser', '无法代理 location 对象');
                     }
                 }
                 
-                // 拦截表单提交
-                const forms = iframeDocument.querySelectorAll('form');
-                forms.forEach(form => {
-                    form.addEventListener('submit', (e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        
-                        let action = form.getAttribute('action') || '';
-                        const extractedFromProxy = action ? self._extractUrlFromProxy(action) : null;
-                        if (extractedFromProxy) {
-                            action = extractedFromProxy;
+                // 拦截表单提交（文档委托，包含动态添加的表单，如 Bing 结果页的搜索框）
+                iframeDocument.addEventListener('submit', (e) => {
+                    const form = e.target && e.target.tagName === 'FORM' ? e.target : null;
+                    if (!form) return;
+                    e.preventDefault();
+                    e.stopPropagation();
+                    
+                    let action = form.getAttribute('action') || '';
+                    const extractedFromProxy = action ? self._extractUrlFromProxy(action) : null;
+                    if (extractedFromProxy) {
+                        action = extractedFromProxy;
+                    }
+                    const baseHref = (self.currentUrl && self.currentUrl.startsWith('http')) ? self.currentUrl : 'https://example.com/';
+                    const actionUrl = (action && !action.startsWith('about:')) ? action : baseHref.replace(/\?.*$/, '');
+                    const method = (form.getAttribute('method') || 'GET').toUpperCase();
+                    
+                    try {
+                        const fullActionUrl = new URL(actionUrl, baseHref).href;
+                        if (method === 'POST' && self._shouldUseProxy(fullActionUrl)) {
+                            const proxyUrl = self._buildProxyUrl(fullActionUrl);
+                            const origAction = form.action;
+                            const origTarget = form.target;
+                            form.action = proxyUrl;
+                            form.target = self.iframe && self.iframe.name ? self.iframe.name : '_self';
+                            self.currentUrl = fullActionUrl;
+                            if (self.addressBar) self.addressBar.value = fullActionUrl;
+                            self.history.push(fullActionUrl);
+                            self.historyIndex = self.history.length - 1;
+                            self._updateNavigationButtons();
+                            form.submit();
+                            form.action = origAction;
+                            form.target = origTarget;
+                        } else {
+                            const formData = new FormData(form);
+                            const params = new URLSearchParams(formData);
+                            const url = new URL(actionUrl, baseHref);
+                            params.forEach((value, key) => {
+                                url.searchParams.append(key, value);
+                            });
+                            self._navigateTo(url.href);
                         }
-                        const baseHref = (self.currentUrl && self.currentUrl.startsWith('http')) ? self.currentUrl : 'https://example.com/';
-                        const actionUrl = (action && !action.startsWith('about:')) ? action : baseHref.replace(/\?.*$/, '');
-                        const method = (form.getAttribute('method') || 'GET').toUpperCase();
-                        
-                        try {
-                            const fullActionUrl = new URL(actionUrl, baseHref).href;
-                            if (method === 'POST' && self._shouldUseProxy(fullActionUrl)) {
-                                const proxyUrl = self._buildProxyUrl(fullActionUrl);
-                                const origAction = form.action;
-                                const origTarget = form.target;
-                                form.action = proxyUrl;
-                                form.target = self.iframe && self.iframe.name ? self.iframe.name : '_self';
-                                self.currentUrl = fullActionUrl;
-                                if (self.addressBar) self.addressBar.value = fullActionUrl;
-                                self.history.push(fullActionUrl);
-                                self.historyIndex = self.history.length - 1;
-                                self._updateNavigationButtons();
-                                form.submit();
-                                form.action = origAction;
-                                form.target = origTarget;
-                            } else {
-                                const formData = new FormData(form);
-                                const params = new URLSearchParams(formData);
-                                const url = new URL(actionUrl, baseHref);
-                                params.forEach((value, key) => {
-                                    url.searchParams.append(key, value);
-                                });
-                                self._navigateTo(url.href);
-                            }
-                        } catch (err) {
-                            if (typeof KernelLogger !== 'undefined') {
-                                KernelLogger.warn('Browser', '表单 action URL 解析失败', { action, baseHref, err });
-                            }
+                    } catch (err) {
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('Browser', '表单 action URL 解析失败', { action, baseHref, err });
                         }
-                    });
-                });
+                    }
+                }, true);
                 
             } catch (e) {
                 // 跨域或其他错误，无法注入
@@ -936,13 +938,6 @@
          * 程序退出
          */
         __exit__: function() {
-            // 清理定时器
-            if (this.updateInterval) {
-                clearInterval(this.updateInterval);
-                this.updateInterval = null;
-            }
-            
-            // 注销窗口
             if (typeof GUIManager !== 'undefined') {
                 GUIManager.unregisterWindow(this.pid);
             }

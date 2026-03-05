@@ -14,6 +14,7 @@
 | BrowserProxy | [BrowserProxy.md](./BrowserProxy.md) | 浏览器网页代理（绕过 iframe 限制） |
 | ImageProxy | [ImageProxy.md](./ImageProxy.md) | 图片代理（跨域图片加载） |
 | audio-proxy | [audioProxy.md](./audioProxy.md) | 音频代理（跨域音频加载） |
+| video-proxy | [videoProxy.md](./videoProxy.md) | 视频代理（跨域视频加载，支持 Range） |
 | module-proxy | [moduleProxy.md](./moduleProxy.md) | ES 模块代理（MIME 类型、跨域） |
 | AIProxy | [AIProxy.md](./AIProxy.md) | AI 代理（讯飞星火、通义千问） |
 | programPermissions | [programPermissions.md](./programPermissions.md) | 程序权限注册（upid 分配） |

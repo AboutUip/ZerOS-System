@@ -7,10 +7,10 @@ KernelLogger.info("NotificationManager", "模块初始化");
 class NotificationManager {
     // ==================== 常量配置 ====================
     static CONFIG = {
-        // 容器配置
-        CONTAINER_WIDTH: 380,
-        CONTAINER_TOP: 60,  // 增加顶部距离，避免通知溢出
-        CONTAINER_SIDE: 20,
+        // 容器配置（宽度 400，右侧/左侧留空隙）
+        CONTAINER_WIDTH: 400,
+        CONTAINER_TOP: 60,
+        CONTAINER_SIDE: 12,  // 通知面板与屏幕边缘的留白（左右已留好）
         CONTAINER_MIN_HEIGHT: 100,
         CONTAINER_Z_INDEX: 10000,
         
@@ -49,6 +49,13 @@ class NotificationManager {
             INITIAL_TRANSLATE_X: 80,
             TARGET_BORDER_RADIUS: '16px'
         }
+    };
+
+    /** 打开通知时 #sandbox-container 的样式：仅毛玻璃，不覆盖背景（保留沙盒自身渐变等） */
+    static _SANDBOX_NOTIFICATION_STYLE = {
+        TRANSITION: 'backdrop-filter 0.25s ease, -webkit-backdrop-filter 0.25s ease',
+        BACKDROP_FILTER: 'blur(14px) saturate(130%)',
+        CLASS: 'zeros-notification-open'
     };
     
     // ==================== 私有属性 ====================
@@ -542,9 +549,11 @@ class NotificationManager {
             position: fixed;
             top: 0;
             bottom: 0;
-            width: ${config.OVERLAY_WIDTH};
+            left: 0;
+            top: 0;
+            width: 100vw;
             height: 100vh;
-            background: rgba(0, 0, 0, 0.3);
+            background: rgba(0, 0, 0, 0.35);
             backdrop-filter: blur(2px);
             -webkit-backdrop-filter: blur(2px);
             z-index: ${config.OVERLAY_Z_INDEX};
@@ -578,27 +587,29 @@ class NotificationManager {
         emptyState.id = 'notification-empty-state';
         emptyState.className = 'notification-empty-state';
         emptyState.style.cssText = `
-            background: rgba(30, 30, 30, 0.95);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
-            border-radius: 16px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-            padding: 40px 20px;
+            background: var(--theme-background-elevated, rgba(40, 42, 54, 0.6));
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border-radius: 14px;
+            border: 1px solid var(--theme-border, rgba(255, 255, 255, 0.08));
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+            padding: 32px 24px;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            gap: 12px;
+            gap: 10px;
             pointer-events: auto;
-            min-height: 120px;
+            min-height: 100px;
         `;
         
         const icon = document.createElement('div');
+        icon.className = 'notification-empty-state-icon';
         icon.style.cssText = `
-            font-size: 48px;
-            opacity: 0.5;
-            margin-bottom: 8px;
+            font-size: 40px;
+            opacity: 0.7;
+            color: var(--theme-primary, rgba(139, 92, 246, 0.9));
+            line-height: 1;
         `;
         icon.textContent = '🔔';
         emptyState.appendChild(icon);
@@ -607,8 +618,9 @@ class NotificationManager {
         text.className = 'notification-empty-state-text';
         text.style.cssText = `
             font-size: 14px;
-            color: #b3b3b3;
+            color: var(--theme-text-secondary, rgba(255, 255, 255, 0.65));
             text-align: center;
+            line-height: 1.4;
         `;
         text.textContent = NotificationManager._getText('NOTIFICATION_EMPTY_STATE', '暂时没有通知');
         emptyState.appendChild(text);
@@ -991,26 +1003,219 @@ class NotificationManager {
     }
     
     /**
-     * 更新通知蒙版层位置（根据任务栏位置）
+     * 更新通知蒙版层位置（蒙版全屏，点击任意处退出通知模式、防止误操作）
      */
     static _updateNotificationOverlayPosition() {
         if (!NotificationManager._notificationOverlay) {
             return;
         }
-        
-        const taskbarPosition = NotificationManager._getTaskbarPosition();
-        
-        if (taskbarPosition === 'right') {
-            NotificationManager._notificationOverlay.style.left = '0';
-            NotificationManager._notificationOverlay.style.right = 'auto';
-            NotificationManager._notificationOverlay.style.background = 
-                'linear-gradient(to right, rgba(0, 0, 0, 0.5) 0%, rgba(0, 0, 0, 0.3) 50%, rgba(0, 0, 0, 0) 100%)';
-        } else {
-            NotificationManager._notificationOverlay.style.right = '0';
-            NotificationManager._notificationOverlay.style.left = 'auto';
-            NotificationManager._notificationOverlay.style.background = 
-                'linear-gradient(to left, rgba(0, 0, 0, 0.5) 0%, rgba(0, 0, 0, 0.3) 50%, rgba(0, 0, 0, 0) 100%)';
+        NotificationManager._notificationOverlay.style.left = '0';
+        NotificationManager._notificationOverlay.style.top = '0';
+        NotificationManager._notificationOverlay.style.right = '0';
+        NotificationManager._notificationOverlay.style.bottom = '0';
+        NotificationManager._notificationOverlay.style.width = '100%';
+        NotificationManager._notificationOverlay.style.height = '100%';
+        NotificationManager._notificationOverlay.style.background = 'rgba(0, 0, 0, 0.35)';
+    }
+    
+    /** 通知栏占位宽度（面板宽度 + 贴边留白 + 与桌面之间的空隙） */
+    static _PANEL_OCCUPY_WIDTH = 400 + 12 + 12;  // CONTAINER_WIDTH + CONTAINER_SIDE + 与内容区间隙
+    /** 桌面+任务栏块相对视口左/右的边缘留白（假设任务栏在底部时左边缘留距） */
+    static _CONTENT_MARGIN_EDGE = 20;
+    /** 任务栏高度（与 core.css 一致，用于任务栏紧贴桌面下方） */
+    static _TASKBAR_HEIGHT = 60;
+    
+    /**
+     * 应用通知面板主题色并施加桌面+任务栏“整体左靠、右贴通知栏、等比缩小高度、垂直居中、左缘留距、任务栏贴桌面底”效果
+     */
+    static _applyNotificationPanelThemeAndDesktopPush() {
+        const container = NotificationManager._notificationContainer;
+        if (!container) {
+            return;
         }
+        // 通知面板占据全部高度（背景不再单独设置，由样式或透明处理）
+        container.style.top = '0';
+        container.style.height = '100vh';
+        container.style.maxHeight = '100vh';
+        const kernelContent = document.getElementById('kernel-content');
+        const taskbar = document.getElementById('taskbar');
+        if (!kernelContent || !taskbar) {
+            return;
+        }
+        const taskbarPosition = NotificationManager._getTaskbarPosition();
+        const config = NotificationManager.CONFIG;
+        const duration = config.ANIMATION.SHOW_DURATION;
+        const w = NotificationManager._PANEL_OCCUPY_WIDTH;
+        const m = NotificationManager._CONTENT_MARGIN_EDGE;
+        const th = NotificationManager._TASKBAR_HEIGHT;
+        const transition = `width ${duration}ms cubic-bezier(0.4, 0, 0.2, 1), height ${duration}ms cubic-bezier(0.4, 0, 0.2, 1), left ${duration}ms cubic-bezier(0.4, 0, 0.2, 1), top ${duration}ms cubic-bezier(0.4, 0, 0.2, 1), transform ${duration}ms cubic-bezier(0.4, 0, 0.2, 1)`;
+        kernelContent.style.transition = transition;
+        taskbar.style.transition = transition;
+        const isPanelOnLeft = taskbarPosition === 'right';
+        const contentWidthRight = `calc(100vw - ${w}px - ${m}px)`;
+        const contentWidthLeft = `calc(100vw - ${w}px - ${m * 2}px)`;
+        const contentHeightExpr = `(100vh * (100vw - ${w}px) / 100vw)`;
+        const contentHeight = `calc(100vh * (100vw - ${w}px) / 100vw)`;
+        const blockTop = `calc(50vh - ${contentHeightExpr} / 2)`;
+        // 对 #sandbox-container 施加“高级”背景（毛玻璃 + 渐变暗化），替代纯 background-color
+        NotificationManager._applySandboxNotificationStyle();
+
+        // 核心原因：kernel-content 使用了 transform: translateY(-50%)，会为 position:fixed 创建新的包含块，
+        // 导致任务栏的 fixed 相对于 kernel-content 而非视口定位，基于视口的 top 计算失效。
+        // 解决：通知打开时把任务栏改为 position:absolute + bottom:0，相对 kernel-content 贴底，自然紧贴桌面下缘。
+        if (isPanelOnLeft) {
+            kernelContent.style.left = `${w + m}px`;
+            kernelContent.style.top = '50%';
+            kernelContent.style.transform = 'translateY(-50%)';
+            kernelContent.style.width = contentWidthLeft;
+            kernelContent.style.height = contentHeight;
+            if (taskbarPosition === 'bottom') {
+                taskbar.style.setProperty('position', 'absolute', 'important');
+                taskbar.style.setProperty('bottom', '0', 'important');
+                taskbar.style.removeProperty('top');
+                taskbar.style.left = '0';
+                taskbar.style.right = '';
+                taskbar.style.width = '100%';
+                taskbar.style.height = `${th}px`;
+            } else if (taskbarPosition === 'top') {
+                taskbar.style.setProperty('position', 'absolute', 'important');
+                taskbar.style.setProperty('top', '0', 'important');
+                taskbar.style.setProperty('bottom', 'auto', 'important');
+                taskbar.style.left = '0';
+                taskbar.style.right = '';
+                taskbar.style.width = '100%';
+                taskbar.style.height = `${th}px`;
+            } else if (taskbarPosition === 'left') {
+                taskbar.style.setProperty('position', 'absolute', 'important');
+                taskbar.style.height = contentHeight;
+                taskbar.style.left = '0';
+                taskbar.style.top = '0';
+                taskbar.style.right = '';
+                taskbar.style.bottom = '';
+                taskbar.style.width = '60px';
+            } else {
+                taskbar.style.setProperty('position', 'absolute', 'important');
+                taskbar.style.height = contentHeight;
+                taskbar.style.right = '0';
+                taskbar.style.top = '0';
+                taskbar.style.left = '';
+                taskbar.style.bottom = '';
+                taskbar.style.width = '60px';
+            }
+        } else {
+            kernelContent.style.left = `${m}px`;
+            kernelContent.style.top = '50%';
+            kernelContent.style.transform = 'translateY(-50%)';
+            kernelContent.style.width = contentWidthRight;
+            kernelContent.style.height = contentHeight;
+            if (taskbarPosition === 'bottom') {
+                taskbar.style.setProperty('position', 'absolute', 'important');
+                taskbar.style.setProperty('bottom', '0', 'important');
+                taskbar.style.removeProperty('top');
+                taskbar.style.left = '0';
+                taskbar.style.right = '';
+                taskbar.style.width = '100%';
+                taskbar.style.height = `${th}px`;
+            } else if (taskbarPosition === 'top') {
+                taskbar.style.setProperty('position', 'absolute', 'important');
+                taskbar.style.setProperty('top', '0', 'important');
+                taskbar.style.setProperty('bottom', 'auto', 'important');
+                taskbar.style.left = '0';
+                taskbar.style.right = '';
+                taskbar.style.width = '100%';
+                taskbar.style.height = `${th}px`;
+            } else if (taskbarPosition === 'left') {
+                taskbar.style.setProperty('position', 'absolute', 'important');
+                taskbar.style.height = contentHeight;
+                taskbar.style.left = '0';
+                taskbar.style.top = '0';
+                taskbar.style.right = '';
+                taskbar.style.bottom = '';
+                taskbar.style.width = '60px';
+            } else {
+                taskbar.style.setProperty('position', 'absolute', 'important');
+                taskbar.style.height = contentHeight;
+                taskbar.style.right = '0';
+                taskbar.style.top = '0';
+                taskbar.style.left = '';
+                taskbar.style.bottom = '';
+                taskbar.style.width = '60px';
+            }
+        }
+    }
+    
+    /**
+     * 打开通知时：为 #sandbox-container 应用毛玻璃 + 渐变暗化，替代纯 background-color
+     */
+    static _applySandboxNotificationStyle() {
+        const sandbox = document.getElementById('sandbox-container') || document.querySelector('.sandbox-container');
+        if (!sandbox) return;
+        const cfg = NotificationManager._SANDBOX_NOTIFICATION_STYLE;
+        sandbox.classList.add(cfg.CLASS);
+        sandbox.style.transition = cfg.TRANSITION;
+        sandbox.style.backdropFilter = cfg.BACKDROP_FILTER;
+        sandbox.style.webkitBackdropFilter = cfg.BACKDROP_FILTER;
+    }
+
+    /**
+     * 关闭通知时：恢复 #sandbox-container 的默认背景（由主题/样式控制）
+     */
+    static _removeSandboxNotificationStyle() {
+        const sandbox = document.getElementById('sandbox-container') || document.querySelector('.sandbox-container');
+        if (!sandbox) return;
+        const cfg = NotificationManager._SANDBOX_NOTIFICATION_STYLE;
+        sandbox.classList.remove(cfg.CLASS);
+        sandbox.style.transition = '';
+        sandbox.style.backdropFilter = '';
+        sandbox.style.webkitBackdropFilter = '';
+    }
+
+    /**
+     * 移除桌面+任务栏的“挤压”效果，恢复全屏
+     */
+    static _removeDesktopPushEffect() {
+        NotificationManager._removeSandboxNotificationStyle();
+        if (NotificationManager._taskbarAlignRaf) {
+            cancelAnimationFrame(NotificationManager._taskbarAlignRaf);
+            NotificationManager._taskbarAlignRaf = null;
+        }
+        if (NotificationManager._taskbarAlignTimer) {
+            clearTimeout(NotificationManager._taskbarAlignTimer);
+            NotificationManager._taskbarAlignTimer = null;
+        }
+        const kernelContent = document.getElementById('kernel-content');
+        const taskbar = document.getElementById('taskbar');
+        if (!kernelContent || !taskbar) {
+            return;
+        }
+        const config = NotificationManager.CONFIG;
+        const duration = config.ANIMATION.HIDE_DURATION;
+        const transition = `width ${duration}ms cubic-bezier(0.4, 0, 0.2, 1), height ${duration}ms cubic-bezier(0.4, 0, 0.2, 1), left ${duration}ms cubic-bezier(0.4, 0, 0.2, 1), top ${duration}ms cubic-bezier(0.4, 0, 0.2, 1), transform ${duration}ms cubic-bezier(0.4, 0, 0.2, 1)`;
+        kernelContent.style.transition = transition;
+        kernelContent.style.width = '';
+        kernelContent.style.height = '';
+        kernelContent.style.left = '';
+        kernelContent.style.top = '';
+        kernelContent.style.transform = '';
+        taskbar.style.transition = transition;
+        // 任务栏保持 position:absolute 随 kernel-content 一起做恢复动画，动画结束后再恢复为 fixed（略晚于 HIDE_DURATION 以便 _isShowing 已置 false）
+        setTimeout(() => {
+            const t = document.getElementById('taskbar');
+            if (!t) {
+                return;
+            }
+            t.style.transition = transition;
+            t.style.width = '';
+            t.style.height = '';
+            t.style.left = '';
+            t.style.right = '';
+            t.style.removeProperty('top');
+            t.style.removeProperty('bottom');
+            t.style.removeProperty('position');
+            if (typeof TaskbarManager !== 'undefined' && typeof TaskbarManager._applyTaskbarPosition === 'function') {
+                TaskbarManager._applyTaskbarPosition(t);
+            }
+        }, duration + 50);
     }
     
     /**
@@ -1043,6 +1248,9 @@ class NotificationManager {
         
         NotificationManager._isShowing = true;
         NotificationManager._updateNotificationContainerPosition();
+        
+        // 通知面板主题色 + 桌面被挤压推动效果（根据任务栏位置）
+        NotificationManager._applyNotificationPanelThemeAndDesktopPush();
         
         // 更新空状态显示
         NotificationManager._updateEmptyState();
@@ -1239,6 +1447,9 @@ class NotificationManager {
         
         const container = NotificationManager._notificationContainer;
         const overlay = NotificationManager._notificationOverlay;
+        
+        // 移除桌面被挤压推动效果，与面板关闭动画同步
+        NotificationManager._removeDesktopPushEffect();
         
         // 隐藏蒙版层
         if (overlay) {

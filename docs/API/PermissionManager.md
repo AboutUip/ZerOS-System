@@ -61,7 +61,7 @@ PermissionManager.PERMISSION.DESKTOP_SHORTCUT         // 创建/删除桌面快�
 ```javascript
 PermissionManager.PERMISSION.KERNEL_DISK_READ         // 读取磁盘文件
 PermissionManager.PERMISSION.KERNEL_DISK_WRITE        // 写入磁盘文件
-PermissionManager.PERMISSION.KERNEL_DISK_DELETE       // 删除磁盘文件
+PermissionManager.PERMISSION.KERNEL_DISK_DELETE       // 删除磁盘文件（普通权限，自动授予）
 PermissionManager.PERMISSION.KERNEL_DISK_CREATE       // 创建磁盘文件/目录
 PermissionManager.PERMISSION.KERNEL_DISK_LIST         // 列出磁盘文件/目录
 ```
@@ -146,7 +146,7 @@ PermissionManager.PERMISSION.LANGUAGES_WRITE          // 加载语言包、设�
 
 ## 初始化
 
-权限管理器在系统启动时自动初始化，无需手动调用。
+权限管理器在系统启动时自动初始化，无需手动调用。初始化时会**异步加载**已保存的权限（`_loadPermissions` 使用 `LStorage.getSystemStorage('permissionManager.permissions')`），必须 await 完成后再使用，否则已授予的权限（如服务管理、磁盘创建等）无法恢复，会导致每次调用都重复弹窗申请。
 
 ```javascript
 // 自动初始化（在 BootLoader 中）
@@ -416,6 +416,7 @@ PermissionManager.clearAuditLog(true);
 
 - `KERNEL_DISK_READ` - 读取文件
 - `KERNEL_DISK_LIST` - 列出目录
+- `KERNEL_DISK_DELETE` - 删除文件（普通权限，自动授予）
 - `GUI_WINDOW_CREATE` - 创建窗口
 - `THEME_READ` - 读取主题
 - `SYSTEM_NOTIFICATION` - 系统通知
@@ -437,7 +438,6 @@ PermissionManager.clearAuditLog(true);
 特殊权限首次使用时需要用户确认，用户允许后会被持久化保存。
 - `KERNEL_DISK_WRITE` - 写入文件
 - `KERNEL_DISK_CREATE` - 创建文件/目录
-- `KERNEL_DISK_DELETE` - 删除文件
 - `KERNEL_MEMORY_READ` - 读取内存
 - `KERNEL_MEMORY_WRITE` - 写入内存
 - `GUI_WINDOW_MANAGE` - 管理窗口
@@ -540,11 +540,11 @@ try {
 
 ## 权限持久化
 
-权限管理器使用 `LStorage` 持久化权限记录：
+权限管理器使用 `LStorage` 持久化权限记录（按**程序名称**保存，非 PID）：
 
 - 权限记录保存在 `permissionManager.permissions` 键中
 - 程序关闭后，已授予的权限会被保存
-- 下次启动时，已授予的权限会自动恢复
+- 下次启动时，初始化阶段会 **await _loadPermissions()** 从存储恢复权限，已授予的权限才会正确恢复，避免重复申请
 - 普通权限会在程序启动时自动授予
 
 ## 性能优化

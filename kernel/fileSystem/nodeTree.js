@@ -1455,8 +1455,13 @@ class NodeTreeCollection {
             KernelLogger.error("NodeTree", `read_file: 目录节点不存在: ${path}`);
             return null;
         }
-        const fileObj = target.attributes[fileName];
+        let fileObj = target.attributes[fileName];
         if (!fileObj) {
+            // 目录在树中存在但文件节点不存在（如由 PHP/CompressionDirve 解压直接写入磁盘）：尝试从 PHP 读取
+            if (typeof this._readFileContentFromPHP === 'function') {
+                const fromPHP = await this._readFileContentFromPHP(path, fileName);
+                if (fromPHP != null) return fromPHP;
+            }
             KernelLogger.error("NodeTree", `read_file: 文件不存在: ${path}/${fileName}`);
             return null;
         }

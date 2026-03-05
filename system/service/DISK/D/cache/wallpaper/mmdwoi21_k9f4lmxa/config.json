@@ -1,0 +1,61 @@
+{
+  "constants": {
+    "paperFormatVersion": 1,
+    "name": "数字时钟"
+  },
+  "options": [
+    {
+      "key": "signature",
+      "type": "string",
+      "label": "签名",
+      "default": "萱",
+      "description": "显示在时钟下方的签名"
+    },
+    {
+      "key": "showDate",
+      "type": "boolean",
+      "label": "显示日期",
+      "default": true,
+      "description": "是否显示当前日期"
+    },
+    {
+      "key": "fontSize",
+      "type": "number",
+      "label": "时钟字号",
+      "default": 72,
+      "min": 36,
+      "max": 120,
+      "step": 4,
+      "description": "时钟数字的大小"
+    },
+    {
+      "key": "fontFamily",
+      "type": "select",
+      "label": "字体",
+      "default": "monospace",
+      "choices": [
+        { "value": "monospace", "label": "等宽字体" },
+        { "value": "Georgia, serif", "label": "衬线字体" },
+        { "value": "Courier New, monospace", "label": "Courier" },
+        { "value": "Consolas, monospace", "label": "Consolas" }
+      ]
+    },
+    {
+      "key": "textColor",
+      "type": "string",
+      "label": "文字颜色",
+      "default": "#00ff88",
+      "description": "时钟文字颜色"
+    },
+    {
+      "key": "bgOpacity",
+      "type": "number",
+      "label": "背景透明度",
+      "default": 0.15,
+      "min": 0,
+      "max": 0.5,
+      "step": 0.05,
+      "description": "JSON背景的透明度"
+    }
+  ]
+}

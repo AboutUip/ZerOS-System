@@ -29,6 +29,7 @@
 - [GUIManager.md](./GUIManager.md) - GUI 窗口管理 ✅
 - [NotificationManager.md](./NotificationManager.md) - 通知管理 ✅
 - [TaskbarManager.md](./TaskbarManager.md) - 任务栏管理 ✅
+- [VolumeManager.md](./VolumeManager.md) - 音量管理（Web Audio 拦截、系统音量 0–1、任务栏音量 UI） ✅
 - [ThemeManager.md](./ThemeManager.md) - 主题管理 ✅
 - [EventManager.md](./EventManager.md) - 事件管理 ✅
 - [ContextMenuManager.md](./ContextMenuManager.md) - 上下文菜单管理 ✅
@@ -104,6 +105,7 @@
 - GUIManager
 - NotificationManager
 - TaskbarManager
+- VolumeManager
 - ThemeManager
 - EventManager
 - ContextMenuManager

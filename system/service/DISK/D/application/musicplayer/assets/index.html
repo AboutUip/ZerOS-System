@@ -172,6 +172,27 @@
         };
       })();
     </script>
+    <script>
+      (function() {
+        window.__ZEROS_SYSTEM_VOLUME__ = 1;
+        window.__ZEROS_AUDIO_PROXY__ = '';
+        window.__ZEROS_AUDIO_PROXY_DISABLE__ = false;  // 设为 true 可禁用代理，尝试直连
+        window.addEventListener('message', function(e) {
+          if (e.data && e.data.type === 'kitemusic-system-volume' && typeof e.data.value === 'number') {
+            window.__ZEROS_SYSTEM_VOLUME__ = Math.max(0, Math.min(1, e.data.value));
+          }
+          if (e.data && e.data.type === 'kitemusic-audio-proxy' && e.data.url) {
+            window.__ZEROS_AUDIO_PROXY__ = e.data.url.replace(/\/$/, '');
+          }
+        });
+        setInterval(function() {
+          if (!window.$audio || !window.$audio.el) return;
+          var appVol = Number(localStorage.getItem('volume')) || 1;
+          var sysVol = window.__ZEROS_SYSTEM_VOLUME__ !== undefined ? window.__ZEROS_SYSTEM_VOLUME__ : 1;
+          window.$audio.el.volume = Math.max(0, Math.min(1, appVol * sysVol));
+        }, 400);
+      })();
+    </script>
     <script type="module" crossorigin src="./assets/index-DUNGDuLl.js"></script>
     <link rel="stylesheet" crossorigin href="./assets/index-CNIKra-V.css">
   </head>

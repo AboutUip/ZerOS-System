@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 225">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1a1a2e"/>
+      <stop offset="100%" stop-color="#16213e"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="225" fill="url(#bg)"/>
+  <text x="10" y="20" fill="#2d3748" font-family="monospace" font-size="10">
+    <tspan x="10" y="20">"time": "12:34:56"</tspan>
+    <tspan x="10" y="36">"date": "2024-01-15"</tspan>
+    <tspan x="10" y="52">"status": true</tspan>
+    <tspan x="10" y="68">"mode": "clock"</tspan>
+    <tspan x="10" y="84">"format": 24</tspan>
+    <tspan x="10" y="100">// signature</tspan>
+  </text>
+  <text x="200" y="115" fill="#00ff88" font-family="monospace" font-size="48" font-weight="bold" text-anchor="middle" letter-spacing="8">12:34:56</text>
+  <text x="200" y="150" fill="#00ff88" font-family="monospace" font-size="16" text-anchor="middle" opacity="0.7">2024-01-15 星期一</text>
+  <text x="200" y="185" fill="#00ff88" font-family="monospace" font-size="14" text-anchor="middle" opacity="0.5">萱</text>
+</svg>

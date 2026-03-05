@@ -3415,6 +3415,18 @@ class ThemeManager {
             'app-default': `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <rect x="4" y="4" width="16" height="16" rx="2" fill="currentColor" opacity="0.2" stroke="currentColor" stroke-width="1.5"/>
                 <path d="M8 8h8v8H8z" fill="currentColor" opacity="0.5"/>
+            </svg>`,
+            brightness: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="12" cy="12" r="5" stroke="currentColor" stroke-width="1.5" fill="none" opacity="0.9"/>
+                <path d="M12 2v3M12 19v3M22 12h-3M5 12H2M19.07 4.93l-2.12 2.12M7.05 16.95l-2.12 2.12M19.07 19.07l-2.12-2.12M7.05 7.05L4.93 4.93" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" opacity="0.9"/>
+            </svg>`,
+            volume: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M11 5L6 9H2v6h4l5 4V5z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>
+                <path d="M15.5 8.5c.5.5.5 1.5.5 2.5s0 2-.5 2.5M18 6c1.2 1.2 2 3 2 5s-.8 3.8-2 5M18 6c-1.2 1.2-2 3-2 5s.8 3.8 2 5M20.5 3.5c1.8 1.8 3 4.5 3 7.5s-1.2 5.7-3 7.5M20.5 3.5c-1.8 1.8-3 4.5-3 7.5s1.2 5.7 3 7.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" opacity="0.9"/>
+            </svg>`,
+            'volume-mute': `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M11 5L6 9H2v6h4l5 4V5z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>
+                <path d="M23 9l-6 6M17 9l6 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" opacity="0.9"/>
             </svg>`
         };
         return defaultIcons[iconName] || '';

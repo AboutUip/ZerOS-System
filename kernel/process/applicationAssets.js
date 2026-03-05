@@ -151,8 +151,7 @@ const APPLICATION_ASSETS = {
         styles: ["D:/application/browser/browser.css"],
         icon: "D:/application/browser/browser.svg",
         assets: [
-            "D:/application/browser/assets/booklink.js",
-            "D:/application/browser/assets/x-frame-bypass.js"
+            "D:/application/browser/assets/booklink.js"
         ],
         metadata: {
             autoStart: false,
@@ -310,7 +309,7 @@ const APPLICATION_ASSETS = {
         metadata: {
             autoStart: false,
             priority: 8,
-            description: "音乐Music",
+            description: "网易云音乐",
             version: "1.0.0",
             type: "GUI",
             alwaysShowInTaskbar: false,
@@ -393,6 +392,24 @@ const APPLICATION_ASSETS = {
             allowMultipleInstances: false,
             supportsPreview: true,  // 支持窗口预览快照
             category: "utility"  // 工具类应用
+        }
+    },
+
+    // KiteEngine - 3D 游戏引擎
+    "kiteengine": {
+        script: "D:/application/kiteengine/kiteengine.js",
+        styles: ["D:/application/kiteengine/kiteengine.css"],
+        icon: "D:/application/kiteengine/kiteengine.svg",
+        metadata: {
+            autoStart: false,
+            priority: 5,
+            description: "KiteEngine 3D 游戏引擎",
+            version: "1.0.0",
+            type: "GUI",
+            alwaysShowInTaskbar: false,
+            allowMultipleInstances: false,
+            supportsPreview: true,
+            category: "utility"
         }
     },
     

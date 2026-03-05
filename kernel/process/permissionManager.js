@@ -133,6 +133,7 @@ class PermissionManager {
         // 普通权限（自动授予）
         [PermissionManager.PERMISSION.KERNEL_DISK_READ]: PermissionManager.PERMISSION_LEVEL.NORMAL,
         [PermissionManager.PERMISSION.KERNEL_DISK_LIST]: PermissionManager.PERMISSION_LEVEL.NORMAL,
+        [PermissionManager.PERMISSION.KERNEL_DISK_DELETE]: PermissionManager.PERMISSION_LEVEL.NORMAL, // 删除文件（普通权限，自动授予）
         [PermissionManager.PERMISSION.GUI_WINDOW_CREATE]: PermissionManager.PERMISSION_LEVEL.NORMAL,
         [PermissionManager.PERMISSION.THEME_READ]: PermissionManager.PERMISSION_LEVEL.NORMAL,
         [PermissionManager.PERMISSION.SYSTEM_NOTIFICATION]: PermissionManager.PERMISSION_LEVEL.NORMAL, // 通知权限（普通权限，自动授予）
@@ -141,7 +142,6 @@ class PermissionManager {
         // 特殊权限（需要用户确认）
         [PermissionManager.PERMISSION.KERNEL_DISK_WRITE]: PermissionManager.PERMISSION_LEVEL.SPECIAL,
         [PermissionManager.PERMISSION.KERNEL_DISK_CREATE]: PermissionManager.PERMISSION_LEVEL.SPECIAL,
-        [PermissionManager.PERMISSION.KERNEL_DISK_DELETE]: PermissionManager.PERMISSION_LEVEL.SPECIAL,
         [PermissionManager.PERMISSION.KERNEL_MEMORY_READ]: PermissionManager.PERMISSION_LEVEL.SPECIAL,
         [PermissionManager.PERMISSION.KERNEL_MEMORY_WRITE]: PermissionManager.PERMISSION_LEVEL.SPECIAL,
         [PermissionManager.PERMISSION.GUI_WINDOW_MANAGE]: PermissionManager.PERMISSION_LEVEL.SPECIAL,
@@ -384,8 +384,8 @@ class PermissionManager {
                 
                 PermissionManager._initialized = true;
                 
-                // 从存储加载权限记录（如果有）
-                PermissionManager._loadPermissions();
+                // 从存储加载权限记录（必须 await，否则已授予的服务管理等权限无法恢复，会反复弹窗）
+                await PermissionManager._loadPermissions();
                 
                 // 从存储加载拒绝次数记录（如果有，异步加载，不阻塞初始化）
                 PermissionManager._loadDenialCounts().catch(e => {
@@ -420,16 +420,17 @@ class PermissionManager {
     /**
      * 从存储加载权限记录
      * 注意：权限记录按程序名称保存，而不是PID，因为PID是随机分配的
+     * getSystemStorage 为异步，必须 await 后使用，否则无法加载到已保存的权限，导致每次都会弹窗申请
      */
-    static _loadPermissions() {
+    static async _loadPermissions() {
         if (typeof LStorage === 'undefined') {
             KernelLogger.debug("PermissionManager", "LStorage 未加载，跳过权限记录加载");
             return;
         }
         
         try {
-            const saved = LStorage.getSystemStorage('permissionManager.permissions');
-            if (saved && typeof saved === 'object') {
+            const saved = await LStorage.getSystemStorage('permissionManager.permissions');
+            if (saved && typeof saved === 'object' && !(saved instanceof Promise)) {
                 // 恢复权限记录（按程序名称）
                 let loadedCount = 0;
                 for (const [programName, permissions] of Object.entries(saved)) {
