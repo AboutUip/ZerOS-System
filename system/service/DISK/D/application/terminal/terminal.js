@@ -2619,7 +2619,7 @@ function escapeHtml(s){
                                 const cmd = parts[0];
                                 const second = parts[1];
                                 if (cmd === 'debug' && parts.length === 1) {
-                                    const debugActions = ['exception', 'geography', 'weather', 'translate', 'services', 'systemexpansion', 'se'];
+                                    const debugActions = ['exception', 'geography', 'weather', 'translate', 'services', 'systemexpansion', 'se', 'nodelib'];
                                     candidates = debugActions.filter(c => c.indexOf(token) === 0).slice();
                                     candidates.sort();
                                 } else if (cmd === 'debug' && second === 'exception' && parts.length === 2) {
@@ -2978,7 +2978,7 @@ function escapeHtml(s){
                                     const cmd = parts[0];
                                     const second = parts[1];
                                     if (cmd === 'debug' && parts.length === 1) {
-                                        const debugActions = ['exception', 'geography', 'weather', 'translate', 'services', 'systemexpansion', 'se'];
+                                        const debugActions = ['exception', 'geography', 'weather', 'translate', 'services', 'systemexpansion', 'se', 'nodelib'];
                                         candidates = debugActions.filter(c => c.indexOf(token) === 0).slice();
                                         candidates.sort();
                                     } else if (cmd === 'debug' && second === 'exception' && parts.length === 2) {
@@ -7567,6 +7567,8 @@ function escapeHtml(s){
                             payload.write('  services [--status [id]]  - D/server 服务列表；--status 显示各服务状态，可指定 id 查看单服务');
                             payload.write('  systemexpansion|se <action>  - SystemExpansion 全屏覆盖调试');
                             payload.write('    actions: enter <type> [title] [step], exit, status, help');
+                            payload.write('  nodelib [--status] [--config] [--check] [--perf [--raw]]  - NodeLib 调试');
+                            payload.write('    --status: 服务与扩展状态  --config: 扩展配置  --check: 执行 Node 检测  --perf: 执行 perf 脚本，--raw 输出完整 JSON');
                             payload.write('');
                             payload.write('Examples:');
                             payload.write('  debug exception service "测试服务异常"');
@@ -7579,6 +7581,8 @@ function escapeHtml(s){
                             payload.write('  debug services --status');
                             payload.write('  debug systemexpansion enter SystemConfiguration "配置" 1');
                             payload.write('  debug se status');
+                            payload.write('  debug nodelib --status');
+                            payload.write('  debug nodelib --perf');
                             return;
                         }
                         
@@ -8023,6 +8027,86 @@ function escapeHtml(s){
                                 payload.write(`debug systemexpansion: 错误: ${err.message}`);
                                 if (typeof KernelLogger !== 'undefined') {
                                     KernelLogger.debug('Terminal', 'debug systemexpansion 失败', err);
+                                }
+                            }
+                        } else if (action === 'nodelib') {
+                            try {
+                                const exp = (typeof window !== 'undefined' && window.NodeLibExpansion) || (typeof POOL !== 'undefined' && typeof POOL.__GET__ === 'function' ? POOL.__GET__('KERNEL_GLOBAL_POOL', 'NodeLibExpansion') : null);
+                                const nodeLib = (typeof POOL !== 'undefined' && typeof POOL.__GET__ === 'function') ? POOL.__GET__('SERVER', 'NodeLib') : null;
+                                const hasOpt = (name) => payload.args.indexOf(name) >= 0;
+                                const rawPerf = hasOpt('--raw');
+                                payload.write('NodeLib 调试');
+                                payload.write('---');
+                                if (hasOpt('--status') || (!hasOpt('--config') && !hasOpt('--check') && !hasOpt('--perf'))) {
+                                    payload.write('POOL > SERVER NodeLib: ' + (nodeLib && typeof nodeLib.run === 'function' ? '已注册（服务已启动）' : '未注册'));
+                                    if (exp) {
+                                        payload.write('NodeLibExpansion: 已加载');
+                                        payload.write('  isNodeAvailable: ' + exp.isNodeAvailable());
+                                        payload.write('  lastCheck: ' + (exp.getLastCheck() ? new Date(exp.getLastCheck()).toISOString() : '—'));
+                                    } else {
+                                        payload.write('NodeLibExpansion: 未加载');
+                                    }
+                                    payload.write('---');
+                                }
+                                if (hasOpt('--config')) {
+                                    if (!exp) {
+                                        payload.write('debug nodelib: NodeLibExpansion 未加载');
+                                    } else {
+                                        const cfg = exp.getConfig();
+                                        payload.write('配置: ' + JSON.stringify(cfg, null, 2));
+                                    }
+                                    payload.write('---');
+                                }
+                                if (hasOpt('--check')) {
+                                    if (!exp) {
+                                        payload.write('debug nodelib: NodeLibExpansion 未加载');
+                                    } else {
+                                        payload.write('执行 check()...');
+                                        const ok = await exp.check();
+                                        payload.write('check 结果: ' + (ok ? 'Node 可用' : 'Node 不可用'));
+                                    }
+                                    payload.write('---');
+                                }
+                                if (hasOpt('--perf')) {
+                                    const runner = (nodeLib && typeof nodeLib.run === 'function') ? nodeLib : exp;
+                                    if (!runner || typeof runner.run !== 'function') {
+                                        payload.write('debug nodelib: 无可用的 run（请先启动 nodeLib 服务或确保 NodeLibExpansion 已加载）');
+                                    } else {
+                                        payload.write('执行 run("perf")...');
+                                        const result = await runner.run('perf');
+                                        const payloadData = result && result.data && result.data.data ? result.data.data : null;
+                                        const stdout = payloadData && typeof payloadData.stdout === 'string' ? payloadData.stdout : null;
+                                        if (!result || !result.success || !stdout) {
+                                            payload.write('perf 数据不可用');
+                                        } else if (rawPerf) {
+                                            payload.write(stdout);
+                                        } else {
+                                            try {
+                                                const data = JSON.parse(stdout);
+                                                const os = data.os || {};
+                                                const proc = data.process || {};
+                                                payload.write('ts: ' + (data.ts ? new Date(data.ts).toISOString() : '—'));
+                                                if (os.hostname) payload.write('hostname: ' + os.hostname);
+                                                if (os.platform) payload.write('platform: ' + os.platform + ' / ' + (os.arch || ''));
+                                                if (proc.nodeVersion) payload.write('nodeVersion: ' + proc.nodeVersion);
+                                                if (os.totalmem != null) payload.write('memory: total ' + Math.round(os.totalmem / 1024 / 1024) + ' MB, free ' + Math.round((os.freemem || 0) / 1024 / 1024) + ' MB');
+                                                if (os.cpusCount != null) payload.write('cpus: ' + os.cpusCount);
+                                                if (data.si && data.si.currentLoad && typeof data.si.currentLoad.currentLoad === 'number') {
+                                                    payload.write('currentLoad: ' + data.si.currentLoad.currentLoad.toFixed(1) + '%');
+                                                }
+                                            } catch (e) {
+                                                payload.write('解析摘要失败: ' + (e.message || ''));
+                                                payload.write(stdout.slice(0, 500) + (stdout.length > 500 ? '...' : ''));
+                                            }
+                                        }
+                                    }
+                                    payload.write('---');
+                                }
+                                payload.write('完成');
+                            } catch (err) {
+                                payload.write('debug nodelib: 错误: ' + (err && err.message ? err.message : String(err)));
+                                if (typeof KernelLogger !== 'undefined') {
+                                    KernelLogger.debug('Terminal', 'debug nodelib 失败', err);
                                 }
                             }
                         } else {

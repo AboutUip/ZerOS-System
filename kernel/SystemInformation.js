@@ -103,7 +103,9 @@ class SystemInformation {
         DASHSCOPE_AI_PROXY: 'dashscope-ai-proxy',
         RANDOM_SECURITY: 'randomSecurity',
         PROGRAM_PERMISSIONS: 'programPermissions',
-        NETWORK_DIRVE: 'networkDirve'
+        NETWORK_DIRVE: 'networkDirve',
+        NODE_LIB_EXEC: 'nodeLibExec',
+        NODE_LIB_INIT: 'nodeLibInit'
     };
     
     // 服务基础路径

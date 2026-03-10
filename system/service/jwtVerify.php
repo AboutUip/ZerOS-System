@@ -262,3 +262,22 @@ function requireJWTVerify($serviceName = null) {
 
     jwtVerifyDeny();
 }
+
+/**
+ * 仅允许 SystemToken 调用（UserToken 及无效 Token 一律 401）
+ * 用于 nodeLibExec 等仅内核可调用的接口
+ */
+function requireSystemTokenOnly() {
+    $token = jwtVerifyExtractToken();
+    if ($token === null || $token === '') {
+        jwtVerifyDeny();
+    }
+    $payload = JWT::decode($token);
+    if ($payload === false) {
+        jwtVerifyDeny();
+    }
+    $type = $payload['type'] ?? '';
+    if ($type !== 'SystemToken') {
+        jwtVerifyDeny('本接口仅允许 SystemToken 调用');
+    }
+}

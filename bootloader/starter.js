@@ -128,7 +128,13 @@
         "../system/expansion/wasmExpansion.js": [
             "../kernel/filesystem/init.js"
         ],
-        
+
+        // 第十二层：Node 扩展（检测宿主 Node 环境，按配置周期执行 nodeLibs 脚本，依赖 LStorage 与 SystemInformation）
+        "../system/expansion/nodeLibExpansion.js": [
+            "../kernel/drive/LStorage.js",
+            "../kernel/SystemInformation.js"
+        ],
+
         // 第十一层：锁屏界面（依赖用户控制系统和本地存储管理器，高优先级）
         "../system/ui/lockscreen.js": [
             "../kernel/core/usercontrol/userControl.js",

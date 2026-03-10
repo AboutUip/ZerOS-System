@@ -834,6 +834,33 @@
             
             panel.appendChild(diskSection);
             
+            // 宿主性能 (Node)：仅当 Node 脚本服务启用时显示，曲线图 + 百分比/详细数据，不持久化
+            this._perfHistory = { cpu: [], mem: [], gpu: [] };
+            const nodePerfSection = document.createElement('div');
+            nodePerfSection.className = 'taskmanager-node-perf-section';
+            nodePerfSection.style.cssText = 'margin-bottom: 24px;';
+            const nodePerfTitle = document.createElement('h3');
+            nodePerfTitle.textContent = this._getText('TASKMANAGER_NODE_PERF', '宿主性能 (Node)');
+            nodePerfTitle.style.cssText = 'color: #e8ecf0; font-size: 16px; margin-bottom: 12px;';
+            nodePerfSection.appendChild(nodePerfTitle);
+            const nodePerfPanel = document.createElement('div');
+            nodePerfPanel.className = 'taskmanager-node-perf-panel';
+            nodePerfPanel.style.cssText = 'background: rgba(108, 142, 255, 0.05); border: 1px solid rgba(108, 142, 255, 0.2); border-radius: 8px; padding: 16px; min-height: 120px;';
+            const nodePerfPlaceholder = document.createElement('div');
+            nodePerfPlaceholder.className = 'taskmanager-node-perf-placeholder';
+            nodePerfPlaceholder.style.cssText = 'color: #aab2c0; font-size: 13px; text-align: center; padding: 24px;';
+            nodePerfPlaceholder.textContent = this._getText('TASKMANAGER_NODE_PERF_DISABLED', '请先启动 Node 脚本服务 (nodeLib) 以显示宿主 CPU/GPU 等指标');
+            const nodePerfContainer = document.createElement('div');
+            nodePerfContainer.className = 'taskmanager-node-perf-container';
+            nodePerfContainer.style.cssText = 'display: none;';
+            nodePerfPanel.appendChild(nodePerfPlaceholder);
+            nodePerfPanel.appendChild(nodePerfContainer);
+            nodePerfSection.appendChild(nodePerfPanel);
+            panel.appendChild(nodePerfSection);
+            this.nodePerfPanel = nodePerfPanel;
+            this.nodePerfPlaceholder = nodePerfPlaceholder;
+            this.nodePerfContainer = nodePerfContainer;
+            
             // 存储引用
             this.resourceMonitorPanel = panel;
             this.memoryChart = memoryChart;
@@ -2640,6 +2667,161 @@
             if (this.diskChart) {
                 this._updateDiskChart();
             }
+            // 宿主性能 (Node)：仅服务启用时更新并绘制，不持久化
+            this._updateNodePerfPanel();
+        },
+        
+        _updateNodePerfPanel: function() {
+            if (!this.nodePerfPanel || !this.nodePerfPlaceholder || !this.nodePerfContainer) return;
+            const nodeLib = (typeof POOL !== 'undefined' && typeof POOL.__GET__ === 'function') ? POOL.__GET__('SERVER', 'NodeLib') : null;
+            if (!nodeLib || typeof nodeLib.run !== 'function') {
+                this.nodePerfPlaceholder.style.display = 'block';
+                this.nodePerfContainer.style.display = 'none';
+                this.nodePerfPlaceholder.textContent = this._getText('TASKMANAGER_NODE_PERF_DISABLED', '请先启动 Node 脚本服务 (nodeLib) 以显示宿主 CPU/GPU 等指标');
+                return;
+            }
+            this.nodePerfPlaceholder.style.display = 'none';
+            this.nodePerfContainer.style.display = 'block';
+            nodeLib.run('perf').then((function(result) {
+                const payload = result && result.data && result.data.data ? result.data.data : null;
+                const stdout = payload && typeof payload.stdout === 'string' ? payload.stdout : null;
+                if (!result || !result.success || !stdout) {
+                    this.nodePerfContainer.innerHTML = '<div style="color:#aab2c0;font-size:12px;">perf 数据不可用</div>';
+                    return;
+                }
+                try {
+                    const data = JSON.parse(stdout);
+                    const maxLen = 60;
+                    const os = data.os || {};
+                    const process = data.process || {};
+                    const si = data.si || {};
+                    let cpuPct = null;
+                    if (si.currentLoad && typeof si.currentLoad.currentLoad === 'number') {
+                        cpuPct = si.currentLoad.currentLoad;
+                    } else if (Array.isArray(os.loadavg) && os.loadavg.length > 0 && os.cpusCount) {
+                        cpuPct = Math.min(100, (os.loadavg[0] / Math.max(1, os.cpusCount)) * 100);
+                    }
+                    let memPct = null;
+                    if (os.totalmem > 0 && typeof os.freemem === 'number') {
+                        memPct = (1 - os.freemem / os.totalmem) * 100;
+                    } else if (si.mem && si.mem.total > 0 && si.mem.used != null) {
+                        memPct = (si.mem.used / si.mem.total) * 100;
+                    }
+                    let gpuPct = null;
+                    if (si.graphics && si.graphics.controllers && si.graphics.controllers.length > 0) {
+                        const g = si.graphics.controllers[0];
+                        gpuPct = typeof g.utilizationGpu === 'number' ? g.utilizationGpu : (typeof g.utilizationGPU === 'number' ? g.utilizationGPU : null);
+                    }
+                    if (cpuPct != null) {
+                        this._perfHistory.cpu.push(cpuPct);
+                        if (this._perfHistory.cpu.length > maxLen) this._perfHistory.cpu.shift();
+                    }
+                    if (memPct != null) {
+                        this._perfHistory.mem.push(memPct);
+                        if (this._perfHistory.mem.length > maxLen) this._perfHistory.mem.shift();
+                    }
+                    if (gpuPct != null) {
+                        this._perfHistory.gpu.push(gpuPct);
+                        if (this._perfHistory.gpu.length > maxLen) this._perfHistory.gpu.shift();
+                    }
+                    this._drawNodePerfPanel(data);
+                } catch (e) {
+                    this.nodePerfContainer.innerHTML = '<div style="color:#f87171;font-size:12px;">解析失败: ' + (e.message || '') + '</div>';
+                }
+            }).bind(this)).catch((function() {
+                this.nodePerfContainer.innerHTML = '<div style="color:#aab2c0;font-size:12px;">获取宿主性能数据失败</div>';
+            }).bind(this));
+        },
+        
+        _drawNodePerfPanel: function(data) {
+            if (!this.nodePerfContainer) return;
+            const os = data.os || {};
+            const process = data.process || {};
+            const si = data.si || {};
+            const w = 280;
+            const h = 56;
+            const stroke = '#6c8eff';
+            const fill = 'rgba(108, 142, 255, 0.15)';
+            let curvesDiv = this.nodePerfContainer.querySelector('.taskmanager-node-perf-curves');
+            if (!curvesDiv) {
+                curvesDiv = document.createElement('div');
+                curvesDiv.className = 'taskmanager-node-perf-curves';
+                curvesDiv.style.cssText = 'margin-bottom:12px;';
+                this.nodePerfContainer.appendChild(curvesDiv);
+            }
+            curvesDiv.innerHTML = '';
+            const addCurve = function(title, history, currentVal) {
+                const row = document.createElement('div');
+                row.style.cssText = 'margin-bottom:10px;';
+                const label = document.createElement('div');
+                label.style.cssText = 'color:#aab2c0;font-size:12px;margin-bottom:4px;display:flex;justify-content:space-between;';
+                label.innerHTML = '<span>' + title + '</span><span style="color:#6c8eff;font-weight:600;">' + (currentVal != null ? (typeof currentVal === 'number' && currentVal <= 1 ? (currentVal * 100).toFixed(1) + '%' : currentVal.toFixed(1) + '%') : '—') + '</span>';
+                row.appendChild(label);
+                const c = document.createElement('canvas');
+                c.width = w;
+                c.height = h;
+                c.style.cssText = 'display:block;border-radius:4px;background:rgba(0,0,0,0.2);width:100%;max-width:' + w + 'px;height:' + h + 'px;';
+                row.appendChild(c);
+                const ctx = c.getContext('2d');
+                if (ctx && history.length) {
+                    const pad = 4;
+                    const max = Math.max(1, Math.max.apply(null, history));
+                    const min = 0;
+                    const range = max - min || 1;
+                    ctx.fillStyle = fill;
+                    ctx.strokeStyle = stroke;
+                    ctx.lineWidth = 1.5;
+                    ctx.beginPath();
+                    for (let i = 0; i < history.length; i++) {
+                        const x = pad + (i / Math.max(1, history.length - 1)) * (w - 2 * pad);
+                        const y = h - pad - ((history[i] - min) / range) * (h - 2 * pad);
+                        if (i === 0) ctx.moveTo(x, y);
+                        else ctx.lineTo(x, y);
+                    }
+                    const last = history.length - 1;
+                    const lx = pad + (last / Math.max(1, history.length - 1)) * (w - 2 * pad);
+                    ctx.lineTo(lx, h - pad);
+                    ctx.lineTo(pad, h - pad);
+                    ctx.closePath();
+                    ctx.fill();
+                    ctx.beginPath();
+                    for (let i = 0; i < history.length; i++) {
+                        const x = pad + (i / Math.max(1, history.length - 1)) * (w - 2 * pad);
+                        const y = h - pad - ((history[i] - min) / range) * (h - 2 * pad);
+                        if (i === 0) ctx.moveTo(x, y);
+                        else ctx.lineTo(x, y);
+                    }
+                    ctx.stroke();
+                }
+                curvesDiv.appendChild(row);
+            };
+            const cpuVal = this._perfHistory.cpu.length ? this._perfHistory.cpu[this._perfHistory.cpu.length - 1] : null;
+            const memVal = this._perfHistory.mem.length ? this._perfHistory.mem[this._perfHistory.mem.length - 1] : null;
+            const gpuVal = this._perfHistory.gpu.length ? this._perfHistory.gpu[this._perfHistory.gpu.length - 1] : null;
+            addCurve(this._getText('TASKMANAGER_CPU', 'CPU'), this._perfHistory.cpu, cpuVal);
+            addCurve(this._getText('TASKMANAGER_MEM', '内存'), this._perfHistory.mem, memVal);
+            addCurve(this._getText('TASKMANAGER_GPU', 'GPU'), this._perfHistory.gpu, gpuVal != null ? (gpuVal <= 1 ? gpuVal * 100 : gpuVal) : null);
+            let detailHtml = '<div style="display:grid;grid-template-columns:auto 1fr;gap:4px 12px;">';
+            if (os.hostname) detailHtml += '<span>主机名</span><span style="color:#e8ecf0;">' + String(os.hostname) + '</span>';
+            if (os.platform) detailHtml += '<span>平台</span><span style="color:#e8ecf0;">' + String(os.platform) + '</span>';
+            if (os.release) detailHtml += '<span>内核</span><span style="color:#e8ecf0;">' + String(os.release) + '</span>';
+            if (process.nodeVersion) detailHtml += '<span>Node</span><span style="color:#e8ecf0;">' + String(process.nodeVersion) + '</span>';
+            if (process.memory && process.memory.rss) detailHtml += '<span>进程 RSS</span><span style="color:#8da6ff;">' + this._formatBytes(process.memory.rss) + '</span>';
+            if (os.totalmem) detailHtml += '<span>系统内存</span><span style="color:#8da6ff;">' + this._formatBytes(os.totalmem) + ' / 空闲 ' + this._formatBytes(os.freemem || 0) + '</span>';
+            if (si.graphics && si.graphics.controllers && si.graphics.controllers.length > 0) {
+                si.graphics.controllers.forEach(function(g, i) {
+                    detailHtml += '<span>GPU' + (i + 1) + '</span><span style="color:#e8ecf0;">' + (g.model || g.name || '') + (g.memoryTotal ? ' ' + Math.round(g.memoryTotal / 1024 / 1024) + ' MB' : '') + '</span>';
+                });
+            }
+            detailHtml += '</div>';
+            let detailEl = this.nodePerfContainer.querySelector('.taskmanager-node-perf-detail');
+            if (!detailEl) {
+                detailEl = document.createElement('div');
+                detailEl.className = 'taskmanager-node-perf-detail';
+                detailEl.style.cssText = 'font-size:11px;color:#aab2c0;border-top:1px solid rgba(108,142,255,0.15);padding-top:10px;margin-top:8px;';
+                this.nodePerfContainer.appendChild(detailEl);
+            }
+            detailEl.innerHTML = detailHtml;
         },
         
         _updateSystemInfo: function() {

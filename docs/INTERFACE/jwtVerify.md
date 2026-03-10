@@ -40,6 +40,9 @@ require_once __DIR__ . '/jwtVerify.php';
 requireJWTVerify('FSDirve');      // FSDirve、CompressionDirve、DISKMANAGER
 requireJWTVerify();               // 不传服务名时仅校验 Token 和 upid 存在，不做权限映射校验
 
+// 仅允许 SystemToken（UserToken 一律 401），用于 nodeLibExec 等仅内核可调用的接口
+requireSystemTokenOnly();
+
 // 通过后继续处理请求
 // ...
 ```
@@ -119,3 +122,4 @@ requireJWTVerify();               // 不传服务名时仅校验 Token 和 upid 
 - [randomSecurity](./randomSecurity.md) - JWT 签发服务
 - [RandomSecurity API](../API/RandomSecurity.md) - 内核 JWT 与 upid 传递
 - [FSDirve](./FSDirve.md) - 使用本校验的文件服务
+- [nodeLibExec](./nodeLibExec.md) - 使用 requireSystemTokenOnly 的 Node 扩展执行接口

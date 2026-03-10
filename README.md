@@ -273,6 +273,7 @@ ZerOS Kernel 采用模块化架构，主要包含以下核心模块：
 ### 架构文档
 - **[内核架构](docs/ZEROS_KERNEL.md)** - 系统架构和模块设计详解
 - **[系统流程文档](docs/SYSTEM_FLOW.md)** - 系统启动、程序启动/结束、内核交互、权限控制等核心流程详解
+- **[书籍文档（Beta）](dev/books/ZerOSVirtualSystem/README.md)** - ZerOS 虚拟系统书籍，循序渐进学习 ZerOS 开发
 
 ### API 文档
 - **[API 文档索引](docs/API/README.md)** - 完整的 API 参考文档

@@ -1,26 +1,6 @@
 {
   "system": {
     "permissionManager.permissions": {
-      "regedit": [
-        "EVENT_LISTENER",
-        "GUI_WINDOW_CREATE",
-        "CACHE_READ",
-        "CACHE_WRITE",
-        "SYSTEM_STORAGE_READ",
-        "SYSTEM_STORAGE_READ_USER_CONTROL",
-        "SYSTEM_STORAGE_READ_PERMISSION_CONTROL",
-        "SYSTEM_STORAGE_WRITE",
-        "SYSTEM_STORAGE_WRITE_USER_CONTROL",
-        "SYSTEM_STORAGE_WRITE_PERMISSION_CONTROL",
-        "APPLICATION_INSTALL",
-        "APPLICATION_UNINSTALL",
-        "KERNEL_DISK_READ",
-        "KERNEL_DISK_LIST"
-      ],
-      "cvs014": [
-        "EVENT_LISTENER",
-        "KERNEL_DISK_READ"
-      ],
       "settings": [
         "SYSTEM_NOTIFICATION",
         "APPLICATION_UNINSTALL",
@@ -33,6 +13,23 @@
         "THEME_READ",
         "LANGUAGES_READ",
         "LANGUAGES_WRITE",
+        "KERNEL_DISK_READ"
+      ],
+      "taskmanager": [
+        "GUI_WINDOW_CREATE",
+        "KERNEL_DISK_READ",
+        "SYSTEM_NOTIFICATION",
+        "EVENT_LISTENER"
+      ],
+      "servicemanager": [
+        "SERVER_SERVICE_MANAGE",
+        "SCHEDULE_TASK_MANAGE",
+        "SYSTEM_STORAGE_WRITE",
+        "GUI_WINDOW_CREATE",
+        "EVENT_LISTENER"
+      ],
+      "cvs014": [
+        "EVENT_LISTENER",
         "KERNEL_DISK_READ"
       ],
       "musicplayer": [
@@ -86,17 +83,15 @@
         "SCHEDULE_TASK_MANAGE",
         "SYSTEM_STORAGE_WRITE"
       ],
-      "servicemanager": [
-        "SERVER_SERVICE_MANAGE",
-        "SCHEDULE_TASK_MANAGE",
-        "SYSTEM_STORAGE_WRITE"
-      ],
       "filemanager": [
         "SYSTEM_STORAGE_WRITE_DESKTOP"
       ],
       "notepad": [
         "SYSTEM_NOTIFICATION",
         "DRAG_ELEMENT"
+      ],
+      "service": [
+        "SERVER_SERVICE_MANAGE"
       ]
     },
     "system.style": "macos",
@@ -391,7 +386,7 @@
         "password": "61b249bf6d604d14120821f43625e84e",
         "avatar": "avatar_root_1766272534753.jpg",
         "createdAt": 1766271155991,
-        "lastLogin": 1773116250560
+        "lastLogin": 1773162733361
       },
       "TestUser": {
         "level": "USER",
@@ -443,9 +438,9 @@
         "triggerConfig": {},
         "enabled": true,
         "createdAt": 1771942626583,
-        "updatedAt": 1773116251409,
-        "lastRunAt": 1773116251409,
-        "runCount": 279,
+        "updatedAt": 1773162734175,
+        "lastRunAt": 1773162734175,
+        "runCount": 288,
         "createdBy": "servicemanager",
         "requiresStartupPermission": true,
         "serviceId": "notice",
@@ -482,7 +477,16 @@
       "2026-02-24 22:03:54"
     ],
     "bios.memoryAllocation": true,
-    "system.volume": 1
+    "system.volume": 1,
+    "nodeLibExpansion": {
+      "nodeAvailable": true,
+      "lastCheck": 1773147352002,
+      "intervalSeconds": 1,
+      "scriptId": "perf",
+      "nodeDependencies": [
+        "systeminformation"
+      ]
+    }
   },
   "programs": {}
 }

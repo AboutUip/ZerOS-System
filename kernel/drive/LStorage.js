@@ -1562,6 +1562,19 @@ class LStorage {
                         throw error;
                     }
                 }
+            } else if (key === 'nodeLibExpansion' && !currentPid) {
+                // Node 扩展在引导阶段初始化时无 PID，允许其读写自身键
+                const hasNodeLibExpansion = /nodeLibExpansion\.js/i.test(fullCallStack) || /NodeLibExpansion/i.test(fullCallStack) || /_loadConfig/i.test(fullCallStack) || /_persistState/i.test(fullCallStack);
+                if (hasNodeLibExpansion) {
+                    KernelLogger.debug("LStorage", `Node 扩展访问键 ${key}，允许读取（无 PID）`);
+                    try {
+                        const value = LStorage._storageData.system[key] ?? null;
+                        return value;
+                    } catch (error) {
+                        KernelLogger.error("LStorage", `读取系统存储失败: ${error.message}`, error);
+                        throw error;
+                    }
+                }
             } else {
                 // 用户程序调用：需要基础权限（SYSTEM_STORAGE_READ，普通权限，自动授予）
                 if (typeof PermissionManager !== 'undefined' && currentPid) {

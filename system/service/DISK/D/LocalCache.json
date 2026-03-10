@@ -23,24 +23,24 @@
         "size": 161
       }
     },
-    "TaskbarManager": {
-      "weather:泽州县": {
-        "value": null,
-        "expiresAt": 1773159360304,
-        "createdAt": 1773116160304,
-        "updatedAt": 1773116160304,
-        "size": 2774,
-        "isFileBacked": true
-      }
-    },
     "exploit": {
       "system.dailyQuote": {
-        "value": "我是最强的！",
+        "value": "我们必须接受失望，因为它是有限的，但千万不可失去希望，因为它是无穷的",
         "expiresAt": 0,
-        "createdAt": 1773116249203,
-        "updatedAt": 1773116249203,
-        "size": 20,
+        "createdAt": 1773162730733,
+        "updatedAt": 1773162730733,
+        "size": 104,
         "isFileBacked": false
+      }
+    },
+    "TaskbarManager": {
+      "weather:泽州": {
+        "value": null,
+        "expiresAt": 1773205934603,
+        "createdAt": 1773162734603,
+        "updatedAt": 1773162734603,
+        "size": 2718,
+        "isFileBacked": true
       }
     }
   }
