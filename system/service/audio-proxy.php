@@ -97,9 +97,17 @@ try {
     // 网易云 music.126.net 需要 Referer 和浏览器 UA 绕过防盗链
     $isNetEase = (strpos($audioUrl, 'music.126.net') !== false);
     $userAgent = $isNetEase ? 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' : 'ZerOS-AudioProxy/1.0';
-    $headers = ['Accept: audio/*', 'Accept-Encoding: identity', 'User-Agent: ' . $userAgent];
+    $headers = [
+        'Accept: audio/*',
+        'Accept-Encoding: identity',
+        'User-Agent: ' . $userAgent,
+        'Accept-Language: zh-CN,zh;q=0.9,en;q=0.8',
+        'Connection: keep-alive',
+        'Upgrade-Insecure-Requests: 1'
+    ];
     if ($isNetEase) {
         $headers[] = 'Referer: https://music.163.com/';
+        $headers[] = 'Origin: https://music.163.com';
     }
     if (isset($_SERVER['HTTP_RANGE'])) {
         $headers[] = 'Range: ' . $_SERVER['HTTP_RANGE'];

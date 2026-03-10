@@ -68,6 +68,7 @@
 | [语言包格式](./PLUGINS/LanguagePack.md) | D/plugins 语言包存放位置与 JSON 格式 |
 | [服务文档 (SERVER)](./SERVER/README.md) | D/server 服务模块编写与各内置服务说明 |
 | [Office 规范 (OFFICE)](./OFFICE/README.md) | ZerOS 自研 Office 体系规范（格式/编辑/导出/动态库） |
+| [工具包 (TOOLKIT)](./TOOLKIT/README.md) | 本地打包/解包脚本（zompkg、zomunpack、paperpkg、paperunpack），脚本位于 `dev/toolkit/` |
 
 ### 🔧 API 参考文档
 
@@ -183,7 +184,7 @@
 |---------|---------|
 | **GUI 程序开发** | [GUIManager](./API/GUIManager.md) + [EventManager](./API/EventManager.md) |
 | **文件操作** | [FileFramework](./API/FileFramework.md) + [FSDirve](./INTERFACE/FSDirve.md) + [SystemInformation](./API/SystemInformation.md) |
-| **程序打包与安装** | [ZOMInstall](./API/ZOMInstall.md)（zompkg 打包、zominstall 安装；本地开发可用 dev/toolkit/zompkg.ps1） |
+| **程序打包与安装** | [ZOMInstall](./API/ZOMInstall.md) + [TOOLKIT](./TOOLKIT/README.md)（zompkg/zomunpack 程序包，paperpkg/paperunpack 壁纸包；本地脚本在 `dev/toolkit/`） |
 | **数据存储** | [LStorage](./API/LStorage.md) + [CacheDrive](./API/CacheDrive.md) |
 | **权限管理** | [PermissionManager](./API/PermissionManager.md) |
 | **扩展/插件** | [扩展与插件索引](./PLUGINS/README.md)（语言包、服务模块编写） |

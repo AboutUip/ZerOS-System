@@ -255,11 +255,6 @@ class DesktopManager {
         // 强制浏览器重新计算布局（确保 clientWidth/clientHeight 更新）
         void DesktopManager._iconsContainer.offsetWidth;
         
-        // 调试日志：输出容器尺寸信息
-        const actualWidth = DesktopManager._iconsContainer.clientWidth || DesktopManager._iconsContainer.offsetWidth || 0;
-        const actualHeight = DesktopManager._iconsContainer.clientHeight || DesktopManager._iconsContainer.offsetHeight || 0;
-        KernelLogger.debug("DesktopManager", `图标容器布局更新: 桌面容器 ${containerWidth}x${containerHeight}, 设置尺寸 ${width}x${height}, 实际可用 ${actualWidth}x${actualHeight}, 任务栏位置 ${taskbarPosition}, 任务栏尺寸 ${taskbarWidth}x${taskbarHeight}`);
-        
         // 重新应用排列模式（确保排列样式正确）
         DesktopManager._applyArrangementMode();
         
@@ -714,7 +709,7 @@ class DesktopManager {
         
         // 调试日志
         if (icons.length > 0) {
-            KernelLogger.debug("DesktopManager", `列表排列: 容器 ${containerWidth}x${containerHeight}, 图标 ${iconWidth}x${iconHeight}, 间距 ${spacing}, 每列 ${iconsPerCol} 个, 每行 ${colsPerRow} 列, 总列数 ${totalCols}, 实际列数 ${actualCols}, 共 ${icons.length} 个图标`);
+            // KernelLogger.debug("DesktopManager", `列表排列: 容器 ${containerWidth}x${containerHeight}, 图标 ${iconWidth}x${iconHeight}, 间距 ${spacing}, 每列 ${iconsPerCol} 个, 每行 ${colsPerRow} 列, 总列数 ${totalCols}, 实际列数 ${actualCols}, 共 ${icons.length} 个图标`);
         }
         
         icons.forEach((iconData, index) => {

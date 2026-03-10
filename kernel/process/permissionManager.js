@@ -745,6 +745,37 @@ class PermissionManager {
             }
         }
     }
+
+    /**
+     * 获取进程当前已授予的权限列表（用于后端 programPermissions 注册，CVS-ZEROS-014）
+     * @param {number} pid 进程ID
+     * @returns {string[]} 已授予的权限名称数组
+     */
+    static getGrantedPermissions(pid) {
+        const set = PermissionManager._permissions.get(pid);
+        return set ? Array.from(set) : [];
+    }
+
+    /**
+     * 将当前进程已授予的权限同步到后端（用户授权或持久化恢复后，保证后端 programPermissionsMap 与前端一致）
+     * 仅当该 pid 已有关联的 upid 时执行；不阻塞 _grantPermission 主流程。
+     * @param {number} pid 进程ID
+     * @param {string} upid 后端分配的权限映射 ID
+     */
+    static _syncGrantedPermissionsToBackend(pid, upid) {
+        if (typeof fetch === 'undefined') return;
+        const granted = PermissionManager.getGrantedPermissions(pid);
+        const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrl && SystemInformation.SERVICE_NAMES && SystemInformation.SERVICE_NAMES.PROGRAM_PERMISSIONS)
+            ? SystemInformation.buildServiceUrl(SystemInformation.SERVICE_NAMES.PROGRAM_PERMISSIONS)
+            : (typeof window !== 'undefined' && window.location ? window.location.origin : 'http://localhost:8089') + '/system/service/programPermissions.php';
+        fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'update', upid, permissions: granted })
+        }).then(res => res.json()).then(() => {}).catch(e => {
+            if (typeof KernelLogger !== 'undefined') KernelLogger.warn("PermissionManager", `同步权限到后端失败 (PID: ${pid}, upid: ${upid}): ${e.message}`);
+        });
+    }
     
     // ==================== 权限检查 ====================
     
@@ -1072,6 +1103,13 @@ class PermissionManager {
         
         // 异步保存（避免阻塞）
         PermissionManager._savePermissions();
+        // 若该进程已向后端注册过 upid，则同步当前已授予权限到后端（用户授权/持久化放行后与后端一致）
+        if (typeof ProcessManager !== 'undefined') {
+            const upid = ProcessManager._pidToUpid.get(pid);
+            if (upid != null) {
+                PermissionManager._syncGrantedPermissionsToBackend(pid, upid);
+            }
+        }
         KernelLogger.info("PermissionManager", `程序 ${pid} 获得权限: ${permission} (原因: ${reason})`);
     }
     

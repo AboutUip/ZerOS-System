@@ -562,54 +562,17 @@ BootLoader 初始化
 ├─ 获取程序信息
 │  └─ 调用程序的 __info__() 方法
 │
-├─ 提取权限列表
-│  └─ programInfo.permissions
+├─ 调用 PermissionManager.registerProgramPermissions(pid, programInfo, options)
+│  ├─ 内部使用 programInfo.permissions 声明列表，按策略授予（普通/已保存/管理员专用）
+│  ├─ 确保权限管理器已初始化
+│  │  └─ await PermissionManager._ensureInitialized()
+│  │
+│  ├─ 验证权限有效性、检查管理员专用程序、遍历权限列表并根据级别处理
+│  ├─ 保存权限到本地存储（LStorage）
+│  └─ 记录注册结果
 │
-└─ 调用 PermissionManager.registerProgramPermissions(pid, programInfo, options)
-   ├─ 确保权限管理器已初始化
-   │  └─ await PermissionManager._ensureInitialized()
-   │
-   ├─ 验证权限有效性
-   │  └─ 检查权限是否在 PERMISSION 枚举中
-   │
-   ├─ 检查是否为管理员专用程序
-   │  └─ options.isAdminProgram === true
-   │
-   ├─ 遍历权限列表
-   │  └─ 对每个权限进行处理
-   │
-   ├─ 根据权限级别处理
-   │  ├─ NORMAL（普通权限）
-   │  │  ├─ 自动授予
-   │  │  ├─ 添加到权限表 (_permissions)
-   │  │  ├─ 记录到审计日志
-   │  │  └─ 增加 granted 计数
-   │  │
-   │  ├─ SPECIAL（特殊权限）
-   │  │  ├─ 检查是否已授予（从本地存储读取）
-   │  │  │  ├─ 已授予：添加到权限表
-   │  │  │  └─ 未授予：等待首次使用时请求
-   │  │  ├─ 记录到审计日志
-   │  │  └─ 增加 checked 计数
-   │  │
-   │  └─ DANGEROUS（危险权限）
-   │     ├─ 如果是管理员专用程序
-   │     │  ├─ 自动授予（管理员专用程序享有特权）
-   │     │  ├─ 添加到权限表
-   │     │  └─ 记录到审计日志（标记为管理员程序）
-   │     │
-   │     └─ 如果不是管理员专用程序
-   │        ├─ 检查是否已授予（从本地存储读取）
-   │        │  ├─ 已授予：添加到权限表
-   │        │  └─ 未授予：等待首次使用时请求
-   │        └─ 记录到审计日志
-   │
-   ├─ 保存权限到本地存储
-   │  └─ LStorage.setSystemStorage('permissionManager.permissions', ...)
-   │
-   └─ 记录注册结果
-      ├─ 记录授予的权限数量
-      └─ 记录危险权限数量（如果是管理员程序）
+└─ 向后端 programPermissions.php 发起 register
+   └─ permissions = PermissionManager.getGrantedPermissions(pid)（仅已授予权限，CVS-ZEROS-014）
 
 标记 DOM 元素
 ├─ 创建 MutationObserver（可选）
@@ -901,7 +864,7 @@ BootLoader 初始化
    ├─ 确保权限管理器已初始化
    │  └─ await PermissionManager._ensureInitialized()
    │
-   ├─ 提取权限列表
+   ├─ 提取权限列表（声明）
    │  ├─ 从 programInfo.permissions 获取
    │  └─ 如果为空：记录日志并返回
    │

@@ -28,7 +28,7 @@
       "key": "speed",
       "type": "number",
       "label": "流动速度",
-      "default": 1,
+      "default": 1.2,
       "min": 0.5,
       "max": 4,
       "step": 0.5,

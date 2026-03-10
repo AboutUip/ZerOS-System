@@ -2,7 +2,7 @@
 
 ## 概述
 
-`audio-proxy.php` 用于代理外部音频请求，规避 CORS 限制。支持 HTTP Range 请求，适用于音频流式播放。
+`audio-proxy.php` 用于代理外部音频请求，规避 CORS 限制。支持 HTTP Range 请求，适用于音频流式播放。增强了对网易云音乐等平台的反盗链措施的绕过能力。
 
 - **类型**：PHP 后端服务
 - **位置**：`system/service/audio-proxy.php`
@@ -28,6 +28,15 @@ GET /system/service/audio-proxy.php?url=<目标音频URL>
 ## 支持格式
 
 根据扩展名设置 Content-Type：wav、mp3、ogg、m4a、aac、flac、webm、opus。
+
+## 反盗链增强
+
+音频代理服务增强了以下特性以更好地绕过反盗链措施：
+
+- **浏览器模拟**：添加了更完整的浏览器like头信息，包括 User-Agent、Accept、Accept-Language 等
+- **Referer 模拟**：为不同平台设置合适的 Referer 头
+- **Origin 头**：特别为网易云音乐请求添加了 Origin 头
+- **Cache 控制**：合理设置缓存头以提高性能
 
 ## 错误码
 

@@ -788,10 +788,30 @@ class CacheDrive {
                 return false;
             }
             
+            // 先检查文件是否存在
             const pid = callerPid || ProcessManager.EXPLOIT_PID || 10000;
+            try {
+                const listResult = await ProcessManager.callKernelAPI(pid, 'FileSystem.list', [CacheDrive.CACHE_DIR]);
+                if (listResult && Array.isArray(listResult)) {
+                    const fileName = filePath.substring(filePath.lastIndexOf('/') + 1);
+                    const fileExists = listResult.some(fileInfo => fileInfo.name === fileName && fileInfo.type === 'file');
+                    if (!fileExists) {
+                        KernelLogger.debug("CacheDrive", `缓存文件不存在，跳过删除: ${fileName}`);
+                        return true;
+                    }
+                }
+            } catch (listError) {
+                // 忽略列表错误，继续尝试删除
+            }
+            
             await ProcessManager.callKernelAPI(pid, 'FileSystem.delete', [filePath]);
             return true;
         } catch (error) {
+            // 忽略文件不存在的错误
+            if (error.message && (error.message.includes('不存在') || error.message.includes('404'))) {
+                KernelLogger.debug("CacheDrive", `缓存文件不存在: ${error.message}`);
+                return true;
+            }
             KernelLogger.warn("CacheDrive", `删除缓存文件失败: ${error.message}`);
             return false;
         }

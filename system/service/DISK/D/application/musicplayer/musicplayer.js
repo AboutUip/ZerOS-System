@@ -551,6 +551,9 @@
                 this._desktopLyricsComponentId = null;
                 
                 if (this._cacheHelper) {
+                    if (this._cacheHelper.cleanup) {
+                        this._cacheHelper.cleanup();
+                    }
                     await this._cacheHelper.clear();
                     this._cacheHelper = null;
                 }
@@ -562,22 +565,49 @@
         _initCacheHelper: function(initArgs) {
             var self = this;
             var cachePrefix = 'kitemusic.';
+            var cleanupInterval = null;
+            
+            // 启动定期清理缓存的定时器
+            function startCleanupInterval() {
+                // 每10分钟清理一次过期缓存
+                cleanupInterval = setInterval(async function() {
+                    try {
+                        if (initArgs.kernelAPI && typeof initArgs.kernelAPI.call === 'function') {
+                            var pid = initArgs.pid || 0;
+                            // 只清理过期缓存
+                            await initArgs.kernelAPI.call('Cache.clear', [{ 
+                                pid: pid, 
+                                expiredOnly: true 
+                            }]);
+                        }
+                    } catch (e) {}
+                }, 10 * 60 * 1000);
+            }
+            
+            // 启动清理定时器
+            startCleanupInterval();
+            
             this._cacheHelper = {
                 set: async function(key, value) {
                     if (!initArgs.kernelAPI || typeof initArgs.kernelAPI.call !== 'function') return;
                     try {
+                        // 检查键是否已经包含kitemusic.前缀
+                        var finalKey = key.startsWith('kitemusic.') ? key : 'kitemusic.' + key;
+                        // 设置10分钟的过期时间
                         await initArgs.kernelAPI.call('Cache.set', [
-                            'kitemusic.' + key,
+                            finalKey,
                             value,
-                            { ttl: 30 * 60 * 1000, fileCache: true }
+                            { ttl: 10 * 60 * 1000, fileCache: true }
                         ]);
                     } catch (e) {}
                 },
                 get: async function(key, defaultValue) {
                     if (!initArgs.kernelAPI || typeof initArgs.kernelAPI.call !== 'function') return defaultValue;
                     try {
+                        // 检查键是否已经包含kitemusic.前缀
+                        var finalKey = key.startsWith('kitemusic.') ? key : 'kitemusic.' + key;
                         var result = await initArgs.kernelAPI.call('Cache.get', [
-                            'kitemusic.' + key,
+                            finalKey,
                             defaultValue
                         ]);
                         return result;
@@ -589,7 +619,9 @@
                     if (!initArgs.kernelAPI || typeof initArgs.kernelAPI.call !== 'function') return;
                     try {
                         var pid = initArgs.pid || 0;
-                        await initArgs.kernelAPI.call('Cache.clear', [{ pid: pid }]);
+                        await initArgs.kernelAPI.call('Cache.clear', [{ 
+                            pid: pid 
+                        }]);
                     } catch (e) {}
                 },
                 saveToParent: function(key, value) {
@@ -634,6 +666,12 @@
                         'kitemusic./playlist/detail&id=',
                         'kitemusic./song/detail&ids='
                     ];
+                },
+                cleanup: function() {
+                    if (cleanupInterval) {
+                        clearInterval(cleanupInterval);
+                        cleanupInterval = null;
+                    }
                 }
             };
         },

@@ -8,7 +8,7 @@ ZOM (ZerOS Object Module) 是 ZerOS 系统的程序安装包格式，实际上�
 
 `zompkg` 是 ZerOS 系统的 CLI 程序打包工具，位于 `D:/bin/zompkg.js`。该程序将目录打包为 `.zom` 程序安装包（ZIP 格式）。支持源目录已有 `application.json`，或通过 **手动提供数据** 自动创建 `application.json`。
 
-**本地开发打包**：在项目内可使用 PowerShell 脚本 `dev/toolkit/zompkg.ps1` 在 Windows 下本地打包，行为与 zompkg 一致。用法示例见 `dev/toolkit/README.md` 与 `dev/zom-sources/README.md`。
+**本地开发打包**：在项目内可使用 PowerShell 脚本 `dev/toolkit/zompkg.ps1` 在 Windows 下本地打包，行为与 zompkg 一致。完整工具包说明（含 zomunpack、paperpkg、paperunpack）见 [docs/TOOLKIT/README.md](../TOOLKIT/README.md)，用法示例见 `dev/toolkit/README.md` 与 `dev/zom-sources/README.md`。
 
 ### 使用方法
 

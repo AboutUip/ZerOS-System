@@ -4975,7 +4975,7 @@
                 container.appendChild(errorMsg);
                 return container;
             }
-            
+
             // 创建工具栏
             const toolbar = document.createElement('div');
             toolbar.style.cssText = `
@@ -4986,6 +4986,8 @@
                 padding-bottom: 16px;
                 border-bottom: 1px solid var(--theme-border, rgba(139, 92, 246, 0.25));
                 flex-shrink: 0;
+                flex-wrap: wrap;
+                gap: 12px;
             `;
             
             const title = document.createElement('h2');
@@ -4997,7 +4999,75 @@
                 margin: 0;
             `;
             toolbar.appendChild(title);
+
+            // 创建分类筛选器
+            const filterContainer = document.createElement('div');
+            filterContainer.style.cssText = `
+                display: flex;
+                gap: 8px;
+                flex-wrap: wrap;
+            `;
+
+            // 获取程序分类列表
+            const appCategories = this._getApplicationCategories();
             
+            // 创建"全部"筛选按钮
+            const allFilterBtn = document.createElement('button');
+            allFilterBtn.textContent = this._getText('SETTINGS_FILTER_ALL', '全部');
+            allFilterBtn.dataset.filter = 'all';
+            allFilterBtn.className = 'app-filter-btn active';
+            allFilterBtn.style.cssText = `
+                padding: 6px 16px;
+                background: rgba(139, 92, 246, 0.2);
+                color: #8b5cf6;
+                border: 1px solid rgba(139, 92, 246, 0.4);
+                border-radius: 16px;
+                font-size: 13px;
+                cursor: pointer;
+                transition: all 0.2s;
+            `;
+            allFilterBtn.addEventListener('click', () => this._handleCategoryFilter('all', filterContainer));
+            allFilterBtn.addEventListener('mouseenter', () => {
+                allFilterBtn.style.background = 'rgba(139, 92, 246, 0.3)';
+            });
+            allFilterBtn.addEventListener('mouseleave', () => {
+                if (!allFilterBtn.classList.contains('active')) {
+                    allFilterBtn.style.background = 'transparent';
+                }
+            });
+            filterContainer.appendChild(allFilterBtn);
+
+            // 为每个分类创建筛选按钮
+            appCategories.forEach(cat => {
+                const btn = document.createElement('button');
+                btn.textContent = cat.name;
+                btn.dataset.filter = cat.id;
+                btn.className = 'app-filter-btn';
+                btn.style.cssText = `
+                    padding: 6px 16px;
+                    background: transparent;
+                    color: var(--theme-text-secondary, #b8c5c0);
+                    border: 1px solid var(--theme-border, rgba(139, 92, 246, 0.25));
+                    border-radius: 16px;
+                    font-size: 13px;
+                    cursor: pointer;
+                    transition: all 0.2s;
+                `;
+                btn.addEventListener('click', () => this._handleCategoryFilter(cat.id, filterContainer));
+                btn.addEventListener('mouseenter', () => {
+                    btn.style.background = 'rgba(139, 92, 246, 0.15)';
+                    btn.style.borderColor = 'rgba(139, 92, 246, 0.4)';
+                });
+                btn.addEventListener('mouseleave', () => {
+                    if (!btn.classList.contains('active')) {
+                        btn.style.background = 'transparent';
+                        btn.style.borderColor = 'var(--theme-border, rgba(139, 92, 246, 0.25))';
+                    }
+                });
+                filterContainer.appendChild(btn);
+            });
+
+            toolbar.appendChild(filterContainer);
             container.appendChild(toolbar);
             
             // 创建程序列表容器
@@ -5014,16 +5084,118 @@
             `;
             container.appendChild(listContainer);
             
+            // 保存分类筛选状态
+            this._appCurrentFilter = 'all';
+            
             // 加载程序列表
             this._loadApplications(listContainer);
             
             return container;
         },
+
+        /**
+         * 获取应用程序分类列表
+         * @returns {Array} 分类列表 [{id, name}]
+         */
+        _getApplicationCategories: function() {
+            const categories = [];
+            
+            // 尝试从 POOL 获取内核定义的分类
+            if (typeof POOL !== 'undefined' && typeof POOL.__GET__ === 'function') {
+                const poolCategories = POOL.__GET__('KERNEL_GLOBAL_POOL', 'PROGRAM_CATEGORIES');
+                if (poolCategories && typeof poolCategories === 'object') {
+                    for (const [id, name] of Object.entries(poolCategories)) {
+                        if (id !== 'all') { // 排除"全部"分类，使用自定义
+                            categories.push({ id, name });
+                        }
+                    }
+                    return categories;
+                }
+            }
+            
+            // 降级：使用全局变量
+            if (typeof window !== 'undefined' && window.PROGRAM_CATEGORIES) {
+                for (const [id, name] of Object.entries(window.PROGRAM_CATEGORIES)) {
+                    if (id !== 'all') {
+                        categories.push({ id, name });
+                    }
+                }
+                return categories;
+            }
+            
+            // 默认分类
+            return [
+                { id: 'system', name: '系统应用' },
+                { id: 'utility', name: '工具类' },
+                { id: 'game', name: '游戏' },
+                { id: 'other', name: '其他' }
+            ];
+        },
+
+        /**
+         * 处理分类筛选点击
+         * @param {string} categoryId 分类ID
+         * @param {HTMLElement} filterContainer 筛选容器
+         */
+        _handleCategoryFilter: function(categoryId, filterContainer) {
+            // 更新按钮状态
+            const buttons = filterContainer.querySelectorAll('.app-filter-btn');
+            buttons.forEach(btn => {
+                if (btn.dataset.filter === categoryId) {
+                    btn.classList.add('active');
+                    btn.style.background = 'rgba(139, 92, 246, 0.2)';
+                    btn.style.color = '#8b5cf6';
+                    btn.style.borderColor = 'rgba(139, 92, 246, 0.4)';
+                } else {
+                    btn.classList.remove('active');
+                    btn.style.background = 'transparent';
+                    btn.style.color = 'var(--theme-text-secondary, #b8c5c0)';
+                    btn.style.borderColor = 'var(--theme-border, rgba(139, 92, 246, 0.25))';
+                }
+            });
+            
+            // 更新状态并重新加载
+            this._appCurrentFilter = categoryId;
+            const listContainer = document.getElementById('applications-list');
+            if (listContainer) {
+                this._loadApplications(listContainer, categoryId);
+            }
+        },
+
+        /**
+         * 获取单个程序的分类
+         * @param {Object} program 程序对象
+         * @returns {string} 分类ID
+         */
+        _getProgramCategory: function(program) {
+            // 优先使用 metadata.category
+            if (program && program.metadata && program.metadata.category) {
+                return program.metadata.category;
+            }
+            
+            // 尝试从 POOL 获取 getProgramCategory 函数
+            if (typeof POOL !== 'undefined' && typeof POOL.__GET__ === 'function') {
+                const getCategoryFn = POOL.__GET__('KERNEL_GLOBAL_POOL', 'getProgramCategory');
+                if (typeof getCategoryFn === 'function') {
+                    return getCategoryFn(program ? program.name : '', program ? program.metadata : null);
+                }
+            }
+            
+            // 降级：使用全局函数
+            if (typeof window !== 'undefined' && typeof window.getProgramCategory === 'function') {
+                return window.getProgramCategory(program ? program.name : '', program ? program.metadata : null);
+            }
+            
+            // 默认返回 "other"
+            return 'other';
+        },
         
         /**
          * 加载程序列表
+         * @param {HTMLElement} container 程序列表容器
+         * @param {string} filterCategory 分类筛选（可选，默认 'all'）
          */
-        _loadApplications: async function(container) {
+        _loadApplications: async function(container, filterCategory = 'all') {
             if (typeof ApplicationAssetManager === 'undefined' || typeof ProcessManager === 'undefined') {
                 return;
             }
@@ -5047,14 +5219,14 @@
             if (!processReady) {
                 // 如果进程仍未就绪，延迟执行
                 setTimeout(() => {
-                    this._loadApplications(container);
+                    this._loadApplications(container, filterCategory);
                 }, 200);
                 return;
             }
-            
+
             try {
                 // 获取所有程序（包括静态和动态）
-                const allPrograms = ApplicationAssetManager.listAllPrograms();
+                let allPrograms = ApplicationAssetManager.listAllPrograms();
                 
                 // 获取动态安装的程序列表
                 let installedPrograms = {};
@@ -5079,6 +5251,28 @@
                         font-size: 14px;
                     `;
                     container.appendChild(emptyMsg);
+                    return;
+                }
+                
+                // 根据分类筛选程序
+                if (filterCategory && filterCategory !== 'all') {
+                    allPrograms = allPrograms.filter(program => {
+                        const programCategory = this._getProgramCategory(program);
+                        return programCategory === filterCategory;
+                    });
+                }
+                
+                // 如果筛选后没有结果
+                if (allPrograms.length === 0) {
+                    const noResultMsg = document.createElement('div');
+                    noResultMsg.textContent = this._getText('SETTINGS_NO_APPS_IN_CATEGORY', '该分类下没有程序');
+                    noResultMsg.style.cssText = `
+                        padding: 48px;
+                        text-align: center;
+                        color: var(--theme-text-secondary, #b8c5c0);
+                        font-size: 14px;
+                    `;
+                    container.appendChild(noResultMsg);
                     return;
                 }
                 
@@ -5193,6 +5387,31 @@
                 staticEl.style.cssText = 'color: var(--theme-text-secondary, #b8c5c0);';
                 metaInfo.appendChild(staticEl);
             }
+
+            // 添加分类标签
+            const category = this._getProgramCategory(program);
+            const categoryNames = {
+                'system': '系统应用',
+                'utility': '工具类',
+                'game': '游戏',
+                'security': '安全',
+                'tool': '工具',
+                'other': '其他'
+            };
+            const categoryName = categoryNames[category] || '其他';
+            const categoryEl = document.createElement('span');
+            categoryEl.textContent = categoryName;
+            const categoryColors = {
+                'system': '#4CAF50',
+                'utility': '#2196F3',
+                'game': '#FF9800',
+                'security': '#f44336',
+                'tool': '#9C27B0',
+                'other': '#607D8B'
+            };
+            const categoryColor = categoryColors[category] || '#607D8B';
+            categoryEl.style.cssText = `color: ${categoryColor}; font-weight: 500;`;
+            metaInfo.appendChild(categoryEl);
             
             info.appendChild(metaInfo);
             leftSection.appendChild(info);
@@ -5282,10 +5501,11 @@
                 
                 await this._showNotification('程序已卸载', 'success');
                 
-                // 重新加载程序列表
+                // 重新加载程序列表（保持当前筛选状态）
                 const listContainer = document.getElementById('applications-list');
                 if (listContainer) {
-                    await this._loadApplications(listContainer);
+                    const currentFilter = this._appCurrentFilter || 'all';
+                    await this._loadApplications(listContainer, currentFilter);
                 }
             } catch (error) {
                 if (typeof KernelLogger !== 'undefined') {

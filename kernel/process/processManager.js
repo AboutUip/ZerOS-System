@@ -1774,28 +1774,6 @@ class ProcessManager {
             }
 
             let upid = null;
-            if (programInfo) {
-                const permissions = Array.isArray(programInfo.permissions) ? programInfo.permissions : [];
-                try {
-                    const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrl)
-                        ? SystemInformation.buildServiceUrl(SystemInformation.SERVICE_NAMES.PROGRAM_PERMISSIONS)
-                        : `${typeof window !== 'undefined' && window.location ? window.location.origin : 'http://localhost:8089'}/system/service/programPermissions.php`;
-                    const res = await fetch(url, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ action: 'register', programName: programName, permissions: permissions })
-                    });
-                    const data = await res.json();
-                    if (data && data.status === 'success' && data.data && data.data.upid != null) {
-                        upid = data.data.upid;
-                        processInfo.upid = upid;
-                        ProcessManager._pidToUpid.set(pid, upid);
-                        ProcessManager._log(2, `[启动程序] 程序权限已注册到后端，upid: ${upid}`);
-                    }
-                } catch (e) {
-                    ProcessManager._log(1, `注册程序权限到后端失败: ${e.message}`);
-                }
-            }
 
             // 如果是CLI程序，处理终端环境
             let terminalInstance = initArgs.terminal || null;
@@ -1902,6 +1880,30 @@ class ProcessManager {
                     ProcessManager._log(1, `注册程序权限失败: ${e.message}`);
                     KernelLogger.error("ProcessManager", `注册程序 ${pid} 权限失败`, e);
                     // 权限注册失败不应该阻止程序启动，但会记录错误
+                }
+            }
+
+            // 向后端注册程序权限（CVS-ZEROS-014 修复：使用实际授予的权限，而非 __info__ 声明，避免程序提权）
+            if (programInfo && typeof PermissionManager !== 'undefined') {
+                try {
+                    const grantedPermissions = PermissionManager.getGrantedPermissions(pid);
+                    const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrl)
+                        ? SystemInformation.buildServiceUrl(SystemInformation.SERVICE_NAMES.PROGRAM_PERMISSIONS)
+                        : `${typeof window !== 'undefined' && window.location ? window.location.origin : 'http://localhost:8089'}/system/service/programPermissions.php`;
+                    const res = await fetch(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ action: 'register', programName: programName, permissions: grantedPermissions })
+                    });
+                    const data = await res.json();
+                    if (data && data.status === 'success' && data.data && data.data.upid != null) {
+                        upid = data.data.upid;
+                        processInfo.upid = upid;
+                        ProcessManager._pidToUpid.set(pid, upid);
+                        ProcessManager._log(2, `[启动程序] 程序权限已注册到后端（已授予权限），upid: ${upid}`);
+                    }
+                } catch (e) {
+                    ProcessManager._log(1, `注册程序权限到后端失败: ${e.message}`);
                 }
             }
 

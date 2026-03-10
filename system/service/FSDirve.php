@@ -430,6 +430,19 @@ function readFileContent($path, $fileName, $asBase64 = false) {
 }
 
 /**
+ * D 盘根目录下禁止 UserToken 写入的系统关键文件名（仅对 D: 分区收紧，CVS-ZEROS-012 修复）
+ */
+function getSensitiveFileNamesOnDRoot() {
+    return [
+        'LocalSData.json',
+        'LocalSData_backup.json',
+        'ApplicationTable.json',
+        'LocalCache.json',
+        'BootSecurityToken.json',
+    ];
+}
+
+/**
  * 写入文件
  */
 function writeFile($path, $fileName, $content, $writeMod = 'overwrite', $isBase64 = false) {
@@ -441,6 +454,21 @@ function writeFile($path, $fileName, $content, $writeMod = 'overwrite', $isBase6
     // 验证文件名
     if (empty($fileName) || strpos($fileName, '/') !== false || strpos($fileName, '\\') !== false) {
         sendResponse(false, '无效的文件名', null, 400);
+    }
+    
+    // UserToken 收紧：仅允许 SystemToken 写入 D 盘根目录下的系统关键文件（CVS-ZEROS-012）
+    $validated = validatePath($path);
+    if ($validated && $validated['disk'] === 'D' && $validated['path'] === '') {
+        $token = jwtVerifyExtractToken();
+        if ($token !== null && $token !== '') {
+            $payload = JWT::decode($token);
+            if ($payload !== false && (($payload['type'] ?? '') === 'UserToken')) {
+                $sensitiveNames = getSensitiveFileNamesOnDRoot();
+                if (in_array($fileName, $sensitiveNames, true)) {
+                    sendResponse(false, '禁止使用 UserToken 写入 D 盘根目录下的系统关键文件，请通过前端系统模块（如 LStorage）操作', null, 403);
+                }
+            }
+        }
     }
     
     // 检查父目录是否存在
@@ -499,8 +527,15 @@ function deleteFile($path, $fileName) {
     
     // 检查文件是否存在
     if (!file_exists($filePath)) {
-        sendResponse(false, '文件不存在: ' . $fileName, null, 404);
-    }
+        // 文件不存在，返回成功（可能已经被删除或从未存在）
+        sendResponse(true, '文件不存在，跳过删除', [
+            'path' => normalizePath($path) . '/' . $fileName,
+            'fileName' => $fileName,
+            'deleted' => false,
+            'reason' => 'file_not_found'
+        ]);
+        return;
+    }   
     
     // 检查是否为文件
     if (!is_file($filePath)) {

@@ -1,0 +1,46 @@
+{
+  "constants": {
+    "paperFormatVersion": 1,
+    "name": "藏猫猫时钟"
+  },
+  "options": [
+    {
+      "key": "fontSize",
+      "type": "number",
+      "label": "时钟字号",
+      "default": 72,
+      "min": 48,
+      "max": 100,
+      "step": 4,
+      "description": "时钟数字的大小"
+    },
+    {
+      "key": "textColor",
+      "type": "string",
+      "label": "文字颜色",
+      "default": "#ffffff",
+      "description": "时钟文字颜色"
+    },
+    {
+      "key": "bgColor",
+      "type": "string",
+      "label": "背景颜色",
+      "default": "#1e3a8a",
+      "description": "背景颜色"
+    },
+    {
+      "key": "catColor",
+      "type": "string",
+      "label": "猫咪颜色",
+      "default": "#ffffff",
+      "description": "猫咪线条颜色"
+    },
+    {
+      "key": "butterflyColor",
+      "type": "string",
+      "label": "蝴蝶颜色",
+      "default": "#fbbf24",
+      "description": "跟随鼠标的蝴蝶颜色"
+    }
+  ]
+}

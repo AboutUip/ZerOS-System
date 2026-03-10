@@ -1,0 +1,45 @@
+{
+  "constants": {
+    "paperFormatVersion": 1,
+    "name": "桌宠猫咪"
+  },
+  "options": [
+    {
+      "key": "catColor",
+      "type": "select",
+      "label": "猫咪颜色",
+      "default": "orange",
+      "choices": [
+        { "value": "orange", "label": "橘猫" },
+        { "value": "black", "label": "黑猫" },
+        { "value": "white", "label": "白猫" },
+        { "value": "gray", "label": "灰猫" },
+        { "value": "calico", "label": "三花" }
+      ]
+    },
+    {
+      "key": "catSize",
+      "type": "number",
+      "label": "猫咪大小",
+      "default": 120,
+      "min": 80,
+      "max": 200,
+      "step": 10,
+      "description": "猫咪的基础大小"
+    },
+    {
+      "key": "autoAction",
+      "type": "boolean",
+      "label": "自动动作",
+      "default": true,
+      "description": "猫咪是否自动做动作"
+    },
+    {
+      "key": "soundEnabled",
+      "type": "boolean",
+      "label": "启用声音",
+      "default": false,
+      "description": "启用互动音效（需要用户交互后）"
+    }
+  ]
+}

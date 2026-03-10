@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 225">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ffeaa7"/>
+      <stop offset="100%" stop-color="#fdcb6e"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="225" fill="url(#bg)"/>
+  <g transform="translate(150, 80)">
+    <ellipse cx="50" cy="80" rx="45" ry="35" fill="#ff9f43"/>
+    <circle cx="50" cy="20" r="35" fill="#ff9f43"/>
+    <polygon points="25,-5 15,15 35,10" fill="#ff9f43"/>
+    <polygon points="75,-5 85,15 65,10" fill="#ff9f43"/>
+    <ellipse cx="38" cy="15" rx="8" ry="10" fill="#fff"/>
+    <ellipse cx="62" cy="15" rx="8" ry="10" fill="#fff"/>
+    <circle cx="40" cy="17" r="5" fill="#feca57"/>
+    <circle cx="64" cy="17" r="5" fill="#feca57"/>
+    <circle cx="42" cy="15" r="2" fill="#2d3436"/>
+    <circle cx="66" cy="15" r="2" fill="#2d3436"/>
+    <ellipse cx="50" cy="30" rx="4" ry="3" fill="#ff6b81"/>
+    <path d="M45,35 Q50,40 55,35" stroke="#2d3436" stroke-width="2" fill="none"/>
+    <rect x="30" y="115" width="40" height="8" fill="#ff9f43" rx="4" transform="rotate(-20, 50, 120)"/>
+  </g>
+  <text x="200" y="210" text-anchor="middle" font-family="sans-serif" font-size="14" fill="#636e72">点击并拖动撸猫</text>
+</svg>

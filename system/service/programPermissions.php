@@ -169,6 +169,23 @@ try {
         sendResponse(true, 'upid 已回收', ['upid' => $upid]);
     }
 
+    // 更新已注册 upid 的权限列表（用户授权后前端同步，与 register 使用同一 JWT）
+    if ($action === 'update') {
+        $upidRaw = $postData['upid'] ?? null;
+        $permissions = $postData['permissions'] ?? null;
+        $upid = is_string($upidRaw) ? trim($upidRaw) : (string)$upidRaw;
+        if ($upid === '' || $upid === null || !is_array($permissions)) {
+            sendResponse(false, 'upid 和 permissions 必填且有效', null, 400);
+        }
+        $ok = loadModifySaveBootSecurity(function (array &$data) use ($upid, $permissions) {
+            $data['programPermissionsMap'][$upid] = $permissions;
+        });
+        if (!$ok) {
+            sendResponse(false, '写入安全文件失败', null, 500);
+        }
+        sendResponse(true, '权限已同步', ['upid' => $upid]);
+    }
+
     sendResponse(false, '无效的 action', null, 400);
 } catch (Exception $e) {
     sendResponse(false, '服务器错误: ' . $e->getMessage(), null, 500);

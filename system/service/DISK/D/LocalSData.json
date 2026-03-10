@@ -1,6 +1,10 @@
 {
   "system": {
     "permissionManager.permissions": {
+      "cvs014": [
+        "EVENT_LISTENER",
+        "KERNEL_DISK_READ"
+      ],
       "settings": [
         "SYSTEM_NOTIFICATION",
         "APPLICATION_UNINSTALL",
@@ -14,6 +18,14 @@
         "LANGUAGES_READ",
         "LANGUAGES_WRITE",
         "KERNEL_DISK_READ"
+      ],
+      "musicplayer": [
+        "KERNEL_DISK_LIST",
+        "GUI_WINDOW_CREATE",
+        "NETWORK_ACCESS",
+        "CACHE_READ",
+        "CACHE_WRITE",
+        "KERNEL_DISK_DELETE"
       ],
       "wallpaperengine": [
         "SYSTEM_NOTIFICATION",
@@ -29,17 +41,46 @@
         "KERNEL_DISK_CREATE",
         "KERNEL_DISK_WRITE"
       ],
+      "douyin": [
+        "GUI_WINDOW_CREATE",
+        "EVENT_LISTENER",
+        "NETWORK_ACCESS",
+        "PROCESS_BACKGROUND"
+      ],
+      "scheduletask": [
+        "SYSTEM_NOTIFICATION",
+        "SCHEDULE_TASK_MANAGE",
+        "SYSTEM_STORAGE_WRITE"
+      ],
+      "ps": [
+        "EVENT_LISTENER"
+      ],
       "zominstall": [
         "KERNEL_DISK_READ",
         "KERNEL_DISK_DELETE",
         "APPLICATION_INSTALL"
+      ],
+      "kiteengine": [
+        "GUI_WINDOW_CREATE",
+        "EVENT_LISTENER",
+        "KERNEL_DISK_READ",
+        "KERNEL_DISK_LIST"
       ],
       "uninstall": [
         "SCHEDULE_TASK_MANAGE",
         "SYSTEM_STORAGE_WRITE"
       ],
       "servicemanager": [
-        "SERVER_SERVICE_MANAGE"
+        "SERVER_SERVICE_MANAGE",
+        "SCHEDULE_TASK_MANAGE",
+        "SYSTEM_STORAGE_WRITE"
+      ],
+      "filemanager": [
+        "SYSTEM_STORAGE_WRITE_DESKTOP"
+      ],
+      "notepad": [
+        "SYSTEM_NOTIFICATION",
+        "DRAG_ELEMENT"
       ]
     },
     "system.style": "macos",
@@ -334,7 +375,7 @@
         "password": "61b249bf6d604d14120821f43625e84e",
         "avatar": "avatar_root_1766272534753.jpg",
         "createdAt": 1766271155991,
-        "lastLogin": 1772742955162
+        "lastLogin": 1773116250560
       },
       "TestUser": {
         "level": "USER",
@@ -386,9 +427,9 @@
         "triggerConfig": {},
         "enabled": true,
         "createdAt": 1771942626583,
-        "updatedAt": 1772742956037,
-        "lastRunAt": 1772742956037,
-        "runCount": 261,
+        "updatedAt": 1773116251409,
+        "lastRunAt": 1773116251409,
+        "runCount": 279,
         "createdBy": "servicemanager",
         "requiresStartupPermission": true,
         "serviceId": "notice",
@@ -427,35 +468,5 @@
     "bios.memoryAllocation": true,
     "system.volume": 1
   },
-  "programs": {
-    "program:wallpaperengine": {
-      "wallpaperengine.library": {
-        "version": 1,
-        "items": [
-          {
-            "id": "mmdvsq3b_mc7yukoo",
-            "path": "D:/cache/wallpaper/mmdvsq3b_mc7yukoo",
-            "sourceFile": "C:/papers/particle-mouse.paper",
-            "name": "particle-mouse",
-            "addedAt": 1772740290319
-          },
-          {
-            "id": "mmdwgxbc_sdr9cit3",
-            "path": "D:/cache/wallpaper/mmdwgxbc_sdr9cit3",
-            "sourceFile": "C:/papers/particle-nebula.paper",
-            "name": "particle-nebula",
-            "addedAt": 1772741419285
-          },
-          {
-            "id": "mmdwoi21_k9f4lmxa",
-            "path": "D:/cache/wallpaper/mmdwoi21_k9f4lmxa",
-            "sourceFile": "C:/papers/clock-mini.paper",
-            "name": "clock-mini",
-            "addedAt": 1772741772714
-          }
-        ],
-        "enabledId": null
-      }
-    }
-  }
+  "programs": {}
 }

@@ -22,6 +22,9 @@
         currentStorageType: 'localSData', // 当前编辑的存储类型：'localSData'、'localCache' 或 'applicationTable'
         _selectedValue: null, // 当前选中的值 { parentPath, key, row }
         _languageChangeUnsubscribe: null,
+        _history: [], // 导航历史
+        _historyIndex: -1, // 当前历史位置
+        _maxHistorySize: 50, // 最大历史记录数
 
         /** 多语言文案：优先使用 LanguagesExpansion，否则返回 fallback */
         _getText: function(key, fallback) {
@@ -158,7 +161,124 @@
                 min-width: 0;
             `;
             
-            // 创建值列表头部
+            // 创建面包屑导航栏
+            const breadcrumbBar = document.createElement('div');
+            breadcrumbBar.className = 'regedit-breadcrumb-bar';
+            breadcrumbBar.style.cssText = `
+                display: flex;
+                align-items: center;
+                padding: 8px 12px;
+                background: rgba(20, 20, 30, 0.4);
+                border-bottom: 1px solid rgba(108, 142, 255, 0.15);
+                font-size: 13px;
+                min-height: 36px;
+                overflow-x: auto;
+                white-space: nowrap;
+            `;
+            
+            const breadcrumbContainer = document.createElement('div');
+            breadcrumbContainer.className = 'regedit-breadcrumb';
+            breadcrumbContainer.style.cssText = `
+                display: flex;
+                align-items: center;
+                gap: 4px;
+            `;
+            
+            // 根节点
+            const rootItem = document.createElement('span');
+            rootItem.textContent = this._getText('REGEDIT_ROOT', '根');
+            rootItem.style.cssText = `
+                color: rgba(108, 142, 255, 0.8);
+                cursor: pointer;
+                padding: 2px 6px;
+                border-radius: 3px;
+                transition: background 0.2s;
+            `;
+            rootItem.addEventListener('click', () => {
+                this._selectPath('');
+                this._renderTree();
+            });
+            rootItem.addEventListener('mouseenter', () => {
+                rootItem.style.background = 'rgba(108, 142, 255, 0.15)';
+            });
+            rootItem.addEventListener('mouseleave', () => {
+                rootItem.style.background = 'transparent';
+            });
+            breadcrumbContainer.appendChild(rootItem);
+            
+            // 存储类型节点（如果已选择）
+            this._updateBreadcrumb = (path) => {
+                breadcrumbContainer.innerHTML = '';
+                
+                // 根节点
+                const root = document.createElement('span');
+                root.textContent = this._getText('REGEDIT_ROOT', '根');
+                root.style.cssText = `
+                    color: rgba(108, 142, 255, 0.8);
+                    cursor: pointer;
+                    padding: 2px 6px;
+                    border-radius: 3px;
+                    transition: background 0.2s;
+                `;
+                root.addEventListener('click', () => {
+                    this._selectPath('');
+                    this._renderTree();
+                });
+                root.addEventListener('mouseenter', () => {
+                    root.style.background = 'rgba(108, 142, 255, 0.15)';
+                });
+                root.addEventListener('mouseleave', () => {
+                    root.style.background = 'transparent';
+                });
+                breadcrumbContainer.appendChild(root);
+                
+                if (!path) return;
+                
+                const parts = path.split('.');
+                let currentPath = '';
+                
+                parts.forEach((part, index) => {
+                    // 分隔符
+                    const sep = document.createElement('span');
+                    sep.textContent = '›';
+                    sep.style.cssText = `
+                        color: rgba(215, 224, 221, 0.4);
+                        margin: 0 2px;
+                    `;
+                    breadcrumbContainer.appendChild(sep);
+                    
+                    // 路径部分
+                    currentPath = currentPath ? `${currentPath}.${part}` : part;
+                    const partEl = document.createElement('span');
+                    partEl.textContent = part;
+                    partEl.style.cssText = `
+                        color: ${index === parts.length - 1 ? 'var(--theme-text, #d7e0dd)' : 'rgba(215, 224, 221, 0.7)'};
+                        cursor: pointer;
+                        padding: 2px 6px;
+                        border-radius: 3px;
+                        transition: background 0.2s;
+                        font-weight: ${index === parts.length - 1 ? '500' : '400'};
+                    `;
+                    if (index < parts.length - 1) {
+                        partEl.addEventListener('click', () => {
+                            this._selectPath(currentPath);
+                            this._renderTree();
+                        });
+                        partEl.addEventListener('mouseenter', () => {
+                            partEl.style.background = 'rgba(108, 142, 255, 0.15)';
+                        });
+                        partEl.addEventListener('mouseleave', () => {
+                            partEl.style.background = 'transparent';
+                        });
+                    }
+                    breadcrumbContainer.appendChild(partEl);
+                });
+            };
+            
+            breadcrumbBar.appendChild(breadcrumbContainer);
+            rightPanel.appendChild(breadcrumbBar);
+            
+            // 创建值列表头部（列头）
             const valueHeader = document.createElement('div');
             valueHeader.className = 'regedit-value-header';
             valueHeader.style.cssText = `
@@ -186,6 +306,37 @@
                 overflow-x: hidden;
             `;
             rightPanel.appendChild(this.valueContainer);
+            
+            // 创建状态栏
+            const statusBar = document.createElement('div');
+            statusBar.className = 'regedit-status-bar';
+            statusBar.style.cssText = `
+                height: 24px;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                padding: 0 12px;
+                background: rgba(20, 20, 30, 0.4);
+                border-top: 1px solid rgba(108, 142, 255, 0.15);
+                font-size: 11px;
+                color: rgba(215, 224, 221, 0.5);
+            `;
+            
+            const itemCount = document.createElement('span');
+            itemCount.className = 'regedit-item-count';
+            itemCount.textContent = this._getText('REGEDIT_READY', '就绪');
+            statusBar.appendChild(itemCount);
+            
+            const storageInfo = document.createElement('span');
+            storageInfo.className = 'regedit-storage-info';
+            storageInfo.textContent = this._getStorageTypeLabel(this.currentStorageType);
+            statusBar.appendChild(storageInfo);
+            
+            // 保存引用以便更新
+            this._statusItemCount = itemCount;
+            this._statusStorageInfo = storageInfo;
+            
+            rightPanel.appendChild(statusBar);
             
             content.appendChild(rightPanel);
             this.window.appendChild(content);
@@ -309,6 +460,72 @@
             
             menuBar.appendChild(buttonGroup);
             
+            // 前进/后退按钮组
+            const historyGroup = document.createElement('div');
+            historyGroup.style.cssText = `
+                display: flex;
+                gap: 4px;
+                margin-left: 15px;
+            `;
+            
+            const backBtn = document.createElement('button');
+            backBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 18-6-6 6-6"/></svg>';
+            backBtn.className = 'regedit-history-back';
+            backBtn.title = this._getText('REGEDIT_BACK', '后退 (Alt+←)');
+            backBtn.style.cssText = `
+                padding: 6px 8px;
+                background: transparent;
+                border: 1px solid rgba(108, 142, 255, 0.2);
+                border-radius: 4px;
+                color: rgba(215, 224, 221, 0.7);
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                transition: all 0.2s;
+                opacity: 0.4;
+            `;
+            backBtn.addEventListener('click', () => self._goBack());
+            backBtn.addEventListener('mouseenter', () => {
+                if (backBtn.style.opacity !== '0.4') {
+                    backBtn.style.background = 'rgba(108, 142, 255, 0.2)';
+                }
+            });
+            backBtn.addEventListener('mouseleave', () => {
+                backBtn.style.background = 'transparent';
+            });
+            
+            const forwardBtn = document.createElement('button');
+            forwardBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg>';
+            forwardBtn.className = 'regedit-history-forward';
+            forwardBtn.title = this._getText('REGEDIT_FORWARD', '前进 (Alt+→)');
+            forwardBtn.style.cssText = `
+                padding: 6px 8px;
+                background: transparent;
+                border: 1px solid rgba(108, 142, 255, 0.2);
+                border-radius: 4px;
+                color: rgba(215, 224, 221, 0.7);
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                transition: all 0.2s;
+                opacity: 0.4;
+            `;
+            forwardBtn.addEventListener('click', () => self._goForward());
+            forwardBtn.addEventListener('mouseenter', () => {
+                if (forwardBtn.style.opacity !== '0.4') {
+                    forwardBtn.style.background = 'rgba(108, 142, 255, 0.2)';
+                }
+            });
+            forwardBtn.addEventListener('mouseleave', () => {
+                forwardBtn.style.background = 'transparent';
+            });
+            
+            historyGroup.appendChild(backBtn);
+            historyGroup.appendChild(forwardBtn);
+            menuBar.appendChild(historyGroup);
+            
             // 刷新按钮
             const refreshBtn = this._createMenuButton(this._getText('KEY_REFRESH', '刷新'), async () => {
                 await self._refreshData({ forceReload: true });
@@ -318,6 +535,83 @@
             refreshBtn.className = 'regedit-refresh-btn';
             refreshBtn.style.marginLeft = 'auto';
             menuBar.appendChild(refreshBtn);
+
+            // 搜索框
+            const searchContainer = document.createElement('div');
+            searchContainer.style.cssText = `
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                margin-left: 10px;
+            `;
+
+            const searchInput = document.createElement('input');
+            searchInput.type = 'text';
+            searchInput.placeholder = this._getText('REGEDIT_SEARCH', '搜索...');
+            searchInput.className = 'regedit-search-input';
+            searchInput.style.cssText = `
+                width: 150px;
+                padding: 6px 12px;
+                background: rgba(20, 20, 30, 0.5);
+                border: 1px solid rgba(108, 142, 255, 0.3);
+                border-radius: 4px;
+                color: var(--theme-text, #d7e0dd);
+                font-size: 12px;
+                outline: none;
+                transition: border-color 0.2s, width 0.2s;
+            `;
+            searchInput.addEventListener('focus', () => {
+                searchInput.style.borderColor = 'rgba(108, 142, 255, 0.6)';
+                searchInput.style.width = '250px';
+            });
+            searchInput.addEventListener('blur', () => {
+                searchInput.style.borderColor = 'rgba(108, 142, 255, 0.3)';
+                if (!searchInput.value) {
+                    searchInput.style.width = '150px';
+                }
+            });
+            searchInput.addEventListener('keydown', async (e) => {
+                if (e.key === 'Enter') {
+                    const query = searchInput.value.trim();
+                    if (query) {
+                        await self._searchRegistry(query);
+                    }
+                }
+            });
+
+            const searchBtn = document.createElement('button');
+            searchBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>';
+            searchBtn.className = 'regedit-search-btn';
+            searchBtn.style.cssText = `
+                padding: 6px 10px;
+                background: transparent;
+                border: 1px solid rgba(108, 142, 255, 0.3);
+                border-radius: 4px;
+                color: rgba(215, 224, 221, 0.7);
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                transition: all 0.2s;
+            `;
+            searchBtn.addEventListener('mouseenter', () => {
+                searchBtn.style.background = 'rgba(108, 142, 255, 0.2)';
+                searchBtn.style.borderColor = 'rgba(108, 142, 255, 0.5)';
+            });
+            searchBtn.addEventListener('mouseleave', () => {
+                searchBtn.style.background = 'transparent';
+                searchBtn.style.borderColor = 'rgba(108, 142, 255, 0.3)';
+            });
+            searchBtn.addEventListener('click', async () => {
+                const query = searchInput.value.trim();
+                if (query) {
+                    await self._searchRegistry(query);
+                }
+            });
+
+            searchContainer.appendChild(searchInput);
+            searchContainer.appendChild(searchBtn);
+            menuBar.appendChild(searchContainer);
             
             return menuBar;
         },
@@ -352,6 +646,245 @@
                 const titleEl = cw.window && cw.window.querySelector ? cw.window.querySelector('.zos-window-title') : null;
                 if (titleEl && key) titleEl.textContent = key + ' - ' + this._getText('REGEDIT_TITLE', '注册表编辑器');
             }.bind(this));
+        },
+
+        /**
+         * 搜索注册表
+         * @param {string} query 搜索关键词
+         */
+        _searchRegistry: async function(query) {
+            if (!this.storageData || !query) return;
+
+            const results = [];
+            const lowerQuery = query.toLowerCase();
+            const storageType = this.currentStorageType;
+
+            // 递归搜索函数
+            const searchObject = (obj, path, currentStorageType) => {
+                if (!obj || typeof obj !== 'object') return;
+
+                for (const key in obj) {
+                    if (!Object.prototype.hasOwnProperty.call(obj, key)) continue;
+                    
+                    const currentPath = path ? `${path}.${key}` : key;
+                    const value = obj[key];
+
+                    // 检查键名是否匹配
+                    if (key.toLowerCase().includes(lowerQuery)) {
+                        results.push({
+                            key: key,
+                            path: currentPath,
+                            value: value,
+                            matchType: 'key',
+                            storageType: currentStorageType
+                        });
+                    }
+
+                    // 检查值是否匹配
+                    if (value !== null && value !== undefined) {
+                        const valueStr = String(value).toLowerCase();
+                        if (valueStr.includes(lowerQuery)) {
+                            results.push({
+                                key: key,
+                                path: currentPath,
+                                value: value,
+                                matchType: 'value',
+                                storageType: currentStorageType
+                            });
+                        }
+                    }
+
+                    // 递归搜索子对象
+                    if (value && typeof value === 'object' && !Array.isArray(value)) {
+                        searchObject(value, currentPath, currentStorageType);
+                    }
+                }
+            };
+
+            // 根据当前存储类型搜索
+            if (storageType === 'localSData' && this.storageData.system) {
+                searchObject(this.storageData.system, 'system', 'localSData');
+            } else if (storageType === 'localCache' && this.storageData.applications) {
+                searchObject(this.storageData.applications, 'applications', 'localCache');
+            } else if (storageType === 'applicationTable' && this.storageData.programs) {
+                searchObject(this.storageData.programs, 'programs', 'applicationTable');
+            }
+
+            // 显示搜索结果
+            this._showSearchResults(results, query);
+        },
+
+        /**
+         * 显示搜索结果
+         * @param {Array} results 搜索结果
+         * @param {string} query 搜索关键词
+         */
+        _showSearchResults: function(results, query) {
+            if (!this.valueContainer) return;
+
+            this.valueContainer.innerHTML = '';
+
+            // 创建搜索结果头部
+            const header = document.createElement('div');
+            header.style.cssText = `
+                padding: 12px 16px;
+                background: rgba(30, 30, 46, 0.5);
+                border-bottom: 1px solid rgba(108, 142, 255, 0.2);
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            `;
+
+            const resultCount = document.createElement('div');
+            resultCount.style.cssText = `
+                color: rgba(215, 224, 221, 0.8);
+                font-size: 13px;
+            `;
+            resultCount.textContent = this._getText('REGEDIT_SEARCH_RESULTS', '搜索结果') + `: ${results.length} ${this._getText('REGEDIT_FOUND_ITEMS', '项')}`;
+            header.appendChild(resultCount);
+
+            const clearBtn = document.createElement('button');
+            clearBtn.textContent = this._getText('REGEDIT_CLEAR_SEARCH', '清除搜索');
+            clearBtn.style.cssText = `
+                padding: 4px 12px;
+                background: transparent;
+                border: 1px solid rgba(108, 142, 255, 0.3);
+                border-radius: 4px;
+                color: rgba(215, 224, 221, 0.7);
+                font-size: 12px;
+                cursor: pointer;
+            `;
+            clearBtn.addEventListener('click', () => {
+                this._renderValues(this.selectedPath);
+            });
+            header.appendChild(clearBtn);
+
+            this.valueContainer.appendChild(header);
+
+            if (results.length === 0) {
+                const noResult = document.createElement('div');
+                noResult.style.cssText = `
+                    padding: 40px;
+                    text-align: center;
+                    color: rgba(215, 224, 221, 0.5);
+                `;
+                noResult.textContent = this._getText('REGEDIT_NO_RESULTS', '未找到匹配项');
+                this.valueContainer.appendChild(noResult);
+                return;
+            }
+
+            // 限制显示结果数量
+            const maxResults = 100;
+            const displayResults = results.slice(0, maxResults);
+
+            // 创建结果列表
+            const listContainer = document.createElement('div');
+            listContainer.style.cssText = `
+                flex: 1;
+                overflow-y: auto;
+            `;
+
+            displayResults.forEach(result => {
+                const item = document.createElement('div');
+                item.style.cssText = `
+                    padding: 10px 16px;
+                    border-bottom: 1px solid rgba(108, 142, 255, 0.1);
+                    cursor: pointer;
+                    transition: background 0.2s;
+                `;
+                item.addEventListener('mouseenter', () => {
+                    item.style.background = 'rgba(108, 142, 255, 0.1)';
+                });
+                item.addEventListener('mouseleave', () => {
+                    item.style.background = 'transparent';
+                });
+                item.addEventListener('click', () => {
+                    this._selectPath(result.path);
+                    this._renderTree();
+                    // 展开到目标路径
+                    const pathParts = result.path.split('.');
+                    const treeItems = this.treeContainer.querySelectorAll('.regedit-tree-item');
+                    treeItems.forEach(treeItem => {
+                        const itemPath = treeItem.dataset.path;
+                        if (itemPath && result.path.startsWith(itemPath)) {
+                            treeItem.dataset.expanded = 'true';
+                        }
+                    });
+                    this._renderTree();
+                });
+
+                const keyName = document.createElement('div');
+                keyName.style.cssText = `
+                    color: var(--theme-text, #d7e0dd);
+                    font-size: 14px;
+                    font-weight: 500;
+                    margin-bottom: 4px;
+                `;
+                keyName.textContent = result.key;
+                
+                // 添加匹配类型标签
+                if (result.matchType === 'key') {
+                    const tag = document.createElement('span');
+                    tag.textContent = '键名';
+                    tag.style.cssText = `
+                        display: inline-block;
+                        padding: 2px 6px;
+                        background: rgba(76, 175, 80, 0.2);
+                        color: #4CAF50;
+                        border-radius: 3px;
+                        font-size: 10px;
+                        margin-left: 8px;
+                    `;
+                    keyName.appendChild(tag);
+                }
+
+                item.appendChild(keyName);
+
+                const pathInfo = document.createElement('div');
+                pathInfo.style.cssText = `
+                    color: rgba(215, 224, 221, 0.5);
+                    font-size: 11px;
+                    margin-bottom: 4px;
+                    word-break: break-all;
+                `;
+                pathInfo.textContent = result.path;
+                item.appendChild(pathInfo);
+
+                const valueInfo = document.createElement('div');
+                valueInfo.style.cssText = `
+                    color: rgba(215, 224, 221, 0.7);
+                    font-size: 12px;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                    white-space: nowrap;
+                    max-width: 400px;
+                `;
+                const valueStr = result.value !== null && result.value !== undefined ? String(result.value) : '(null)';
+                if (result.matchType === 'value') {
+                    // 高亮匹配的值
+                    const regex = new RegExp(`(${query})`, 'gi');
+                    valueInfo.innerHTML = valueStr.replace(regex, '<mark style="background: rgba(255, 235, 59, 0.3); color: inherit;">$1</mark>');
+                } else {
+                    valueInfo.textContent = valueStr;
+                }
+                item.appendChild(valueInfo);
+
+                listContainer.appendChild(item);
+            });
+
+            if (results.length > maxResults) {
+                const more = document.createElement('div');
+                more.style.cssText = `
+                    padding: 12px;
+                    text-align: center;
+                    color: rgba(215, 224, 221, 0.5);
+                    font-size: 12px;
+                `;
+                more.textContent = `... 还有 ${results.length - maxResults} 项结果`;
+                listContainer.appendChild(more);
+            }
+
+            this.valueContainer.appendChild(listContainer);
         },
 
         /**
@@ -674,8 +1207,18 @@
         /**
          * 选择路径
          */
-        _selectPath: function(path) {
+        _selectPath: function(path, isHistoryNavigation = false) {
             this.selectedPath = path;
+            
+            // 添加到历史记录（如果不是历史导航）
+            if (!isHistoryNavigation) {
+                this._addToHistory(path);
+            }
+            
+            // 更新面包屑导航
+            if (this._updateBreadcrumb) {
+                this._updateBreadcrumb(path);
+            }
             
             // 更新选中状态
             const items = this.treeContainer.querySelectorAll('.regedit-tree-item');
@@ -689,6 +1232,75 @@
             
             // 渲染值列表
             this._renderValues(path);
+            
+            // 更新前进/后退按钮状态
+            this._updateHistoryButtons();
+        },
+        
+        /**
+         * 添加到历史记录
+         */
+        _addToHistory: function(path) {
+            // 如果当前不是最新位置，删除当前位置之后的所有历史
+            if (this._historyIndex < this._history.length - 1) {
+                this._history = this._history.slice(0, this._historyIndex + 1);
+            }
+            
+            // 如果与最后一个历史相同，不添加
+            if (this._history.length > 0 && this._history[this._history.length - 1] === path) {
+                return;
+            }
+            
+            // 添加新历史
+            this._history.push(path);
+            
+            // 限制历史记录数量
+            if (this._history.length > this._maxHistorySize) {
+                this._history.shift();
+            } else {
+                this._historyIndex++;
+            }
+        },
+        
+        /**
+         * 后退到上一个历史
+         */
+        _goBack: function() {
+            if (this._historyIndex > 0) {
+                this._historyIndex--;
+                const path = this._history[this._historyIndex];
+                this._selectPath(path, true);
+            }
+        },
+        
+        /**
+         * 前进到下一个历史
+         */
+        _goForward: function() {
+            if (this._historyIndex < this._history.length - 1) {
+                this._historyIndex++;
+                const path = this._history[this._historyIndex];
+                this._selectPath(path, true);
+            }
+        },
+        
+        /**
+         * 更新前进/后退按钮状态
+         */
+        _updateHistoryButtons: function() {
+            if (!this.window) return;
+            
+            const backBtn = this.window.querySelector('.regedit-history-back');
+            const forwardBtn = this.window.querySelector('.regedit-history-forward');
+            
+            if (backBtn) {
+                backBtn.disabled = this._historyIndex <= 0;
+                backBtn.style.opacity = this._historyIndex <= 0 ? '0.4' : '1';
+            }
+            if (forwardBtn) {
+                forwardBtn.disabled = this._historyIndex >= this._history.length - 1;
+                forwardBtn.style.opacity = this._historyIndex >= this._history.length - 1 ? '0.4' : '1';
+            }
         },
         
         /**
@@ -710,6 +1322,7 @@
                     KernelLogger.warn('RegEdit', 'storageData 未加载');
                 }
                 this.valueContainer.innerHTML = '<div style="padding: 20px; color: rgba(255, 100, 100, 0.7);">' + this._getText('REGEDIT_DATA_NOT_LOADED', '数据未加载，请刷新') + '</div>';
+                this._updateStatusBar(0);
                 return;
             }
             
@@ -718,6 +1331,7 @@
             
             if (data === null || data === undefined) {
                 this.valueContainer.innerHTML = '<div style="padding: 20px; color: rgba(215, 224, 221, 0.5);">' + this._getText('REGEDIT_NO_DATA', '无数据') + '</div>';
+                this._updateStatusBar(0);
                 return;
             }
             
@@ -768,6 +1382,7 @@
                     frag.appendChild(row);
                 }
                 this.valueContainer.appendChild(frag);
+                this._updateStatusBar(data.length);
             } else {
                 // 显示对象键值对
                 const frag = document.createDocumentFragment();
@@ -779,6 +1394,23 @@
                     frag.appendChild(row);
                 }
                 this.valueContainer.appendChild(frag);
+                this._updateStatusBar(keys.length);
+            }
+        },
+        
+        /**
+         * 更新状态栏
+         * @param {number} itemCount 项数量
+         */
+        _updateStatusBar: function(itemCount) {
+            if (this._statusItemCount) {
+                const countText = itemCount === 0 
+                    ? this._getText('REGEDIT_NO_ITEMS', '无项目')
+                    : `${itemCount} ${this._getText('REGEDIT_ITEMS', '项')}`;
+                this._statusItemCount.textContent = countText;
+            }
+            if (this._statusStorageInfo) {
+                this._statusStorageInfo.textContent = this._getStorageTypeLabel(this.currentStorageType);
             }
         },
         
@@ -1564,7 +2196,7 @@
             
             const self = this;
             
-            // 注册值列表项的右键菜单
+            // 1. 注册值列表项的右键菜单
             this.contextMenuId = ContextMenuManager.registerContextMenu(this.pid, {
                 context: 'window-content',
                 selector: '.regedit-value-row',
@@ -1575,7 +2207,6 @@
                         return [];
                     }
                     
-                    // 从行元素获取数据（需要存储这些信息）
                     const key = row.dataset.key;
                     const parentPath = row.dataset.parentPath;
                     const valueType = row.dataset.valueType;
@@ -1584,10 +2215,8 @@
                         return [];
                     }
                     
-                    // 获取实际值
                     let value = null;
                     try {
-                        // 从存储的数据中获取值
                         const pathParts = parentPath ? parentPath.split('.') : [];
                         let data = self.storageData;
                         for (const part of pathParts) {
@@ -1621,36 +2250,169 @@
                                 self._deleteValue(parentPath, key);
                             }
                         },
-                        {
-                            separator: true
-                        },
-                        {
-                            label: self._getText('REGEDIT_NEW_STRING', '新建字符串值'),
-                            action: () => {
-                                self._newValue(parentPath, 'string');
-                            }
-                        },
-                        {
-                            label: self._getText('REGEDIT_NEW_NUMBER', '新建数字值'),
-                            action: () => {
-                                self._newValue(parentPath, 'number');
-                            }
-                        },
-                        {
-                            label: self._getText('REGEDIT_NEW_BOOLEAN', '新建布尔值'),
-                            action: () => {
-                                self._newValue(parentPath, 'boolean');
-                            }
-                        },
-                        {
-                            label: self._getText('REGEDIT_NEW_OBJECT', '新建对象'),
-                            action: () => {
-                                self._newValue(parentPath, 'object');
-                            }
-                        }
+                        { separator: true },
+                        { label: self._getText('REGEDIT_COPY_KEY', '复制键名'), action: () => { navigator.clipboard.writeText(key); } },
+                        { label: self._getText('REGEDIT_COPY_VALUE', '复制值'), action: () => { navigator.clipboard.writeText(String(value)); } },
+                        { label: self._getText('REGEDIT_COPY_PATH', '复制完整路径'), action: () => { navigator.clipboard.writeText(parentPath ? parentPath + '.' + key : key); } },
+                        { separator: true },
+                        { label: self._getText('REGEDIT_NEW_STRING', '新建字符串值'), action: () => { self._newValue(parentPath, 'string'); } },
+                        { label: self._getText('REGEDIT_NEW_NUMBER', '新建数字值'), action: () => { self._newValue(parentPath, 'number'); } },
+                        { label: self._getText('REGEDIT_NEW_BOOLEAN', '新建布尔值'), action: () => { self._newValue(parentPath, 'boolean'); } },
+                        { label: self._getText('REGEDIT_NEW_OBJECT', '新建对象'), action: () => { self._newValue(parentPath, 'object'); } }
                     ];
                 }
             });
+            
+            // 2. 注册树形结构项的右键菜单
+            this.treeContextMenuId = ContextMenuManager.registerContextMenu(this.pid, {
+                context: 'window-content',
+                selector: '.regedit-tree-item',
+                priority: 99,
+                items: (target) => {
+                    const item = target.closest('.regedit-tree-item');
+                    if (!item) {
+                        return [];
+                    }
+                    
+                    const path = item.dataset.path;
+                    const hasChildren = item.dataset.hasChildren === 'true';
+                    
+                    const menuItems = [];
+                    
+                    if (path) {
+                        menuItems.push(
+                            { label: self._getText('REGEDIT_EXPAND_ALL', '展开全部'), action: () => { self._expandAll(path); } },
+                            { label: self._getText('REGEDIT_COLLAPSE_ALL', '折叠全部'), action: () => { self._collapseAll(path); } },
+                            { separator: true },
+                            { label: self._getText('REGEDIT_COPY_PATH', '复制路径'), action: () => { navigator.clipboard.writeText(path); } },
+                            { separator: true }
+                        );
+                        
+                        if (path !== 'system' && path !== 'applications' && path !== 'programs') {
+                            menuItems.push(
+                                { label: self._getText('KEY_DELETE', '删除项'), danger: true, action: () => { self._deleteTreeItem(path); } },
+                                { separator: true }
+                            );
+                        }
+                    }
+                    
+                    menuItems.push(
+                        { label: self._getText('REGEDIT_NEW_STRING', '新建字符串值'), action: () => { self._newValue(path || '', 'string'); } },
+                        { label: self._getText('REGEDIT_NEW_NUMBER', '新建数字值'), action: () => { self._newValue(path || '', 'number'); } },
+                        { label: self._getText('REGEDIT_NEW_BOOLEAN', '新建布尔值'), action: () => { self._newValue(path || '', 'boolean'); } },
+                        { label: self._getText('REGEDIT_NEW_OBJECT', '新建对象'), action: () => { self._newValue(path || '', 'object'); } },
+                        { separator: true },
+                        { label: self._getText('KEY_REFRESH', '刷新'), action: () => { self._refreshData({ forceReload: true }); self._renderTree(); } }
+                    );
+                    
+                    return menuItems;
+                }
+            });
+            
+            // 3. 注册空白区域的右键菜单（值列表空白处）
+            this.blankContextMenuId = ContextMenuManager.registerContextMenu(this.pid, {
+                context: 'window-content',
+                selector: '.regedit-value-list',
+                priority: 98,
+                items: (target) => {
+                    return [
+                        { label: self._getText('KEY_REFRESH', '刷新'), action: () => { self._refreshData({ forceReload: true }); self._renderTree(); self._renderValues(self.selectedPath); } },
+                        { separator: true },
+                        { label: self._getText('REGEDIT_NEW_STRING', '新建字符串值'), action: () => { self._newValue(self.selectedPath || '', 'string'); } },
+                        { label: self._getText('REGEDIT_NEW_NUMBER', '新建数字值'), action: () => { self._newValue(self.selectedPath || '', 'number'); } },
+                        { label: self._getText('REGEDIT_NEW_BOOLEAN', '新建布尔值'), action: () => { self._newValue(self.selectedPath || '', 'boolean'); } },
+                        { label: self._getText('REGEDIT_NEW_OBJECT', '新建对象'), action: () => { self._newValue(self.selectedPath || '', 'object'); } }
+                    ];
+                }
+            });
+            
+            // 4. 注册树形容器空白区域的右键菜单
+            this.treeBlankContextMenuId = ContextMenuManager.registerContextMenu(this.pid, {
+                context: 'window-content',
+                selector: '.regedit-tree',
+                priority: 97,
+                items: (target) => {
+                    return [
+                        { label: self._getText('KEY_REFRESH', '刷新'), action: () => { self._refreshData({ forceReload: true }); self._renderTree(); } },
+                        { separator: true },
+                        { label: self._getText('REGEDIT_EXPAND_ALL', '展开全部'), action: () => { self._expandAllTree(); } },
+                        { label: self._getText('REGEDIT_COLLAPSE_ALL', '折叠全部'), action: () => { self._collapseAllTree(); } }
+                    ];
+                }
+            });
+        },
+        
+        /**
+         * 展开指定路径下的所有子节点
+         */
+        _expandAll: function(parentPath) {
+            if (!this.treeContainer) return;
+            const items = this.treeContainer.querySelectorAll('.regedit-tree-item');
+            items.forEach(item => {
+                const itemPath = item.dataset.path;
+                if (itemPath && itemPath.startsWith(parentPath) && itemPath !== parentPath) {
+                    item.dataset.expanded = 'true';
+                }
+            });
+            this._renderTree();
+        },
+        
+        /**
+         * 折叠指定路径下的所有子节点
+         */
+        _collapseAll: function(parentPath) {
+            if (!this.treeContainer) return;
+            const items = this.treeContainer.querySelectorAll('.regedit-tree-item');
+            items.forEach(item => {
+                const itemPath = item.dataset.path;
+                if (itemPath && itemPath.startsWith(parentPath) && itemPath !== parentPath) {
+                    item.dataset.expanded = 'false';
+                }
+            });
+            this._renderTree();
+        },
+        
+        /**
+         * 展开全部树节点
+         */
+        _expandAllTree: function() {
+            if (!this.treeContainer) return;
+            const items = this.treeContainer.querySelectorAll('.regedit-tree-item');
+            items.forEach(item => {
+                if (item.dataset.hasChildren === 'true') {
+                    item.dataset.expanded = 'true';
+                }
+            });
+            this._renderTree();
+        },
+        
+        /**
+         * 折叠全部树节点
+         */
+        _collapseAllTree: function() {
+            if (!this.treeContainer) return;
+            const items = this.treeContainer.querySelectorAll('.regedit-tree-item');
+            items.forEach(item => {
+                item.dataset.expanded = 'false';
+            });
+            this._renderTree();
+        },
+        
+        /**
+         * 删除树节点
+         */
+        _deleteTreeItem: function(path) {
+            if (!path) return;
+            
+            if (typeof KernelLogger !== 'undefined') {
+                KernelLogger.info('RegEdit', '删除树节点: ' + path);
+            }
+            
+            const parts = path.split('.');
+            const key = parts.pop();
+            const parentPath = parts.join('.');
+            
+            this._deleteValue(parentPath, key);
         },
         
         /**
@@ -2210,21 +2972,54 @@
                         return;
                     }
                     
-                    // 检查是否在输入框中
+                    // 检查是否在输入框中（除了特定快捷键）
                     const activeElement = document.activeElement;
-                    if (activeElement && (
+                    const isInInput = activeElement && (
                         activeElement.tagName === 'INPUT' ||
                         activeElement.tagName === 'TEXTAREA' ||
                         activeElement.isContentEditable
-                    )) {
-                        return;
-                    }
+                    );
                     
                     // Delete: 删除选中的值
-                    if (!e.ctrlKey && !e.shiftKey && !e.altKey && !e.metaKey && e.key === 'Delete') {
+                    if (!e.ctrlKey && !e.shiftKey && !e.altKey && !e.metaKey && e.key === 'Delete' && !isInInput) {
                         e.preventDefault();
                         e.stopPropagation();
                         self._deleteSelectedValue();
+                    }
+                    
+                    // F5: 刷新
+                    if (e.key === 'F5' && !isInInput) {
+                        e.preventDefault();
+                        self._refreshData({ forceReload: true });
+                        self._renderTree();
+                        self._renderValues(self.selectedPath);
+                    }
+                    
+                    // Ctrl+F: 聚焦搜索框
+                    if (e.ctrlKey && e.key === 'f' && !isInInput) {
+                        e.preventDefault();
+                        const searchInput = self.window.querySelector('.regedit-search-input');
+                        if (searchInput) {
+                            searchInput.focus();
+                        }
+                    }
+                    
+                    // Alt+←: 后退
+                    if (e.altKey && e.key === 'ArrowLeft' && !isInInput) {
+                        e.preventDefault();
+                        self._goBack();
+                    }
+                    
+                    // Alt+→: 前进
+                    if (e.altKey && e.key === 'ArrowRight' && !isInInput) {
+                        e.preventDefault();
+                        self._goForward();
+                    }
+                    
+                    // Ctrl+N: 新建值
+                    if (e.ctrlKey && e.key === 'n' && !isInInput) {
+                        e.preventDefault();
+                        self._newValue(self.selectedPath || '', 'string');
                     }
                 }, {
                     priority: 100,
@@ -2235,19 +3030,52 @@
                 this.window.addEventListener('keydown', (e) => {
                     // 检查是否在输入框中
                     const activeElement = document.activeElement;
-                    if (activeElement && (
+                    const isInInput = activeElement && (
                         activeElement.tagName === 'INPUT' ||
                         activeElement.tagName === 'TEXTAREA' ||
                         activeElement.isContentEditable
-                    )) {
-                        return;
-                    }
+                    );
                     
                     // Delete: 删除选中的值
-                    if (!e.ctrlKey && !e.shiftKey && !e.altKey && !e.metaKey && e.key === 'Delete') {
+                    if (!e.ctrlKey && !e.shiftKey && !e.altKey && !e.metaKey && e.key === 'Delete' && !isInInput) {
                         e.preventDefault();
                         e.stopPropagation();
                         self._deleteSelectedValue();
+                    }
+                    
+                    // F5: 刷新
+                    if (e.key === 'F5' && !isInInput) {
+                        e.preventDefault();
+                        self._refreshData({ forceReload: true });
+                        self._renderTree();
+                        self._renderValues(self.selectedPath);
+                    }
+                    
+                    // Ctrl+F: 聚焦搜索框
+                    if (e.ctrlKey && e.key === 'f' && !isInInput) {
+                        e.preventDefault();
+                        const searchInput = self.window.querySelector('.regedit-search-input');
+                        if (searchInput) {
+                            searchInput.focus();
+                        }
+                    }
+                    
+                    // Alt+←: 后退
+                    if (e.altKey && e.key === 'ArrowLeft' && !isInInput) {
+                        e.preventDefault();
+                        self._goBack();
+                    }
+                    
+                    // Alt+→: 前进
+                    if (e.altKey && e.key === 'ArrowRight' && !isInInput) {
+                        e.preventDefault();
+                        self._goForward();
+                    }
+                    
+                    // Ctrl+N: 新建值
+                    if (e.ctrlKey && e.key === 'n' && !isInInput) {
+                        e.preventDefault();
+                        self._newValue(self.selectedPath || '', 'string');
                     }
                 });
             }

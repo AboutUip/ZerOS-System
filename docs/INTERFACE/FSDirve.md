@@ -367,6 +367,12 @@ const result = await response.json();
   - `prepend`: 前置模式
 - `content` (string, 必需): 文件内容（可通过 GET 参数或 POST Body 传递）
 
+**安全策略（CVS-ZEROS-012 修复）**：
+- **SystemToken**：所有写入一律放行。
+- **UserToken**：仅对 **D 盘根目录**（`path` 为 `D:` 或 `D:/`）下的以下系统关键文件禁止写入，返回 **403**：
+  - `LocalSData.json`、`LocalSData_backup.json`、`ApplicationTable.json`、`LocalCache.json`、`BootSecurityToken.json`
+- 其他路径（含 D 盘任意子目录、其他分区）及非敏感文件名不受限制。若程序需要修改上述系统存储，请通过前端系统模块（如 LStorage）操作，由内核路径发起请求以使用 SystemToken。
+
 **示例** (POST):
 ```javascript
 const url = new URL('/system/service/FSDirve.php', window.location.origin);
@@ -426,6 +432,8 @@ const result = await response.json();
     "message": "文件删除成功"
 }
 ```
+
+**说明**: 删除不存在的文件时，仍然返回成功响应，而不是 404 错误。这是为了简化缓存清理等操作，避免因文件不存在而导致的错误。
 
 ### 重命名文件
 

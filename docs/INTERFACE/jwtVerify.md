@@ -22,9 +22,9 @@
 
 1. **分析请求意图**：从 `$_GET['action']` 解析本次操作（不读取 POST body，避免消耗 `php://input` 导致后续无法获取文件内容）
 2. **映射到所需权限**：根据服务名与 action 映射到所需权限（如 `read_file` → `KERNEL_DISK_READ`）
-3. **程序权限检查**：从 `BootSecurityToken.json` 的 `programPermissionsMap[upid]` 读取程序声明的权限
+3. **程序权限检查**：从 `BootSecurityToken.json` 的 `programPermissionsMap[upid]` 读取该 upid 对应的**已授予权限**（由前端 register/update 同步，与 PermissionManager 一致）
    - 若 upid 未注册或已失效 → 拒绝
-   - 若程序未声明该所需权限 → 拒绝
+   - 若该 upid 的权限列表中不包含本次所需权限 → 拒绝
 4. **用户授权检查**：检查当前用户是否有权授予该权限
    - ADMIN / DEFAULT_ADMIN：可授予所有权限
    - USER：不能授予高风险权限（如 `PROCESS_MANAGE`、`CRYPT_*` 等）；可授予的权限需在 UserToken 的 `permissions` 列表中
