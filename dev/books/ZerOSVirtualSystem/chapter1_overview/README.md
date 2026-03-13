@@ -58,6 +58,46 @@
 
 完整启动流程图，本章要点回顾。
 
+## 本章小节速览（链接跳转）
+
+以下为本章所有小节的直达链接，便于快速定位。
+
+**1.1 内核的概念与歧义**  
+[1.1.1 什么是内核](section1_concept/1.1.1_什么是内核.md) · [1.1.2 内核的绝对化理解](section1_concept/1.1.2_内核的绝对化理解.md) · [1.1.3 为什么是 BootLoader 而非 Boot](section1_concept/1.1.3_为什么是BootLoader而非Boot.md) · [1.1.4 为什么内核结构与常见操作系统不一致](section1_concept/1.1.4_为什么内核结构与常见操作系统不一致.md) · [1.1.5 内核的多样形态](section1_concept/1.1.5_内核的多样形态.md) · [1.1.6 本书的定位](section1_concept/1.1.6_本书的定位.md) · [1.1.7 系统分层与启动机制](section1_concept/1.1.7_系统分层与启动机制.md)
+
+**1.2 日志系统**  
+[1.2.1 日志系统的作用](section2_logger/1.2.1_日志系统的作用.md) · [1.2.2 日志系统的核心能力](section2_logger/1.2.2_日志系统的核心能力.md) · [1.2.3 KernelLogger 实现](section2_logger/1.2.3_KernelLogger实现.md)
+
+**1.3 依赖配置**  
+[1.3.1 依赖配置的作用](section3_dependency/1.3.1_依赖配置的作用.md) · [1.3.2 依赖配置的核心概念](section3_dependency/1.3.2_依赖配置的核心概念.md) · [1.3.3 DependencyConfig 实现](section3_dependency/1.3.3_DependencyConfig实现.md)
+
+**1.4 对象池**  
+[1.4.1 对象池的作用](section4_pool/1.4.1_对象池的作用.md) · [1.4.2 对象池的核心概念](section4_pool/1.4.2_对象池的核心概念.md)
+
+**1.5 模块加载器**  
+[1.5.1 模块加载器的作用](section5_loader/1.5.1_模块加载器的作用.md) · [1.5.2 模块加载的核心概念](section5_loader/1.5.2_模块加载的核心概念.md) · [1.5.3 Starter 实现](section5_loader/1.5.3_Starter实现.md)
+
+**1.6 进程管理**  
+[1.6.1 进程管理的作用](section6_process/1.6.1_进程管理的作用.md) · [1.6.2 进程管理的核心概念](section6_process/1.6.2_进程管理的核心概念.md) · [1.6.3 ProcessManager 实现](section6_process/1.6.3_ProcessManager实现.md)
+
+**1.7 内存管理**  
+[1.7.1 内存管理的作用](section7_memory/1.7.1_内存管理的作用.md) · [1.7.2 内存管理的核心概念](section7_memory/1.7.2_内存管理的核心概念.md) · [1.7.3 MemoryManager 实现](section7_memory/1.7.3_MemoryManager实现.md)
+
+**1.8 文件系统**  
+[1.8.1 文件系统的作用](section8_filesystem/1.8.1_文件系统的作用.md) · [1.8.2 文件系统的核心概念](section8_filesystem/1.8.2_文件系统的核心概念.md) · [1.8.3 Disk 实现](section8_filesystem/1.8.3_Disk实现.md)
+
+**1.9 安全控制**  
+[1.9.1 安全控制的作用](section9_security/1.9.1_安全控制的作用.md) · [1.9.2 安全控制的核心概念](section9_security/1.9.2_安全控制的核心概念.md) · [1.9.3 PermissionManager 实现](section9_security/1.9.3_PermissionManager实现.md)
+
+**1.10 GUI 窗口管理**  
+[1.10.1 GUI 窗口管理的作用](section10_guimanager/1.10.1_GUI窗口管理的作用.md) · [1.10.2 GUI 窗口管理的核心概念](section10_guimanager/1.10.2_GUI窗口管理的核心概念.md) · [1.10.3 GUIManager 实现](section10_guimanager/1.10.3_GUIManager实现.md)
+
+**1.11 事件系统**  
+[1.11.1 事件系统的作用](section11_event/1.11.1_事件系统的作用.md) · [1.11.2 事件系统的核心概念](section11_event/1.11.2_事件系统的核心概念.md) · [1.11.3 EventManager 实现](section11_event/1.11.3_EventManager实现.md)
+
+**1.12 启动流程总结**  
+[1.12.1 启动流程概览](section12_summary/1.12.1_启动流程概览.md) · [1.12.2 模块协作关系](section12_summary/1.12.2_模块协作关系.md) · [1.12.3 流程图解析](section12_summary/1.12.3_流程图解析.md)
+
 ## 学习目标
 
 完成本章学习后，读者应能够：
@@ -69,4 +109,4 @@
 
 ---
 
-**[返回书籍目录](../README.md)** | **[下一章：Boot 引导层（待编写）](../chapter2_boot/README.md)**
+**[返回书籍目录](../README.md)** | **[下一章：Boot 引导层实现](../chapter2_boot_detailed/README.md)**
