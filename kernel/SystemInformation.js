@@ -82,6 +82,15 @@ class SystemInformation {
         SPRINGBOOT: 'SPRINGBOOT'
     };
     
+    static CPU_CONFIG = {
+        tokensPerSecond: 30,
+        maxQueueSize: 100,
+        enableScheduling: true,
+        netTokensPerSecond: 35,
+        netMaxQueueSize: 100,
+        enableNetScheduling: true
+    };
+    
     // 后端配置（可通过 LStorage 或环境变量配置）
     static _backendConfig = {
         type: SystemInformation.BACKEND_TYPE.PHP,
@@ -170,6 +179,22 @@ class SystemInformation {
         return SystemInformation._backendConfig.type === SystemInformation.BACKEND_TYPE.PHP ? '.php' : '';
     }
     
+    static getCpuConfig() {
+        return SystemInformation.CPU_CONFIG;
+    }
+
+    static setCpuConfig(config) {
+        if (config.tokensPerSecond !== undefined) {
+            SystemInformation.CPU_CONFIG.tokensPerSecond = Math.max(1, Math.min(1000, config.tokensPerSecond));
+        }
+        if (config.maxQueueSize !== undefined) {
+            SystemInformation.CPU_CONFIG.maxQueueSize = Math.max(10, Math.min(1000, config.maxQueueSize));
+        }
+        if (config.enableScheduling !== undefined) {
+            SystemInformation.CPU_CONFIG.enableScheduling = config.enableScheduling;
+        }
+    }
+
     /**
      * 获取服务完整路径（根据后端类型自动添加后缀）
      * @param {string} serviceName 服务名称（如 'FSDirve'）

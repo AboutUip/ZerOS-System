@@ -49,7 +49,8 @@
         "../kernel/process/applicationAssets.js": [],
         "../kernel/process/applicationAssetManager.js": ["../kernel/process/applicationAssets.js"],
         "../kernel/process/programCategories.js": [], // 程序类别配置（独立模块）
-        "../kernel/process/processManager.js": ["../kernel/memory/memoryManager.js", "../kernel/memory/kernelMemory.js", "../kernel/process/applicationAssetManager.js"],
+        "../kernel/process/resourceScheduler.js": [],
+        "../kernel/process/processManager.js": ["../kernel/memory/memoryManager.js", "../kernel/memory/kernelMemory.js", "../kernel/process/applicationAssetManager.js", "../kernel/process/resourceScheduler.js"],
         
         // 第六层：事件管理器（必须在其他使用事件的模块之前加载）
         "../system/ui/eventManager.js": ["../kernel/process/processManager.js"],

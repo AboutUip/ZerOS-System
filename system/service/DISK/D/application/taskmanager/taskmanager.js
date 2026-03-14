@@ -776,95 +776,209 @@
             panel.style.cssText = `
                 display: none;
                 overflow-y: auto;
-            `;
-            
-            // 内存使用图表
-            const memorySection = document.createElement('div');
-            memorySection.style.cssText = `
-                margin-bottom: 24px;
-            `;
-            
-            const memoryTitle = document.createElement('h3');
-            memoryTitle.textContent = this._getText('TASKMANAGER_MEMORY_USAGE', '内存使用');
-            memoryTitle.style.cssText = `
-                color: #e8ecf0;
-                font-size: 16px;
-                margin-bottom: 12px;
-            `;
-            memorySection.appendChild(memoryTitle);
-            
-            const memoryChart = document.createElement('div');
-            memoryChart.className = 'taskmanager-memory-chart';
-            memoryChart.style.cssText = `
-                background: rgba(108, 142, 255, 0.05);
-                border: 1px solid rgba(108, 142, 255, 0.2);
-                border-radius: 8px;
                 padding: 16px;
-                min-height: 200px;
+                background: #1a1d24;
             `;
-            memorySection.appendChild(memoryChart);
             
-            panel.appendChild(memorySection);
+            // ==================== CPU 面板 ====================
+            this._cpuHistory = { total: [], user: [], system: [], idle: [] };
+            const cpuSection = document.createElement('div');
+            cpuSection.style.cssText = 'margin-bottom: 16px;';
             
-            // 磁盘分区使用情况
+            // CPU 标题栏
+            const cpuHeader = document.createElement('div');
+            cpuHeader.style.cssText = 'display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;';
+            const cpuTitle = document.createElement('div');
+            cpuTitle.style.cssText = 'color: #e8ecf0; font-size: 14px; font-weight: 500;';
+            cpuTitle.textContent = 'CPU';
+            cpuHeader.appendChild(cpuTitle);
+            const cpuValue = document.createElement('div');
+            cpuValue.className = 'taskmanager-cpu-value';
+            cpuValue.style.cssText = 'color: #6c8eff; font-size: 24px; font-weight: 600; font-family: Consolas, monospace;';
+            cpuValue.textContent = '0%';
+            cpuHeader.appendChild(cpuValue);
+            cpuSection.appendChild(cpuHeader);
+            
+            // CPU 图表
+            const cpuChart = document.createElement('canvas');
+            cpuChart.className = 'taskmanager-cpu-chart';
+            cpuChart.style.cssText = 'width: 100%; height: 120px; background: rgba(30, 33, 40, 0.8); border-radius: 4px; border: 1px solid #2a2e38;';
+            cpuChart.width = 400;
+            cpuChart.height = 120;
+            cpuSection.appendChild(cpuChart);
+            this.cpuChart = cpuChart;
+            
+            // CPU 详细信息
+            const cpuDetail = document.createElement('div');
+            cpuDetail.className = 'taskmanager-cpu-detail';
+            cpuDetail.style.cssText = 'display: flex; gap: 24px; margin-top: 8px; flex-wrap: wrap;';
+            cpuDetail.innerHTML = `
+                <div style="color: #8da6ff; font-size: 12px;"><span style="color: #aab2c0;">进程:</span> <span class="cpu-procs">0</span></div>
+                <div style="color: #8da6ff; font-size: 12px;"><span style="color: #aab2c0;">速度:</span> <span class="cpu-speed">--</span></div>
+                <div style="color: #8da6ff; font-size: 12px;"><span style="color: #aab2c0;">使用率:</span> <span class="cpu-usage">0%</span></div>
+            `;
+            cpuSection.appendChild(cpuDetail);
+            panel.appendChild(cpuSection);
+            
+            // ==================== 内存面板 ====================
+            this._memHistory = { used: [], available: [], cached: [] };
+            const memSection = document.createElement('div');
+            memSection.style.cssText = 'margin-bottom: 16px;';
+            
+            const memHeader = document.createElement('div');
+            memHeader.style.cssText = 'display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;';
+            const memTitle = document.createElement('div');
+            memTitle.style.cssText = 'color: #e8ecf0; font-size: 14px; font-weight: 500;';
+            memTitle.textContent = '内存';
+            memHeader.appendChild(memTitle);
+            const memValue = document.createElement('div');
+            memValue.className = 'taskmanager-mem-value';
+            memValue.style.cssText = 'color: #34d399; font-size: 24px; font-weight: 600; font-family: Consolas, monospace;';
+            memValue.textContent = '0%';
+            memHeader.appendChild(memValue);
+            memSection.appendChild(memHeader);
+            
+            const memChart = document.createElement('canvas');
+            memChart.className = 'taskmanager-mem-chart';
+            memChart.style.cssText = 'width: 100%; height: 120px; background: rgba(30, 33, 40, 0.8); border-radius: 4px; border: 1px solid #2a2e38;';
+            memChart.width = 400;
+            memChart.height = 120;
+            memSection.appendChild(memChart);
+            this.memChart = memChart;
+            
+            const memDetail = document.createElement('div');
+            memDetail.className = 'taskmanager-mem-detail';
+            memDetail.style.cssText = 'display: flex; gap: 24px; margin-top: 8px; flex-wrap: wrap;';
+            memDetail.innerHTML = `
+                <div style="color: #34d399; font-size: 12px;"><span style="color: #aab2c0;">已用:</span> <span class="mem-used">0 MB</span></div>
+                <div style="color: #34d399; font-size: 12px;"><span style="color: #aab2c0;">可用:</span> <span class="mem-avail">0 MB</span></div>
+                <div style="color: #34d399; font-size: 12px;"><span style="color: #aab2c0;">缓存:</span> <span class="mem-cached">0 MB</span></div>
+            `;
+            memSection.appendChild(memDetail);
+            panel.appendChild(memSection);
+            
+            // ==================== 网络面板 ====================
+            this._netHistory = { sent: [], received: [], requests: [] };
+            const netSection = document.createElement('div');
+            netSection.style.cssText = 'margin-bottom: 16px;';
+            
+            const netHeader = document.createElement('div');
+            netHeader.style.cssText = 'display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;';
+            const netTitle = document.createElement('div');
+            netTitle.style.cssText = 'color: #e8ecf0; font-size: 14px; font-weight: 500;';
+            netTitle.textContent = '网络';
+            netHeader.appendChild(netTitle);
+            const netValue = document.createElement('div');
+            netValue.className = 'taskmanager-net-value';
+            netValue.style.cssText = 'color: #f472c6; font-size: 24px; font-weight: 600; font-family: Consolas, monospace;';
+            netValue.textContent = '0/s';
+            netHeader.appendChild(netValue);
+            netSection.appendChild(netHeader);
+            
+            const netChart = document.createElement('canvas');
+            netChart.className = 'taskmanager-net-chart';
+            netChart.style.cssText = 'width: 100%; height: 120px; background: rgba(30, 33, 40, 0.8); border-radius: 4px; border: 1px solid #2a2e38;';
+            netChart.width = 400;
+            netChart.height = 120;
+            netSection.appendChild(netChart);
+            this.netChart = netChart;
+            
+            const netDetail = document.createElement('div');
+            netDetail.className = 'taskmanager-net-detail';
+            netDetail.style.cssText = 'display: flex; gap: 24px; margin-top: 8px; flex-wrap: wrap;';
+            netDetail.innerHTML = `
+                <div style="color: #f472c6; font-size: 12px;"><span style="color: #aab2c0;">发送:</span> <span class="net-sent">0 KB/s</span></div>
+                <div style="color: #f472c6; font-size: 12px;"><span style="color: #aab2c0;">接收:</span> <span class="net-recv">0 KB/s</span></div>
+                <div style="color: #f472c6; font-size: 12px;"><span style="color: #aab2c0;">请求:</span> <span class="net-reqs">0/s</span></div>
+            `;
+            netSection.appendChild(netDetail);
+            panel.appendChild(netSection);
+            
+            // ==================== 磁盘面板 ====================
+            this._diskHistory = { read: [], write: [] };
             const diskSection = document.createElement('div');
-            diskSection.style.cssText = `
-                margin-bottom: 24px;
-            `;
+            diskSection.style.cssText = 'margin-bottom: 16px;';
             
-            const diskTitle = document.createElement('h3');
-            diskTitle.textContent = this._getText('TASKMANAGER_DISK_PARTITIONS', '磁盘分区');
-            diskTitle.style.cssText = `
-                color: #e8ecf0;
-                font-size: 16px;
-                margin-bottom: 12px;
-            `;
-            diskSection.appendChild(diskTitle);
+            const diskHeader = document.createElement('div');
+            diskHeader.style.cssText = 'display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;';
+            const diskTitle = document.createElement('div');
+            diskTitle.style.cssText = 'color: #e8ecf0; font-size: 14px; font-weight: 500;';
+            diskTitle.textContent = '磁盘';
+            diskHeader.appendChild(diskTitle);
+            const diskValue = document.createElement('div');
+            diskValue.className = 'taskmanager-disk-value';
+            diskValue.style.cssText = 'color: #fbbf24; font-size: 24px; font-weight: 600; font-family: Consolas, monospace;';
+            diskValue.textContent = '0 MB/s';
+            diskHeader.appendChild(diskValue);
+            diskSection.appendChild(diskHeader);
             
-            const diskChart = document.createElement('div');
+            const diskChart = document.createElement('canvas');
             diskChart.className = 'taskmanager-disk-chart';
-            diskChart.style.cssText = `
-                background: rgba(108, 142, 255, 0.05);
-                border: 1px solid rgba(108, 142, 255, 0.2);
-                border-radius: 8px;
-                padding: 16px;
-                min-height: 150px;
-            `;
+            diskChart.style.cssText = 'width: 100%; height: 120px; background: rgba(30, 33, 40, 0.8); border-radius: 4px; border: 1px solid #2a2e38;';
+            diskChart.width = 400;
+            diskChart.height = 120;
             diskSection.appendChild(diskChart);
+            this.diskChart = diskChart;
             
+            const diskDetail = document.createElement('div');
+            diskDetail.className = 'taskmanager-disk-detail';
+            diskDetail.style.cssText = 'display: flex; gap: 24px; margin-top: 8px; flex-wrap: wrap;';
+            diskDetail.innerHTML = `
+                <div style="color: #fbbf24; font-size: 12px;"><span style="color: #aab2c0;">读取:</span> <span class="disk-read">0 MB/s</span></div>
+                <div style="color: #fbbf24; font-size: 12px;"><span style="color: #aab2c0;">写入:</span> <span class="disk-write">0 MB/s</span></div>
+            `;
+            diskSection.appendChild(diskDetail);
             panel.appendChild(diskSection);
             
-            // 宿主性能 (Node)：仅当 Node 脚本服务启用时显示，曲线图 + 百分比/详细数据，不持久化
-            this._perfHistory = { cpu: [], mem: [], gpu: [] };
-            const nodePerfSection = document.createElement('div');
-            nodePerfSection.className = 'taskmanager-node-perf-section';
-            nodePerfSection.style.cssText = 'margin-bottom: 24px;';
-            const nodePerfTitle = document.createElement('h3');
-            nodePerfTitle.textContent = this._getText('TASKMANAGER_NODE_PERF', '宿主性能 (Node)');
-            nodePerfTitle.style.cssText = 'color: #e8ecf0; font-size: 16px; margin-bottom: 12px;';
-            nodePerfSection.appendChild(nodePerfTitle);
-            const nodePerfPanel = document.createElement('div');
-            nodePerfPanel.className = 'taskmanager-node-perf-panel';
-            nodePerfPanel.style.cssText = 'background: rgba(108, 142, 255, 0.05); border: 1px solid rgba(108, 142, 255, 0.2); border-radius: 8px; padding: 16px; min-height: 120px;';
-            const nodePerfPlaceholder = document.createElement('div');
-            nodePerfPlaceholder.className = 'taskmanager-node-perf-placeholder';
-            nodePerfPlaceholder.style.cssText = 'color: #aab2c0; font-size: 13px; text-align: center; padding: 24px;';
-            nodePerfPlaceholder.textContent = this._getText('TASKMANAGER_NODE_PERF_DISABLED', '请先启动 Node 脚本服务 (nodeLib) 以显示宿主 CPU/GPU 等指标');
-            const nodePerfContainer = document.createElement('div');
-            nodePerfContainer.className = 'taskmanager-node-perf-container';
-            nodePerfContainer.style.cssText = 'display: none;';
-            nodePerfPanel.appendChild(nodePerfPlaceholder);
-            nodePerfPanel.appendChild(nodePerfContainer);
-            nodePerfSection.appendChild(nodePerfPanel);
-            panel.appendChild(nodePerfSection);
-            this.nodePerfPanel = nodePerfPanel;
-            this.nodePerfPlaceholder = nodePerfPlaceholder;
-            this.nodePerfContainer = nodePerfContainer;
+            // ==================== 资源调度面板 ====================
+            this._schedCpuHistory = { total: [], byProcess: {} };
+            this._schedNetHistory = { total: [], byProcess: {} };
+            
+            const schedSection = document.createElement('div');
+            schedSection.style.cssText = 'margin-bottom: 16px;';
+            
+            const schedHeader = document.createElement('div');
+            schedHeader.style.cssText = 'display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;';
+            const schedTitle = document.createElement('div');
+            schedTitle.style.cssText = 'color: #e8ecf0; font-size: 14px; font-weight: 500;';
+            schedTitle.textContent = '资源调度 (API 限流)';
+            schedHeader.appendChild(schedTitle);
+            const schedValue = document.createElement('div');
+            schedValue.className = 'taskmanager-sched-value';
+            schedValue.style.cssText = 'color: #a78bfa; font-size: 24px; font-weight: 600; font-family: Consolas, monospace;';
+            schedValue.textContent = '0/s';
+            schedHeader.appendChild(schedValue);
+            schedSection.appendChild(schedHeader);
+            
+            // CPU 调度图表
+            const schedCpuChart = document.createElement('div');
+            schedCpuChart.style.cssText = 'display: flex; gap: 8px; margin-bottom: 8px;';
+            schedCpuChart.innerHTML = `
+                <div style="flex: 1;">
+                    <div style="color: #8da6ff; font-size: 11px; margin-bottom: 4px;">CPU 调度</div>
+                    <canvas class="sched-cpu-canvas" style="width: 100%; height: 60px; background: rgba(30, 33, 40, 0.8); border-radius: 4px; border: 1px solid #2a2e38;"></canvas>
+                </div>
+                <div style="flex: 1;">
+                    <div style="color: #34d399; font-size: 11px; margin-bottom: 4px;">网络调度</div>
+                    <canvas class="sched-net-canvas" style="width: 100%; height: 60px; background: rgba(30, 33, 40, 0.8); border-radius: 4px; border: 1px solid #2a2e38;"></canvas>
+                </div>
+            `;
+            schedSection.appendChild(schedCpuChart);
+            
+            const schedDetail = document.createElement('div');
+            schedDetail.className = 'taskmanager-sched-detail';
+            schedDetail.style.cssText = 'display: flex; gap: 24px; flex-wrap: wrap; font-size: 11px;';
+            schedDetail.innerHTML = `
+                <div style="color: #8da6ff;"><span style="color: #aab2c0;">令牌:</span> <span class="sched-cpu-tokens">20</span>/s</div>
+                <div style="color: #8da6ff;"><span style="color: #aab2c0;">队列:</span> <span class="sched-cpu-queue">0</span></div>
+                <div style="color: #34d399;"><span style="color: #aab2c0;">网络令牌:</span> <span class="sched-net-tokens">35</span>/s</div>
+                <div style="color: #34d399;"><span style="color: #aab2c0;">网络队列:</span> <span class="sched-net-queue">0</span></div>
+            `;
+            schedSection.appendChild(schedDetail);
+            panel.appendChild(schedSection);
             
             // 存储引用
             this.resourceMonitorPanel = panel;
-            this.memoryChart = memoryChart;
-            this.diskChart = diskChart;
             
             return panel;
         },
@@ -2550,187 +2664,471 @@
         },
         
         _updateResourceMonitor: function() {
-            if (!this.memoryChart) return;
+            if (!this.resourceMonitorPanel) return;
             
-            // 获取所有进程的内存信息
+            // 初始化历史数组
+            this._memHistory = this._memHistory || { used: [] };
+            this._netHistory = this._netHistory || { requests: [] };
+            this._schedCpuHistory = this._schedCpuHistory || { total: [] };
+            this._schedNetHistory = this._schedNetHistory || { total: [] };
+            
+            const rs = (typeof ResourceScheduler !== 'undefined') ? ResourceScheduler : null;
+            
+            // 获取内存数据
             const processes = ProcessManager.listProcesses();
             let totalHeap = 0;
             let totalShed = 0;
             
-            // 调试：记录获取到的内存信息
-            const debugInfo = [];
-            
             processes.forEach(process => {
-                let memInfo = null;
-                
-                // 尝试从 process.memoryInfo 获取
                 if (process.memoryInfo) {
-                    memInfo = process.memoryInfo;
-                    if (memInfo.programs && memInfo.programs.length > 0) {
-                        memInfo = memInfo.programs[0];
+                    const memInfo = process.memoryInfo.programs ? process.memoryInfo.programs[0] : process.memoryInfo;
+                    if (memInfo) {
+                        totalHeap += parseInt(memInfo.totalHeapSize) || 0;
+                        totalShed += parseInt(memInfo.totalShedSize) || 0;
                     }
-                } else {
-                    // 如果 process.memoryInfo 不存在，尝试直接获取
-                    if (typeof MemoryManager !== 'undefined') {
-                        try {
-                            // 对于Exploit程序，确保内存已分配
-                            if (process.pid === 10000 && typeof KernelMemory !== 'undefined') {
-                                try {
-                                    KernelMemory._ensureMemory();
-                                } catch (e) {
-                                    // 忽略错误
-                                }
-                            }
-                            const memoryResult = MemoryManager.checkMemory(process.pid);
-                            if (memoryResult) {
-                                // MemoryManager.checkMemory 返回 { totalPrograms, programs: [...] }
-                                if (memoryResult.programs && memoryResult.programs.length > 0) {
-                                    memInfo = memoryResult.programs[0];
-                                } else if (memoryResult.pid === process.pid) {
-                                    // 如果直接返回程序信息（不应该发生，但兼容处理）
-                                    memInfo = memoryResult;
-                                }
-                            }
-                        } catch (e) {
-                            // 静默处理，避免日志过多
-                            debugInfo.push(`PID ${process.pid}: 获取失败 - ${e.message}`);
-                        }
-                    }
-                }
-                
-                if (memInfo) {
-                    // 确保使用数字值，而不是字符串
-                    const heapSize = typeof memInfo.totalHeapSize === 'number' ? memInfo.totalHeapSize : 
-                                    (typeof memInfo.totalHeapSize === 'string' ? parseInt(memInfo.totalHeapSize, 10) || 0 : 0);
-                    const shedSize = typeof memInfo.totalShedSize === 'number' ? memInfo.totalShedSize : 
-                                   (typeof memInfo.totalShedSize === 'string' ? parseInt(memInfo.totalShedSize, 10) || 0 : 0);
-                    totalHeap += heapSize;
-                    totalShed += shedSize;
-                    debugInfo.push(`PID ${process.pid} (${process.programName}): 堆=${heapSize}, 栈=${shedSize}`);
-                } else {
-                    debugInfo.push(`PID ${process.pid} (${process.programName}): 无内存信息`);
                 }
             });
             
-            // 移除调试输出，避免日志过多
+            const totalMem = totalHeap + totalShed;
+            const memUsedMB = totalMem / (1024 * 1024);
             
-            // 更新内存图表
-            this.memoryChart.innerHTML = `
-                <div style="display: flex; flex-direction: column; gap: 12px;">
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <span style="color: #aab2c0; font-size: 13px;">堆内存</span>
-                        <span style="color: #6c8eff; font-size: 14px; font-weight: 600;">${this._formatBytes(totalHeap)}</span>
-                    </div>
-                    <div style="height: 8px; background: rgba(108, 142, 255, 0.1); border-radius: 4px; overflow: hidden;">
-                        <div style="height: 100%; width: ${Math.min(100, (totalHeap / (1024 * 1024 * 100)) * 100)}%; background: linear-gradient(90deg, #6c8eff, #8da6ff); transition: width 0.3s;"></div>
-                    </div>
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <span style="color: #aab2c0; font-size: 13px;">栈内存</span>
-                        <span style="color: #6c8eff; font-size: 14px; font-weight: 600;">${this._formatBytes(totalShed)}</span>
-                    </div>
-                    <div style="height: 8px; background: rgba(108, 142, 255, 0.1); border-radius: 4px; overflow: hidden;">
-                        <div style="height: 100%; width: ${Math.min(100, (totalShed / (1024 * 1024 * 50)) * 100)}%; background: linear-gradient(90deg, #6c8eff, #8da6ff); transition: width 0.3s;"></div>
-                    </div>
-                    <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(108, 142, 255, 0.1);">
-                        <div style="color: #aab2c0; font-size: 12px; margin-bottom: 8px;">进程内存详情</div>
-                        <div style="display: flex; flex-direction: column; gap: 6px; max-height: 200px; overflow-y: auto;">
-                            ${processes.map(p => {
-                                let pmemInfo = null;
-                                if (p.memoryInfo) {
-                                    pmemInfo = p.memoryInfo;
-                                    if (pmemInfo.programs && pmemInfo.programs.length > 0) {
-                                        pmemInfo = pmemInfo.programs[0];
-                                    }
-                                } else if (typeof MemoryManager !== 'undefined') {
-                                    try {
-                                        if (p.pid === 10000 && typeof KernelMemory !== 'undefined') {
-                                            try { KernelMemory._ensureMemory(); } catch(e) {}
-                                        }
-                                        const mr = MemoryManager.checkMemory(p.pid);
-                                        if (mr && mr.programs && mr.programs.length > 0) {
-                                            pmemInfo = mr.programs[0];
-                                        }
-                                    } catch(e) {}
-                                }
-                                const pheap = pmemInfo ? (typeof pmemInfo.totalHeapSize === 'number' ? pmemInfo.totalHeapSize : parseInt(pmemInfo.totalHeapSize, 10) || 0) : 0;
-                                return `<div style="display: flex; justify-content: space-between; font-size: 11px; color: #aab2c0;">
-                                    <span>${p.programName || `PID ${p.pid}`}</span>
-                                    <span style="color: #8da6ff;">${this._formatBytes(pheap)}</span>
-                                </div>`;
-                            }).join('')}
-                        </div>
-                    </div>
-                </div>
-            `;
+            // 更新内存历史
+            this._memHistory.used.push(memUsedMB);
+            if (this._memHistory.used.length > 120) this._memHistory.used.shift();
             
-            // 更新磁盘分区图表（从 PHP 服务实时获取）
-            if (this.diskChart) {
-                this._updateDiskChart();
+            // 绘制内存图表
+            const memChart = this.resourceMonitorPanel.querySelector('.taskmanager-mem-chart');
+            if (memChart) {
+                this._drawSimpleChart(memChart, this._memHistory.used, '#34d399', 120);
             }
-            // 宿主性能 (Node)：仅服务启用时更新并绘制，不持久化
-            this._updateNodePerfPanel();
+            
+            // 更新内存值显示
+            const memValue = this.resourceMonitorPanel.querySelector('.taskmanager-mem-value');
+            if (memValue) memValue.textContent = memUsedMB.toFixed(1) + ' MB';
+            
+            // 更新内存详情
+            const memDetail = this.resourceMonitorPanel.querySelector('.taskmanager-mem-detail');
+            if (memDetail) {
+                const usedEl = memDetail.querySelector('.mem-used');
+                const availEl = memDetail.querySelector('.mem-avail');
+                if (usedEl) usedEl.textContent = memUsedMB.toFixed(1) + ' MB';
+                if (availEl) availEl.textContent = ((8 * 1024) - memUsedMB).toFixed(1) + ' MB';
+            }
+            
+            // 更新 CPU 详情
+            const cpuDetail = this.resourceMonitorPanel.querySelector('.taskmanager-cpu-detail');
+            if (cpuDetail) {
+                const procsEl = cpuDetail.querySelector('.cpu-procs');
+                const usageEl = cpuDetail.querySelector('.cpu-usage');
+                if (procsEl) procsEl.textContent = processes.length;
+                if (usageEl) usageEl.textContent = '0%';
+            }
+            
+            // 更新网络历史（从 ResourceScheduler）
+            if (rs && rs.getNetStats) {
+                const netStats = rs.getNetStats();
+                const reqPerSec = netStats.totalCalls || 0;
+                
+                this._netHistory.requests.push(reqPerSec);
+                if (this._netHistory.requests.length > 120) this._netHistory.requests.shift();
+                
+                const netChart = this.resourceMonitorPanel.querySelector('.taskmanager-net-chart');
+                if (netChart) {
+                    this._drawSimpleChart(netChart, this._netHistory.requests, '#f472c6', 120);
+                }
+                
+                const netValue = this.resourceMonitorPanel.querySelector('.taskmanager-net-value');
+                if (netValue) netValue.textContent = reqPerSec + '/s';
+                
+                const netDetail = this.resourceMonitorPanel.querySelector('.taskmanager-net-detail');
+                if (netDetail) {
+                    const reqsEl = netDetail.querySelector('.net-reqs');
+                    if (reqsEl) reqsEl.textContent = reqPerSec + '/s';
+                }
+            }
+            
+            // 更新 CPU 调度面板
+            this._updateSchedCpuPanel();
+            this._updateSchedNetPanel();
+            this._updatePerfCharts();
         },
         
-        _updateNodePerfPanel: function() {
-            if (!this.nodePerfPanel || !this.nodePerfPlaceholder || !this.nodePerfContainer) return;
-            const nodeLib = (typeof POOL !== 'undefined' && typeof POOL.__GET__ === 'function') ? POOL.__GET__('SERVER', 'NodeLib') : null;
-            if (!nodeLib || typeof nodeLib.run !== 'function') {
-                this.nodePerfPlaceholder.style.display = 'block';
-                this.nodePerfContainer.style.display = 'none';
-                this.nodePerfPlaceholder.textContent = this._getText('TASKMANAGER_NODE_PERF_DISABLED', '请先启动 Node 脚本服务 (nodeLib) 以显示宿主 CPU/GPU 等指标');
+        _updatePerfCharts: function() {
+            if (!this.resourceMonitorPanel) return;
+            
+            const rs = (typeof ResourceScheduler !== 'undefined') ? ResourceScheduler : null;
+            
+            // 更新 CPU 调度图表
+            if (rs && rs.getCpuUsage && rs.isSchedulingEnabled && rs.isSchedulingEnabled()) {
+                const cpuUsage = rs.getCpuUsage();
+                const stats = rs.getStats();
+                
+                const schedCpuCanvas = this.resourceMonitorPanel.querySelector('.sched-cpu-canvas');
+                if (schedCpuCanvas) {
+                    // 计算过去1秒内的调用次数
+                    const now = Date.now();
+                    const history = rs.getHistory ? rs.getHistory() : [];
+                    const recentCalls = history.filter(h => now - h.timestamp < 1000).length;
+                    
+                    const cpuPercent = rs.CONFIG ? (recentCalls / rs.CONFIG.tokensPerSecond * 100) : 0;
+                    
+                    this._schedCpuHistory.total.push(cpuPercent);
+                    if (this._schedCpuHistory.total.length > 120) this._schedCpuHistory.total.shift();
+                    
+                    this._drawSimpleChart(schedCpuCanvas, this._schedCpuHistory.total, '#8da6ff', 60);
+                    
+                    const cpuValue = this.resourceMonitorPanel.querySelector('.taskmanager-cpu-value');
+                    if (cpuValue) cpuValue.textContent = recentCalls + '/s';
+                    
+                    const detail = this.resourceMonitorPanel.querySelector('.taskmanager-sched-detail');
+                    if (detail) {
+                        const tokensEl = detail.querySelector('.sched-cpu-tokens');
+                        const queueEl = detail.querySelector('.sched-cpu-queue');
+                        if (tokensEl) tokensEl.textContent = rs.CONFIG.tokensPerSecond;
+                        if (queueEl) queueEl.textContent = stats.queueLength;
+                    }
+                }
+            }
+            
+            // 更新网络调度图表
+            if (rs && rs.getNetUsage && rs.isNetSchedulingEnabled && rs.isNetSchedulingEnabled()) {
+                const netUsage = rs.getNetUsage();
+                const stats = rs.getNetStats();
+                const schedNetCanvas = this.resourceMonitorPanel.querySelector('.sched-net-canvas');
+                
+                if (schedNetCanvas) {
+                    // 计算过去1秒内的网络调用次数
+                    const now = Date.now();
+                    const netHistory = rs._netHistory || [];
+                    const recentCalls = netHistory.filter(h => now - h.timestamp < 1000).length;
+                    
+                    const netPercent = rs.NET_CONFIG ? (recentCalls / rs.NET_CONFIG.tokensPerSecond * 100) : 0;
+                    
+                    this._schedNetHistory.total.push(netPercent);
+                    if (this._schedNetHistory.total.length > 120) this._schedNetHistory.total.shift();
+                    
+                    this._drawSimpleChart(schedNetCanvas, this._schedNetHistory.total, '#34d399', 60);
+                    
+                    const netValue = this.resourceMonitorPanel.querySelector('.taskmanager-net-value');
+                    if (netValue) netValue.textContent = recentCalls + '/s';
+                    
+                    const detail = this.resourceMonitorPanel.querySelector('.taskmanager-sched-detail');
+                    if (detail) {
+                        const tokensEl = detail.querySelector('.sched-net-tokens');
+                        const queueEl = detail.querySelector('.sched-net-queue');
+                        if (tokensEl) tokensEl.textContent = rs.NET_CONFIG.tokensPerSecond;
+                        if (queueEl) queueEl.textContent = stats.queueLength;
+                    }
+                }
+            }
+        },
+        
+        _drawSimpleChart: function(canvas, data, color, height) {
+            if (!canvas || !data || data.length === 0) return;
+            const ctx = canvas.getContext('2d');
+            const w = canvas.width || 400;
+            const h = height || 120;
+            ctx.clearRect(0, 0, w, h);
+            
+            // 绘制坐标系背景
+            ctx.fillStyle = 'rgba(30, 33, 40, 0.8)';
+            ctx.fillRect(0, 0, w, h);
+            
+            // 绘制网格线
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+            ctx.lineWidth = 0.5;
+            for (let i = 0; i <= 4; i++) {
+                const y = (h / 4) * i;
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(w, y);
+                ctx.stroke();
+            }
+            
+            // 绘制Y轴标签
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+            ctx.font = '9px Consolas, monospace';
+            
+            // 找到最大值用于缩放
+            const maxVal = Math.max(...data, 1);
+            const maxDisplay = Math.ceil(maxVal);
+            
+            ctx.fillText(maxDisplay.toString(), 2, 10);
+            ctx.fillText('0', 2, h - 2);
+            
+            // 绘制数据曲线
+            if (data.length > 1) {
+                ctx.strokeStyle = color;
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                
+                const step = w / Math.max(1, data.length - 1);
+                for (let i = 0; i < data.length; i++) {
+                    const x = i * step;
+                    const y = h - (data[i] / maxDisplay) * h * 0.95; // 使用最大值进行缩放
+                    
+                    if (i === 0) {
+                        ctx.moveTo(x, y);
+                    } else {
+                        ctx.lineTo(x, y);
+                    }
+                }
+                ctx.stroke();
+            }
+        },
+        
+        _updateSchedCpuPanel: function() {
+            if (!this.schedCpuPanel || !this.schedCpuPlaceholder || !this.schedCpuContainer) return;
+            
+            const rs = (typeof ResourceScheduler !== 'undefined') ? ResourceScheduler : null;
+            if (!rs || typeof rs.isSchedulingEnabled !== 'function' || !rs.isSchedulingEnabled()) {
+                this.schedCpuPlaceholder.style.display = 'block';
+                this.schedCpuContainer.style.display = 'none';
+                this.schedCpuPlaceholder.textContent = this._getText('TASKMANAGER_SCHED_CPU_DISABLED', '资源调度器未启用，暂无 CPU 占用数据');
                 return;
             }
-            this.nodePerfPlaceholder.style.display = 'none';
-            this.nodePerfContainer.style.display = 'block';
-            nodeLib.run('perf').then((function(result) {
-                const payload = result && result.data && result.data.data ? result.data.data : null;
-                const stdout = payload && typeof payload.stdout === 'string' ? payload.stdout : null;
-                if (!result || !result.success || !stdout) {
-                    this.nodePerfContainer.innerHTML = '<div style="color:#aab2c0;font-size:12px;">perf 数据不可用</div>';
-                    return;
+            
+            this.schedCpuPlaceholder.style.display = 'none';
+            this.schedCpuContainer.style.display = 'block';
+            
+            try {
+                const cpuUsage = rs.getCpuUsage();
+                const stats = rs.getStats();
+                const maxLen = 60;
+                
+                // 计算总 CPU 占用
+                let totalCpu = 0;
+                const pids = Object.keys(cpuUsage);
+                if (pids.length > 0) {
+                    pids.forEach(pid => {
+                        totalCpu += parseFloat(cpuUsage[pid].percentage) || 0;
+                    });
                 }
-                try {
-                    const data = JSON.parse(stdout);
-                    const maxLen = 60;
-                    const os = data.os || {};
-                    const process = data.process || {};
-                    const si = data.si || {};
-                    let cpuPct = null;
-                    if (si.currentLoad && typeof si.currentLoad.currentLoad === 'number') {
-                        cpuPct = si.currentLoad.currentLoad;
-                    } else if (Array.isArray(os.loadavg) && os.loadavg.length > 0 && os.cpusCount) {
-                        cpuPct = Math.min(100, (os.loadavg[0] / Math.max(1, os.cpusCount)) * 100);
-                    }
-                    let memPct = null;
-                    if (os.totalmem > 0 && typeof os.freemem === 'number') {
-                        memPct = (1 - os.freemem / os.totalmem) * 100;
-                    } else if (si.mem && si.mem.total > 0 && si.mem.used != null) {
-                        memPct = (si.mem.used / si.mem.total) * 100;
-                    }
-                    let gpuPct = null;
-                    if (si.graphics && si.graphics.controllers && si.graphics.controllers.length > 0) {
-                        const g = si.graphics.controllers[0];
-                        gpuPct = typeof g.utilizationGpu === 'number' ? g.utilizationGpu : (typeof g.utilizationGPU === 'number' ? g.utilizationGPU : null);
-                    }
-                    if (cpuPct != null) {
-                        this._perfHistory.cpu.push(cpuPct);
-                        if (this._perfHistory.cpu.length > maxLen) this._perfHistory.cpu.shift();
-                    }
-                    if (memPct != null) {
-                        this._perfHistory.mem.push(memPct);
-                        if (this._perfHistory.mem.length > maxLen) this._perfHistory.mem.shift();
-                    }
-                    if (gpuPct != null) {
-                        this._perfHistory.gpu.push(gpuPct);
-                        if (this._perfHistory.gpu.length > maxLen) this._perfHistory.gpu.shift();
-                    }
-                    this._drawNodePerfPanel(data);
-                } catch (e) {
-                    this.nodePerfContainer.innerHTML = '<div style="color:#f87171;font-size:12px;">解析失败: ' + (e.message || '') + '</div>';
+                totalCpu = Math.min(100, totalCpu);
+                
+                // 更新历史记录
+                this._schedCpuHistory.total.push(totalCpu);
+                if (this._schedCpuHistory.total.length > maxLen) {
+                    this._schedCpuHistory.total.shift();
                 }
-            }).bind(this)).catch((function() {
-                this.nodePerfContainer.innerHTML = '<div style="color:#aab2c0;font-size:12px;">获取宿主性能数据失败</div>';
-            }).bind(this));
+                
+                // 更新每个进程的 CPU 历史
+                pids.forEach(pid => {
+                    if (!this._schedCpuHistory.byProcess[pid]) {
+                        this._schedCpuHistory.byProcess[pid] = [];
+                    }
+                    const pct = parseFloat(cpuUsage[pid].percentage) || 0;
+                    this._schedCpuHistory.byProcess[pid].push(pct);
+                    if (this._schedCpuHistory.byProcess[pid].length > maxLen) {
+                        this._schedCpuHistory.byProcess[pid].shift();
+                    }
+                });
+                
+                // 绘制曲线
+                this._drawSchedCpuPanel(cpuUsage, stats, rs);
+            } catch (e) {
+                this.schedCpuContainer.innerHTML = '<div style="color:#f87171;font-size:12px;">获取 CPU 数据失败: ' + (e.message || '') + '</div>';
+            }
+        },
+        
+        _drawSchedCpuPanel: function(cpuUsage, stats, rs) {
+            if (!this.schedCpuContainer) return;
+            
+            const w = 280;
+            const h = 56;
+            const stroke = '#6c8eff';
+            const fill = 'rgba(108, 142, 255, 0.15)';
+            
+            let curvesDiv = this.schedCpuContainer.querySelector('.taskmanager-sched-cpu-curves');
+            if (!curvesDiv) {
+                curvesDiv = document.createElement('div');
+                curvesDiv.className = 'taskmanager-sched-cpu-curves';
+                curvesDiv.style.cssText = 'margin-bottom:12px;';
+                this.schedCpuContainer.appendChild(curvesDiv);
+            }
+            curvesDiv.innerHTML = '';
+            
+            const addCurve = (title, history, currentVal) => {
+                if (!history || history.length === 0) return;
+                const curveWrapper = document.createElement('div');
+                curveWrapper.style.cssText = 'margin-bottom:8px;';
+                const titleSpan = document.createElement('span');
+                titleSpan.style.cssText = 'color:#aab2c0;font-size:12px;display:inline-block;width:80px;';
+                titleSpan.textContent = title;
+                curveWrapper.appendChild(titleSpan);
+                const pctSpan = document.createElement('span');
+                pctSpan.style.cssText = 'color:#e8ecf0;font-size:12px;font-family:monospace;margin-right:8px;';
+                pctSpan.textContent = (currentVal != null ? currentVal.toFixed(1) : '0.0') + '%';
+                curveWrapper.appendChild(pctSpan);
+                const canvas = document.createElement('canvas');
+                canvas.width = w;
+                canvas.height = h;
+                canvas.style.cssText = 'vertical-align:middle;';
+                curveWrapper.appendChild(canvas);
+                curvesDiv.appendChild(curveWrapper);
+                
+                const ctx = canvas.getContext('2d');
+                ctx.clearRect(0, 0, w, h);
+                ctx.strokeStyle = stroke;
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                const step = w / Math.max(1, history.length - 1);
+                history.forEach((val, i) => {
+                    const x = i * step;
+                    const y = h - (Math.min(100, val) / 100) * h;
+                    if (i === 0) ctx.moveTo(x, y);
+                    else ctx.lineTo(x, y);
+                });
+                ctx.stroke();
+            };
+            
+            // 绘制总 CPU 曲线
+            const totalCpu = this._schedCpuHistory.total.length > 0 
+                ? this._schedCpuHistory.total[this._schedCpuHistory.total.length - 1] 
+                : 0;
+            addCurve(this._getText('TASKMANAGER_TOTAL_CPU', '总 CPU'), this._schedCpuHistory.total, totalCpu);
+            
+            // 绘制各进程 CPU
+            const pids = Object.keys(cpuUsage).slice(0, 5); // 最多显示5个进程
+            pids.forEach(pid => {
+                const procHistory = this._schedCpuHistory.byProcess[pid] || [];
+                const currentVal = cpuUsage[pid] ? parseFloat(cpuUsage[pid].percentage) : 0;
+                addCurve(`PID ${pid}`, procHistory, currentVal);
+            });
+            
+            // 显示统计信息
+            let detailDiv = this.schedCpuContainer.querySelector('.taskmanager-sched-cpu-detail');
+            if (!detailDiv) {
+                detailDiv = document.createElement('div');
+                detailDiv.className = 'taskmanager-sched-cpu-detail';
+                detailDiv.style.cssText = 'color:#aab2c0;font-size:11px;margin-top:8px;';
+                this.schedCpuContainer.appendChild(detailDiv);
+            }
+            detailDiv.innerHTML = '';
+            detailDiv.innerHTML += `<div>令牌:${stats.tokens}/${rs.CONFIG.tokensPerSecond}/s 队列:${stats.queueLength}/${stats.totalCalls}次</div>`;
+        },
+        
+        _updateSchedNetPanel: function() {
+            if (!this.schedNetPanel || !this.schedNetPlaceholder || !this.schedNetContainer) return;
+            
+            const rs = (typeof ResourceScheduler !== 'undefined') ? ResourceScheduler : null;
+            if (!rs || typeof rs.isNetSchedulingEnabled !== 'function' || !rs.isNetSchedulingEnabled()) {
+                this.schedNetPlaceholder.style.display = 'block';
+                this.schedNetContainer.style.display = 'none';
+                this.schedNetPlaceholder.textContent = this._getText('TASKMANAGER_SCHED_NET_DISABLED', '网络调度器未启用，暂无请求数据');
+                return;
+            }
+            
+            this.schedNetPlaceholder.style.display = 'none';
+            this.schedNetContainer.style.display = 'block';
+            
+            try {
+                const netUsage = rs.getNetUsage();
+                const stats = rs.getNetStats();
+                const maxLen = 60;
+                
+                let totalNet = 0;
+                const pids = Object.keys(netUsage);
+                if (pids.length > 0) {
+                    pids.forEach(pid => {
+                        totalNet += parseFloat(netUsage[pid].percentage) || 0;
+                    });
+                }
+                totalNet = Math.min(100, totalNet);
+                
+                this._schedNetHistory.total.push(totalNet);
+                if (this._schedNetHistory.total.length > maxLen) {
+                    this._schedNetHistory.total.shift();
+                }
+                
+                pids.forEach(pid => {
+                    if (!this._schedNetHistory.byProcess[pid]) {
+                        this._schedNetHistory.byProcess[pid] = [];
+                    }
+                    const pct = parseFloat(netUsage[pid].percentage) || 0;
+                    this._schedNetHistory.byProcess[pid].push(pct);
+                    if (this._schedNetHistory.byProcess[pid].length > maxLen) {
+                        this._schedNetHistory.byProcess[pid].shift();
+                    }
+                });
+                
+                this._drawSchedNetPanel(netUsage, stats, rs);
+            } catch (e) {
+                this.schedNetContainer.innerHTML = '<div style="color:#f87171;font-size:12px;">获取网络数据失败: ' + (e.message || '') + '</div>';
+            }
+        },
+        
+        _drawSchedNetPanel: function(netUsage, stats, rs) {
+            if (!this.schedNetContainer) return;
+            
+            const w = 280;
+            const h = 56;
+            const stroke = '#34d399';
+            
+            let curvesDiv = this.schedNetContainer.querySelector('.taskmanager-sched-net-curves');
+            if (!curvesDiv) {
+                curvesDiv = document.createElement('div');
+                curvesDiv.className = 'taskmanager-sched-net-curves';
+                curvesDiv.style.cssText = 'margin-bottom:12px;';
+                this.schedNetContainer.appendChild(curvesDiv);
+            }
+            curvesDiv.innerHTML = '';
+            
+            const addCurve = (title, history, currentVal) => {
+                if (!history || history.length === 0) return;
+                const curveWrapper = document.createElement('div');
+                curveWrapper.style.cssText = 'margin-bottom:8px;';
+                const titleSpan = document.createElement('span');
+                titleSpan.style.cssText = 'color:#aab2c0;font-size:12px;display:inline-block;width:80px;';
+                titleSpan.textContent = title;
+                curveWrapper.appendChild(titleSpan);
+                const pctSpan = document.createElement('span');
+                pctSpan.style.cssText = 'color:#e8ecf0;font-size:12px;font-family:monospace;margin-right:8px;';
+                pctSpan.textContent = (currentVal != null ? currentVal.toFixed(1) : '0.0') + '%';
+                curveWrapper.appendChild(pctSpan);
+                const canvas = document.createElement('canvas');
+                canvas.width = w;
+                canvas.height = h;
+                canvas.style.cssText = 'vertical-align:middle;';
+                curveWrapper.appendChild(canvas);
+                curvesDiv.appendChild(curveWrapper);
+                
+                const ctx = canvas.getContext('2d');
+                ctx.clearRect(0, 0, w, h);
+                ctx.strokeStyle = stroke;
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                const step = w / Math.max(1, history.length - 1);
+                history.forEach((val, i) => {
+                    const x = i * step;
+                    const y = h - (Math.min(100, val) / 100) * h;
+                    if (i === 0) ctx.moveTo(x, y);
+                    else ctx.lineTo(x, y);
+                });
+                ctx.stroke();
+            };
+            
+            const totalNet = this._schedNetHistory.total.length > 0 
+                ? this._schedNetHistory.total[this._schedNetHistory.total.length - 1] 
+                : 0;
+            addCurve(this._getText('TASKMANAGER_TOTAL_NET', '总网络'), this._schedNetHistory.total, totalNet);
+            
+            const pids = Object.keys(netUsage).slice(0, 5);
+            pids.forEach(pid => {
+                const procHistory = this._schedNetHistory.byProcess[pid] || [];
+                const currentVal = netUsage[pid] ? parseFloat(netUsage[pid].percentage) : 0;
+                addCurve(`PID ${pid}`, procHistory, currentVal);
+            });
+            
+            let detailDiv = this.schedNetContainer.querySelector('.taskmanager-sched-net-detail');
+            if (!detailDiv) {
+                detailDiv = document.createElement('div');
+                detailDiv.className = 'taskmanager-sched-net-detail';
+                detailDiv.style.cssText = 'color:#aab2c0;font-size:11px;margin-top:8px;';
+                this.schedNetContainer.appendChild(detailDiv);
+            }
+            detailDiv.innerHTML = '';
+            detailDiv.innerHTML += `<div>令牌:${stats.tokens}/${rs.NET_CONFIG.tokensPerSecond}/s 队列:${stats.queueLength}/${stats.totalCalls}次</div>`;
         },
         
         _drawNodePerfPanel: function(data) {

@@ -1049,6 +1049,47 @@
                 });
             }
 
+            // 获取当前进程 PID
+            const pid = this._getCurrentProcessPid ? this._getCurrentProcessPid() : 0;
+
+            // 使用 ResourceScheduler 进行网络请求调度和统计
+            const rs = (typeof ResourceScheduler !== 'undefined') ? ResourceScheduler : null;
+            const useScheduling = rs && typeof rs.scheduleNetwork === 'function' && rs.isNetSchedulingEnabled();
+
+            if (typeof KernelLogger !== 'undefined') {
+                KernelLogger.debug('NetworkManager', `fetch: url=${url}, useScheduling=${useScheduling}, rs=${!!rs}, scheduleNetwork=${rs ? typeof rs.scheduleNetwork : 'N/A'}, isNetSchedulingEnabled=${rs ? rs.isNetSchedulingEnabled() : 'N/A'}`);
+            }
+
+            if (useScheduling) {
+                const apiName = 'Network.fetch';
+                return new Promise((resolve, reject) => {
+                    const scheduleResult = rs.scheduleNetwork(
+                        async () => {
+                            return await this._doFetch(url, options);
+                        },
+                        pid,
+                        apiName
+                    );
+
+                    if (scheduleResult instanceof Promise) {
+                        scheduleResult.then(result => {
+                            resolve(result.result);
+                        }).catch(err => {
+                            reject(err);
+                        });
+                    } else if (scheduleResult && scheduleResult.result) {
+                        resolve(scheduleResult.result);
+                    } else {
+                        reject(new Error('Network scheduling failed'));
+                    }
+                });
+            } else {
+                // 降级：直接使用原生 fetch
+                return this._doFetch(url, options);
+            }
+        }
+
+        async _doFetch(url, options) {
             // 通过 Service Worker 发送请求
             if (this.serviceWorker) {
                 try {

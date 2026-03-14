@@ -84,6 +84,7 @@
 | [PermissionManager](./API/PermissionManager.md) | 权限管理、审计、统计 | ⚠️ **必读** |
 | [KernelLogger](./API/KernelLogger.md) | 统一的日志记录 | ⚠️ **必读** |
 | [ExceptionHandler](./API/ExceptionHandler.md) | 异常处理管理器（结构化异常处理 SEH） | ✅ |
+| [ResourceScheduler](./API/resourceScheduler.md) | CPU 和网络资源调度器（令牌桶限流、队列管理、实时监控） | ✅ **新增** |
 
 #### 💾 存储与内存 API
 

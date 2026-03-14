@@ -64,6 +64,9 @@
 - [Pool.md](./Pool.md) - 全局对象池 ✅
 - [DependencyConfig.md](./DependencyConfig.md) - 依赖管理和模块加载 ✅
 
+### 资源调度
+- [resourceScheduler.md](./resourceScheduler.md) - CPU 和网络资源调度器（令牌桶限流、队列管理、实时监控） ✅
+
 ### 启动引导
 - [Starter.md](./Starter.md) - 内核启动器 ✅
 

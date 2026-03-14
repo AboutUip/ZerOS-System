@@ -4,24 +4,102 @@
 const CACHE_NAME = 'zeros-network-cache-v1';
 const requestHandlers = new Map();
 
+// 令牌桶配置
+let netTokens = 35;
+let netLastRefillTime = Date.now();
+const netTokensPerSecond = 35;
+const netQueue = [];
+const netQueueMaxSize = 100;
+
+// 网络启用状态（从主线程同步）
+let networkEnabled = true;
+
+// 令牌补充函数
+function refillTokens() {
+    const now = Date.now();
+    const elapsed = now - netLastRefillTime;
+    if (elapsed >= 1000) {
+        netTokens = netTokensPerSecond;
+        netLastRefillTime = now;
+    }
+}
+
+// 处理队列中的请求
+function processQueue() {
+    while (netQueue.length > 0 && netTokens > 0) {
+        const item = netQueue.shift();
+        netTokens--;
+        item.resolve(executeRequest(item.request));
+    }
+}
+
+// 执行实际的请求
+async function executeRequest(request) {
+    try {
+        // 检查是否有自定义处理器
+        for (const [pattern, handler] of requestHandlers.entries()) {
+            const regex = new RegExp(pattern);
+            if (regex.test(request.url)) {
+                const response = await handler(request);
+                if (response) {
+                    return response;
+                }
+            }
+        }
+        
+        // 默认处理：发送网络请求
+        const response = await fetch(request);
+        
+        // 获取响应大小
+        const clonedResponse = response.clone();
+        const body = await clonedResponse.text();
+        
+        // 发送响应接收消息到主线程
+        sendMessageToClient({
+            type: 'RESPONSE_RECEIVED',
+            data: {
+                url: request.url,
+                status: response.status,
+                statusText: response.statusText,
+                body: body.substring(0, 1000)
+            }
+        });
+        
+        return new Response(body, {
+            status: response.status,
+            statusText: response.statusText,
+            headers: response.headers
+        });
+        
+    } catch (error) {
+        sendMessageToClient({
+            type: 'REQUEST_FAILED',
+            data: {
+                url: request.url,
+                error: error.message
+            }
+        });
+        
+        return new Response(JSON.stringify({
+            error: error.message
+        }), {
+            status: 500,
+            headers: { 'Content-Type': 'application/json' }
+        });
+    }
+}
+
 // Service Worker 安装事件
-// 注意：Service Worker 运行在独立上下文中，无法直接访问 KernelLogger
-// 这些 console 调用会在主线程的控制台中显示，会绕过日志级别设置
 self.addEventListener('install', (event) => {
     console.log('[NetworkServiceWorker] Service Worker 安装中...');
-    self.skipWaiting(); // 立即激活
+    self.skipWaiting();
 });
 
 // Service Worker 激活事件
 self.addEventListener('activate', (event) => {
     console.log('[NetworkServiceWorker] Service Worker 激活中...');
-    event.waitUntil(
-        clients.claim() // 立即控制所有页面
-    );
+    event.waitUntil(clients.claim());
 });
-
-// 网络启用状态（从主线程同步）
-let networkEnabled = true;
 
 // 拦截 fetch 请求
 self.addEventListener('fetch', (event) => {
@@ -73,10 +151,33 @@ self.addEventListener('fetch', (event) => {
         }
     });
     
-    // 处理请求
-    event.respondWith(
-        handleRequest(request)
-    );
+    // 令牌桶限流处理
+    refillTokens();
+    
+    if (netTokens > 0) {
+        // 令牌足够，立即执行
+        netTokens--;
+        event.respondWith(executeRequest(request));
+    } else if (netQueue.length < netQueueMaxSize) {
+        // 令牌不足，进入队列等待
+        event.respondWith(new Promise((resolve, reject) => {
+            netQueue.push({
+                request: request,
+                resolve: resolve,
+                reject: reject,
+                timestamp: Date.now()
+            });
+            
+            // 设置定时器处理队列
+            setInterval(() => {
+                refillTokens();
+                processQueue();
+            }, 100);
+        }));
+    } else {
+        // 队列已满，拒绝请求
+        event.respondWith(Promise.reject(new Error('Network queue full, request rejected')));
+    }
 });
 
 /**

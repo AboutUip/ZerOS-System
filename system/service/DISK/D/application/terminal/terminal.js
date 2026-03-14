@@ -7569,6 +7569,8 @@ function escapeHtml(s){
                             payload.write('    actions: enter <type> [title] [step], exit, status, help');
                             payload.write('  nodelib [--status] [--config] [--check] [--perf [--raw]]  - NodeLib 调试');
                             payload.write('    --status: 服务与扩展状态  --config: 扩展配置  --check: 执行 Node 检测  --perf: 执行 perf 脚本，--raw 输出完整 JSON');
+                            payload.write('  resource|rs [--stats] [--cpu] [--queue] [--history]  - 资源调度器调试');
+                            payload.write('    --stats: 显示总体统计  --cpu: 显示各进程 CPU 占用  --queue: 显示队列状态  --history: 显示调用历史');
                             payload.write('');
                             payload.write('Examples:');
                             payload.write('  debug exception service "测试服务异常"');
@@ -7583,6 +7585,10 @@ function escapeHtml(s){
                             payload.write('  debug se status');
                             payload.write('  debug nodelib --status');
                             payload.write('  debug nodelib --perf');
+                            payload.write('  debug resource --stats');
+                            payload.write('  debug resource --cpu');
+                            payload.write('  debug resource --net');
+                            payload.write('  debug rs --queue');
                             return;
                         }
                         
@@ -8108,6 +8114,136 @@ function escapeHtml(s){
                                 if (typeof KernelLogger !== 'undefined') {
                                     KernelLogger.debug('Terminal', 'debug nodelib 失败', err);
                                 }
+                            }
+                        } else if (action === 'resource' || action === 'rs') {
+                            try {
+                                const subArgs = payload.args.slice(2);
+                                const showStats = subArgs.includes('--stats') || subArgs.includes('-s');
+                                const showCpu = subArgs.includes('--cpu') || subArgs.includes('-c');
+                                const showQueue = subArgs.includes('--queue') || subArgs.includes('-q');
+                                const showHistory = subArgs.includes('--history') || subArgs.includes('-h');
+                                const showNet = subArgs.includes('--net') || subArgs.includes('-n');
+                                const showAll = subArgs.length === 0 || subArgs.includes('--all') || subArgs.includes('-a');
+
+                                if (typeof ResourceScheduler === 'undefined') {
+                                    payload.write('debug resource: 资源调度器未加载');
+                                    return;
+                                }
+
+                                payload.write('=== 资源调度器状态 ===');
+                                payload.write('');
+
+                                const isEnabled = ResourceScheduler.isSchedulingEnabled();
+                                const config = ResourceScheduler.CONFIG;
+                                payload.write(`调度状态: ${isEnabled ? '已启用' : '已禁用'}`);
+                                payload.write(`令牌/秒: ${config.tokensPerSecond}`);
+                                payload.write(`最大队列: ${config.maxQueueSize}`);
+                                payload.write('');
+                                
+                                const isNetEnabled = ResourceScheduler.isNetSchedulingEnabled ? ResourceScheduler.isNetSchedulingEnabled() : false;
+                                const netConfig = ResourceScheduler.NET_CONFIG;
+                                payload.write(`网络调度: ${isNetEnabled ? '已启用' : '已禁用'}`);
+                                payload.write(`网络令牌/秒: ${netConfig.tokensPerSecond}`);
+                                payload.write(`网络最大队列: ${netConfig.maxQueueSize}`);
+                                payload.write('');
+
+                                if (showAll || showStats) {
+                                    const stats = ResourceScheduler.getStats();
+                                    payload.write('--- 总体统计 ---');
+                                    payload.write(`令牌余额: ${stats.tokens}`);
+                                    payload.write(`队列长度: ${stats.queueLength}`);
+                                    payload.write(`总调用次数: ${stats.totalCalls}`);
+                                    payload.write(`排队次数: ${stats.queuedCalls}`);
+                                    payload.write(`拒绝次数: ${stats.rejectedCalls}`);
+                                    payload.write('');
+
+                                    const processStats = Object.keys(stats.byProcess);
+                                    if (processStats.length > 0) {
+                                        payload.write('--- 按进程统计 ---');
+                                        for (const pid of processStats) {
+                                            const p = stats.byProcess[pid];
+                                            payload.write(`PID ${pid}: 调用=${p.calls}, 排队=${p.queued}, 拒绝=${p.rejected}`);
+                                        }
+                                        payload.write('');
+                                    }
+                                }
+
+                                if (showAll || showCpu) {
+                                    const cpuUsage = ResourceScheduler.getCpuUsage();
+                                    const stats = ResourceScheduler.getStats();
+                                    const cpuPids = Object.keys(cpuUsage);
+                                    
+                                    payload.write('--- CPU 占用 (最近1秒) ---');
+                                    payload.write(`总历史记录: ${stats.totalCalls} 次`);
+                                    payload.write(`_history 长度: ${stats.historyLength || 'N/A'}`);
+                                    
+                                    if (cpuPids.length > 0) {
+                                        for (const pid of cpuPids) {
+                                            const cpu = cpuUsage[pid];
+                                            payload.write(`PID ${pid}: ${cpu.percentage}% (${cpu.calls}次) 即时:${cpu.immediate} 排队:${cpu.queued} 拒绝:${cpu.rejected}`);
+                                        }
+                                        payload.write('');
+                                    } else {
+                                        payload.write('--- CPU 占用: 无数据 ---');
+                                        payload.write('');
+                                    }
+                                }
+
+                                if (showAll || showQueue) {
+                                    const queueStatus = ResourceScheduler.getQueueStatus();
+                                    payload.write('--- 队列状态 ---');
+                                    payload.write(`长度: ${queueStatus.length}/${queueStatus.maxSize} (${(queueStatus.utilization * 100).toFixed(1)}%)`);
+                                    if (queueStatus.items && queueStatus.items.length > 0) {
+                                        payload.write('排队项:');
+                                        for (const item of queueStatus.items.slice(0, 10)) {
+                                            const priorityNames = ['CRITICAL', 'HIGH', 'NORMAL', 'LOW'];
+                                            payload.write(`  PID ${item.pid}: ${item.apiName} 优先级:${priorityNames[item.priority]||item.priority} 等待:${item.waitTime}ms`);
+                                        }
+                                        if (queueStatus.items.length > 10) {
+                                            payload.write(`  ... 还有 ${queueStatus.items.length - 10} 项`);
+                                        }
+                                    }
+                                    payload.write('');
+                                }
+
+                                if (showAll || showHistory) {
+                                    const history = ResourceScheduler.getHistory();
+                                    payload.write('--- 最近调用历史 ---');
+                                    if (history && history.length > 0) {
+                                        const recent = history.slice(-20).reverse();
+                                        for (const h of recent) {
+                                            const time = new Date(h.timestamp).toLocaleTimeString();
+                                            payload.write(`${time} PID ${h.pid}: ${h.apiName} [${h.status}]`);
+                                        }
+                                    } else {
+                                        payload.write('无历史记录');
+                                    }
+                                }
+                                
+                                if (showAll || showNet) {
+                                    const netUsage = ResourceScheduler.getNetUsage ? ResourceScheduler.getNetUsage() : {};
+                                    const netStats = ResourceScheduler.getNetStats ? ResourceScheduler.getNetStats() : null;
+                                    const netPids = Object.keys(netUsage);
+                                    
+                                    payload.write('--- 网络占用 (最近1秒) ---');
+                                    if (netStats) {
+                                        payload.write(`总请求: ${netStats.totalCalls} 次`);
+                                        payload.write(`令牌余额: ${netStats.tokens}`);
+                                    }
+                                    
+                                    if (netPids.length > 0) {
+                                        for (const pid of netPids) {
+                                            const net = netUsage[pid];
+                                            payload.write(`PID ${pid}: ${net.percentage}% (${net.calls}次) 即时:${net.immediate} 排队:${net.queued} 拒绝:${net.rejected}`);
+                                        }
+                                        payload.write('');
+                                    } else {
+                                        payload.write('--- 网络占用: 无数据 ---');
+                                        payload.write('');
+                                    }
+                                }
+                            } catch (err) {
+                                payload.write('debug resource: 错误: ' + (err && err.message ? err.message : String(err)));
                             }
                         } else {
                             payload.write(`debug: 未知的操作 '${action}'`);

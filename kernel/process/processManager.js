@@ -596,6 +596,12 @@ class ProcessManager {
     static async init() {
         ProcessManager._log(2, "初始化进程管理器");
 
+        if (typeof ResourceScheduler !== 'undefined') {
+            ResourceScheduler._init();
+            ResourceScheduler._initNetworkScheduler();
+            ProcessManager._log(2, "资源调度器已初始化");
+        }
+
         // 确保KernelMemory可用
         if (typeof KernelMemory === 'undefined') {
             ProcessManager._log(1, "KernelMemory 不可用，将使用降级方案");
@@ -3248,6 +3254,14 @@ class ProcessManager {
             ProcessManager._log(3, `Exploit程序 ${pid} 直接调用内核API: ${apiName}`);
             // 所有内核模块均支持记录：Exploit 的 API 调用也写入程序日志（任务管理器「API 调用记录」）
             ProcessManager._logProgramAction(pid, 'callKernelAPI', { apiName, args });
+            // 资源调度统计（Exploit 也需要统计以便计算 CPU 占用）
+            if (typeof ResourceScheduler !== 'undefined' && ResourceScheduler.isSchedulingEnabled()) {
+                try {
+                    ResourceScheduler.schedule(() => {}, pid, apiName);
+                } catch (e) {
+                    ProcessManager._log(1, `ResourceScheduler.schedule 异常: ${e.message}`);
+                }
+            }
             // 必须传入 pid，否则依赖进程 ID 的 API（如 Speech.createSession）会报「无法获取进程 ID」
             return await ProcessManager._executeKernelAPI(apiName, args, pid);
         }
@@ -3327,6 +3341,52 @@ class ProcessManager {
         ProcessManager._logProgramAction(pid, 'callKernelAPI', { apiName, args });
 
         ProcessManager._log(2, `进程 ${pid} 调用内核API: ${apiName}`);
+
+        // 资源调度：如果启用调度器，则通过调度器管理 API 执行
+        const rsEnabled = typeof ResourceScheduler !== 'undefined' && typeof ResourceScheduler.isSchedulingEnabled === 'function' && ResourceScheduler.isSchedulingEnabled();
+        ProcessManager._log(3, `资源调度: 检查 ResourceScheduler, typeof: ${typeof ResourceScheduler}, isSchedulingEnabled: ${rsEnabled}`);
+        
+        if (rsEnabled) {
+            ProcessManager._log(3, `资源调度: 开始调度 API ${apiName} (PID: ${pid})`);
+            return new Promise((resolve, reject) => {
+                if (!ResourceScheduler || typeof ResourceScheduler.schedule !== 'function') {
+                    ProcessManager._log(1, `ResourceScheduler 不可用，直接执行`);
+                    ProcessManager._executeKernelAPI(apiName, args, pid).then(resolve).catch(reject);
+                    return;
+                }
+                
+                const scheduleResult = ResourceScheduler.schedule(
+                    async () => {
+                        try {
+                            const result = await ProcessManager._executeKernelAPI(apiName, args, pid);
+                            return result;
+                        } catch (e) {
+                            throw e;
+                        }
+                    },
+                    pid,
+                    apiName
+                );
+
+                if (!scheduleResult) {
+                    ProcessManager._log(1, `schedule 返回空值`);
+                    reject(new Error('schedule 返回空值'));
+                } else if (scheduleResult instanceof Promise) {
+                    scheduleResult.then(result => {
+                        resolve(result && result.result);
+                    }).catch(err => {
+                        reject(err);
+                    });
+                } else if (!scheduleResult.allowed) {
+                    const error = new Error(`系统资源不足，API ${apiName} 调用被拒绝（队列已满）`);
+                    ProcessManager._log(1, error.message);
+                    KernelLogger.error("ProcessManager", `资源调度拒绝: ${apiName} (PID: ${pid})`);
+                    reject(error);
+                } else {
+                    resolve(scheduleResult.result);
+                }
+            });
+        }
 
         // 执行API调用
         return await ProcessManager._executeKernelAPI(apiName, args, pid);
@@ -3453,6 +3513,12 @@ class ProcessManager {
             'Multithreading.getProcessThreads': PermissionManager.PERMISSION.MULTITHREADING_EXECUTE,
             'Multithreading.getProcessesWithThreads': PermissionManager.PERMISSION.MULTITHREADING_EXECUTE,
 
+            // 资源调度器 API
+            'Resource.getCpuUsage': null,
+            'Resource.getStats': null,
+            'Resource.getQueueStatus': null,
+            'Resource.isSchedulingEnabled': null,
+
             // 加密API
             'Crypt.generateKeyPair': PermissionManager.PERMISSION.CRYPT_GENERATE_KEY,
             'Crypt.importKeyPair': PermissionManager.PERMISSION.CRYPT_IMPORT_KEY,
@@ -3560,6 +3626,9 @@ class ProcessManager {
      * @throws {Error} 如果API名称无效或调用失败
      */
     static async _executeKernelAPI(apiName, args, pid = null) {
+        if (typeof KernelLogger !== 'undefined') {
+            KernelLogger.debug('ProcessManager', `_executeKernelAPI: ${apiName}, pid=${pid}`);
+        }
         // 参数验证
         if (!apiName || typeof apiName !== 'string') {
             throw new Error('_executeKernelAPI: apiName 必须是字符串');
@@ -5614,6 +5683,32 @@ class ProcessManager {
                     throw new Error('MultithreadingDrive 模块未加载');
                 }
                 return MultithreadingDrive.getProcessesWithThreads();
+            },
+
+            // 资源调度器 API
+            'Resource.getCpuUsage': async () => {
+                if (typeof ResourceScheduler === 'undefined') {
+                    return null;
+                }
+                return ResourceScheduler.getCpuUsage();
+            },
+            'Resource.getStats': async () => {
+                if (typeof ResourceScheduler === 'undefined') {
+                    return null;
+                }
+                return ResourceScheduler.getStats();
+            },
+            'Resource.getQueueStatus': async () => {
+                if (typeof ResourceScheduler === 'undefined') {
+                    return null;
+                }
+                return ResourceScheduler.getQueueStatus();
+            },
+            'Resource.isSchedulingEnabled': async () => {
+                if (typeof ResourceScheduler === 'undefined') {
+                    return false;
+                }
+                return ResourceScheduler.isSchedulingEnabled();
             },
 
             // 拖拽API

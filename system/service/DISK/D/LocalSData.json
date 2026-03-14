@@ -1,6 +1,34 @@
 {
   "system": {
     "permissionManager.permissions": {
+      "taskmanager": [
+        "GUI_WINDOW_CREATE",
+        "KERNEL_DISK_READ",
+        "SYSTEM_NOTIFICATION",
+        "EVENT_LISTENER"
+      ],
+      "hellogui": [
+        "GUI_WINDOW_CREATE",
+        "PROCESS_BACKGROUND",
+        "EVENT_LISTENER",
+        "KERNEL_DISK_READ",
+        "KERNEL_DISK_LIST",
+        "KERNEL_DISK_DELETE"
+      ],
+      "kernelchecker": [
+        "SYSTEM_STORAGE_WRITE",
+        "SYSTEM_STORAGE_READ",
+        "KERNEL_DISK_CREATE",
+        "KERNEL_DISK_WRITE"
+      ],
+      "terminal": [
+        "GEOGRAPHY_LOCATION",
+        "GUI_WINDOW_CREATE",
+        "KERNEL_DISK_READ",
+        "KERNEL_DISK_LIST",
+        "EVENT_LISTENER",
+        "ENVIRONMENT_READ"
+      ],
       "store": [
         "GUI_WINDOW_CREATE",
         "EVENT_LISTENER",
@@ -10,12 +38,6 @@
         "KERNEL_DISK_DELETE"
       ],
       "ps": [
-        "EVENT_LISTENER"
-      ],
-      "taskmanager": [
-        "GUI_WINDOW_CREATE",
-        "KERNEL_DISK_READ",
-        "SYSTEM_NOTIFICATION",
         "EVENT_LISTENER"
       ],
       "musicplayer": [
@@ -105,9 +127,6 @@
       ],
       "service": [
         "SERVER_SERVICE_MANAGE"
-      ],
-      "terminal": [
-        "GEOGRAPHY_LOCATION"
       ],
       "permissioncontrol": [
         "SYSTEM_LOG_READ"
@@ -405,7 +424,7 @@
         "password": "61b249bf6d604d14120821f43625e84e",
         "avatar": "avatar_root_1766272534753.jpg",
         "createdAt": 1766271155991,
-        "lastLogin": 1773479774547
+        "lastLogin": 1773494978377
       },
       "TestUser": {
         "level": "USER",
@@ -457,9 +476,9 @@
         "triggerConfig": {},
         "enabled": true,
         "createdAt": 1771942626583,
-        "updatedAt": 1773479775292,
-        "lastRunAt": 1773479775292,
-        "runCount": 314,
+        "updatedAt": 1773494979397,
+        "lastRunAt": 1773494979397,
+        "runCount": 333,
         "createdBy": "servicemanager",
         "requiresStartupPermission": true,
         "serviceId": "notice",
@@ -472,9 +491,9 @@
         "triggerConfig": {},
         "enabled": true,
         "createdAt": 1773477739546,
-        "updatedAt": 1773479775415,
-        "lastRunAt": 1773479775415,
-        "runCount": 4,
+        "updatedAt": 1773494979556,
+        "lastRunAt": 1773494979556,
+        "runCount": 23,
         "createdBy": "servicemanager",
         "requiresStartupPermission": true,
         "serviceId": "office",
@@ -514,7 +533,7 @@
     "system.volume": 1,
     "nodeLibExpansion": {
       "nodeAvailable": true,
-      "lastCheck": 1773479771762,
+      "lastCheck": 1773494974427,
       "intervalSeconds": 1,
       "scriptId": "perf",
       "nodeDependencies": [

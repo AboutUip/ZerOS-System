@@ -1194,6 +1194,11 @@ class LStorage {
      * @returns {Promise<any>} 存储的值，如果不存在返回 null
      */
     static async getSystemStorage(key) {
+        if (typeof ResourceScheduler !== 'undefined') {
+            const pid = LStorage._getCurrentPid() || 0;
+            ResourceScheduler.recordCall(pid, 'LStorage.get');
+        }
+
         if (!LStorage._initialized) {
             await LStorage.init();
         }
@@ -1790,6 +1795,11 @@ class LStorage {
      * @returns {Promise<boolean>} 是否成功
      */
     static async setSystemStorage(key, value) {
+        if (typeof ResourceScheduler !== 'undefined') {
+            const pid = LStorage._getCurrentPid() || 0;
+            ResourceScheduler.recordCall(pid, 'LStorage.set');
+        }
+
         if (!LStorage._initialized) {
             await LStorage.init();
         }

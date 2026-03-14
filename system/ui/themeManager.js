@@ -1478,6 +1478,10 @@ class ThemeManager {
      * @param {boolean} save 是否保存到 LStorage（默认 true）
      */
     static async setTheme(themeId, save = true) {
+        if (typeof ResourceScheduler !== 'undefined') {
+            ResourceScheduler.recordCall(0, 'ThemeManager.setTheme');
+        }
+
         if (!ThemeManager._initialized) {
             await ThemeManager.init();
         }
@@ -2118,6 +2122,10 @@ class ThemeManager {
      * @returns {Object|null} 当前主题配置（name/description 已多语言）
      */
     static getCurrentTheme() {
+        if (typeof ResourceScheduler !== 'undefined') {
+            ResourceScheduler.recordCall(0, 'ThemeManager.getCurrentTheme');
+        }
+        
         const themeId = ThemeManager._currentThemeId;
         const theme = ThemeManager._themes.get(themeId) || null;
         if (!theme) return null;
@@ -2154,6 +2162,10 @@ class ThemeManager {
      * @returns {Array<Object>} 主题列表（包含完整主题信息）
      */
     static getAllThemes() {
+        if (typeof ResourceScheduler !== 'undefined') {
+            ResourceScheduler.recordCall(0, 'ThemeManager.getAllThemes');
+        }
+        
         return Array.from(ThemeManager._themes.values()).map(function (t) {
             return Object.assign({}, t, {
                 name: ThemeManager.getThemeDisplayName(t.id),
@@ -3241,6 +3253,10 @@ class ThemeManager {
      * @returns {string|null} 当前桌面背景图ID
      */
     static getCurrentDesktopBackground() {
+        if (typeof ResourceScheduler !== 'undefined') {
+            ResourceScheduler.recordCall(0, 'ThemeManager.getCurrentDesktopBackground');
+        }
+        
         return ThemeManager._currentDesktopBackgroundId;
     }
     
@@ -3249,6 +3265,10 @@ class ThemeManager {
      * @returns {Array<Object>} 桌面背景图数组
      */
     static getAllDesktopBackgrounds() {
+        if (typeof ResourceScheduler !== 'undefined') {
+            ResourceScheduler.recordCall(0, 'ThemeManager.getAllDesktopBackgrounds');
+        }
+        
         return Array.from(ThemeManager._desktopBackgrounds.values()).map(function (bg) {
             return Object.assign({}, bg, {
                 name: ThemeManager.getDesktopBackgroundDisplayName(bg.id),
