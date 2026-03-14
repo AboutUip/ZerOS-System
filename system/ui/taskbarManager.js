@@ -5348,8 +5348,8 @@ class TaskbarManager {
                 if (!forceRefresh && TaskbarManager._weatherApiFailureCount >= TaskbarManager.WEATHER_API_MAX_FAILURES) {
                     KernelLogger.warn("TaskbarManager", `天气API连续失败 ${TaskbarManager._weatherApiFailureCount} 次，跳过API请求，仅使用缓存数据`);
                     
-                    // 先获取城市名称（使用默认城市作为后备）
-                    let requestCityName = '晋城'; // 默认城市
+                    // 先获取城市名称（尝试获取，失败则通过IP自动识别）
+                    let requestCityName = null; // 不设置默认城市，让API通过IP自动识别
                     try {
                         // 尝试快速获取城市名称（不等待，使用默认值作为后备）
                         if (typeof GeographyDrive !== 'undefined') {
@@ -5362,11 +5362,11 @@ class TaskbarManager {
                                     requestCityName = location.name;
                                 }
                             } catch (e) {
-                                // 超时或失败，使用默认城市
+                                // 超时或失败，通过IP自动识别
                             }
                         }
                     } catch (e) {
-                        // 获取城市名称失败，使用默认城市
+                        // 获取城市名称失败，通过IP自动识别
                     }
                     
                     const cacheKey = `${TaskbarManager.WEATHER_CACHE_PREFIX}${requestCityName}`;
@@ -5479,18 +5479,18 @@ class TaskbarManager {
                                 throw new Error('城市信息缺少 district/region');
                             }
                         } catch (cityApiError) {
-                            // 城市信息 API 也失败，使用默认城市
-                            requestCityName = '晋城'; // 默认城市
-                            KernelLogger.warn("TaskbarManager", `所有获取城市名称的方法都失败，使用默认城市: ${requestCityName}`);
+                            // 城市信息 API 也失败，通过IP自动识别
+                            requestCityName = null; // 不设置默认城市，让API通过IP自动识别
+                            KernelLogger.warn("TaskbarManager", `所有获取城市名称的方法都失败，将通过IP自动识别天气`);
                         }
                     }
                 }
                 
                 // 确保有城市名称
                 if (!requestCityName) {
-                    // 最后的后备方案：使用默认城市
-                    requestCityName = '晋城';
-                    KernelLogger.warn("TaskbarManager", `城市名称为空，使用默认城市: ${requestCityName}`);
+                    // 最后的后备方案：通过IP自动识别
+                    requestCityName = null;
+                    KernelLogger.warn("TaskbarManager", `城市名称为空，将通过IP自动识别天气`);
                 }
                 
                 // 2. 先查进程内短期缓存，再查 CacheDrive（避免不必要的磁盘/网络请求）
@@ -5534,7 +5534,8 @@ class TaskbarManager {
                 KernelLogger.debug("TaskbarManager", `从API获取天气数据: ${requestCityName}（失败次数: ${TaskbarManager._weatherApiFailureCount}/${TaskbarManager.WEATHER_API_MAX_FAILURES}）`);
                 
                 try {
-                    const weatherUrl = `${TaskbarManager.WEATHER_API_URL}?city=${encodeURIComponent(requestCityName)}&extended=true&indices=true&forecast=true`;
+                    const cityParam = requestCityName ? `city=${encodeURIComponent(requestCityName)}&` : '';
+                    const weatherUrl = `${TaskbarManager.WEATHER_API_URL}?${cityParam}extended=true&indices=true&forecast=true`;
                     const weatherResponse = await fetch(weatherUrl);
                     if (!weatherResponse.ok) {
                         throw new Error(`获取天气信息失败: ${weatherResponse.status}`);
@@ -5630,8 +5631,8 @@ class TaskbarManager {
                     }
                     TaskbarManager._pendingWeatherRequest = requestPromise;
             
-            let weatherData;
-            let cityName;
+                    let weatherData;
+                    let cityName;
                     
                     try {
                         const result = await requestPromise;
@@ -12676,7 +12677,7 @@ class TaskbarManager {
         
         // 如果没有有效窗口，直接返回，不执行任何关闭操作
         if (validWindows.length === 0) {
-            KernelLogger.warn("TaskbarManager", "没有运行中的窗口，无法显示多任务选择器");
+            KernelLogger.info("TaskbarManager", "没有运行中的窗口，无法显示多任务选择器");
             return;
         }
         

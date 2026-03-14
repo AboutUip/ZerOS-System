@@ -5,7 +5,7 @@ KernelLogger.info("SystemInformation", "模块初始化");
 
 class SystemInformation {
     // 系统版本
-    static SYSTEM_VERSION = '0.7.2';
+    static SYSTEM_VERSION = '0.7.3';
     
     // 内核版本
     static KERNEL_VERSION = '0.6.8';

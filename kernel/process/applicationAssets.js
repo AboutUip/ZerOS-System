@@ -663,6 +663,24 @@ const APPLICATION_ASSETS = {
             category: "utility",
             showOnDesktop: true
         }
+    },
+    
+    // Counter-Strike Test - 3D FPS 游戏
+    "counterstriketest": {
+        script: "D:/application/counterstriketest/counterstriketest.js",
+        styles: ["D:/application/counterstriketest/counterstriketest.css"],
+        icon: "D:/application/counterstriketest/counterstriketest.svg",
+        metadata: {
+            autoStart: false,
+            priority: 5,
+            description: "Counter-Strike Test",
+            version: "1.0.0",
+            type: "GUI",
+            alwaysShowInTaskbar: false,
+            allowMultipleInstances: true,
+            supportsPreview: true,
+            category: "game"
+        }
     }
 };
 

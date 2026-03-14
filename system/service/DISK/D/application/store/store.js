@@ -395,8 +395,13 @@
 
                 const result = await response.json();
 
-                if (result.code === 200 && result.data) {
-                    app = result.data;
+                if (result.code === 200 && result.data || result.data) {
+                    const appData = result.data && result.data.app ? result.data.app : result.data;
+                    app = appData;
+                    
+                    if (result.data && result.data.screenshots && Array.isArray(result.data.screenshots)) {
+                        app.screenshotUrls = result.data.screenshots.map(s => s.url);
+                    }
                 }
             } catch (error) {
                 if (typeof KernelLogger !== 'undefined') {
@@ -945,7 +950,7 @@
                     KernelLogger.info('STORE', `API响应: code=${result.code}, data类型=${typeof result.data}, data长度=${Array.isArray(result.data) ? result.data.length : '非数组'}`);
                 }
 
-                if (result.code === 200 && result.data) {
+                if (result.code === 200 && result.data || result.data) {
                     let appsData = [];
                     if (Array.isArray(result.data)) {
                         appsData = result.data;
@@ -1001,7 +1006,7 @@
 
                 const result = await response.json();
 
-                if (result.code === 200 && result.data) {
+                if (result.code === 200 && result.data || result.data) {
                     let appsData = [];
                     if (Array.isArray(result.data)) {
                         appsData = result.data;
@@ -1198,10 +1203,7 @@
 
                         if (onProgress) onProgress(90);
 
-                        await ProcessManager.startProgram('zominstall', {
-                            args: [packagePath],
-                            tempAsset: tempAsset
-                        });
+                        await ProcessManager.callKernelAPI(this.pid, 'Application.install', [programName, tempAsset, [packagePath]]);
 
                         await new Promise(resolve => setTimeout(resolve, 2000));
                         
@@ -1813,10 +1815,7 @@
                     throw new Error('无法加载卸载程序');
                 }
 
-                await ProcessManager.startProgram('zominstall', {
-                    args: ['--uninstall', programName],
-                    tempAsset: tempAsset
-                });
+                await ProcessManager.callKernelAPI(this.pid, 'Application.uninstall', [programName]);
 
                 await new Promise(resolve => setTimeout(resolve, 2000));
 
