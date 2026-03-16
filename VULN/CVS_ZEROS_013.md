@@ -2,10 +2,10 @@
 
 **漏洞编号**: CVS-ZEROS-013  
 **发现日期**: 2026-03-09  
-**修复日期**: 待修复  
+**修复日期**: 2026-03-16  
 **严重程度**: 中高 (CVSS 5.5)  
 **CWE分类**: CWE-284 (不恰当的访问控制), CWE-863 (错误的授权)  
-**状态**: 待修复
+**状态**: 已修复
 
 ---
 
@@ -118,4 +118,10 @@ const DANGEROUS_KEYS = {
 
 ---
 
-**修复状态**: ⏳ 待修复
+**修复状态**: ✅ 已修复（2026-03-16）
+
+### 修复内容摘要
+- 在 `DANGEROUS_KEYS` 中新增 `'userControl.currentUser': true`，写入该键需走危险键分支。
+- 在 `DANGEROUS_KEY_PERMISSIONS` 中为 `userControl.currentUser` 指定 `SYSTEM_STORAGE_WRITE_USER_CONTROL`（仅管理员可授予）。
+- 在危险键内核调用校验中新增 `userControl.currentUser` 的调用栈校验：仅允许来自 `kernel/core/usercontrol/userControl.js` 的写入（与 `userControl.users` 一致）。
+- 将 `isUserControlKey` 扩展为包含 `userControl.currentUser`，用户程序（非 UserControl 模块）一律不得直接写入该键。

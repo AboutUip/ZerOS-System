@@ -1522,6 +1522,80 @@ class CacheDrive {
     }
 
     /**
+     * 全局清理过期缓存：仅删除缓存管理器中生命周期已到的条目（含其 .cache 文件），
+     * 不扫描 D:/cache 下其他文件，故不会误删壁纸、桌面等非缓存文件。
+     * 包含系统缓存及所有程序（如 musicplayer 等）的过期缓存。
+     * @returns {Promise<number>} 清理的过期条目数量
+     */
+    static async clearExpiredGlobally() {
+        await CacheDrive._ensureInitialized();
+
+        if (!CacheDrive._cacheMetadata) {
+            await CacheDrive._loadCacheMetadata(true);
+        }
+        if (!CacheDrive._cacheMetadata || typeof CacheDrive._cacheMetadata !== 'object') {
+            return 0;
+        }
+
+        if (!CacheDrive._cacheMetadata.system) {
+            CacheDrive._cacheMetadata.system = {};
+        }
+        if (!CacheDrive._cacheMetadata.programs) {
+            CacheDrive._cacheMetadata.programs = {};
+        }
+
+        const filesToDelete = [];
+        let clearedCount = 0;
+        const pid = typeof ProcessManager !== 'undefined' ? (ProcessManager.EXPLOIT_PID || 10000) : 10000;
+
+        // 系统缓存：仅过期项
+        if (CacheDrive._cacheMetadata.system) {
+            for (const key in CacheDrive._cacheMetadata.system) {
+                const entry = CacheDrive._cacheMetadata.system[key];
+                if (entry && typeof entry === 'object' && CacheDrive._isExpired(entry)) {
+                    if (entry.isFileBacked) {
+                        filesToDelete.push({ key, programName: null });
+                    }
+                    delete CacheDrive._cacheMetadata.system[key];
+                    clearedCount++;
+                }
+            }
+        }
+
+        // 各程序缓存：仅过期项（含 musicplayer 等）
+        if (CacheDrive._cacheMetadata.programs) {
+            for (const programName in CacheDrive._cacheMetadata.programs) {
+                const programCache = CacheDrive._cacheMetadata.programs[programName];
+                if (!programCache || typeof programCache !== 'object') continue;
+                for (const key in programCache) {
+                    const entry = programCache[key];
+                    if (entry && typeof entry === 'object' && CacheDrive._isExpired(entry)) {
+                        if (entry.isFileBacked) {
+                            filesToDelete.push({ key, programName: programName });
+                        }
+                        delete programCache[key];
+                        clearedCount++;
+                    }
+                }
+                if (Object.keys(programCache).length === 0) {
+                    delete CacheDrive._cacheMetadata.programs[programName];
+                }
+            }
+        }
+
+        for (const file of filesToDelete) {
+            await CacheDrive._deleteCacheFile(file.key, file.programName, pid);
+        }
+
+        if (clearedCount > 0) {
+            await CacheDrive._saveCacheMetadata();
+            KernelLogger.info("CacheDrive", `全局已清理 ${clearedCount} 个过期缓存条目`);
+        }
+
+        return clearedCount;
+    }
+
+    /**
      * 获取缓存统计信息
      * @param {Object} options 选项
      * @param {number} options.pid 程序 PID（可选，会自动转换为程序名称）

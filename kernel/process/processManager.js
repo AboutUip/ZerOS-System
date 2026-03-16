@@ -3560,6 +3560,7 @@ class ProcessManager {
             'Cache.has': PermissionManager.PERMISSION.CACHE_READ,
             'Cache.delete': PermissionManager.PERMISSION.CACHE_WRITE,
             'Cache.clear': PermissionManager.PERMISSION.CACHE_WRITE,
+            'Cache.clearExpiredGlobally': PermissionManager.PERMISSION.CACHE_WRITE,
             'Cache.getStats': PermissionManager.PERMISSION.CACHE_READ,
 
             // 语音识别API
@@ -3613,6 +3614,12 @@ class ProcessManager {
             'Server.isStarted': PermissionManager.PERMISSION.SERVER_SERVICE_MANAGE,
             'Server.listConfig': PermissionManager.PERMISSION.SERVER_SERVICE_MANAGE,
             'Server.setConfig': PermissionManager.PERMISSION.SERVER_SERVICE_MANAGE,
+
+            // 文件关联 API（扩展名 → 默认打开程序）
+            'FileAssoc.get': null,       // 读取不需要权限，供文件管理器等使用
+            'FileAssoc.list': null,
+            'FileAssoc.set': PermissionManager.PERMISSION.FILE_ASSOC_MANAGE,
+            'FileAssoc.clear': PermissionManager.PERMISSION.FILE_ASSOC_MANAGE,
         };
 
         return apiPermissionMap[apiName] || null;
@@ -5308,6 +5315,95 @@ class ProcessManager {
                 }
             },
 
+            // 文件关联 API（扩展名 → 默认打开程序，持久化在 system.fileAssoc）
+            'FileAssoc.get': async (ext) => {
+                if (typeof LStorage === 'undefined') {
+                    return null;
+                }
+                const raw = (typeof ext === 'string' && ext.trim()) ? ext.trim().toLowerCase() : '';
+                const key = raw.startsWith('.') ? raw : (raw ? '.' + raw : '');
+                if (!key) return null;
+                const oldContextPid = LStorage._currentContextPid;
+                LStorage._currentContextPid = pid;
+                try {
+                    const map = await LStorage.getSystemStorage('system.fileAssoc');
+                    if (map && typeof map === 'object' && map[key] != null) {
+                        return typeof map[key] === 'string' ? map[key].trim() : null;
+                    }
+                    return null;
+                } finally {
+                    LStorage._currentContextPid = oldContextPid;
+                }
+            },
+            'FileAssoc.list': async () => {
+                if (typeof LStorage === 'undefined') {
+                    return {};
+                }
+                const oldContextPid = LStorage._currentContextPid;
+                LStorage._currentContextPid = pid;
+                try {
+                    const map = await LStorage.getSystemStorage('system.fileAssoc');
+                    if (map && typeof map === 'object') {
+                        return { ...map };
+                    }
+                    return {};
+                } finally {
+                    LStorage._currentContextPid = oldContextPid;
+                }
+            },
+            'FileAssoc.set': async (ext, programName) => {
+                if (typeof LStorage === 'undefined') {
+                    throw new Error('FileAssoc.set: LStorage 模块未加载');
+                }
+                const raw = (typeof ext === 'string' && ext.trim()) ? ext.trim().toLowerCase() : '';
+                const key = raw.startsWith('.') ? raw : (raw ? '.' + raw : '');
+                if (!key) {
+                    throw new Error('FileAssoc.set: 扩展名不能为空');
+                }
+                const program = (typeof programName === 'string' && programName.trim()) ? programName.trim() : '';
+                if (!program) {
+                    throw new Error('FileAssoc.set: 程序名不能为空');
+                }
+                const oldContextPid = LStorage._currentContextPid;
+                LStorage._currentContextPid = pid;
+                try {
+                    let map = await LStorage.getSystemStorage('system.fileAssoc');
+                    if (!map || typeof map !== 'object') {
+                        map = {};
+                    }
+                    map = { ...map };
+                    map[key] = program;
+                    await LStorage.setSystemStorage('system.fileAssoc', map);
+                    return true;
+                } finally {
+                    LStorage._currentContextPid = oldContextPid;
+                }
+            },
+            'FileAssoc.clear': async (ext) => {
+                if (typeof LStorage === 'undefined') {
+                    throw new Error('FileAssoc.clear: LStorage 模块未加载');
+                }
+                const raw = (typeof ext === 'string' && ext.trim()) ? ext.trim().toLowerCase() : '';
+                const key = raw.startsWith('.') ? raw : (raw ? '.' + raw : '');
+                if (!key) {
+                    throw new Error('FileAssoc.clear: 扩展名不能为空');
+                }
+                const oldContextPid = LStorage._currentContextPid;
+                LStorage._currentContextPid = pid;
+                try {
+                    let map = await LStorage.getSystemStorage('system.fileAssoc');
+                    if (!map || typeof map !== 'object') {
+                        return true;
+                    }
+                    map = { ...map };
+                    delete map[key];
+                    await LStorage.setSystemStorage('system.fileAssoc', map);
+                    return true;
+                } finally {
+                    LStorage._currentContextPid = oldContextPid;
+                }
+            },
+
             // 网络信息API
             'Network.getInfo': async () => {
                 return await ProcessManager.getNetworkInfo();
@@ -6025,6 +6121,12 @@ class ProcessManager {
                     finalOptions.pid = pid;
                 }
                 return await CacheDrive.clear(finalOptions);
+            },
+            'Cache.clearExpiredGlobally': async () => {
+                if (typeof CacheDrive === 'undefined') {
+                    throw new Error('CacheDrive 模块未加载');
+                }
+                return await CacheDrive.clearExpiredGlobally();
             },
             'Cache.getStats': async (options = {}) => {
                 if (typeof CacheDrive === 'undefined') {

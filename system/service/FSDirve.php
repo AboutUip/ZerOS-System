@@ -542,6 +542,21 @@ function deleteFile($path, $fileName) {
         sendResponse(false, '路径不是文件: ' . $fileName, null, 400);
     }
     
+    // UserToken 收紧：禁止删除 D 盘根目录下的系统关键文件（CVS-ZEROS-015）
+    $validated = validatePath($path);
+    if ($validated && $validated['disk'] === 'D' && $validated['path'] === '') {
+        $token = jwtVerifyExtractToken();
+        if ($token !== null && $token !== '') {
+            $payload = JWT::decode($token);
+            if ($payload !== false && (($payload['type'] ?? '') === 'UserToken')) {
+                $sensitiveNames = getSensitiveFileNamesOnDRoot();
+                if (in_array($fileName, $sensitiveNames, true)) {
+                    sendResponse(false, '禁止使用 UserToken 在 D 盘根目录对系统关键文件执行该操作，请通过前端系统模块（如 LStorage）操作', null, 403);
+                }
+            }
+        }
+    }
+    
     // 删除文件
     if (unlink($filePath)) {
         sendResponse(true, '文件删除成功', [
@@ -570,6 +585,21 @@ function renameFile($path, $oldFileName, $newFileName) {
     if (strpos($oldFileName, '/') !== false || strpos($newFileName, '/') !== false ||
         strpos($oldFileName, '\\') !== false || strpos($newFileName, '\\') !== false) {
         sendResponse(false, '无效的文件名', null, 400);
+    }
+    
+    // UserToken 收紧：D 根下涉及敏感文件名时禁止重命名（CVS-ZEROS-015）
+    $validated = validatePath($path);
+    if ($validated && $validated['disk'] === 'D' && $validated['path'] === '') {
+        $token = jwtVerifyExtractToken();
+        if ($token !== null && $token !== '') {
+            $payload = JWT::decode($token);
+            if ($payload !== false && (($payload['type'] ?? '') === 'UserToken')) {
+                $sensitiveNames = getSensitiveFileNamesOnDRoot();
+                if (in_array($oldFileName, $sensitiveNames, true) || in_array($newFileName, $sensitiveNames, true)) {
+                    sendResponse(false, '禁止使用 UserToken 在 D 盘根目录对系统关键文件执行该操作，请通过前端系统模块（如 LStorage）操作', null, 403);
+                }
+            }
+        }
     }
     
     $oldFilePath = $dirPath . '/' . $oldFileName;
@@ -636,6 +666,22 @@ function moveFile($sourcePath, $sourceFileName, $targetPath, $targetFileName = n
         sendResponse(false, '目标文件已存在: ' . $targetFileName, null, 409);
     }
     
+    // UserToken 收紧：D 根下涉及敏感文件名时禁止移动（CVS-ZEROS-015）
+    $sensitiveNames = getSensitiveFileNamesOnDRoot();
+    $sourceValidated = validatePath($sourcePath);
+    $targetValidated = validatePath($targetPath);
+    $sourceIsDRootSensitive = $sourceValidated && $sourceValidated['disk'] === 'D' && $sourceValidated['path'] === '' && in_array($sourceFileName, $sensitiveNames, true);
+    $targetIsDRootSensitive = $targetValidated && $targetValidated['disk'] === 'D' && $targetValidated['path'] === '' && in_array($targetFileName, $sensitiveNames, true);
+    if ($sourceIsDRootSensitive || $targetIsDRootSensitive) {
+        $token = jwtVerifyExtractToken();
+        if ($token !== null && $token !== '') {
+            $payload = JWT::decode($token);
+            if ($payload !== false && (($payload['type'] ?? '') === 'UserToken')) {
+                sendResponse(false, '禁止使用 UserToken 在 D 盘根目录对系统关键文件执行该操作，请通过前端系统模块（如 LStorage）操作', null, 403);
+            }
+        }
+    }
+    
     // 移动文件
     if (rename($sourceFilePath, $targetFilePath)) {
         sendResponse(true, '文件移动成功', [
@@ -686,6 +732,21 @@ function copyFile($sourcePath, $sourceFileName, $targetPath, $targetFileName = n
     // 检查目标文件是否已存在
     if (file_exists($targetFilePath)) {
         sendResponse(false, '目标文件已存在: ' . $targetFileName, null, 409);
+    }
+    
+    // UserToken 收紧：禁止在 D 根生成/覆盖系统关键文件（CVS-ZEROS-015）
+    $targetValidated = validatePath($targetPath);
+    if ($targetValidated && $targetValidated['disk'] === 'D' && $targetValidated['path'] === '') {
+        $token = jwtVerifyExtractToken();
+        if ($token !== null && $token !== '') {
+            $payload = JWT::decode($token);
+            if ($payload !== false && (($payload['type'] ?? '') === 'UserToken')) {
+                $sensitiveNames = getSensitiveFileNamesOnDRoot();
+                if (in_array($targetFileName, $sensitiveNames, true)) {
+                    sendResponse(false, '禁止使用 UserToken 在 D 盘根目录对系统关键文件执行该操作，请通过前端系统模块（如 LStorage）操作', null, 403);
+                }
+            }
+        }
     }
     
     // 复制文件

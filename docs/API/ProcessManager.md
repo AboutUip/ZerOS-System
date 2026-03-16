@@ -600,6 +600,7 @@ async __init__(pid, initArgs) {
 **可用 API**（快速索引）：以下按模块分组；**详细参数、返回值与示例**见各模块文档（[GUIManager](./GUIManager.md)、[TaskbarManager](./TaskbarManager.md)、[NotificationManager](./NotificationManager.md)、[LStorage](./LStorage.md)、[PermissionManager](./PermissionManager.md) 等）。
 
 - **文件系统**：`FileSystem.read`（读文件，需 `KERNEL_DISK_READ`）、`FileSystem.write`（写文件，需 `KERNEL_DISK_WRITE`）、`FileSystem.delete`、`FileSystem.create`、`FileSystem.list`。路径格式为 `盘符:/路径`，如 `D:/app/data.txt`。详见 [NodeTree.md - 程序用文件 API（FileSystem.*）](./NodeTree.md#程序用文件-apifilesystem)。
+- **文件关联**：`FileAssoc.get`（按扩展名查默认打开程序，不需权限）、`FileAssoc.list`（列出全部关联，不需权限）、`FileAssoc.set`（设置扩展名默认打开程序，需 `FILE_ASSOC_MANAGE`）、`FileAssoc.clear`（清除扩展名关联，需 `FILE_ASSOC_MANAGE`）。数据持久化在系统存储 `system.fileAssoc`（LocalSData.json）。扩展名需带前导点（如 `.zom`）。文件管理器「打开方式」子窗口会据此优先用默认程序打开文件。
 - **通知**：`Notification.create`（需 `SYSTEM_NOTIFICATION`，参数 `[{ type, title, content }]`）、`Notification.remove`。详见 [NotificationManager](./NotificationManager.md)。
 - **网络**：`Network.request`、`Network.fetch`（需 `NETWORK_ACCESS`，普通权限）；`Network.Port.register` / `unregister` / `getStatus` / `list` / `send`。详见 [NetworkPort](./NetworkPort.md)。
 - **GUI 与窗口**：`GUI.createWindow`、`GUI.manageWindow`（需 `GUI_WINDOW_MANAGE`）；`GUI.registerTaskbarPreviewProvider`（需 `GUI_WINDOW_CREATE`，**pid 由内核注入**，程序仅传 `[provider]`，详见 [GUIManager - 任务栏单窗口预览提供者](./GUIManager.md#任务栏单窗口预览提供者)）、`GUI.unregisterTaskbarPreviewProvider`（不需权限，**pid 由内核注入**，程序传 `[]`）。详见 [GUIManager](./GUIManager.md)。
@@ -615,6 +616,24 @@ async __init__(pid, initArgs) {
 - **语音**：`Speech.isSupported`、`Speech.createSession`、`Speech.startRecognition`、`Speech.stopRecognition`、`Speech.stopSession`、`Speech.getSessionStatus`、`Speech.getSessionResults`。详见 [SpeechDrive](./SpeechDrive.md)。
 - **计划任务**：`ScheduleTask.create`（需 `SCHEDULE_TASK_CREATE` 或 `SCHEDULE_TASK_STARTUP`）、`ScheduleTask.delete`、`ScheduleTask.update`、`ScheduleTask.get`、`ScheduleTask.getAll`、`ScheduleTask.setEnabled`。**pid 由内核注入**的 API 之一，程序调用时 args 不包含 pid。详见 [ScheduleTaskManager](./ScheduleTaskManager.md)。
 - **语言**：`Languages.loadPack`、`Languages.setCurrent`、`Languages.getText`、`Languages.listPacks`、`Languages.getCurrentLocale`、`Languages.getLoadedLocales`。详见 [LanguagesExpansion](./LanguagesExpansion.md)。
+
+##### 文件关联 API（FileAssoc.*）
+
+| API | 参数 | 权限 | 说明 |
+|-----|------|------|------|
+| `FileAssoc.get` | `ext`（字符串，如 `'.zom'`） | 不需权限 | 返回该扩展名的默认打开程序名，无则返回 `null`。扩展名会规范为小写且带前导点。 |
+| `FileAssoc.list` | 无 | 不需权限 | 返回 `{ ".zom": "strawberry-security", ... }` 形式的全部关联（只读）。 |
+| `FileAssoc.set` | `ext`, `programName` | **`FILE_ASSOC_MANAGE`** | 设置扩展名 `ext` 的默认打开程序为 `programName`，持久化到 `system.fileAssoc`。 |
+| `FileAssoc.clear` | `ext` | **`FILE_ASSOC_MANAGE`** | 清除该扩展名的默认打开程序。 |
+
+**示例**：
+```javascript
+// 读取 .zom 的默认打开程序（不需权限）
+const program = await ProcessManager.callKernelAPI(this.pid, 'FileAssoc.get', ['.zom']);
+
+// 将 .zom 设为草莓安全打开（需 FILE_ASSOC_MANAGE）
+await ProcessManager.callKernelAPI(this.pid, 'FileAssoc.set', ['.zom', 'strawberry-security']);
+```
 
 **部分 API 调用约定**：
 - **pid 由内核注入**：以下 API 调用时，内核会把当前调用进程的 pid 作为第一个参数注入，程序传参**不要**包含 pid。例如：`kernelAPI.call('GUI.registerTaskbarPreviewProvider', [provider])`、`kernelAPI.call('GUI.unregisterTaskbarPreviewProvider', [])`、`kernelAPI.call('ScheduleTask.create', [taskConfig])`、`Notification.create` / `Notification.remove`、`Event.register` / `Event.unregister` / `Event.unregisterAll` 等。使用 `callKernelAPI(pid, apiName, args)` 时由调用方传入 pid，通常用于管理其他进程（需相应权限）。

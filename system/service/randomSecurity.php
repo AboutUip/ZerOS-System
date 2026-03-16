@@ -13,6 +13,10 @@ require_once __DIR__ . '/JWT.php';
 define('BOOT_SECURITY_TOKEN_FILE', __DIR__ . '/DISK/D/BootSecurityToken.json');
 // 最多允许的 JWT 数量
 define('BOOT_SECURITY_TOKEN_MAX_COUNT', 2);
+// CVS-ZEROS-016：SystemToken 签发前须先提交 randomValue，存储「每 IP 一笔未消费提交」
+define('BOOT_COMMIT_FILE', __DIR__ . '/DISK/D/cache/temp/boot_commit.json');
+define('BOOT_COMMIT_TTL', 30);       // 提交有效秒数
+define('BOOT_COMMIT_REPLACE_AGE', 5); // 超过该秒数允许同 IP 新提交覆盖旧提交（刷新恢复）
 
 // 设置响应头
 header('Content-Type: application/json; charset=utf-8');
@@ -45,21 +49,19 @@ function sendResponse($success, $message, $data = null, $code = 200) {
 }
 
 try {
-    // 获取请求方法
+    // 获取请求方法与 POST 体（php://input 只能读一次）
     $method = $_SERVER['REQUEST_METHOD'];
-    
-    // action=clear：系统关机/重启时清空所有 JWT
+    $postBody = ($method === 'POST') ? @file_get_contents('php://input') : null;
+
     $action = $_GET['action'] ?? ($_POST['action'] ?? null);
-    if ($method === 'POST') {
-        $rawInput = @file_get_contents('php://input');
-        if ($rawInput) {
-            $postData = json_decode($rawInput, true);
-            if ($postData && isset($postData['action'])) {
-                $action = $postData['action'];
-            }
+    if ($postBody !== null && $postBody !== '') {
+        $postData = json_decode($postBody, true);
+        if (is_array($postData) && isset($postData['action'])) {
+            $action = $postData['action'];
         }
     }
-    
+
+    // action=clear：系统关机/重启时清空所有 JWT
     if ($action === 'clear') {
         $cleared = false;
         $errorMsg = null;
@@ -77,19 +79,64 @@ try {
             'error' => $errorMsg
         ]);
     }
-    
+
+    // action=commit_for_system：CVS-ZEROS-016 引导提交 randomValue，每 IP 仅允许一笔未消费提交
+    if ($action === 'commit_for_system') {
+        $inputData = $postBody !== null ? json_decode($postBody, true) : null;
+        $commitRv = (is_array($inputData) && isset($inputData['randomValue'])) ? $inputData['randomValue'] : null;
+        if (!$commitRv || !is_string($commitRv) || !preg_match('/^[0-9a-f]{32}$/i', $commitRv)) {
+            sendResponse(false, 'commit_for_system 需要有效的 randomValue（32位十六进制）', null, 400);
+        }
+        $clientIp = $_SERVER['REMOTE_ADDR'] ?? '';
+        if ($clientIp === '') {
+            sendResponse(false, '无法获取客户端 IP', null, 403);
+        }
+        $commits = [];
+        $commitDir = dirname(BOOT_COMMIT_FILE);
+        if (is_dir($commitDir) && file_exists(BOOT_COMMIT_FILE)) {
+            $raw = @file_get_contents(BOOT_COMMIT_FILE);
+            if ($raw !== false) {
+                $dec = json_decode($raw, true);
+                if (is_array($dec) && isset($dec['commits']) && is_array($dec['commits'])) {
+                    $commits = $dec['commits'];
+                }
+            }
+        } elseif (!is_dir($commitDir)) {
+            @mkdir($commitDir, 0755, true);
+        }
+        $now = time();
+        foreach ($commits as $rv => $info) {
+            if (!is_array($info) || ($info['created_at'] ?? 0) < $now - BOOT_COMMIT_TTL) {
+                unset($commits[$rv]);
+            }
+        }
+        foreach ($commits as $rv => $info) {
+            if (($info['ip'] ?? '') === $clientIp) {
+                $age = $now - ($info['created_at'] ?? 0);
+                if ($age < BOOT_COMMIT_REPLACE_AGE) {
+                    sendResponse(false, '该 IP 已有未消费的引导提交，请稍后再试或完成当前引导', null, 403);
+                }
+                unset($commits[$rv]);
+                break;
+            }
+        }
+        $commits[$commitRv] = ['ip' => $clientIp, 'created_at' => $now];
+        $json = json_encode(['commits' => $commits], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+        if ($json === false || file_put_contents(BOOT_COMMIT_FILE, $json, LOCK_EX) === false) {
+            sendResponse(false, '提交记录写入失败', null, 500);
+        }
+        sendResponse(true, '已提交，可用于本次引导签发 SystemToken', ['committed' => true]);
+    }
+
     // 获取随机字符串（特征符）、Token 类型、用户级别、可授权权限列表（由前端传入）
     $randomValue = null;
     $tokenType = null;
     $userLevel = null;
     $permissions = null;
     
-    if ($method === 'POST') {
-        // POST 请求：从请求体读取
-        $rawInput = file_get_contents('php://input');
-        $inputData = json_decode($rawInput, true);
-        
-        if ($inputData) {
+    if ($method === 'POST' && $postBody !== null) {
+        $inputData = json_decode($postBody, true);
+        if ($inputData && is_array($inputData)) {
             $randomValue = $inputData['randomValue'] ?? null;
             $tokenType = $inputData['type'] ?? null;
             $userLevel = $inputData['userLevel'] ?? null;
@@ -123,7 +170,46 @@ try {
     
     // 获取 Token 类型（用于判断是否 SystemToken）
     $resolvedType = is_string($tokenType) && $tokenType !== '' ? $tokenType : 'Unknown';
-    
+
+    // CVS-ZEROS-016：SystemToken 必须先通过 action=commit_for_system 提交本 randomValue（同 IP、未消费）
+    if ($resolvedType === 'SystemToken') {
+        $clientIp = $_SERVER['REMOTE_ADDR'] ?? '';
+        $commits = [];
+        if (file_exists(BOOT_COMMIT_FILE)) {
+            $raw = @file_get_contents(BOOT_COMMIT_FILE);
+            if ($raw !== false) {
+                $dec = json_decode($raw, true);
+                if (is_array($dec) && isset($dec['commits']) && is_array($dec['commits'])) {
+                    $commits = $dec['commits'];
+                }
+            }
+        }
+        $now = time();
+        $found = false;
+        foreach ($commits as $rv => $info) {
+            if ($rv === $randomValue && is_array($info) && ($info['ip'] ?? '') === $clientIp) {
+                if (($info['created_at'] ?? 0) < $now - BOOT_COMMIT_TTL) {
+                    sendResponse(false, '引导提交已过期，请重新加载页面后重试', null, 403);
+                }
+                $found = true;
+                unset($commits[$rv]);
+                break;
+            }
+        }
+        if (!$found) {
+            sendResponse(false, 'SystemToken 仅允许在引导流程中签发，请先通过 commit_for_system 提交本 randomValue', null, 403);
+        }
+        foreach ($commits as $rv => $info) {
+            if (!is_array($info) || ($info['created_at'] ?? 0) < $now - BOOT_COMMIT_TTL) {
+                unset($commits[$rv]);
+            }
+        }
+        $json = json_encode(['commits' => $commits], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+        if ($json !== false) {
+            @file_put_contents(BOOT_COMMIT_FILE, $json, LOCK_EX);
+        }
+    }
+
     // 检查已有 JWT 数量，达到上限则禁止生成
     $existingTokens = [];
     if (file_exists(BOOT_SECURITY_TOKEN_FILE)) {

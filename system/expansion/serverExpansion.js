@@ -458,7 +458,10 @@
                     return Promise.reject(new Error("服务 " + id + " 不支持配置"));
                 }
                 try {
-                    entry.api.__set__(config || {});
+                    var result = entry.api.__set__(config || {});
+                    if (result != null && typeof result.then === 'function') {
+                        return result;
+                    }
                 } catch (e) {
                     if (typeof KernelLogger !== 'undefined') {
                         KernelLogger.warn("ServerExpansion", "setConfig: " + id + ", " + (e && e.message));

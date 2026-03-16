@@ -259,10 +259,14 @@ var _config = _defaultConfig;
 /**
  * Load configuration from LStorage
  */
-function _loadConfig() {
+async function _loadConfig() {
     if (typeof LStorage === 'undefined') return;
     
     try {
+        // CRITICAL: Check and initialize before use
+        if (!LStorage._initialized) {
+            await LStorage.init();
+        }
         var saved = LStorage.getSystemStorage(_CONFIG_KEY);
         if (saved && typeof saved === 'object') {
             _config = Object.assign({}, _defaultConfig, saved);
@@ -277,10 +281,14 @@ function _loadConfig() {
 /**
  * Save configuration to LStorage
  */
-function _saveConfig() {
+async function _saveConfig() {
     if (typeof LStorage === 'undefined') return;
     
     try {
+        // CRITICAL: Check and initialize before use
+        if (!LStorage._initialized) {
+            await LStorage.init();
+        }
         LStorage.setSystemStorage(_CONFIG_KEY, _config);
     } catch (e) {
         if (typeof KernelLogger !== 'undefined') {
@@ -523,7 +531,12 @@ if (typeof Disk !== 'undefined') {
 }
 
 // Storage
+// IMPORTANT: Always initialize before use!
 if (typeof LStorage !== 'undefined') {
+    // CRITICAL: Check and initialize first
+    if (!LStorage._initialized) {
+        await LStorage.init();
+    }
     LStorage.setSystemStorage('key', value);
     var value = LStorage.getSystemStorage('key');
 }

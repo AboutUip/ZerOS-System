@@ -367,10 +367,13 @@ const result = await response.json();
   - `prepend`: 前置模式
 - `content` (string, 必需): 文件内容（可通过 GET 参数或 POST Body 传递）
 
-**安全策略（CVS-ZEROS-012 修复）**：
-- **SystemToken**：所有写入一律放行。
-- **UserToken**：仅对 **D 盘根目录**（`path` 为 `D:` 或 `D:/`）下的以下系统关键文件禁止写入，返回 **403**：
-  - `LocalSData.json`、`LocalSData_backup.json`、`ApplicationTable.json`、`LocalCache.json`、`BootSecurityToken.json`
+**D 盘根敏感文件策略（CVS-ZEROS-012/015）**：以下系统关键文件在 **D 盘根目录**（`path` 为 `D:` 或 `D:/`）下受保护，**UserToken 禁止写入/重命名/移动/复制/删除**，否则返回 **403**；**SystemToken** 不受限。
+- 敏感文件名：`LocalSData.json`、`LocalSData_backup.json`、`ApplicationTable.json`、`LocalCache.json`、`BootSecurityToken.json`
+- **write_file**：UserToken 写 D 根且文件名为上述之一 → 403。
+- **rename_file**：UserToken 在 D 根下对 `oldFileName` 或 `newFileName` 为上述之一 → 403。
+- **move_file**：UserToken 源路径或目标路径为 D 根且对应文件名为上述之一 → 403。
+- **copy_file**：UserToken 目标路径为 D 根且目标文件名为上述之一 → 403。
+- **delete_file**：UserToken 在 D 根下删除上述之一 → 403。
 - 其他路径（含 D 盘任意子目录、其他分区）及非敏感文件名不受限制。若程序需要修改上述系统存储，请通过前端系统模块（如 LStorage）操作，由内核路径发起请求以使用 SystemToken。
 
 **示例** (POST):
@@ -414,6 +417,8 @@ const result = await response.json();
 - `path` (string, 必需): 父目录路径
 - `fileName` (string, 必需): 文件名
 
+**安全策略**：若 `path` 为 D 根且 `fileName` 为上述 D 根敏感文件名，UserToken 请求返回 **403**。
+
 **示例**:
 ```javascript
 const url = new URL('/system/service/FSDirve.php', window.location.origin);
@@ -444,6 +449,8 @@ const result = await response.json();
 - `oldFileName` (string, 必需): 旧文件名
 - `newFileName` (string, 必需): 新文件名
 
+**安全策略**：若 `path` 为 D 根且 `oldFileName` 或 `newFileName` 为 D 根敏感文件名之一，UserToken 请求返回 **403**。
+
 **示例**:
 ```javascript
 const url = new URL('/system/service/FSDirve.php', window.location.origin);
@@ -465,6 +472,8 @@ const result = await response.json();
 - `sourceFileName` (string, 必需): 源文件名
 - `targetPath` (string, 必需): 目标文件父目录路径
 - `targetFileName` (string, 可选): 目标文件名（如果省略，使用源文件名）
+
+**安全策略**：若源或目标为 D 根且对应文件名为 D 根敏感文件名之一，UserToken 请求返回 **403**。
 
 **示例**:
 ```javascript
@@ -488,6 +497,8 @@ const result = await response.json();
 - `sourceFileName` (string, 必需): 源文件名
 - `targetPath` (string, 必需): 目标文件父目录路径
 - `targetFileName` (string, 可选): 目标文件名（如果省略，使用源文件名）
+
+**安全策略**：若目标路径为 D 根且目标文件名为 D 根敏感文件名之一，UserToken 请求返回 **403**。
 
 **示例**:
 ```javascript
@@ -617,6 +628,7 @@ const result = await response.json();
 
 **常见错误码**:
 - `400`: 请求参数错误（缺少参数、路径格式错误等）
+- `403`: 禁止操作（如 UserToken 对 D 盘根敏感文件的写入/重命名/移动/复制/删除）
 - `404`: 文件或目录不存在
 - `409`: 文件或目录已存在（创建操作时）
 - `500`: 服务器内部错误（文件操作失败等）

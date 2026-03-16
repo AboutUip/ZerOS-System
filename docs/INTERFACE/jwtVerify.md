@@ -59,6 +59,10 @@ requireSystemTokenOnly();
 - **来源**：仅从 `$_GET['upid']` 读取
 - **UserToken 必须**：应用/bin 程序调用时，URL 必须包含 `?upid=xxx`
 
+## 401 与内核行为
+
+当后端对某请求返回 **HTTP 401** 时，若该请求**携带了 JWT**（SystemToken 或 UserToken，由内核 NetworkManager 注入或请求自带），内核会将其视为「身份被服务器拒绝」的严重安全事件，并**触发系统级异常（蓝屏）**：停止所有程序、显示蓝屏、自检后自动重启。同一会话内只触发一次。详见 [NetworkManager API](../API/NetworkManager.md)（401 响应处理）。因此后端仅在「未认证/令牌无效」等情况下返回 401；**403** 表示「已认证但无权限」，不会触发蓝屏。
+
 ## 401 响应格式
 
 **缺少/无效 Token**：
@@ -121,5 +125,6 @@ requireSystemTokenOnly();
 
 - [randomSecurity](./randomSecurity.md) - JWT 签发服务
 - [RandomSecurity API](../API/RandomSecurity.md) - 内核 JWT 与 upid 传递
+- [NetworkManager API](../API/NetworkManager.md) - 内核请求拦截与 401 触发系统异常
 - [FSDirve](./FSDirve.md) - 使用本校验的文件服务
 - [nodeLibExec](./nodeLibExec.md) - 使用 requireSystemTokenOnly 的 Node 扩展执行接口

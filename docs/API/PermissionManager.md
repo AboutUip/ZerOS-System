@@ -47,6 +47,8 @@ PermissionManager.PERMISSION.SYSTEM_STORAGE_WRITE_DESKTOP              // 写入
 
 PermissionManager.PERMISSION.PROCESS_MANAGE           // 管理其他进程（启动/终止）
 
+PermissionManager.PERMISSION.FILE_ASSOC_MANAGE       // 管理文件关联（设置/清除扩展名默认打开程序，危险权限）
+
 // 服务扩展权限（最高等级，DANGEROUS）
 PermissionManager.PERMISSION.SERVER_SERVICE_MANAGE    // 启动/停止/查询 D/server 服务（Server.* API）
 
@@ -454,6 +456,7 @@ PermissionManager.clearAuditLog(true);
 - `CRYPT_ENCRYPT` - 加密数据
 - `CRYPT_DECRYPT` - 解密数据
 - `PROCESS_MANAGE` - 管理进程（启动/终止其他程序）
+- `FILE_ASSOC_MANAGE` - 管理文件关联（设置/清除扩展名默认打开程序，危险权限）
 
 ### 危险权限（需要明确授权，仅管理员可授予）
 

@@ -68,6 +68,76 @@
     }
 
     /**
+     * 获取 RandomSecurity 服务 URL（与 FSDirve/LStorage 一致：有 SystemInformation 走 getRandomSecurityPath + getOrigin，否则降级为默认 PHP + 当前页 origin）
+     * @returns {string}
+     */
+    function getRandomSecurityServiceUrl() {
+        if (typeof SystemInformation !== 'undefined' && typeof SystemInformation.getRandomSecurityPath === 'function' && typeof SystemInformation.getOrigin === 'function') {
+            return new URL(SystemInformation.getRandomSecurityPath(), SystemInformation.getOrigin()).toString();
+        }
+        var origin = (typeof window !== 'undefined' && window.location && window.location.origin)
+            ? window.location.origin
+            : 'http://localhost:8089';
+        return origin + '/system/service/randomSecurity.php';
+    }
+
+    /**
+     * CVS-ZEROS-016：签发 SystemToken 前先提交 randomValue（每 IP 仅允许一笔未消费提交）
+     * @param {string} randomValue 128位随机字符串
+     * @returns {Promise<void>}
+     */
+    function commitRandomValueForSystem(randomValue) {
+        var serviceUrl = getRandomSecurityServiceUrl();
+        var urlWithAction = serviceUrl + (serviceUrl.indexOf('?') !== -1 ? '&' : '?') + 'action=commit_for_system';
+        return new Promise(function (resolve, reject) {
+            if (typeof fetch !== 'undefined') {
+                fetch(urlWithAction, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ randomValue: randomValue })
+                })
+                .then(function (response) {
+                    if (!response.ok) {
+                        return response.json().then(function (data) {
+                            reject(new Error(data.message || 'commit_for_system 失败: ' + response.status));
+                        }).catch(function () {
+                            reject(new Error('commit_for_system 失败: ' + response.status));
+                        });
+                    }
+                    return response.json();
+                })
+                .then(function (data) {
+                    if (data.status === 'success') {
+                        resolve();
+                    } else {
+                        reject(new Error(data.message || 'commit_for_system 失败'));
+                    }
+                })
+                .catch(reject);
+            } else {
+                var xhr = new XMLHttpRequest();
+                xhr.open('POST', urlWithAction, true);
+                xhr.setRequestHeader('Content-Type', 'application/json');
+                xhr.onload = function () {
+                    if (xhr.status === 200) {
+                        try {
+                            var data = JSON.parse(xhr.responseText);
+                            if (data.status === 'success') resolve();
+                            else reject(new Error(data.message || 'commit_for_system 失败'));
+                        } catch (e) {
+                            reject(new Error('解析响应失败'));
+                        }
+                    } else {
+                        reject(new Error('commit_for_system 失败: ' + xhr.status));
+                    }
+                };
+                xhr.onerror = function () { reject(new Error('网络请求失败')); };
+                xhr.send(JSON.stringify({ randomValue: randomValue }));
+            }
+        });
+    }
+
+    /**
      * 发送随机字符串到后端并获取 JWT Token
      * @param {string} randomValue 128位随机字符串
      * @param {string} type Token 类型（如 'SystemToken'、'UserToken'）
@@ -76,16 +146,7 @@
      */
     function getJWTFromBackend(randomValue, type, extraPayload) {
         return new Promise(function (resolve, reject) {
-            // 优先使用 SystemInformation（BootLoader 已先加载），支持多后端服务；否则降级为当前 origin + 固定路径
-            let serviceUrl;
-            if (typeof SystemInformation !== 'undefined' && typeof SystemInformation.getRandomSecurityUrl === 'function') {
-                serviceUrl = SystemInformation.getRandomSecurityUrl();
-            } else {
-                const origin = typeof window !== 'undefined' && window.location
-                    ? window.location.origin
-                    : 'http://localhost:8089';
-                serviceUrl = origin + '/system/service/randomSecurity.php';
-            }
+            var serviceUrl = getRandomSecurityServiceUrl();
 
             var body = { randomValue: randomValue };
             if (type) {
@@ -163,11 +224,14 @@
             _randomSecurityValue = generateRandomSecurityValue();
 
             if (typeof KernelLogger !== 'undefined') {
-                KernelLogger.info("RandomSecurity", `已生成128位随机安全值，正在获取 JWT Token...`);
+                KernelLogger.info("RandomSecurity", `已生成128位随机安全值，正在提交并获取 JWT Token...`);
             }
 
-            // 发送到后端获取 JWT Token（type 交由前端传入）
-            getJWTFromBackend(_randomSecurityValue, 'SystemToken')
+            // CVS-ZEROS-016：先提交 randomValue，再请求签发 SystemToken
+            commitRandomValueForSystem(_randomSecurityValue)
+                .then(function () {
+                    return getJWTFromBackend(_randomSecurityValue, 'SystemToken');
+                })
                 .then(function (jwtToken) {
                     // 私有保存 JWT，不传给 BootLoader
                     _systemJWT = jwtToken;

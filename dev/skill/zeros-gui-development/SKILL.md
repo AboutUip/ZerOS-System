@@ -922,11 +922,38 @@ await this._kernelAPI.call('Notification.createNotification', [this.pid, {
 
 **Storage:**
 ```javascript
+// Using kernel API (recommended)
+// Note: This requires LSTORAGE_READ/LSTORAGE_WRITE permissions in __info__
+
 // Read from LStorage
 const value = await this._kernelAPI.call('LStorage.read', ['myapp.setting.key']);
 
 // Write to LStorage
 await this._kernelAPI.call('LStorage.write', ['myapp.setting.key', value]);
+
+// Alternative: Direct LStorage access (for kernel modules or when API not available)
+// IMPORTANT: Always initialize before use!
+async function _loadSettings(key) {
+    if (typeof LStorage !== 'undefined') {
+        // CRITICAL: Check and initialize before use
+        if (!LStorage._initialized) {
+            await LStorage.init();
+        }
+        // Now you can safely use getSystemStorage/setSystemStorage
+        const settings = LStorage.getSystemStorage(key);
+        return settings || {};
+    }
+    return {};
+}
+
+async function _saveSettings(key, value) {
+    if (typeof LStorage !== 'undefined') {
+        if (!LStorage._initialized) {
+            await LStorage.init();
+        }
+        LStorage.setSystemStorage(key, value);
+    }
+}
 ```
 
 **GUI Dialogs:**

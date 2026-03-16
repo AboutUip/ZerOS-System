@@ -142,7 +142,10 @@ const value = await this.kernelAPI.call('Storage.read', ['key']);
 // Note: Sensitive keys (userControl.*, permissionControl.*) require special permissions
 await this.kernelAPI.call('Storage.write', ['key', value]);
 
-// Program storage (no special API, use LStorage directly if available)
+// Program storage - use LStorage directly if available
+// IMPORTANT: When using LStorage directly, always check and initialize first:
+//   if (!LStorage._initialized) { await LStorage.init(); }
+//   const data = LStorage.getSystemStorage('myapp.key');
 // Or use Storage.read/write with program-specific keys
 ```
 
@@ -674,6 +677,10 @@ if (typeof DependencyConfig !== 'undefined' && DependencyConfig && typeof Depend
 // From POOL
 const LStorage = POOL.__GET__("KERNEL_GLOBAL_POOL", "LStorage");
 if (LStorage) {
+    // CRITICAL: Check and initialize before use
+    if (!LStorage._initialized) {
+        await LStorage.init();
+    }
     const data = LStorage.getSystemStorage('key');
 }
 
@@ -891,6 +898,21 @@ async restoreWindow() {
 3. Validate all user inputs before API calls
 4. Handle permission errors gracefully
 5. Report security issues via Exception.report
+
+### RandomSecurity & CVS-ZEROS-016
+
+- **问题**：RandomSecurity 接口（签发 SystemToken/UserToken）在修复前未校验请求来源，任意客户端传 `type=SystemToken` 即可未认证获取系统令牌并提权。
+- **修复逻辑**：SystemToken **仅**在「该 randomValue 已通过 `action=commit_for_system` 在同一 IP 下提交且未消费」时签发。引导流程：前端生成 randomValue → 先 POST `commit_for_system` → 再 POST 签发 `type=SystemToken` + 同一 randomValue；后端校验并消费该提交后签发，否则 403。
+- **前端**：`kernel/core/safemode/randomSecurity.js` 的 `runSecurityCheck()` 中先 `commitRandomValueForSystem(_randomSecurityValue)` 再 `getJWTFromBackend(..., 'SystemToken')`。
+- **后端**：PHP 使用 `BOOT_COMMIT_FILE` 存每 IP 一笔未消费提交，TTL 30s，5s 内不可覆盖（防占位），超 5s 可同 IP 覆盖（刷新恢复）。签发 SystemToken 时校验并删除该提交。
+- **补充**：NetworkManager 在携带 JWT 的请求收到 401 时触发系统级异常（蓝屏），同一会话只触发一次。
+
+### Multi-backend service URL（多后端服务地址）
+
+- **统一管理**：后端类型与端口由 **SystemInformation** 管理（`_backendConfig.type`、`phpPort`、`springBootPort`），来自 LStorage `system.backendConfig` 或 URL 参数 `?backend=` / `?backendType=`。
+- **URL 拼装**：有 SystemInformation 时一律用 `SystemInformation.getXxxPath()` / `getXxxUrl()` 或 `buildServiceUrl(SERVICE_NAMES.xxx, params)`，内部按 backend 类型加后缀（PHP→`.php`，SpringBoot→无）并选对应端口。
+- **Fallback**：无 SystemInformation 时与 FSDirve/LStorage 一致：**默认 PHP 路径 + 当前页 `window.location.origin`**，不按端口猜测、不读 URL 参数。用 Java 后端时需保证 SystemInformation 先加载并配置。
+- **禁止**：不要用 `window.location.port === '8080'` 等端口推断后端类型；新服务在 `SystemInformation.SERVICE_NAMES` 注册并视需要提供 `getXxxPath()` / `getXxxUrl()`。
 
 ## Common Issues and Solutions
 

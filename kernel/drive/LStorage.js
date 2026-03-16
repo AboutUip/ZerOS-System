@@ -1853,6 +1853,7 @@ class LStorage {
             DANGEROUS_KEY_PERMISSIONS['userControl.users'] = PermissionManager.PERMISSION.SYSTEM_STORAGE_WRITE_USER_CONTROL;
             DANGEROUS_KEY_PERMISSIONS['userControl.groups'] = PermissionManager.PERMISSION.SYSTEM_STORAGE_WRITE_USER_CONTROL;
             DANGEROUS_KEY_PERMISSIONS['userControl.settings'] = PermissionManager.PERMISSION.SYSTEM_STORAGE_WRITE_USER_CONTROL;
+            DANGEROUS_KEY_PERMISSIONS['userControl.currentUser'] = PermissionManager.PERMISSION.SYSTEM_STORAGE_WRITE_USER_CONTROL;
             DANGEROUS_KEY_PERMISSIONS['permissionControl.blacklist'] = PermissionManager.PERMISSION.SYSTEM_STORAGE_WRITE_PERMISSION_CONTROL;
             DANGEROUS_KEY_PERMISSIONS['permissionControl.whitelist'] = PermissionManager.PERMISSION.SYSTEM_STORAGE_WRITE_PERMISSION_CONTROL;
             DANGEROUS_KEY_PERMISSIONS['permissionControl.settings'] = PermissionManager.PERMISSION.SYSTEM_STORAGE_WRITE_PERMISSION_CONTROL;
@@ -1869,6 +1870,7 @@ class LStorage {
             'userControl.users': true,
             'userControl.groups': true,
             'userControl.settings': true,
+            'userControl.currentUser': true,
             'permissionControl.blacklist': true,
             'permissionControl.whitelist': true,
             'permissionControl.settings': true,
@@ -1919,7 +1921,8 @@ class LStorage {
             // 对于 userControl.* 键，需要更严格的验证
             const isUserControlUsersKey = (key === 'userControl.users');
             const isUserControlGroupsKey = (key === 'userControl.groups');
-            const isUserControlKey = isUserControlUsersKey || isUserControlGroupsKey;
+            const isUserControlCurrentUserKey = (key === 'userControl.currentUser');
+            const isUserControlKey = isUserControlUsersKey || isUserControlGroupsKey || isUserControlCurrentUserKey;
             const isPermissionControlKey = key.startsWith('permissionControl.') || key === 'permissionManager.permissions';
 
             if (isKernelModuleCall) {
@@ -1936,6 +1939,16 @@ class LStorage {
                             } else {
                                 KernelLogger.error("LStorage", `安全警告：检测到疑似伪造的内核模块调用，拒绝写入 ${key}`);
                                 throw new Error(`安全验证失败：只有 UserControl 模块可以写入 userControl.users 键`);
+                            }
+                        }
+                        // 对于 userControl.currentUser 键，只允许 UserControl 模块写入（登录/登出时）
+                        else if (isUserControlCurrentUserKey) {
+                            if (/kernel[\/\\]core[\/\\]usercontrol[\/\\]userControl\.js/i.test(stack)) {
+                                allowed = true;
+                                KernelLogger.debug("LStorage", `UserControl 模块调用，允许写入 ${key}`);
+                            } else {
+                                KernelLogger.error("LStorage", `安全警告：检测到疑似伪造的内核模块调用，拒绝写入 ${key}`);
+                                throw new Error(`安全验证失败：只有 UserControl 模块可以写入 userControl.currentUser 键`);
                             }
                         }
                         // 对于 userControl.groups 键，只允许 UserGroup 模块写入

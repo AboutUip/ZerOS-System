@@ -5,13 +5,13 @@ KernelLogger.info("SystemInformation", "模块初始化");
 
 class SystemInformation {
     // 系统版本
-    static SYSTEM_VERSION = '0.7.3';
+    static SYSTEM_VERSION = '0.7.4';
     
     // 内核版本
-    static KERNEL_VERSION = '0.6.8';
+    static KERNEL_VERSION = '0.6.9';
     
     // 构建日期
-    static BUILD_DATE = new Date('2026-03-05');
+    static BUILD_DATE = new Date('2026-03-17');
     
     // 系统名称
     static SYSTEM_NAME = 'ZerOS';
@@ -98,7 +98,7 @@ class SystemInformation {
         springBootPort: 8000                        // SpringBoot 默认端口
     };
     
-    // 服务名称常量（不含后缀，根据后端类型自动添加）
+    // 多后端服务注册：以下服务名用于 getServicePath / buildServiceUrl；部分提供 getXxxPath、getXxxUrl（如 FSDirve、RandomSecurity）
     static SERVICE_NAMES = {
         FSDIRVE: 'FSDirve',
         COMPRESSION_DIRVE: 'CompressionDirve',

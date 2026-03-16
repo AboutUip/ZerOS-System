@@ -6,9 +6,9 @@
 
 ## 漏洞统计
 
-- **总计**: 14 个漏洞/测试程序
-- **已修复**: 11 个
-- **待修复**: 2 个
+- **总计**: 16 个漏洞/测试程序
+- **已修复**: 14 个
+- **待修复**: 1 个
 - **安全测试程序**: 1 个
 - **严重漏洞**: 9 个
 - **高/中高危漏洞**: 2 个
@@ -33,13 +33,15 @@
 | [CVS-ZEROS-010](CVS_ZEROS_010.md) | 进程绑定内核 API 令牌可读导致权限提升漏洞 | 严重 (9.8) | 2026-02-15 | 2026-02-28 |
 | [CVS-ZEROS-012](CVS_ZEROS_012.md) | FSDirve 未限制敏感文件写入导致用户提权 | 严重 (9.0) | 2026-03-09 | 2026-03-09 |
 | [CVS-ZEROS-014](CVS_ZEROS_014.md) | 程序权限注册后端信任前端声明导致程序提权 | 高 (8.1) | 2026-03-09 | 2026-03-09 |
+| [CVS-ZEROS-013](CVS_ZEROS_013.md) | LStorage 未将 userControl.currentUser 列为危险键 | 中高 (5.5) | 2026-03-09 | 2026-03-16 |
+| [CVS-ZEROS-015](CVS_ZEROS_015.md) | FSDirve rename/move/copy/delete 未限制 D 根敏感文件名导致 012 被绕过 | 严重 (9.0) | 2026-03-15 | 2026-03-16 |
+| [CVS-ZEROS-016](CVS_ZEROS_016.md) | RandomSecurity 未校验来源即签发 SystemToken | 严重 (9.8) | 2026-03-15 | 2026-03-16 |
 
 ### 待修复漏洞
 
 | 编号 | 漏洞名称 | 严重程度 | 发现日期 | 说明 |
 |------|---------|---------|---------|------|
 | [CVS-ZEROS-011](CVS_ZEROS_011.md) | 密码使用弱哈希算法漏洞 | 低危 (3.5) | 2026-03-09 | 变体 MD5 无法使用标准彩虹表，需1年以上建立新彩虹表 |
-| [CVS-ZEROS-013](CVS_ZEROS_013.md) | LStorage 未将 userControl.currentUser 列为危险键 | 中高 (5.5) | 2026-03-09 | 任意 SYSTEM_STORAGE_WRITE 程序可写当前用户键，导致权限伪造/持久化 |
 
 ### 安全测试程序
 
@@ -96,13 +98,16 @@
 3. ✅ **CVS-ZEROS-009 已修复**: ProcessManager PID 欺骗漏洞已修复，已增加调用栈与 PID 一致性校验、Exploit PID 严格校验及进程绑定 API（initArgs.kernelAPI）
 4. ✅ **CVS-ZEROS-010 已修复**: 进程绑定内核 API 令牌可读导致权限提升漏洞已修复，已移除暴露的 `_boundCallSymbol` 和 `_internalCallKernelAPI`，将 kernelAPI.call 内联实现消除内部入口暴露
 5. ✅ **CVS-ZEROS-012 已修复**: FSDirve 敏感文件写入导致用户提权已修复，对 UserToken 收紧 D 盘根目录下系统关键文件（LocalSData.json、ApplicationTable.json 等）的写入，仅 SystemToken 可写；LStorage/Regedit 等通过内核路径注入 SystemToken，不受影响
-6. **定期安全审计**: 建议每季度进行一次全面的安全审计
-7. **代码审查**: 对所有涉及用户输入和权限检查的代码进行审查
-8. **安全测试**: 在发布新版本前进行渗透测试
-9. **最小权限原则**: 所有操作都应该检查用户权限
-10. **输入验证**: 对所有用户输入进行严格验证
-11. **沙箱隔离**: 对不可信代码执行环境进行隔离
-12. **安全审计日志**: 记录所有敏感操作的审计日志
+6. ✅ **CVS-ZEROS-013 已修复**: LStorage 未将 userControl.currentUser 列为危险键已修复，已将该键列入 DANGEROUS_KEYS、要求 SYSTEM_STORAGE_WRITE_USER_CONTROL，并仅允许 UserControl 模块通过调用栈校验写入
+7. ✅ **CVS-ZEROS-015 已修复**: FSDirve rename/move/copy/delete 未限制 D 根敏感文件名已修复，对 D 根敏感名单（与 012 一致）在 rename/move/copy/delete 时施加 UserToken 403，禁止“写非敏感名+重命名”绕过
+8. ✅ **CVS-ZEROS-016 已修复**: RandomSecurity 未校验即签发 SystemToken 已修复，后端要求先通过 action=commit_for_system 提交 randomValue（每 IP 仅一笔未消费），再签发 SystemToken；401 触发蓝屏补充防护保留
+9. **定期安全审计**: 建议每季度进行一次全面的安全审计
+10. **代码审查**: 对所有涉及用户输入和权限检查的代码进行审查
+11. **安全测试**: 在发布新版本前进行渗透测试
+12. **最小权限原则**: 所有操作都应该检查用户权限
+13. **输入验证**: 对所有用户输入进行严格验证
+14. **沙箱隔离**: 对不可信代码执行环境进行隔离
+15. **安全审计日志**: 记录所有敏感操作的审计日志
 
 ---
 
@@ -137,11 +142,13 @@
 | 类型 | 编号 | 简述 |
 |------|------|------|
 | 用户提权 | CVS-ZEROS-012 | ✅ 已修复：UserToken 禁止写 D 盘根敏感文件，仅 SystemToken 放行 |
-| 权限伪造 | CVS-ZEROS-013 | LStorage 未保护 userControl.currentUser 写入，可伪造持久化“当前用户” |
+| 用户提权（012 绕过） | CVS-ZEROS-015 | ✅ 已修复：rename/move/copy/delete 在 D 根涉及敏感文件名时对 UserToken 返回 403 |
+| 系统令牌未校验 | CVS-ZEROS-016 | ✅ 已修复：SystemToken 须先 commit_for_system 提交 randomValue（每 IP 一笔未消费），再签发 |
+| 权限伪造 | CVS-ZEROS-013 | ✅ 已修复：userControl.currentUser 列入危险键并仅允许 UserControl 模块写入 |
 | **程序提权** | **CVS-ZEROS-014** | **✅ 已修复：后端 register 仅接收前端实际授予的权限（getGrantedPermissions），不再信任 __info__.permissions** |
 | 程序/注入提权 | 见 CVS-ZEROS-001/009/010 | 已修复的进程表/PID/令牌相关提权 |
 
 ---
 
-**最后更新**: 2026-03-09  
+**最后更新**: 2026-03-16  
 **维护者**: ZerOS 安全团队

@@ -214,9 +214,13 @@ class MyDrive {
     /**
      * Load configuration from LStorage
      */
-    static _loadConfig() {
+    static async _loadConfig() {
         try {
             if (typeof LStorage !== 'undefined') {
+                // CRITICAL: Check and initialize before use
+                if (!LStorage._initialized) {
+                    await LStorage.init();
+                }
                 const config = LStorage.getSystemStorage('system.myDriveConfig');
                 if (config) {
                     MyDrive._state.config = Object.assign({}, MyDrive.DEFAULT_CONFIG, config);
@@ -236,9 +240,13 @@ class MyDrive {
     /**
      * Save configuration to LStorage
      */
-    static _saveConfig() {
+    static async _saveConfig() {
         try {
             if (typeof LStorage !== 'undefined') {
+                // CRITICAL: Check and initialize before use
+                if (!LStorage._initialized) {
+                    await LStorage.init();
+                }
                 LStorage.setSystemStorage('system.myDriveConfig', MyDrive._state.config);
                 KernelLogger.debug("MyDrive", "已保存配置");
             }

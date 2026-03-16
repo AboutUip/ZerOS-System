@@ -15,11 +15,95 @@
         "LANGUAGES_WRITE",
         "KERNEL_DISK_READ"
       ],
+      "filemanager": [
+        "SYSTEM_STORAGE_WRITE_DESKTOP",
+        "GUI_WINDOW_CREATE",
+        "KERNEL_DISK_READ",
+        "KERNEL_DISK_DELETE",
+        "KERNEL_DISK_LIST",
+        "SYSTEM_NOTIFICATION",
+        "EVENT_LISTENER",
+        "SYSTEM_STORAGE_READ",
+        "SYSTEM_STORAGE_WRITE"
+      ],
+      "zominstall": [
+        "KERNEL_DISK_READ",
+        "KERNEL_DISK_DELETE",
+        "APPLICATION_INSTALL"
+      ],
+      "strawberry-security": [
+        "SCHEDULE_TASK_STARTUP",
+        "SERVER_SERVICE_MANAGE",
+        "KERNEL_DISK_WRITE",
+        "FILE_ASSOC_MANAGE",
+        "PROCESS_MANAGE",
+        "GUI_WINDOW_CREATE",
+        "EVENT_LISTENER",
+        "KERNEL_DISK_READ",
+        "SYSTEM_STORAGE_READ",
+        "SYSTEM_STORAGE_WRITE",
+        "PROCESS_BACKGROUND",
+        "CACHE_READ",
+        "CACHE_WRITE"
+      ],
+      "ps": [
+        "EVENT_LISTENER"
+      ],
+      "setup": [
+        "KERNEL_DISK_READ",
+        "KERNEL_DISK_WRITE",
+        "SCHEDULE_TASK_STARTUP",
+        "SERVER_SERVICE_MANAGE"
+      ],
+      "scheduletask": [
+        "SYSTEM_NOTIFICATION",
+        "SCHEDULE_TASK_MANAGE",
+        "SYSTEM_STORAGE_WRITE"
+      ],
+      "servicemanager": [
+        "SERVER_SERVICE_MANAGE",
+        "SCHEDULE_TASK_MANAGE",
+        "SYSTEM_STORAGE_WRITE",
+        "GUI_WINDOW_CREATE",
+        "EVENT_LISTENER",
+        "SCHEDULE_TASK_STARTUP",
+        "SYSTEM_NOTIFICATION"
+      ],
+      "regedit": [
+        "EVENT_LISTENER",
+        "GUI_WINDOW_CREATE",
+        "CACHE_READ",
+        "CACHE_WRITE",
+        "SYSTEM_STORAGE_READ",
+        "SYSTEM_STORAGE_READ_USER_CONTROL",
+        "SYSTEM_STORAGE_READ_PERMISSION_CONTROL",
+        "SYSTEM_STORAGE_WRITE",
+        "SYSTEM_STORAGE_WRITE_USER_CONTROL",
+        "SYSTEM_STORAGE_WRITE_PERMISSION_CONTROL",
+        "APPLICATION_INSTALL",
+        "APPLICATION_UNINSTALL",
+        "KERNEL_DISK_READ",
+        "KERNEL_DISK_LIST"
+      ],
+      "counterstriketest": [
+        "GUI_WINDOW_CREATE",
+        "EVENT_LISTENER",
+        "SYSTEM_STORAGE_READ",
+        "SYSTEM_STORAGE_WRITE"
+      ],
       "taskmanager": [
         "GUI_WINDOW_CREATE",
         "KERNEL_DISK_READ",
         "SYSTEM_NOTIFICATION",
         "EVENT_LISTENER"
+      ],
+      "musicplayer": [
+        "KERNEL_DISK_LIST",
+        "GUI_WINDOW_CREATE",
+        "NETWORK_ACCESS",
+        "CACHE_READ",
+        "CACHE_WRITE",
+        "KERNEL_DISK_DELETE"
       ],
       "hellogui": [
         "GUI_WINDOW_CREATE",
@@ -51,17 +135,6 @@
         "KERNEL_DISK_READ",
         "KERNEL_DISK_DELETE"
       ],
-      "ps": [
-        "EVENT_LISTENER"
-      ],
-      "musicplayer": [
-        "KERNEL_DISK_LIST",
-        "GUI_WINDOW_CREATE",
-        "NETWORK_ACCESS",
-        "CACHE_READ",
-        "CACHE_WRITE",
-        "KERNEL_DISK_DELETE"
-      ],
       "wallpaperengine": [
         "SYSTEM_NOTIFICATION",
         "SERVER_SERVICE_MANAGE",
@@ -76,23 +149,6 @@
         "KERNEL_DISK_CREATE",
         "KERNEL_DISK_WRITE"
       ],
-      "zominstall": [
-        "KERNEL_DISK_READ",
-        "KERNEL_DISK_DELETE",
-        "APPLICATION_INSTALL"
-      ],
-      "counterstriketest": [
-        "GUI_WINDOW_CREATE",
-        "EVENT_LISTENER"
-      ],
-      "servicemanager": [
-        "SERVER_SERVICE_MANAGE",
-        "SCHEDULE_TASK_MANAGE",
-        "SYSTEM_STORAGE_WRITE",
-        "GUI_WINDOW_CREATE",
-        "EVENT_LISTENER",
-        "SCHEDULE_TASK_STARTUP"
-      ],
       "cvs014": [
         "EVENT_LISTENER",
         "KERNEL_DISK_READ"
@@ -103,11 +159,6 @@
         "NETWORK_ACCESS",
         "PROCESS_BACKGROUND"
       ],
-      "scheduletask": [
-        "SYSTEM_NOTIFICATION",
-        "SCHEDULE_TASK_MANAGE",
-        "SYSTEM_STORAGE_WRITE"
-      ],
       "kiteengine": [
         "GUI_WINDOW_CREATE",
         "EVENT_LISTENER",
@@ -117,9 +168,6 @@
       "uninstall": [
         "SCHEDULE_TASK_MANAGE",
         "SYSTEM_STORAGE_WRITE"
-      ],
-      "filemanager": [
-        "SYSTEM_STORAGE_WRITE_DESKTOP"
       ],
       "notepad": [
         "SYSTEM_NOTIFICATION",
@@ -424,7 +472,7 @@
         "password": "61b249bf6d604d14120821f43625e84e",
         "avatar": "avatar_root_1766272534753.jpg",
         "createdAt": 1766271155991,
-        "lastLogin": 1773494978377
+        "lastLogin": 1773685484211
       },
       "TestUser": {
         "level": "USER",
@@ -476,9 +524,9 @@
         "triggerConfig": {},
         "enabled": true,
         "createdAt": 1771942626583,
-        "updatedAt": 1773494979397,
-        "lastRunAt": 1773494979397,
-        "runCount": 333,
+        "updatedAt": 1773685485171,
+        "lastRunAt": 1773685485171,
+        "runCount": 373,
         "createdBy": "servicemanager",
         "requiresStartupPermission": true,
         "serviceId": "notice",
@@ -491,9 +539,9 @@
         "triggerConfig": {},
         "enabled": true,
         "createdAt": 1773477739546,
-        "updatedAt": 1773494979556,
-        "lastRunAt": 1773494979556,
-        "runCount": 23,
+        "updatedAt": 1773685475855,
+        "lastRunAt": 1773685475855,
+        "runCount": 62,
         "createdBy": "servicemanager",
         "requiresStartupPermission": true,
         "serviceId": "office",
@@ -501,7 +549,9 @@
       }
     ],
     "registry": {
-      "environment": {},
+      "environment": {
+        "_server_gesturecontrol_config": "{\"maxHands\":2,\"precisionSpeed\":\"balanced\",\"useMultithreading\":true,\"gestureActions\":{\"Victory\":\"none\",\"Pointing_Up\":\"none\",\"Closed_Fist\":\"close_program\",\"Open_Palm\":\"none\",\"Thumb_Up\":\"none\",\"Thumb_Down\":\"none\",\"ILoveYou\":\"none\",\"Thumb_Left\":\"none\",\"Thumb_Right\":\"none\"}}"
+      },
       "brightness": 100
     },
     "applicationTable": {},
@@ -533,12 +583,15 @@
     "system.volume": 1,
     "nodeLibExpansion": {
       "nodeAvailable": true,
-      "lastCheck": 1773494974427,
+      "lastCheck": 1773685465682,
       "intervalSeconds": 1,
       "scriptId": "perf",
       "nodeDependencies": [
         "systeminformation"
       ]
+    },
+    "system.fileAssoc": {
+      ".zom": "strawberry-security"
     }
   },
   "programs": {
@@ -570,6 +623,10 @@
         ],
         "enabledId": null
       }
+    },
+    "program:strawberry-security": {
+      "strawberry-security.protectionStartDate": "1773681819947"
     }
-  }
+  },
+  "applications": {}
 }

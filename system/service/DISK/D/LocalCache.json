@@ -26,20 +26,28 @@
     "TaskbarManager": {
       "weather:泽州县": {
         "value": null,
-        "expiresAt": 1773518998106,
-        "createdAt": 1773475798106,
-        "updatedAt": 1773475798106,
-        "size": 2775,
+        "expiresAt": 1773713842473,
+        "createdAt": 1773670642473,
+        "updatedAt": 1773670642473,
+        "size": 2668,
+        "isFileBacked": true
+      },
+      "weather:泽州": {
+        "value": null,
+        "expiresAt": 1773721692477,
+        "createdAt": 1773678492477,
+        "updatedAt": 1773678492477,
+        "size": 2671,
         "isFileBacked": true
       }
     },
     "exploit": {
       "system.dailyQuote": {
-        "value": "我没办法把有趣的东西说成无聊",
+        "value": "你要明白，你爱的不是那段时光，不是那个念念不忘的人，不是那段经历，你爱的只是当年那个羽翼未丰但依然执迷不悔的自己。",
         "expiresAt": 0,
-        "createdAt": 1773494977481,
-        "updatedAt": 1773494977481,
-        "size": 44,
+        "createdAt": 1773685482629,
+        "updatedAt": 1773685482629,
+        "size": 173,
         "isFileBacked": false
       }
     }

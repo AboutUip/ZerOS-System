@@ -44,6 +44,9 @@
             this.portDataListeners = new Map(); // 端口数据监听器映射 port -> [listeners]
             this.portConnectionListeners = new Map(); // 端口连接监听器映射 port -> [listeners]
 
+            // 401 触发系统异常：同一会话只触发一次（CVS-ZEROS-016 补充防护）
+            this._systemExceptionTriggeredFor401 = false;
+
             // 初始化 Service Worker
             this._initServiceWorker();
 
@@ -234,6 +237,25 @@
         }
 
         /**
+         * 当携带 JWT（SystemToken/UserToken）的请求收到 401 时，触发系统级异常/蓝屏（CVS-ZEROS-016 补充防护）
+         * 仅触发一次，避免同一会话内多次 401 重复上报
+         */
+        _triggerSystemExceptionFor401(url, status, statusText, source) {
+            if (this._systemExceptionTriggeredFor401) return;
+            this._systemExceptionTriggeredFor401 = true;
+            const message = '网络身份被拒绝：携带系统/用户令牌的请求收到 401，可能发生令牌窃取或服务器拒绝身份';
+            const details = { url, status, statusText, source };
+            if (typeof KernelLogger !== 'undefined') {
+                KernelLogger.error('NetworkManager', message, details);
+            }
+            if (typeof ExceptionHandler !== 'undefined' && typeof ExceptionHandler.reportException === 'function' && typeof ExceptionHandler.ExceptionLevel !== 'undefined' && ExceptionHandler.ExceptionLevel.SYSTEM) {
+                ExceptionHandler.reportException(ExceptionHandler.ExceptionLevel.SYSTEM, message, details).catch(function (e) {
+                    if (typeof KernelLogger !== 'undefined') KernelLogger.error('NetworkManager', '触发系统异常失败: ' + (e && e.message));
+                });
+            }
+        }
+
+        /**
          * 获取调用者应使用的 JWT 类型（严格遵守，无后备方案）
          * - DISK/ 之外：系统 JWT
          * - DISK/D/server/：系统 JWT（系统盘 D 且子目录为 server）
@@ -399,6 +421,11 @@
                         }
                     }
                 }
+                // 本次请求是否携带 JWT（我们注入或已有）：收到 401 时触发系统异常（CVS-ZEROS-016）
+                const input = args[0];
+                const opts = args[1] || {};
+                const requestHeaders = input instanceof Request ? input.headers : opts.headers;
+                const jwtInjected = !isCrossOrigin && self._headersHasJWT(requestHeaders);
 
                 // 执行原始 fetch
                 // 对于 D:/bin/ 路径的请求，静默处理404错误（文件不存在是正常情况，不应该输出到控制台）
@@ -406,6 +433,10 @@
 
                 return originalFetch.apply(this, args)
                     .then(response => {
+                        // 携带 JWT 的请求若收到 401（令牌被服务器拒绝），触发系统级异常/蓝屏
+                        if (jwtInjected && response.status === 401) {
+                            self._triggerSystemExceptionFor401(url, response.status, response.statusText || 'Unauthorized', 'fetch');
+                        }
                         // 对于 D:/bin/ 路径的 404 错误，完全静默处理（不记录响应）
                         // 注意：浏览器开发者工具仍可能显示404，这是浏览器行为，无法完全避免
                         const isBinPath404 = response.status === 404 && isBinPathRequest;
@@ -543,6 +574,7 @@
                         try {
                             const hasJwt = self._headersHasJWT(requestHeaders);
                             if (hasJwt) {
+                                xhr._zerosJwtInjected = true;
                                 if (typeof KernelLogger !== 'undefined') {
                                     KernelLogger.debug("NetworkManager", "[JWT] XHR 直接放行: 请求已携带 JWT", { url: requestUrl });
                                 }
@@ -556,6 +588,7 @@
                                 }
                                 if (jwt) {
                                     xhr.setRequestHeader('Authorization', 'Bearer ' + jwt);
+                                    xhr._zerosJwtInjected = true;
                                     const tokenLabel = jwtType === 'system' ? 'SystemToken' : 'UserToken';
                                     if (typeof KernelLogger !== 'undefined') {
                                         KernelLogger.debug("NetworkManager", `[JWT] XHR 已注入 ${tokenLabel}`, { url: requestUrl });
@@ -579,6 +612,10 @@
 
                     // 监听响应
                     xhr.addEventListener('load', function () {
+                        // 携带 JWT 的请求若收到 401（令牌被服务器拒绝），触发系统级异常/蓝屏（CVS-ZEROS-016）
+                        if (xhr._zerosJwtInjected && xhr.status === 401) {
+                            self._triggerSystemExceptionFor401(requestUrl, xhr.status, xhr.statusText || 'Unauthorized', 'xhr');
+                        }
                         // 根据 responseType 选择正确的响应数据
                         let responseBody = '';
                         let responseSize = 0;

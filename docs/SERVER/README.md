@@ -15,6 +15,7 @@
 | [AI 助手服务 (ServerAIAssistant.md)](./ServerAIAssistant.md) | 语音唤醒式 AI 助手，唤醒词触发、打开/关闭程序、调节亮度、闲聊，唤醒音效为 D/server/start.mp3 |
 | [Office 服务 (ServerOffice.md)](./ServerOffice.md) | ZerOS Office 服务，v1 实现 ZDOC 预览渲染（POOL > SERVER 暴露 Office.previewZdoc/previewZdocBuffer） |
 | [Node 脚本调度服务 (ServerNodeLib.md)](./ServerNodeLib.md) | 统一管理 system/assets/nodeLibs 下 Node 脚本的执行时机，依赖 NodeLibExpansion，可配置 scriptId 与执行间隔 |
+| [手势控制服务 (ServerGestureControl.md)](./ServerGestureControl.md) | 摄像头手势识别服务，可配置手数/精度/各手势操作（关闭/最小化/最大化/运行程序），POOL 暴露 GestureControl API |
 
 ## 相关链接
 

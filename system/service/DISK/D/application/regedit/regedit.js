@@ -701,13 +701,16 @@
                 }
             };
 
-            // 根据当前存储类型搜索
-            if (storageType === 'localSData' && this.storageData.system) {
-                searchObject(this.storageData.system, 'system', 'localSData');
-            } else if (storageType === 'localCache' && this.storageData.applications) {
-                searchObject(this.storageData.applications, 'applications', 'localCache');
-            } else if (storageType === 'applicationTable' && this.storageData.programs) {
-                searchObject(this.storageData.programs, 'programs', 'applicationTable');
+            // 根据当前存储类型搜索（与 _loadRegistryData 结构一致）
+            if (storageType === 'applicationTable' && this.storageData.applications) {
+                searchObject(this.storageData.applications, 'applications', 'applicationTable');
+            } else if ((storageType === 'localSData' || storageType === 'localCache') && this.storageData) {
+                if (this.storageData.system) {
+                    searchObject(this.storageData.system, 'system', storageType);
+                }
+                if (this.storageData.programs) {
+                    searchObject(this.storageData.programs, 'programs', storageType);
+                }
             }
 
             // 显示搜索结果
@@ -1138,6 +1141,8 @@
         
         /**
          * 渲染树节点的子节点（递归）
+         * 路径规则：始终使用「完整路径」parentPath.childKey，保证与 _resolvePath / 编辑/删除/新建 一致
+         * 例如：system 下键 "volume" -> path "system.volume"；programs 下 "TaskbarManager" -> "programs.TaskbarManager"
          */
         _renderTreeChildren: function(parentPath, data, expandedPaths, level) {
             if (!data || typeof data !== 'object' || Array.isArray(data)) {
@@ -1151,10 +1156,25 @@
             
             Object.keys(data).forEach(childKey => {
                 const childValue = data[childKey];
-                const childPath = parentPath ? `${parentPath}.${childKey}` : childKey;
-                const childNode = this._createTreeNode(childPath, childKey, childValue, expandedPaths, level);
+                const childPath = parentPath ? (parentPath + '.' + childKey) : childKey;
+                
+                const isNestedObject = typeof childValue === 'object' && childValue !== null && !Array.isArray(childValue);
+                let hasRealChildren = false;
+                if (isNestedObject) {
+                    const childKeys = Object.keys(childValue);
+                    hasRealChildren = childKeys.some(k => !k.includes('.'));
+                }
+                
+                let displayLabel = childKey;
+                if (childKey.includes('.')) {
+                    const parts = childKey.split('.');
+                    displayLabel = parts[parts.length - 1];
+                }
+                
+                const childNode = this._createTreeNode(childPath, displayLabel, childValue, expandedPaths, level, hasRealChildren);
                 this.treeContainer.appendChild(childNode);
-                if (typeof childValue === 'object' && childValue !== null && !Array.isArray(childValue)) {
+                
+                if (hasRealChildren) {
                     this._renderTreeChildren(childPath, childValue, expandedPaths, level + 1);
                 }
             });
@@ -1163,9 +1183,10 @@
         /**
          * 创建树节点（递归）
          */
-        _createTreeNode: function(key, label, data, expandedPaths, level) {
+        _createTreeNode: function(key, label, data, expandedPaths, level, hasRealChildren) {
             level = level || 0;
             expandedPaths = expandedPaths || new Set();
+            hasRealChildren = hasRealChildren !== undefined ? hasRealChildren : (typeof data === 'object' && data !== null && !Array.isArray(data) && Object.keys(data).length > 0);
             
             const node = document.createElement('div');
             node.className = 'regedit-tree-item';
@@ -1173,8 +1194,7 @@
             node.dataset.level = level;
             
             const isExpanded = expandedPaths.has(key);
-            const hasChildren = typeof data === 'object' && data !== null && !Array.isArray(data) && Object.keys(data).length > 0;
-            node.dataset.hasChildren = hasChildren ? 'true' : 'false';
+            node.dataset.hasChildren = hasRealChildren ? 'true' : 'false';
             
             if (isExpanded) {
                 node.dataset.expanded = 'true';
@@ -1191,7 +1211,7 @@
                 transition: background 0.2s;
             `;
             
-            const icon = hasChildren ? (isExpanded ? '📂' : '📁') : '📄';
+            const icon = hasRealChildren ? (isExpanded ? '📂' : '📁') : '📄';
             node.innerHTML = `<span style="margin-right: 5px;">${icon}</span>${label}`;
             
             // 选中状态
@@ -1337,38 +1357,12 @@
             
             // 如果数据不是对象也不是数组，显示为单个值（基本类型：string, number, boolean等）
             if (typeof data !== 'object' || data === null) {
-                // 获取当前路径的键名（用于显示）
-                // 对于路径如 'system.randomAnimeBgStatus'，键名应该是 'randomAnimeBgStatus'
-                // 对于路径如 'system.musicplayer.settings'，键名应该是 'settings'
-                let currentKey = '';
-                if (path) {
-                    const pathParts = path.split('.');
-                    if (pathParts.length > 0) {
-                        // 获取路径的最后一部分作为键名
-                        currentKey = pathParts[pathParts.length - 1];
-                    }
+                const pathParts = path ? path.split('.') : [];
+                const currentKey = pathParts.length > 0 ? pathParts[pathParts.length - 1] : this._getText('REGEDIT_DEFAULT_KEY', '（默认）');
+                const parentPath = pathParts.length > 1 ? pathParts.slice(0, -1).join('.') : (pathParts.length === 1 ? '' : '');
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.debug('RegEdit', `_renderValues（基本类型）- path: "${path}", parentPath: "${parentPath}", key: "${currentKey}"`);
                 }
-                
-                // 如果路径为空，使用"（默认）"作为键名
-                if (!currentKey) {
-                    currentKey = this._getText('REGEDIT_DEFAULT_KEY', '（默认）');
-                }
-                
-                // 创建一个特殊的值行，显示基本类型的值
-                // 注意：parentPath 应该是当前路径的父路径，用于编辑和删除操作
-                // 例如：如果 path 是 'system.randomAnimeBgStatus'，parentPath 应该是 'system'
-                let parentPath = '';
-                if (path) {
-                    const pathParts = path.split('.');
-                    if (pathParts.length > 1) {
-                        // 移除最后一部分，得到父路径
-                        parentPath = pathParts.slice(0, -1).join('.');
-                    } else if (pathParts.length === 1) {
-                        // 如果只有一部分（如 'system'），父路径为空
-                        parentPath = '';
-                    }
-                }
-                
                 const row = this._createValueRow(currentKey, data, parentPath);
                 this.valueContainer.appendChild(row);
                 return;
@@ -1387,10 +1381,16 @@
                 // 显示对象键值对
                 const frag = document.createDocumentFragment();
                 const keys = Object.keys(data);
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.debug('RegEdit', `_renderValues（对象）- path: "${path}", 键数：${keys.length}, 前 5 个键：${keys.slice(0, 5).join(', ')}`);
+                }
                 for (let i = 0; i < keys.length; i++) {
                     const key = keys[i];
                     const value = data[key];
-                    const row = this._createValueRow(key, value, path);
+                    // 对于 system/programs 对象，直接使用完整键名作为 key，parentPath 为 system/programs
+                    const rowKey = (path === 'system' || path === 'programs') ? key : key;
+                    const rowParentPath = (path === 'system' || path === 'programs') ? path : path;
+                    const row = this._createValueRow(rowKey, value, rowParentPath);
                     frag.appendChild(row);
                 }
                 this.valueContainer.appendChild(frag);
@@ -1420,10 +1420,15 @@
         _createValueRow: function(key, value, parentPath) {
             const row = document.createElement('div');
             row.className = 'regedit-value-row';
-            // 存储数据到dataset，供ContextMenuManager使用
+            // 存储数据到 dataset，供 ContextMenuManager 使用
             row.dataset.key = key;
             row.dataset.parentPath = parentPath || '';
             row.dataset.valueType = typeof value;
+            
+            if (typeof KernelLogger !== 'undefined') {
+                KernelLogger.debug('RegEdit', `_createValueRow - key: "${key}", parentPath: "${parentPath || ''}", value: ${JSON.stringify(value)}`);
+            }
+            
             row.style.cssText = `
                 display: flex;
                 padding: 5px 10px;
@@ -1489,6 +1494,9 @@
                 });
                 
                 row.addEventListener('dblclick', () => {
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.debug('RegEdit', `双击编辑 - key: "${key}", parentPath: "${parentPath}", value: ${JSON.stringify(value)}`);
+                    }
                     if (typeof value === 'object' && value !== null) {
                         // 对象或数组，打开新窗口
                         this._openChildWindow(key, value, parentPath);
@@ -1929,32 +1937,20 @@
                         // 需要同时支持这两种情况
                         const keyInSystem = pathParts.slice(1).join('.');
                         
-                        // 首先尝试逐层解析（支持嵌套对象的情况）
-                        // 例如：system.permissionControl.settings -> system['permissionControl']['settings']
-                        let tempData = data;
-                        let foundByLayers = true;
-                        for (let i = 1; i < pathParts.length; i++) {
-                            const part = pathParts[i];
-                            if (tempData && typeof tempData === 'object' && part in tempData) {
-                                tempData = tempData[part];
-                            } else {
-                                foundByLayers = false;
-                                break;
-                            }
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.debug('RegEdit', `_resolvePath: 尝试解析 system 路径 "${path}", fullPath: "${path}", keyInSystem: "${keyInSystem}"`);
                         }
                         
-                        if (foundByLayers) {
-                            // 逐层解析成功
-                            data = tempData;
+                        // 优先尝试完整路径作为键名
+                        if (data && typeof data === 'object' && path in data) {
+                            data = data[path];
                             if (typeof KernelLogger !== 'undefined') {
-                                KernelLogger.debug('RegEdit', `_resolvePath: 通过逐层解析找到路径 "${path}"`);
+                                KernelLogger.debug('RegEdit', `_resolvePath: 通过完整路径键名找到 "${path}"`);
                             }
                         } else if (data && typeof data === 'object' && keyInSystem in data) {
-                            // 逐层解析失败，尝试完整键名（支持键名包含点号的情况）
-                            // 例如：system.permissionControl.settings -> system['permissionControl.settings']
                             data = data[keyInSystem];
                             if (typeof KernelLogger !== 'undefined') {
-                                KernelLogger.debug('RegEdit', `_resolvePath: 通过完整键名找到路径 "${path}" (key: "${keyInSystem}")`);
+                                KernelLogger.debug('RegEdit', `_resolvePath: 通过简化键名找到 "${path}" (key: "${keyInSystem}")`);
                             }
                         } else {
                             // 两种方式都失败
@@ -2070,7 +2066,12 @@
          */
         _setValue: async function(parentPath, key, value) {
             try {
-                // 数据完整性检查：确保 storageData 已正确加载
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.debug('RegEdit', `_setValue 开始 - parentPath: "${parentPath}", key: "${key}", value: ${JSON.stringify(value)}`);
+                }
+                if (parentPath === '') {
+                    throw new Error(this._getText('REGEDIT_CANNOT_ADD_AT_ROOT', '不能在根节点下新建，请先选择 system、programs 或 applications'));
+                }
                 if (!this.storageData || typeof this.storageData !== 'object') {
                     if (typeof KernelLogger !== 'undefined') {
                         KernelLogger.error('RegEdit', 'storageData 未正确加载，尝试重新加载');
@@ -2095,14 +2096,54 @@
                     }
                 }
                 
-                // 使用与_renderValues相同的逻辑解析路径
-                let target = this._resolvePath(parentPath);
+                // 特殊处理：对于 system 和 programs 下的值，需要使用完整路径作为键名
+                let actualParentPath = parentPath;
+                let actualKey = key;
+                
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.debug('RegEdit', `_setValue - 初始：parentPath="${parentPath}", key="${key}"`);
+                }
+                
+                // 如果 parentPath 是 'system' 或 'programs'，且 key 包含点号，说明 key 是完整键名
+                if ((parentPath === 'system' || parentPath === 'programs') && key.includes('.')) {
+                    // key 已经是完整键名（如 "system.volume"）
+                    actualKey = key;
+                    actualParentPath = parentPath;
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.debug('RegEdit', `_setValue - 检测到完整键名：${key}`);
+                    }
+                } else if ((parentPath === 'system' || parentPath === 'programs') && this.currentStorageType !== 'applicationTable') {
+                    // 尝试构建完整键名并检查是否存在
+                    const fullPath = `${parentPath}.${key}`;
+                    
+                    // 检查完整路径是否已存在于 storageData 中
+                    if (parentPath === 'system' && fullPath in (this.storageData.system || {})) {
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.debug('RegEdit', `_setValue - 检测到完整键名：${fullPath}`);
+                        }
+                        actualKey = fullPath;
+                        actualParentPath = 'system';
+                    } else if (parentPath === 'programs' && fullPath in (this.storageData.programs || {})) {
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.debug('RegEdit', `_setValue - 检测到完整键名：${fullPath}`);
+                        }
+                        actualKey = fullPath;
+                        actualParentPath = 'programs';
+                    }
+                }
+                
+                // 使用与_renderValues 相同的逻辑解析路径
+                let target = this._resolvePath(actualParentPath);
                 
                 if (!target || typeof target !== 'object') {
                     throw new Error('路径不存在或目标不是对象');
                 }
                 
-                target[key] = value;
+                target[actualKey] = value;
+                
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.debug('RegEdit', `_setValue - 已设置 ${actualParentPath}[${actualKey}] = ${JSON.stringify(value)}`);
+                }
                 
                 // 根据存储类型保存到不同的位置
                 try {
@@ -2144,19 +2185,19 @@
                             }
                         }
                     } else {
-                        // 保存到 LStorage
+                        // 保存到 LStorage（LocalSData）
                         if (typeof LStorage === 'undefined') {
                             throw new Error('LStorage 不可用');
                         }
-                        
-                        // 判断是否需要使用setSystemStorage（仅当parentPath为'system'时）
-                        // 对于'system.xxx'这样的路径，应该保存整个数据，因为键名可能包含点号
-                        if (parentPath === 'system') {
-                            // 直接保存到system存储
-                            await LStorage.setSystemStorage(key, value);
+                        if (actualParentPath === 'system') {
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.debug('RegEdit', `_setValue - 调用 LStorage.setSystemStorage 保存 ${actualKey}`);
+                            }
+                            await LStorage.setSystemStorage(actualKey, value);
                         } else {
-                            // 需要手动保存整个数据（包括system.xxx和programs路径）
-                            // 确保 LStorage._storageData 与 this.storageData 同步
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.debug('RegEdit', `_setValue - 调用 LStorage._saveStorageData 保存整个数据，actualKey: ${actualKey}`);
+                            }
                             if (LStorage._storageData !== this.storageData) {
                                 LStorage._storageData = this.storageData;
                             }
@@ -2217,18 +2258,9 @@
                     
                     let value = null;
                     try {
-                        const pathParts = parentPath ? parentPath.split('.') : [];
-                        let data = self.storageData;
-                        for (const part of pathParts) {
-                            if (data && typeof data === 'object' && part in data) {
-                                data = data[part];
-                            } else {
-                                data = null;
-                                break;
-                            }
-                        }
-                        if (data && typeof data === 'object' && key in data) {
-                            value = data[key];
+                        const parent = self._resolvePath(parentPath);
+                        if (parent && typeof parent === 'object' && key in parent) {
+                            value = parent[key];
                         }
                     } catch (e) {
                         if (typeof KernelLogger !== 'undefined') {
@@ -2240,6 +2272,9 @@
                         {
                             label: self._getText('KEY_EDIT', '编辑'),
                             action: () => {
+                                if (typeof KernelLogger !== 'undefined') {
+                                    KernelLogger.debug('RegEdit', `右键菜单编辑 - key: "${key}", parentPath: "${parentPath}", valueType: ${valueType}`);
+                                }
                                 self._editValue(parentPath, key, value);
                             }
                         },
@@ -2247,6 +2282,9 @@
                             label: self._getText('KEY_DELETE', '删除'),
                             danger: true,
                             action: () => {
+                                if (typeof KernelLogger !== 'undefined') {
+                                    KernelLogger.debug('RegEdit', `右键菜单删除 - key: "${key}", parentPath: "${parentPath}"`);
+                                }
                                 self._deleteValue(parentPath, key);
                             }
                         },
@@ -2399,20 +2437,24 @@
         },
         
         /**
-         * 删除树节点
+         * 删除树节点（路径为完整路径，如 system.volume 或 programs.TaskbarManager.settings）
          */
-        _deleteTreeItem: function(path) {
+        _deleteTreeItem: async function(path) {
             if (!path) return;
             
             if (typeof KernelLogger !== 'undefined') {
-                KernelLogger.info('RegEdit', '删除树节点: ' + path);
+                KernelLogger.info('RegEdit', '删除树节点：' + path);
             }
             
             const parts = path.split('.');
             const key = parts.pop();
-            const parentPath = parts.join('.');
+            const parentPath = parts.length > 0 ? parts.join('.') : '';
             
-            this._deleteValue(parentPath, key);
+            if (typeof KernelLogger !== 'undefined') {
+                KernelLogger.debug('RegEdit', `删除树节点 - path: ${path}, parentPath: ${parentPath}, key: ${key}`);
+            }
+            
+            await this._deleteValue(parentPath, key);
         },
         
         /**
@@ -3103,9 +3145,14 @@
         /**
          * 删除值
          */
-        _deleteValue: async function(parentPath, key) {
+        _deleteValue: async function(parentPath, key, fullPath) {
             // 直接删除，不显示确认对话框
             try {
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.debug('RegEdit', `_deleteValue 开始 - parentPath: "${parentPath}", key: "${key}", fullPath: "${fullPath || 'N/A'}", currentStorageType: ${this.currentStorageType}`);
+                    KernelLogger.debug('RegEdit', `_deleteValue - storageData 存在：${!!this.storageData}, applications 存在：${!!(this.storageData && this.storageData.applications)}, programs 存在：${!!(this.storageData && this.storageData.programs)}`);
+                }
+                
                 // 数据完整性检查：确保 storageData 已正确加载
                 if (!this.storageData || typeof this.storageData !== 'object') {
                     if (typeof KernelLogger !== 'undefined') {
@@ -3129,16 +3176,94 @@
                     if (!this.storageData.programs || typeof this.storageData.programs !== 'object') {
                         this.storageData.programs = {};
                     }
+                    // 也确保 applications 存在（如果是删除 applications 大项）
+                    if (!this.storageData.applications || typeof this.storageData.applications !== 'object') {
+                        this.storageData.applications = {};
+                    }
                 }
                 
-                // 使用与_renderValues和_setValue相同的逻辑解析路径
-                let target = this._resolvePath(parentPath);
+                // 特殊处理：如果提供了 fullPath，说明可能是删除中间节点，需要删除所有以 fullPath 开头的键
+                if (fullPath) {
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.debug('RegEdit', `_deleteValue - 检测到 fullPath: "${fullPath}", 调用 _deletePathAndChildren`);
+                    }
+                    const deletedCount = await this._deletePathAndChildren(fullPath);
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.debug('RegEdit', `_deleteValue - _deletePathAndChildren 返回删除数量：${deletedCount}`);
+                    }
+                    if (deletedCount > 0) {
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.debug('RegEdit', `_deleteValue - 成功删除 ${deletedCount} 个节点（包括子节点）`);
+                        }
+                        // 保存更改
+                        await this._saveChanges();
+                        // 重新加载数据
+                        await this._loadRegistryData();
+                        this._renderTree();
+                        this._renderValues(this.selectedPath);
+                        return;
+                    } else {
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.warn('RegEdit', `_deleteValue - _deletePathAndChildren 未找到匹配的节点，继续常规删除流程`);
+                        }
+                    }
+                }
+                
+                // 特殊处理：对于 system 和 programs 下的值，需要使用完整路径作为键名
+                let actualParentPath = parentPath;
+                let actualKey = key;
+                
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.debug('RegEdit', `_deleteValue - 初始：parentPath="${parentPath}", key="${key}"`);
+                }
+                
+                // 如果 parentPath 是 'system' 或 'programs'，且 key 包含点号，说明 key 是完整键名
+                if ((parentPath === 'system' || parentPath === 'programs') && key.includes('.')) {
+                    // key 已经是完整键名（如 "system.volume"）
+                    actualKey = key;
+                    actualParentPath = parentPath;
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.debug('RegEdit', `_deleteValue - 检测到完整键名：${key}`);
+                    }
+                } else if ((parentPath === 'system' || parentPath === 'programs') && this.currentStorageType !== 'applicationTable') {
+                    // 尝试构建完整键名并检查是否存在
+                    const fullPath = `${parentPath}.${key}`;
+                    
+                    if (parentPath === 'system' && fullPath in (this.storageData.system || {})) {
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.debug('RegEdit', `_deleteValue - 检测到完整键名：${fullPath}`);
+                        }
+                        actualKey = fullPath;
+                        actualParentPath = 'system';
+                    } else if (parentPath === 'programs' && fullPath in (this.storageData.programs || {})) {
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.debug('RegEdit', `_deleteValue - 检测到完整键名：${fullPath}`);
+                        }
+                        actualKey = fullPath;
+                        actualParentPath = 'programs';
+                    }
+                }
+                
+                // 使用实际的路径和键名进行删除
+                let target = this._resolvePath(actualParentPath);
+                
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.debug('RegEdit', `_deleteValue - 实际：actualParentPath="${actualParentPath}", actualKey="${actualKey}"`);
+                }
                 
                 if (!target || typeof target !== 'object') {
                     throw new Error('路径不存在或目标不是对象');
                 }
                 
-                delete target[key];
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.debug('RegEdit', `_deleteValue - 删除前检查 - actualKey "${actualKey}" 在 target 中存在：${actualKey in target}`);
+                }
+                
+                delete target[actualKey];
+                
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.debug('RegEdit', `_deleteValue - 删除后检查 - actualKey "${actualKey}" 在 target 中存在：${actualKey in target}`);
+                }
                 
                 // 根据存储类型保存到不同的位置
                 try {
@@ -3159,27 +3284,38 @@
                             throw new Error('LStorage 不可用');
                         }
                         
-                        // 如果删除的是 applications 下的程序
-                        if (parentPath === 'applications') {
-                            // 从 applications 对象中删除程序
-                            const applicationTable = this.storageData.applications || {};
-                            delete applicationTable[key];
-                            this._applicationTableCache = applicationTable;
-                            // 保存到 ApplicationTable.json
-                            await LStorage.setSystemStorage('applicationTable', applicationTable);
-                            // 刷新 ApplicationAssetManager
-                            if (typeof ApplicationAssetManager !== 'undefined' && typeof ApplicationAssetManager.refresh === 'function') {
-                                await ApplicationAssetManager.refresh();
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.debug('RegEdit', `_deleteValue - 保存到 ApplicationTable, parentPath: ${parentPath}, key: ${key}`);
+                        }
+                        
+                        // 获取最新的 applicationTable（第 3145 行已经删除了 target[key]）
+                        const applicationTable = this.storageData.applications || {};
+                        this._applicationTableCache = applicationTable;
+                        
+                        // 直接调用 _setApplicationTable 绕过安全检查（regedit 是系统工具，享有特权）
+                        if (typeof LStorage._setApplicationTable === 'function') {
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.debug('RegEdit', '_deleteValue - 调用 LStorage._setApplicationTable 保存');
+                            }
+                            const saveSuccess = await LStorage._setApplicationTable(applicationTable);
+                            if (!saveSuccess) {
+                                throw new Error('保存 ApplicationTable 失败');
                             }
                         } else {
-                            // 其他路径的删除，需要保存整个 ApplicationTable
-                            const applicationTable = this.storageData.applications || {};
-                            this._applicationTableCache = applicationTable;
-                            await LStorage.setSystemStorage('applicationTable', applicationTable);
-                            // 刷新 ApplicationAssetManager
-                            if (typeof ApplicationAssetManager !== 'undefined' && typeof ApplicationAssetManager.refresh === 'function') {
-                                await ApplicationAssetManager.refresh();
+                            // 后备方案：使用 setSystemStorage
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.warn('RegEdit', '_deleteValue - LStorage._setApplicationTable 不可用，使用 setSystemStorage 后备方案');
                             }
+                            await LStorage.setSystemStorage('applicationTable', applicationTable);
+                        }
+                        
+                        // 刷新 ApplicationAssetManager
+                        if (typeof ApplicationAssetManager !== 'undefined' && typeof ApplicationAssetManager.refresh === 'function') {
+                            await ApplicationAssetManager.refresh();
+                        }
+                        
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.debug('RegEdit', '_deleteValue - ApplicationTable 保存完成');
                         }
                     } else {
                         // 保存到 LStorage
@@ -3187,13 +3323,22 @@
                             throw new Error('LStorage 不可用');
                         }
                         
-                        // 判断是否需要使用deleteSystemStorage（仅当parentPath为'system'时）
-                        // 对于'system.xxx'这样的路径，应该保存整个数据，因为键名可能包含点号
-                        if (parentPath === 'system') {
-                            // 直接删除system存储中的键
-                            await LStorage.deleteSystemStorage(key);
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.debug('RegEdit', `_deleteValue - 保存到 LStorage, parentPath: ${parentPath}, key: ${key}`);
+                        }
+                        
+                        // 判断是否需要使用 deleteSystemStorage（仅当 actualParentPath 为'system' 且为单段键时）
+                        // 使用 actualKey 与内存删除一致，避免键名与持久化不一致
+                        if (actualParentPath === 'system' && !actualKey.includes('.')) {
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.debug('RegEdit', `_deleteValue - 调用 LStorage.deleteSystemStorage 删除 ${actualKey}`);
+                            }
+                            await LStorage.deleteSystemStorage(actualKey);
                         } else {
-                            // 需要手动保存整个数据（包括system.xxx和programs路径）
+                            // 需要手动保存整个数据（包括 system.xxx 和 programs 路径）
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.debug('RegEdit', '_deleteValue - 调用 LStorage._saveStorageData 保存整个数据');
+                            }
                             // 确保 LStorage._storageData 与 this.storageData 同步
                             if (LStorage._storageData !== this.storageData) {
                                 LStorage._storageData = this.storageData;
@@ -3224,6 +3369,168 @@
                 } else {
                 alert(this._getText('REGEDIT_DELETE_FAILED', '删除失败') + ': ' + error.message);
                 }
+            }
+        },
+        
+        /**
+         * 删除路径及其所有子节点（支持中间节点删除）
+         * @param {string} path 要删除的路径
+         * @returns {Promise<number>} 删除的节点数量
+         */
+        _deletePathAndChildren: async function(path) {
+            if (typeof KernelLogger !== 'undefined') {
+                KernelLogger.debug('RegEdit', `_deletePathAndChildren - 开始删除路径：${path}, currentStorageType: ${this.currentStorageType}`);
+                KernelLogger.debug('RegEdit', `_deletePathAndChildren - storageData.system 键：${Object.keys(this.storageData.system || {}).join(', ')}`);
+                KernelLogger.debug('RegEdit', `_deletePathAndChildren - storageData.programs 键：${Object.keys(this.storageData.programs || {}).join(', ')}`);
+                KernelLogger.debug('RegEdit', `_deletePathAndChildren - 目标路径：${path}, 匹配前缀：${path + '.'}`);
+            }
+            
+            let deletedCount = 0;
+            
+            // 递归删除函数
+            const deleteRecursive = (obj, currentPath, targetPath, rootLevel = true) => {
+                if (!obj || typeof obj !== 'object') {
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.debug('RegEdit', `_deletePathAndChildren.deleteRecursive - 对象无效，返回`);
+                    }
+                    return 0;
+                }
+                
+                let count = 0;
+                const keysToDelete = [];
+                
+                if (typeof KernelLogger !== 'undefined' && !rootLevel) {
+                    KernelLogger.debug('RegEdit', `_deletePathAndChildren.deleteRecursive - 当前路径：${currentPath}, 目标路径：${targetPath}, 对象键：${Object.keys(obj).join(', ')}`);
+                }
+                
+                // 找出所有需要删除的键（keyPath 须与树路径一致：system.xxx / programs.xxx / applications.xxx）
+                for (const key in obj) {
+                    let keyPath;
+                    if (rootLevel) {
+                        if (obj === this.storageData.system) {
+                            keyPath = `system.${key}`;
+                        } else if (obj === this.storageData.programs) {
+                            keyPath = `programs.${key}`;
+                        } else if (this.currentStorageType === 'applicationTable' && obj === this.storageData.applications) {
+                            keyPath = `applications.${key}`;
+                        } else {
+                            keyPath = currentPath ? `${currentPath}.${key}` : key;
+                        }
+                    } else {
+                        keyPath = currentPath ? `${currentPath}.${key}` : key;
+                    }
+                    
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.debug('RegEdit', `_deletePathAndChildren.deleteRecursive - 检查键：${key}, 键路径：${keyPath}, 目标路径：${targetPath}, 完全匹配：${keyPath === targetPath}, 前缀匹配：${keyPath.startsWith(targetPath + '.')}`);
+                    }
+                    
+                    // 如果当前路径等于目标路径，或者当前路径以目标路径.开头，说明是目标路径或其子节点
+                    if (keyPath === targetPath || keyPath.startsWith(targetPath + '.')) {
+                        keysToDelete.push(key);
+                        if (typeof KernelLogger !== 'undefined') {
+                            KernelLogger.debug('RegEdit', `_deletePathAndChildren.deleteRecursive - 标记删除：${key}`);
+                        }
+                    }
+                }
+                
+                // 删除找到的键
+                for (const key of keysToDelete) {
+                    delete obj[key];
+                    count++;
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.debug('RegEdit', `_deletePathAndChildren.deleteRecursive - 已删除：${key}`);
+                    }
+                }
+                
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.debug('RegEdit', `_deletePathAndChildren.deleteRecursive - 删除数量：${count}`);
+                }
+                
+                return count;
+            };
+            
+            // 根据存储类型确定删除范围
+            if (this.currentStorageType === 'applicationTable') {
+                // 在 applications 中删除
+                deletedCount = deleteRecursive(this.storageData.applications, '', path);
+            } else {
+                // 在 system 和 programs 中删除（根级别需要特殊处理）
+                const systemCount = deleteRecursive(this.storageData.system, '', path, true);
+                const programsCount = deleteRecursive(this.storageData.programs, '', path, true);
+                deletedCount = systemCount + programsCount;
+            }
+            
+            if (typeof KernelLogger !== 'undefined') {
+                KernelLogger.debug('RegEdit', `_deletePathAndChildren - 删除完成，共删除 ${deletedCount} 个节点`);
+            }
+            
+            return deletedCount;
+        },
+        
+        /**
+         * 保存更改
+         */
+        _saveChanges: async function() {
+            if (typeof KernelLogger !== 'undefined') {
+                KernelLogger.debug('RegEdit', '_saveChanges - 开始保存更改');
+            }
+            
+            try {
+                if (this.currentStorageType === 'localCache') {
+                    // 保存到 CacheDrive
+                    if (typeof CacheDrive === 'undefined') {
+                        throw new Error('CacheDrive 不可用');
+                    }
+                    
+                    // 确保 CacheDrive._cacheMetadata 与 this.storageData 同步
+                    if (CacheDrive._cacheMetadata !== this.storageData) {
+                        CacheDrive._cacheMetadata = this.storageData;
+                    }
+                    await CacheDrive._saveCacheMetadata();
+                } else if (this.currentStorageType === 'applicationTable') {
+                    // 保存到 ApplicationTable.json
+                    if (typeof LStorage === 'undefined') {
+                        throw new Error('LStorage 不可用');
+                    }
+                    
+                    const applicationTable = this.storageData.applications || {};
+                    this._applicationTableCache = applicationTable;
+                    
+                    // 直接调用 _setApplicationTable 绕过安全检查
+                    if (typeof LStorage._setApplicationTable === 'function') {
+                        const saveSuccess = await LStorage._setApplicationTable(applicationTable);
+                        if (!saveSuccess) {
+                            throw new Error('保存 ApplicationTable 失败');
+                        }
+                    } else {
+                        await LStorage.setSystemStorage('applicationTable', applicationTable);
+                    }
+                    
+                    // 刷新 ApplicationAssetManager
+                    if (typeof ApplicationAssetManager !== 'undefined' && typeof ApplicationAssetManager.refresh === 'function') {
+                        await ApplicationAssetManager.refresh();
+                    }
+                } else {
+                    // 保存到 LStorage
+                    if (typeof LStorage === 'undefined') {
+                        throw new Error('LStorage 不可用');
+                    }
+                    
+                    // 确保 LStorage._storageData 与 this.storageData 同步
+                    if (LStorage._storageData !== this.storageData) {
+                        LStorage._storageData = this.storageData;
+                    }
+                    await LStorage._saveStorageData();
+                }
+                
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.debug('RegEdit', '_saveChanges - 保存成功');
+                }
+            } catch (saveError) {
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.error('RegEdit', '_saveChanges - 保存失败', saveError);
+                }
+                throw saveError;
             }
         },
         

@@ -3243,6 +3243,13 @@ this.fileCountText.textContent = this._getText('FM_ITEMS_COUNT_FOUND', '找到 {
                 const extension = fileName.split('.').pop()?.toLowerCase() || '';
                 const isSvg = extension === 'svg';
                 
+                // 优先使用「扩展名默认打开程序」关联（向后兼容：无 API 或未设置时返回 null，走下方原有逻辑）
+                const assocProgram = await this._getFileAssoc(extension);
+                if (assocProgram) {
+                    await this._openFileWithProgram(item, assocProgram);
+                    return;
+                }
+                
                 // ZOM 文件默认用 zominstall 安装
                 if (fileType === 'ZOM') {
                     await this._openFileWithZominstall(item);
@@ -3294,6 +3301,187 @@ this.fileCountText.textContent = this._getText('FM_ITEMS_COUNT_FOUND', '找到 {
                         }
                     }
                 }
+            }
+        },
+
+        /**
+         * 获取扩展名对应的默认打开程序（FileAssoc.get）
+         * 无内核 API 或未设置时返回 null，保证向后兼容
+         */
+        _getFileAssoc: async function(ext) {
+            if (!ext || typeof ext !== 'string') return null;
+            if (typeof ProcessManager === 'undefined' || typeof ProcessManager.callKernelAPI !== 'function') return null;
+            try {
+                const program = await ProcessManager.callKernelAPI(this.pid, 'FileAssoc.get', [ext]);
+                return (program && typeof program === 'string' && program.trim()) ? program.trim() : null;
+            } catch (e) {
+                return null;
+            }
+        },
+
+        /**
+         * 使用指定程序打开文件（通用：传入程序名与 item）
+         */
+        _openFileWithProgram: async function(item, programName) {
+            if (!item || !item.path || !programName || typeof programName !== 'string') return;
+            const name = programName.trim();
+            if (!name) return;
+            if (typeof ProcessManager === 'undefined' || typeof ProcessManager.startProgram !== 'function') {
+                if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                    try {
+                        await NotificationManager.createNotification(this.pid, {
+                            type: 'snapshot',
+                            title: this._getText('FM_TITLE', '文件管理器'),
+                            content: this._getText('FM_PM_UNAVAILABLE', 'ProcessManager 不可用'),
+                            duration: 3000
+                        });
+                    } catch (e) {}
+                }
+                return;
+            }
+            const cwd = this._getCurrentPath() || 'D:';
+            try {
+                await ProcessManager.startProgram(name, {
+                    args: [item.path],
+                    cwd: cwd
+                });
+            } catch (e) {
+                if (typeof KernelLogger !== 'undefined') {
+                    KernelLogger.warn('FileManager', '使用程序打开文件失败: ' + name, e);
+                }
+                if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                    try {
+                        await NotificationManager.createNotification(this.pid, {
+                            type: 'snapshot',
+                            title: this._getText('FM_TITLE', '文件管理器'),
+                            content: (this._getText('FM_OPEN_FAILED_WITH', '使用「{0}」打开失败: {1}') || '使用「{0}」打开失败: {1}')
+                                .replace('{0}', name).replace('{1}', (e && e.message) || String(e)),
+                            duration: 4000
+                        });
+                    } catch (e2) {}
+                }
+            }
+        },
+
+        /**
+         * 显示「打开方式」子窗口：程序列表 + 可选「设为默认」（通过 GUIManager 注册为独立子窗口，可拖动、有关闭按钮）
+         */
+        _showOpenWithDialog: async function(item, extension, fileType) {
+            if (!item || !item.path || typeof ProcessManager === 'undefined') return;
+            const ext = (extension && typeof extension === 'string') ? extension.trim().toLowerCase() : '';
+            const extKey = ext ? (ext.startsWith('.') ? ext : '.' + ext) : '';
+            // 与计划程序/任务管理器一致：优先用 ApplicationAssetManager 获取全部已安装程序（静态+动态），而非仅运行中或仅 ApplicationTable
+            let programNames = [];
+            if (typeof ApplicationAssetManager !== 'undefined' && typeof ApplicationAssetManager.listAllPrograms === 'function') {
+                try {
+                    const programs = ApplicationAssetManager.listAllPrograms();
+                    programNames = Array.isArray(programs) ? programs.map(function(p) { return (p && (p.name != null)) ? String(p.name) : (typeof p === 'string' ? p : ''); }).filter(Boolean) : [];
+                } catch (e) {
+                    programNames = [];
+                }
+            }
+            if (programNames.length === 0 && typeof ProcessManager !== 'undefined' && typeof ProcessManager.callKernelAPI === 'function') {
+                try {
+                    programNames = await ProcessManager.callKernelAPI(this.pid, 'Application.listNames', []) || [];
+                } catch (e) {
+                    programNames = [];
+                }
+            }
+            if (!Array.isArray(programNames)) programNames = [];
+            programNames.sort(function(a, b) { return String(a).toLowerCase().localeCompare(String(b).toLowerCase()); });
+            const self = this;
+            if (this._openWithWindowId && typeof GUIManager !== 'undefined' && GUIManager.unregisterWindow) {
+                try { GUIManager.unregisterWindow(this._openWithWindowId); } catch (e) {}
+                this._openWithWindowId = null;
+            }
+            const windowDiv = document.createElement('div');
+            windowDiv.className = 'filemanager-openwith-window zos-gui-window';
+            windowDiv.style.cssText = 'width:320px;height:360px;min-width:280px;min-height:280px;display:flex;flex-direction:column;overflow:hidden;box-sizing:border-box;';
+            const content = document.createElement('div');
+            content.style.cssText = 'flex:1;display:flex;flex-direction:column;padding:14px 16px;overflow:hidden;';
+            const listWrap = document.createElement('div');
+            listWrap.style.cssText = 'flex:1;overflow:auto;margin-bottom:12px;';
+            const list = document.createElement('div');
+            list.style.cssText = 'display:flex;flex-direction:column;gap:2px;';
+            const checkDefault = document.createElement('input');
+            checkDefault.type = 'checkbox';
+            checkDefault.id = 'filemanager-openwith-default-' + Date.now();
+            const checkLabel = document.createElement('label');
+            checkLabel.htmlFor = checkDefault.id;
+            checkLabel.textContent = extKey
+                ? (this._getText('FM_ALWAYS_USE_FOR_EXT', '始终使用此程序打开 {0} 文件') || '始终使用此程序打开 {0} 文件').replace('{0}', extKey)
+                : (this._getText('FM_ALWAYS_USE_THIS', '始终使用此程序打开') || '始终使用此程序打开');
+            checkLabel.style.cssText = 'font-size:12px;cursor:pointer;margin-left:6px;';
+            const checkWrap = document.createElement('div');
+            checkWrap.style.cssText = 'display:flex;align-items:center;margin-bottom:10px;flex-shrink:0;';
+            checkWrap.appendChild(checkDefault);
+            checkWrap.appendChild(checkLabel);
+            const cancelBtn = document.createElement('button');
+            cancelBtn.textContent = this._getText('FM_CANCEL', '取消');
+            cancelBtn.style.cssText = 'align-self:flex-start;padding:6px 14px;border-radius:6px;border:none;cursor:pointer;background:rgba(255,255,255,0.1);color:inherit;flex-shrink:0;';
+            function closeSubWindow() {
+                if (self._openWithWindowId && typeof GUIManager !== 'undefined' && GUIManager.unregisterWindow) {
+                    try { GUIManager.unregisterWindow(self._openWithWindowId); } catch (e) {}
+                    self._openWithWindowId = null;
+                }
+            }
+            programNames.forEach(function(name) {
+                const row = document.createElement('div');
+                row.textContent = name;
+                row.dataset.program = name;
+                row.style.cssText = 'padding:8px 10px;border-radius:6px;cursor:pointer;font-size:13px;';
+                row.addEventListener('mouseenter', function() { row.style.background = 'rgba(255,255,255,0.08)'; });
+                row.addEventListener('mouseleave', function() { row.style.background = ''; });
+                row.addEventListener('click', function() {
+                    const program = row.dataset.program;
+                    const setDefault = checkDefault && checkDefault.checked;
+                    if (setDefault && extKey && typeof ProcessManager.callKernelAPI === 'function') {
+                        ProcessManager.callKernelAPI(self.pid, 'FileAssoc.set', [extKey, program]).then(function() {
+                            if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                                NotificationManager.createNotification(self.pid, {
+                                    type: 'snapshot',
+                                    title: self._getText('FM_TITLE', '文件管理器'),
+                                    content: (self._getText('FM_DEFAULT_SET_FOR_EXT', '已设为 {0} 的默认打开程序') || '已设为 {0} 的默认打开程序').replace('{0}', extKey),
+                                    duration: 2000
+                                });
+                            }
+                        }).catch(function(err) {
+                            if (typeof NotificationManager !== 'undefined' && typeof NotificationManager.createNotification === 'function') {
+                                NotificationManager.createNotification(self.pid, {
+                                    type: 'snapshot',
+                                    title: self._getText('FM_TITLE', '文件管理器'),
+                                    content: (self._getText('FM_SET_DEFAULT_FAILED', '设为默认失败: {0}') || '设为默认失败: {0}').replace('{0}', (err && err.message) || String(err)),
+                                    duration: 3000
+                                });
+                            }
+                        });
+                    }
+                    closeSubWindow();
+                    self._openFileWithProgram(item, program);
+                });
+                list.appendChild(row);
+            });
+            listWrap.appendChild(list);
+            content.appendChild(listWrap);
+            content.appendChild(checkWrap);
+            content.appendChild(cancelBtn);
+            windowDiv.appendChild(content);
+            cancelBtn.addEventListener('click', closeSubWindow);
+            const guiContainer = (typeof ProcessManager !== 'undefined' && typeof ProcessManager.getGUIContainer === 'function')
+                ? ProcessManager.getGUIContainer() : document.getElementById('gui-container');
+            if (guiContainer) guiContainer.appendChild(windowDiv);
+            const windowTitle = this._getText('FM_OPEN_WITH_TITLE', '打开方式') + (extKey ? ' (' + extKey + ')' : '');
+            const windowInfo = (typeof GUIManager !== 'undefined' && typeof GUIManager.registerWindow === 'function')
+                ? GUIManager.registerWindow(this.pid, windowDiv, {
+                    title: windowTitle,
+                    icon: null,
+                    onClose: function() {
+                        self._openWithWindowId = null;
+                    }
+                })
+                : null;
+            if (windowInfo && windowInfo.windowId) {
+                this._openWithWindowId = windowInfo.windowId;
             }
         },
 
@@ -5589,6 +5777,21 @@ this.fileCountText.textContent = this._getText('FM_ITEMS_COUNT_FOUND', '找到 {
                             });
                         }
                     }
+                    // 所有文件类型均提供「打开方式…」（选择其他程序打开，可设为默认）
+                    if (!isSelectorMode) {
+                        items.push({ type: 'separator' });
+                        items.push({
+                            label: this._getText('FM_OPEN_WITH_OTHER', '打开方式…'),
+                            icon: '📂',
+                            action: () => {
+                                self._showOpenWithDialog(
+                                    { type: 'file', path: itemPath, name: itemName, fileType: fileType },
+                                    extension,
+                                    fileType
+                                );
+                            }
+                        });
+                    }
                     }
                     
                     // 非选择器模式下显示文件操作菜单
@@ -7469,7 +7672,10 @@ this.fileCountText.textContent = this._getText('FM_ITEMS_COUNT_FOUND', '找到 {
                     PermissionManager.PERMISSION.KERNEL_DISK_CREATE,
                     PermissionManager.PERMISSION.KERNEL_DISK_LIST,
                     PermissionManager.PERMISSION.SYSTEM_NOTIFICATION,
-                    PermissionManager.PERMISSION.EVENT_LISTENER
+                    PermissionManager.PERMISSION.EVENT_LISTENER,
+                    PermissionManager.PERMISSION.SYSTEM_STORAGE_READ,
+                    PermissionManager.PERMISSION.SYSTEM_STORAGE_WRITE,
+                    PermissionManager.PERMISSION.FILE_ASSOC_MANAGE
                 ] : [],
                 metadata: {
                     allowMultipleInstances: true

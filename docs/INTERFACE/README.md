@@ -24,6 +24,8 @@
 
 使用 **User JWT** 的接口（FSDirve、CompressionDirve、DISKMANAGER）必须在 GET 参数中携带 `upid`。详见 [RandomSecurity](../API/RandomSecurity.md) 与 [SystemInformation](../API/SystemInformation.md)。
 
+**401 与系统异常**：当携带 JWT（SystemToken 或 UserToken）的请求收到后端 **401** 时，内核 NetworkManager 会触发系统级异常（蓝屏）。后端应对「未认证/令牌无效」返回 401、「已认证但无权限」返回 403。详见 [jwtVerify](./jwtVerify.md#401-与内核行为) 与 [NetworkManager API](../API/NetworkManager.md)。
+
 ## 相关文档
 
 - [API 文档索引](../API/README.md) - 内核模块 API

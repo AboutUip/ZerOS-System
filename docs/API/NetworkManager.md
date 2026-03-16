@@ -476,6 +476,14 @@ NetworkManager 拦截全局 `fetch` 和 `XMLHttpRequest`，对未携带 JWT 的 
 
 应用无需手动添加 `Authorization` 头，内核和应用请求会由拦截器按规则注入。详见 [RandomSecurity API](./RandomSecurity.md)。
 
+### 401 响应处理（CVS-ZEROS-016 补充防护）
+
+当某次请求**携带了 JWT**（SystemToken 或 UserToken，由内核注入或请求已带），且该请求的 HTTP 响应状态码为 **401 Unauthorized** 时，NetworkManager 会将其视为「身份被服务器拒绝」的严重安全事件，并**触发系统级异常（蓝屏）**：调用 `ExceptionHandler.reportException(ExceptionLevel.SYSTEM, ...)`，停止所有程序、显示蓝屏、自检后自动重启。同一会话内只触发一次。
+
+- **仅 401**：403 Forbidden 表示「已认证但无权限」，不触发；仅 401 表示「身份被拒绝」。
+- **适用范围**：对 SystemToken 与 UserToken 一视同仁；仅对同源且实际携带 JWT 的请求检查响应状态。
+- **后端约定**：需鉴权的接口应对「未认证/令牌无效」返回 401，对「已认证但无权限」返回 403，参见 [jwtVerify 接口文档](../INTERFACE/jwtVerify.md)。
+
 ## 注意事项
 
 1. **单例模式**: NetworkManager 是单例，通过 POOL 获取实例

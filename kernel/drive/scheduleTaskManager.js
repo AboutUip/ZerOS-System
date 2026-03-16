@@ -221,11 +221,16 @@ class ScheduleTaskManager {
         ScheduleTaskManager._systemShuttingDown = true;
         KernelLogger.info("ScheduleTaskManager", "系统关闭中，执行关闭任务");
         
-        // 立即清空所有 JWT（包括文件），关机/重启时调用
+        // 立即清空所有 JWT（包括文件），关机/重启时调用（支持多后端，不写死 .php）
         try {
-            const clearUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrl)
-                ? SystemInformation.buildServiceUrl(SystemInformation.SERVICE_NAMES.RANDOM_SECURITY, { action: 'clear' })
-                : (typeof window !== 'undefined' && window.location ? window.location.origin : '') + '/system/service/randomSecurity.php?action=clear';
+            let clearUrl;
+            if (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrl) {
+                clearUrl = SystemInformation.buildServiceUrl(SystemInformation.SERVICE_NAMES.RANDOM_SECURITY, { action: 'clear' });
+            } else if (typeof window !== 'undefined' && window.location) {
+                clearUrl = window.location.origin + '/system/service/randomSecurity.php?action=clear';
+            } else {
+                clearUrl = '';
+            }
             if (clearUrl && typeof navigator !== 'undefined' && typeof navigator.sendBeacon === 'function') {
                 navigator.sendBeacon(clearUrl, '');
                 if (typeof KernelLogger !== 'undefined') {

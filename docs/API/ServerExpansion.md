@@ -206,11 +206,13 @@ await ServerExpansion.start('myservice');
 ## 内置服务示例
 
 - **notice**（`server-notice.js`）：系统公告通知获取，每 3 分钟拉取公告 API，按等级弹通知或打日志。详见 [通知服务（ServerNotice）](../SERVER/ServerNotice.md)。
+- **gesturecontrol**（`server-gesturecontrol.js`）：摄像头手势识别，可配置各手势执行关闭/最小化/最大化/运行程序，POOL 暴露 `SERVER > GestureControl`。详见 [手势控制服务（ServerGestureControl）](../SERVER/ServerGestureControl.md)。
 
 ## 相关文档
 
 - [服务文档（SERVER）](../SERVER/README.md) - D/server 服务模块编写与各服务说明
 - [服务模块编写指南](../SERVER/ServiceModule.md) - D/server 服务模块的编写约定与示例
 - [通知服务（ServerNotice）](../SERVER/ServerNotice.md) - 内置通知服务说明与 ZerOS API 使用
+- [手势控制服务（ServerGestureControl）](../SERVER/ServerGestureControl.md) - 手势识别服务与 POOL API
 - [扩展与插件索引](../PLUGINS/README.md) - 语言包等扩展文档
 - [Starter](./Starter.md) - BootLoader 与模块加载顺序

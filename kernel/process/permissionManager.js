@@ -113,7 +113,10 @@ class PermissionManager {
         LANGUAGES_WRITE: 'LANGUAGES_WRITE',                 // 加载语言包、设置当前语言
 
         // 服务扩展权限（最高等级，仅进程管理器暴露的 Server.* API 需要）
-        SERVER_SERVICE_MANAGE: 'SERVER_SERVICE_MANAGE'       // 启动/停止/查询 D/server 服务（危险权限）
+        SERVER_SERVICE_MANAGE: 'SERVER_SERVICE_MANAGE',      // 启动/停止/查询 D/server 服务（危险权限）
+
+        // 文件关联权限（扩展名默认打开程序，由文件管理器与安全软件等使用）
+        FILE_ASSOC_MANAGE: 'FILE_ASSOC_MANAGE'               // 设置/清除扩展名默认打开程序（危险权限）
     };
     
     /**
@@ -220,6 +223,9 @@ class PermissionManager {
 
         // 服务扩展权限（最高等级）
         [PermissionManager.PERMISSION.SERVER_SERVICE_MANAGE]: PermissionManager.PERMISSION_LEVEL.DANGEROUS,
+
+        // 文件关联管理（危险权限，仅管理员可授予）
+        [PermissionManager.PERMISSION.FILE_ASSOC_MANAGE]: PermissionManager.PERMISSION_LEVEL.DANGEROUS,
     };
     
     // ==================== 内部状态 ====================
