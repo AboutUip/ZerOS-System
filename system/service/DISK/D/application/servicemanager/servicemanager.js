@@ -35,6 +35,7 @@
         _statusRefreshTimer: null,
         _STATUS_REFRESH_INTERVAL_MS: 3000,
         _refreshingServiceList: false,
+        _pendingRefreshServiceList: false,
 
         /** 是否具备服务扩展 API（kernelAPI 可用且支持 Server.*） */
         _hasServerAPI: function () {
@@ -58,6 +59,8 @@
         __init__: async function (pid, initArgs) {
             this.pid = pid;
             this._kernelAPI = (initArgs && initArgs.kernelAPI) || null;
+            this._refreshingServiceList = false;
+            this._pendingRefreshServiceList = false;
 
             if (typeof KernelLogger !== 'undefined') {
                 KernelLogger.info('SERVICEMANAGER', '系统服务管理程序初始化');
@@ -129,6 +132,8 @@
                 }
             }
             this.eventHandlers = [];
+            this._refreshingServiceList = false;
+            this._pendingRefreshServiceList = false;
             if (this.window && this._onWindowFocusRefresh) {
                 this.window.removeEventListener('focus', this._onWindowFocusRefresh);
                 this._onWindowFocusRefresh = null;
@@ -385,7 +390,10 @@
         },
 
         _refreshServiceList: async function () {
-            if (this._refreshingServiceList) return;
+            if (this._refreshingServiceList) {
+                this._pendingRefreshServiceList = true;
+                return;
+            }
             this._refreshingServiceList = true;
             var listEl = this.window.querySelector('[data-role="list"]');
             var detailEl = this.window.querySelector('[data-role="detail"]');
@@ -459,6 +467,12 @@
             }
             } finally {
                 this._refreshingServiceList = false;
+                if (this._pendingRefreshServiceList && this.window && this.window.parentElement) {
+                    this._pendingRefreshServiceList = false;
+                    setTimeout(() => {
+                        this._refreshServiceList();
+                    }, 0);
+                }
             }
         },
 

@@ -93,6 +93,10 @@ await this.kernelAPI.call('FileSystem.create', ['D:/path/to/newdir', 'directory'
 // List directory (requires KERNEL_DISK_LIST)
 const files = await this.kernelAPI.call('FileSystem.list', ['D:/path/to/dir']);
 
+// Check path existence (requires KERNEL_DISK_LIST)
+const info = await this.kernelAPI.call('FileSystem.exists', ['D:/path/to/file.txt']);
+// info: { path, exists, type: 'file' | 'directory' | null, ...metadata }
+
 // Note: Path format is "Disk:/path/to/file" (e.g., "C:/Users/file.txt", "D:/system/app.js")
 // Supports A-Z partitions (C:, D:, E:, etc.)
 ```
