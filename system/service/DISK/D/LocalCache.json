@@ -24,30 +24,22 @@
       }
     },
     "TaskbarManager": {
-      "weather:泽州县": {
+      "weather:中原": {
         "value": null,
-        "expiresAt": 1773713842473,
-        "createdAt": 1773670642473,
-        "updatedAt": 1773670642473,
-        "size": 2668,
-        "isFileBacked": true
-      },
-      "weather:泽州": {
-        "value": null,
-        "expiresAt": 1773721692477,
-        "createdAt": 1773678492477,
-        "updatedAt": 1773678492477,
-        "size": 2671,
+        "expiresAt": 1777846706340,
+        "createdAt": 1777803506340,
+        "updatedAt": 1777803506340,
+        "size": 2801,
         "isFileBacked": true
       }
     },
     "exploit": {
       "system.dailyQuote": {
-        "value": "你要明白，你爱的不是那段时光，不是那个念念不忘的人，不是那段经历，你爱的只是当年那个羽翼未丰但依然执迷不悔的自己。",
+        "value": "不管有多痛多受伤，真正受伤的人一定不是你自己。",
         "expiresAt": 0,
-        "createdAt": 1773685482629,
-        "updatedAt": 1773685482629,
-        "size": 173,
+        "createdAt": 1777819646120,
+        "updatedAt": 1777819646120,
+        "size": 71,
         "isFileBacked": false
       }
     }

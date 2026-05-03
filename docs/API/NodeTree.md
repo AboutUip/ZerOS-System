@@ -136,6 +136,31 @@ await this.kernelAPI.call('FileSystem.delete', ['D:/app/old.txt']);
 const { files, directories } = await this.kernelAPI.call('FileSystem.list', ['D:/app']);
 ```
 
+### `FileSystem.exists`
+
+检查文件或目录是否存在。该接口只做存在性与类型判断，适合在读取文件前使用，避免把不存在路径作为 `FileSystem.read` 异常处理。
+
+**调用方式**：`ProcessManager.callKernelAPI(pid, 'FileSystem.exists', [path])` 或 `initArgs.kernelAPI.call('FileSystem.exists', [path])`
+
+**参数**：
+- `path` (string)：文件或目录路径，如 `D:/app/readme.txt`、`D:/app` 或 `D:`
+
+**返回值**：`Promise<Object>` - 形如 `{ path, exists, type }`：
+- `path` (string)：规范化后的路径
+- `exists` (boolean)：目标是否存在
+- `type` (string|null)：`'file'`、`'directory'` 或 `null`
+- 文件存在时可能包含 `size`、`created`、`modified`、`extension` 等元数据
+
+**权限**：`KERNEL_DISK_LIST`
+
+**示例**：
+```javascript
+const info = await this.kernelAPI.call('FileSystem.exists', ['D:/app/readme.txt']);
+if (info.exists && info.type === 'file') {
+    const content = await this.kernelAPI.call('FileSystem.read', ['D:/app/readme.txt']);
+}
+```
+
 ---
 
 以下为内核内部使用的 NodeTree 类与节点/目录操作说明。

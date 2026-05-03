@@ -3160,33 +3160,27 @@ const url = `/system/service/FSDirve.php?path=D:/path with spaces/file.txt`;
 
 ### Q: 如何检查文件或目录是否存在？
 
-A: 使用 `FileSystem.list` 或 `FileSystem.read`：
+A: 使用 `FileSystem.exists`。它返回 `{ path, exists, type }`，其中 `type` 为 `'file'`、`'directory'` 或 `null`，需要 `KERNEL_DISK_LIST` 权限：
 
 ```javascript
-try {
-    // 尝试读取文件
-    await ProcessManager.callKernelAPI(
-        this.pid,
-        'FileSystem.read',
-        ['D:/file.txt']
-    );
+const info = await ProcessManager.callKernelAPI(
+    this.pid,
+    'FileSystem.exists',
+    ['D:/file.txt']
+);
+
+if (info.exists && info.type === 'file') {
     console.log('文件存在');
-} catch (error) {
-    if (error.message.includes('不存在') || error.message.includes('not found')) {
-        console.log('文件不存在');
-    }
 }
 
-// 或者列出目录内容
-try {
-    const list = await ProcessManager.callKernelAPI(
-        this.pid,
-        'FileSystem.list',
-        ['D:/directory']
-    );
-    console.log('目录存在，包含', list.length, '个项目');
-} catch (error) {
-    console.log('目录不存在');
+const dirInfo = await ProcessManager.callKernelAPI(
+    this.pid,
+    'FileSystem.exists',
+    ['D:/directory']
+);
+
+if (dirInfo.exists && dirInfo.type === 'directory') {
+    console.log('目录存在');
 }
 ```
 

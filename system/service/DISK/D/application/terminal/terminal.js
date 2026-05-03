@@ -8935,6 +8935,8 @@ function escapeHtml(s){
                     let foundInBin = false;  // 标记是否在 D/bin/ 中找到文件
                     let foundInRegistry = false;  // 标记是否在程序注册表中找到
                     let foundInEnv = false;  // 标记是否在环境变量中找到
+                    let registryProgramType = null;  // 程序注册表中的类型（GUI/CLI等）
+                    let registryLookupAvailable = false;  // 标记程序注册表是否可用于判断命令有效性
                     
                     // 步骤0: 先检查程序注册表（如果程序已注册，跳过 D:/bin 检查，避免不必要的 404 请求）
                     let AssetManager = null;
@@ -8949,14 +8951,17 @@ function escapeHtml(s){
                     }
                     
                     if (AssetManager && typeof AssetManager.hasProgram === 'function') {
+                        registryLookupAvailable = true;
                         const hasProgram = AssetManager.hasProgram(cmd);
                         if (hasProgram) {
                             foundInRegistry = true;
-                            isCLIProgram = true;
                             programInfo = AssetManager.getProgramInfo(cmd);
+                            const metadata = (programInfo && programInfo.metadata) || {};
+                            registryProgramType = (programInfo && (programInfo.type || metadata.type)) || null;
+                            isCLIProgram = registryProgramType === 'CLI';
                             programName = cmd;
                             if (typeof KernelLogger !== 'undefined') {
-                                KernelLogger.debug('Terminal', `从程序注册表找到程序: ${cmd}, 跳过 D:/bin 检查`);
+                                KernelLogger.debug('Terminal', `从程序注册表找到程序: ${cmd}, 类型: ${registryProgramType || 'UNKNOWN'}, 跳过 D:/bin 检查`);
                             }
                         }
                     }
@@ -8964,174 +8969,124 @@ function escapeHtml(s){
                     // 步骤1: 如果程序注册表中没找到，尝试从 D/bin/ 目录查找同名 .js 文件
                     if (!foundInRegistry) {
                         try {
-                            // 获取 SystemInformation（用于构建 FSDirve URL）
-                            let SystemInfo = null;
-                            if (typeof SystemInformation !== 'undefined') {
-                                SystemInfo = SystemInformation;
+                            // 通过内核 FileSystem API 检查 D:/bin，避免直接请求 PHP 产生 404 或绕过 upid 权限链路。
+                            let ProcessMgr = null;
+                            if (typeof ProcessManager !== 'undefined') {
+                                ProcessMgr = ProcessManager;
                             } else if (typeof safePoolGet === 'function') {
                                 try {
-                                    SystemInfo = safePoolGet('KERNEL_GLOBAL_POOL', 'SystemInformation');
+                                    ProcessMgr = safePoolGet('KERNEL_GLOBAL_POOL', 'ProcessManager');
                                 } catch (e) {
-                                    // 忽略错误
+                                    if (typeof KernelLogger !== 'undefined') {
+                                        KernelLogger.error('Terminal', '获取ProcessManager失败', e);
+                                    }
                                 }
                             }
-                            
-                            if (SystemInfo && cmd && typeof cmd === 'string' && cmd.trim() !== '') {
-                                // 构建 FSDirve 服务 URL
-                                let url = null;
-                                if (SystemInfo.buildServiceUrlObject && SystemInfo.SERVICE_NAMES) {
-                                    url = SystemInfo.buildServiceUrlObject(SystemInfo.SERVICE_NAMES.FSDIRVE, { upid: typeof TERMINAL !== 'undefined' ? TERMINAL._upid : undefined });
-                                } else if (SystemInfo.getFSDirvePath && SystemInfo.getOrigin) {
-                                    url = new URL(SystemInfo.getFSDirvePath(), SystemInfo.getOrigin());
-                                } else {
-                                    const origin = (typeof SystemInfo !== 'undefined' && SystemInfo.getOrigin) ? SystemInfo.getOrigin() : (window.location && window.location.origin) || 'http://localhost:8089';
-                                    const path = (typeof SystemInfo !== 'undefined' && SystemInfo.getFSDirvePath) ? SystemInfo.getFSDirvePath() : '/system/service/FSDirve.php';
-                                    url = new URL(path, origin);
-                                }
-                                if (typeof TERMINAL !== 'undefined' && TERMINAL._upid != null) url.searchParams.set('upid', TERMINAL._upid);
-                                url.searchParams.set('action', 'read_file');
-                                url.searchParams.set('path', 'D:/bin');
-                                // 确保 cmd 是有效字符串，避免 undefined.js
-                                url.searchParams.set('fileName', `${cmd}.js`);
-                                
-                                // 尝试读取文件（静默处理 404 错误，因为文件不存在是正常情况）
-                                // 注意：浏览器可能会在控制台显示404错误，这是浏览器行为，无法完全避免
-                                // 但我们可以通过提前检查来减少不必要的请求
-                                let response;
-                                try {
-                                    // 使用fetch，但捕获所有错误（包括404）
-                                    response = await fetch(url.toString());
-                                    // 如果响应不是 200，静默继续（文件不存在是正常情况）
-                                    if (!response.ok) {
-                                        foundInBin = false;
-                                        // 不return，继续后续查找（环境变量等）
-                                    }
-                                } catch (error) {
-                                    // 网络错误，静默继续后续查找
-                                    foundInBin = false;
-                                    // 不return，继续后续查找（环境变量等）
-                                }
-                                
-                                // 如果响应不是ok，直接跳过后续处理，继续查找其他位置
-                                if (!response || !response.ok) {
-                                    foundInBin = false;
-                                    // 继续执行后续查找（不return）
-                                } else if (response.ok) {
-                                    const result = await response.json();
-                                    if (result.status === 'success') {
-                                        const fileContent = result.data?.content || result.data || '';
-                                        if (fileContent && typeof fileContent === 'string') {
-                                            // 文件存在，标记为已找到
-                                            foundInBin = true;
-                                            
-                                            // 获取 ProcessManager
-                                            let ProcessMgr = null;
-                                            if (typeof ProcessManager !== 'undefined') {
-                                                ProcessMgr = ProcessManager;
-                                            } else if (typeof safePoolGet === 'function') {
-                                                try {
-                                                    ProcessMgr = safePoolGet('KERNEL_GLOBAL_POOL', 'ProcessManager');
-                                                } catch (e) {
-                                                    if (typeof KernelLogger !== 'undefined') {
-                                                        KernelLogger.error('Terminal', '获取ProcessManager失败', e);
-                                                    }
+
+                            if (ProcessMgr && typeof ProcessMgr.callKernelAPI === 'function' && cmd && typeof cmd === 'string' && cmd.trim() !== '') {
+                                const binProgramPath = `D:/bin/${cmd}.js`;
+                                const terminalPid = terminalInstance.pid || (terminalInstance.tabManager && terminalInstance.tabManager.pid);
+                                const existsInfo = await ProcessMgr.callKernelAPI(terminalPid, 'FileSystem.exists', [binProgramPath]);
+
+                                if (existsInfo && existsInfo.exists && existsInfo.type === 'file') {
+                                    const fileContent = await ProcessMgr.callKernelAPI(terminalPid, 'FileSystem.read', [binProgramPath]);
+                                    if (fileContent && typeof fileContent === 'string') {
+                                        // 文件存在，标记为已找到
+                                        foundInBin = true;
+
+                                        if (typeof ProcessMgr.startProgram !== 'function') {
+                                            // ProcessManager 不可用，静默继续后续查找
+                                            foundInBin = false;
+                                        } else {
+                                            // 验证文件是否是有效的 ZerOS 程序
+                                            let isValidProgram = true;
+                                            if (ProcessMgr.validateProgramFile && typeof ProcessMgr.validateProgramFile === 'function') {
+                                                const validation = ProcessMgr.validateProgramFile(fileContent, `${cmd}.js`);
+                                                if (!validation.valid) {
+                                                    // 文件不是有效的 ZerOS 程序，静默继续后续查找
+                                                    isValidProgram = false;
+                                                    foundInBin = false;
                                                 }
                                             }
-                                            
-                                            if (!ProcessMgr || typeof ProcessMgr.startProgram !== 'function') {
-                                                // ProcessManager 不可用，静默继续后续查找
-                                                foundInBin = false;
-                                            } else {
-                                                // 验证文件是否是有效的 ZerOS 程序
-                                                let isValidProgram = true;
-                                                if (ProcessMgr.validateProgramFile && typeof ProcessMgr.validateProgramFile === 'function') {
-                                                    const validation = ProcessMgr.validateProgramFile(fileContent, `${cmd}.js`);
-                                                    if (!validation.valid) {
-                                                        // 文件不是有效的 ZerOS 程序，静默继续后续查找
-                                                        isValidProgram = false;
-                                                        foundInBin = false;
+
+                                            if (isValidProgram) {
+                                                // 使用 tempAsset 启动程序
+                                                const tempAsset = {
+                                                    script: fileContent,
+                                                    styles: [],
+                                                    icon: null,  // 使用默认图标
+                                                    metadata: {
+                                                        name: cmd,
+                                                        type: 'CLI',  // 默认作为 CLI 程序
+                                                        allowMultipleInstances: true
                                                     }
-                                                }
-                                                
-                                                if (isValidProgram) {
-                                                    // 使用 tempAsset 启动程序
-                                                    const tempAsset = {
-                                                        script: fileContent,
-                                                        styles: [],
-                                                        icon: null,  // 使用默认图标
-                                                        metadata: {
-                                                            name: cmd,
-                                                            type: 'CLI',  // 默认作为 CLI 程序
-                                                            allowMultipleInstances: true
-                                                        }
-                                                    };
-                                                    
-                                                    // 立即设置 busy 状态，隐藏命令输入
-                                                    terminalInstance._setBusy(true);
-                                                    
-                                                    // 尝试启动程序（异步）
-                                                    try {
-                                                        const pid = await ProcessMgr.startProgram(cmd, {
-                                                            terminal: terminalInstance,
-                                                            args: payload.args.slice(1),
-                                                            env: payload.env,
-                                                            cwd: payload.env.cwd,
-                                                            tempAsset: tempAsset
-                                                        });
-                                                        // 启动成功
-                                                        // 保存当前运行的 CLI 程序 PID，用于 Ctrl+C 中断
-                                                        terminalInstance._currentCliPid = pid;
-                                                        
-                                                        // 监听程序退出，自动恢复 busy 状态
-                                                        const checkProgramStatus = setInterval(() => {
-                                                            const processInfo = ProcessMgr.PROCESS_TABLE.get(pid);
-                                                            if (!processInfo || processInfo.status !== 'running') {
-                                                                clearInterval(checkProgramStatus);
-                                                                // 程序已退出，恢复 busy 状态
-                                                                if (terminalInstance.busy) {
-                                                                    terminalInstance._setBusy(false);
-                                                                }
-                                                                // 清除保存的 PID
-                                                                if (terminalInstance._currentCliPid === pid) {
-                                                                    terminalInstance._currentCliPid = null;
-                                                                }
+                                                };
+
+                                                // 立即设置 busy 状态，隐藏命令输入
+                                                terminalInstance._setBusy(true);
+
+                                                // 尝试启动程序（异步）
+                                                try {
+                                                    const pid = await ProcessMgr.startProgram(cmd, {
+                                                        terminal: terminalInstance,
+                                                        args: payload.args.slice(1),
+                                                        env: payload.env,
+                                                        cwd: payload.env.cwd,
+                                                        tempAsset: tempAsset
+                                                    });
+                                                    // 启动成功
+                                                    // 保存当前运行的 CLI 程序 PID，用于 Ctrl+C 中断
+                                                    terminalInstance._currentCliPid = pid;
+
+                                                    // 监听程序退出，自动恢复 busy 状态
+                                                    const checkProgramStatus = setInterval(() => {
+                                                        const processInfo = ProcessMgr.PROCESS_TABLE.get(pid);
+                                                        if (!processInfo || processInfo.status !== 'running') {
+                                                            clearInterval(checkProgramStatus);
+                                                            // 程序已退出，恢复 busy 状态
+                                                            if (terminalInstance.busy) {
+                                                                terminalInstance._setBusy(false);
                                                             }
-                                                        }, 100);
-                                                        
-                                                        // 注意：不输出启动消息，让程序自己输出
-                                                        return;
-                                                    } catch (error) {
-                                                        // 启动失败，恢复 busy 状态
-                                                        terminalInstance._setBusy(false);
-                                                        terminalInstance._currentCliPid = null;
-                                                        
-                                                        // 启动失败，检查进程是否已经被创建
-                                                        // 如果进程已经被创建（即使初始化失败），不应该继续查找
-                                                        let processCreated = false;
-                                                        if (ProcessMgr && typeof ProcessMgr.getProcessInfo === 'function') {
-                                                            // 检查是否有同名进程（可能是刚创建的）
-                                                            const allProcesses = ProcessMgr.getProcessInfo();
-                                                            if (Array.isArray(allProcesses)) {
-                                                                const recentProcess = allProcesses.find(p => 
-                                                                    p.programName === cmd && 
-                                                                    (p.status === 'loading' || p.status === 'exited' || p.status === 'running')
-                                                                );
-                                                                if (recentProcess) {
-                                                                    processCreated = true;
-                                                                    // 进程已创建但初始化失败，输出错误信息
-                                                                    payload.write(`${cmd}: 程序启动失败: ${error.message || error}`);
-                                                                    return;
-                                                                }
+                                                            // 清除保存的 PID
+                                                            if (terminalInstance._currentCliPid === pid) {
+                                                                terminalInstance._currentCliPid = null;
                                                             }
                                                         }
-                                                        
-                                                        // 如果进程没有被创建，继续后续查找
-                                                        if (!processCreated) {
-                                                            if (typeof KernelLogger !== 'undefined') {
-                                                                KernelLogger.debug('Terminal', `D:/bin/${cmd}.js 启动失败，继续查找其他位置`, error);
+                                                    }, 100);
+
+                                                    // 注意：不输出启动消息，让程序自己输出
+                                                    return;
+                                                } catch (error) {
+                                                    // 启动失败，恢复 busy 状态
+                                                    terminalInstance._setBusy(false);
+                                                    terminalInstance._currentCliPid = null;
+
+                                                    // 启动失败，检查进程是否已经被创建
+                                                    // 如果进程已经被创建（即使初始化失败），不应该继续查找
+                                                    let processCreated = false;
+                                                    if (ProcessMgr && typeof ProcessMgr.getProcessInfo === 'function') {
+                                                        // 检查是否有同名进程（可能是刚创建的）
+                                                        const allProcesses = ProcessMgr.getProcessInfo();
+                                                        if (Array.isArray(allProcesses)) {
+                                                            const recentProcess = allProcesses.find(p =>
+                                                                p.programName === cmd &&
+                                                                (p.status === 'loading' || p.status === 'exited' || p.status === 'running')
+                                                            );
+                                                            if (recentProcess) {
+                                                                processCreated = true;
+                                                                // 进程已创建但初始化失败，输出错误信息
+                                                                payload.write(`${cmd}: 程序启动失败: ${error.message || error}`);
+                                                                return;
                                                             }
-                                                            foundInBin = false;
                                                         }
+                                                    }
+
+                                                    // 如果进程没有被创建，继续后续查找
+                                                    if (!processCreated) {
+                                                        if (typeof KernelLogger !== 'undefined') {
+                                                            KernelLogger.debug('Terminal', `D:/bin/${cmd}.js 启动失败，继续查找其他位置`, error);
+                                                        }
+                                                        foundInBin = false;
                                                     }
                                                 }
                                             }
@@ -9145,11 +9100,12 @@ function escapeHtml(s){
                                 KernelLogger.debug('Terminal', `检查 D:/bin/${cmd}.js 失败`, error);
                             }
                         }
+                    }
                     
                     // 步骤2: 如果程序注册表中没找到且 D/bin/ 中也没找到，步骤2 已在步骤0 中处理（程序注册表检查）
                     
                     // 步骤3: 如果程序注册表中找不到，尝试从环境变量查找
-                    if (!foundInBin && !isCLIProgram) {
+                    if (!foundInBin && !foundInRegistry) {
                         // 获取 ProcessManager（用于调用内核 API）
                         let ProcessMgr = null;
                         if (typeof ProcessManager !== 'undefined') {
@@ -9174,9 +9130,10 @@ function escapeHtml(s){
                                 }
                                 
                                 if (!terminalPid) {
-                                    payload.write(`${cmd}: command not found (无法获取终端进程ID)`);
-                                    return;
-                                }
+                                    if (typeof KernelLogger !== 'undefined') {
+                                        KernelLogger.debug('Terminal', `跳过环境变量查找: 无法获取终端进程ID (${cmd})`);
+                                    }
+                                } else {
                                 
                                 const envValue = await ProcessMgr.callKernelAPI(terminalPid, 'Environment.get', [cmd]);
                                 if (envValue && typeof envValue === 'string' && envValue.trim()) {
@@ -9398,28 +9355,31 @@ function escapeHtml(s){
                                         });
                                     }
                                 } else {
-                                    // 环境变量不存在或为空，输出命令未找到
-                                    payload.write(`${cmd}: command not found`);
-                                    return;
+                                    // 环境变量不存在或为空，继续后面的 ProcessManager 程序名兜底。
+                                    foundInEnv = false;
+                                }
                                 }
                             } catch (error) {
-                                // 获取环境变量失败，输出命令未找到
+                                // 获取环境变量失败时不要提前返回；继续尝试按程序名启动。
                                 if (typeof KernelLogger !== 'undefined') {
-                                    KernelLogger.error('Terminal', `获取环境变量 ${cmd} 失败`, error);
+                                    KernelLogger.debug('Terminal', `获取环境变量 ${cmd} 失败，继续尝试程序启动`, error);
                                 }
-                                payload.write(`${cmd}: command not found`);
+                                foundInEnv = false;
+                            }
+                            if (foundInEnv) {
+                                // 环境变量处理完成，直接返回，不继续后续步骤
                                 return;
                             }
-                            // 环境变量处理完成，直接返回，不继续后续步骤
-                            return;
                         } else {
                             // 环境变量查找失败或不可用，继续后续步骤
                         }
                     }
                     
-                    // 步骤4: 如果从程序注册表找到了程序，启动它
-                    if (isCLIProgram && programInfo) {
-                        // 这是一个CLI程序，通过ProcessManager启动
+                    // 步骤4: 尝试按程序名启动。
+                    // 注册表可用时必须先命中注册表，避免无效命令被 ProcessManager 当作程序名兜底启动。
+                    // 只有注册表不可用时，才保留 ProcessManager 自身资源查找作为兼容兜底。
+                    const shouldTryProgramLaunch = foundInRegistry || (!registryLookupAvailable && !foundInBin && !foundInEnv);
+                    if (shouldTryProgramLaunch) {
                         let ProcessMgr = null;
                         if (typeof ProcessManager !== 'undefined') {
                             ProcessMgr = ProcessManager;
@@ -9450,26 +9410,38 @@ function escapeHtml(s){
                         }
                         
                         if (typeof KernelLogger !== 'undefined') {
-                            KernelLogger.debug('Terminal', `准备启动程序: ${programName}, script: ${programInfo.script || 'N/A'}, cwd: ${payload.env.cwd}`);
+                            KernelLogger.debug('Terminal', `准备启动程序: ${programName}, type: ${registryProgramType || 'UNKNOWN'}, script: ${programInfo && programInfo.script ? programInfo.script : 'N/A'}, cwd: ${payload.env.cwd}`);
                         }
-                        
-                        // 立即设置 busy 状态，隐藏命令输入
-                        terminalInstance._setBusy(true);
-                        
-                        // 异步启动程序
-                        ProcessMgr.startProgram(programName, {
-                            terminal: terminalInstance,
+
+                        const startArgs = {
                             args: payload.args.slice(1),  // 传递剩余参数
                             env: payload.env,
                             cwd: payload.env.cwd
-                        }).then((pid) => {
+                        };
+
+                        if (isCLIProgram) {
+                            startArgs.terminal = terminalInstance;
+                            // CLI 程序占用当前终端，直到程序退出才恢复输入。
+                            terminalInstance._setBusy(true);
+                        }
+
+                        // 异步启动程序
+                        ProcessMgr.startProgram(programName, startArgs).then((pid) => {
                             if (typeof KernelLogger !== 'undefined') {
                                 KernelLogger.debug('Terminal', `程序 ${programName} 启动成功, PID: ${pid}`);
                             }
                             // 程序启动成功
                             // 注意：不输出启动消息，让程序自己输出
                             // payload.write(`[CLI] 程序 ${programName} 已启动 (PID: ${pid})`);
-                            
+
+                            if (!isCLIProgram) {
+                                // GUI 程序已经打开，不应该让终端一直保持 busy。
+                                if (terminalInstance.busy) {
+                                    terminalInstance._setBusy(false);
+                                }
+                                return;
+                            }
+
                             // 保存当前运行的 CLI 程序 PID，用于 Ctrl+C 中断
                             terminalInstance._currentCliPid = pid;
                             
@@ -9501,7 +9473,11 @@ function escapeHtml(s){
                             }
                             // 输出更详细的错误信息
                             const errorMsg = error && error.message ? error.message : String(error);
-                            payload.write(`${cmd}: 程序启动失败: ${errorMsg}`);
+                            if (!foundInRegistry && /not found|未在应用程序资源映射中找到|Program .* not found/i.test(errorMsg)) {
+                                payload.write(`${cmd}: command not found`);
+                            } else {
+                                payload.write(`${cmd}: 程序启动失败: ${errorMsg}`);
+                            }
                         });
                     } else {
                         // 如果既不是 D/bin/ 中的文件，也不是程序注册表中的程序，也没有环境变量，输出命令未找到
@@ -9519,7 +9495,6 @@ function escapeHtml(s){
                             }
                         }
                     }
-                }
                 })();
                 // 异步处理所有步骤，直接返回
                 return;

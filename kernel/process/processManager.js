@@ -887,15 +887,20 @@ class ProcessManager {
             // 转换虚拟路径为实际 URL
             const actualUrl = ProcessManager.convertVirtualPathToUrl(path);
 
-            // 检查是否已经加载过，如果加载过则移除旧的，重新加载
-            const existingScript = document.querySelector(`script[src="${actualUrl}"]`);
-            if (existingScript) {
+            // 检查是否已经加载过，如果加载过则移除旧的，重新加载。
+            // 动态应用脚本由 PHP 路由设置了较长缓存，重新加载时加 cache bust 以避免拿到旧版本。
+            const existingScripts = Array.from(document.scripts || []).filter(script => {
+                return script.getAttribute('data-zeros-src') === actualUrl || script.getAttribute('src') === actualUrl;
+            });
+            existingScripts.forEach(script => {
                 ProcessManager._log(3, `脚本已存在，移除旧的: ${path} (${actualUrl})`);
-                existingScript.remove();
-            }
+                script.remove();
+            });
 
             const script = document.createElement('script');
-            script.src = actualUrl;
+            const separator = actualUrl.indexOf('?') >= 0 ? '&' : '?';
+            script.src = `${actualUrl}${separator}_zeros_t=${Date.now()}`;
+            script.setAttribute('data-zeros-src', actualUrl);
             script.async = true;
             script.onload = () => {
                 ProcessManager._log(3, `脚本加载成功: ${path} (${actualUrl})`);
@@ -3421,6 +3426,7 @@ class ProcessManager {
             'FileSystem.delete': PermissionManager.PERMISSION.KERNEL_DISK_DELETE,
             'FileSystem.create': PermissionManager.PERMISSION.KERNEL_DISK_CREATE,
             'FileSystem.list': PermissionManager.PERMISSION.KERNEL_DISK_LIST,
+            'FileSystem.exists': PermissionManager.PERMISSION.KERNEL_DISK_LIST,
 
             // 通知API
             'Notification.create': PermissionManager.PERMISSION.SYSTEM_NOTIFICATION,
@@ -5020,6 +5026,117 @@ class ProcessManager {
                 } catch (error) {
                     if (typeof KernelLogger !== 'undefined') {
                         KernelLogger.error('ProcessManager', `FileSystem.list 失败: ${error.message}`, { path });
+                    }
+                    throw error;
+                }
+            },
+            'FileSystem.exists': async (path) => {
+                if (!path || typeof path !== 'string') {
+                    throw new Error('FileSystem.exists: 路径必须是字符串');
+                }
+
+                const emptyInfo = (normalizedPath) => ({
+                    path: normalizedPath,
+                    exists: false,
+                    type: null
+                });
+
+                try {
+                    let normalizedPath = path.replace(/\\/g, '/').replace(/([A-Z]:)\/\/+/gi, '$1/');
+                    const parts = normalizedPath.split('/').filter((part, index) => index === 0 || part !== '');
+                    if (parts.length === 0) {
+                        throw new Error(`FileSystem.exists: 无效的路径格式: ${path}`);
+                    }
+
+                    const diskName = ProcessManager._normalizeDiskName(parts[0]);
+                    parts[0] = diskName;
+                    normalizedPath = parts.join('/');
+
+                    if (typeof Disk === 'undefined') {
+                        throw new Error('FileSystem.exists: Disk 模块未加载');
+                    }
+
+                    const diskMap = Disk.diskSeparateMap;
+                    const diskSize = Disk.diskSeparateSize;
+                    const hasPartition = (diskMap && diskMap.has(diskName)) ||
+                        (diskSize && diskSize.has(diskName));
+
+                    if (!hasPartition) {
+                        return emptyInfo(normalizedPath);
+                    }
+
+                    if (parts.length === 1 || normalizedPath === diskName || normalizedPath === `${diskName}/`) {
+                        return {
+                            path: diskName,
+                            exists: true,
+                            type: 'directory'
+                        };
+                    }
+
+                    const parentPath = parts.slice(0, -1).join('/');
+                    const entryName = parts[parts.length - 1];
+                    const nodeTree = diskMap && diskMap.has(diskName) ? diskMap.get(diskName) : null;
+
+                    if (nodeTree && nodeTree.initialized && nodeTree.nodes) {
+                        const directoryNode = nodeTree.nodes.get(normalizedPath);
+                        if (directoryNode) {
+                            return {
+                                path: normalizedPath,
+                                exists: true,
+                                type: 'directory'
+                            };
+                        }
+
+                        const parentNode = nodeTree.nodes.get(parentPath);
+                        const fileObj = parentNode && parentNode.attributes ? parentNode.attributes[entryName] : null;
+                        if (fileObj) {
+                            return {
+                                path: normalizedPath,
+                                exists: true,
+                                type: 'file',
+                                size: fileObj.fileSize || 0,
+                                modified: fileObj.fileModifyTime || null,
+                                created: fileObj.fileCreatTime || null,
+                                extension: entryName.includes('.') ? entryName.split('.').pop() : ''
+                            };
+                        }
+                    }
+
+                    const processInfo = ProcessManager.PROCESS_TABLE.get(pid);
+                    const upid = processInfo && (processInfo.upid ?? ProcessManager._pidToUpid.get(pid));
+                    const url = (typeof SystemInformation !== 'undefined' && SystemInformation.buildServiceUrlObject)
+                        ? SystemInformation.buildServiceUrlObject(
+                            SystemInformation.SERVICE_NAMES.FSDIRVE,
+                            upid != null ? { upid } : undefined
+                        )
+                        : new URL(
+                            (typeof SystemInformation !== 'undefined' && SystemInformation.getFSDirvePath)
+                                ? SystemInformation.getFSDirvePath()
+                                : '/system/service/FSDirve.php',
+                            (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin)
+                                ? SystemInformation.getOrigin()
+                                : window.location.origin
+                        );
+                    if (upid != null && !url.searchParams.has('upid')) {
+                        url.searchParams.set('upid', String(upid));
+                    }
+                    url.searchParams.set('action', 'exists');
+                    url.searchParams.set('path', ProcessManager._normalizePath(normalizedPath));
+
+                    const response = await fetch(url.toString());
+                    if (!response.ok) {
+                        throw new Error(`FileSystem.exists: 从 PHP 服务检查路径失败: ${path}`);
+                    }
+
+                    const result = await response.json();
+                    if (result.status === 'success' && result.data) {
+                        return result.data;
+                    }
+
+                    return emptyInfo(normalizedPath);
+                } catch (error) {
+                    if (typeof KernelLogger !== 'undefined') {
+                        KernelLogger.error('ProcessManager', `FileSystem.exists 失败: ${error.message}`, { path });
                     }
                     throw error;
                 }

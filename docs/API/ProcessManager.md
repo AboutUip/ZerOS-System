@@ -599,7 +599,7 @@ async __init__(pid, initArgs) {
 
 **可用 API**（快速索引）：以下按模块分组；**详细参数、返回值与示例**见各模块文档（[GUIManager](./GUIManager.md)、[TaskbarManager](./TaskbarManager.md)、[NotificationManager](./NotificationManager.md)、[LStorage](./LStorage.md)、[PermissionManager](./PermissionManager.md) 等）。
 
-- **文件系统**：`FileSystem.read`（读文件，需 `KERNEL_DISK_READ`）、`FileSystem.write`（写文件，需 `KERNEL_DISK_WRITE`）、`FileSystem.delete`、`FileSystem.create`、`FileSystem.list`。路径格式为 `盘符:/路径`，如 `D:/app/data.txt`。详见 [NodeTree.md - 程序用文件 API（FileSystem.*）](./NodeTree.md#程序用文件-apifilesystem)。
+- **文件系统**：`FileSystem.read`（读文件，需 `KERNEL_DISK_READ`）、`FileSystem.write`（写文件，需 `KERNEL_DISK_WRITE`）、`FileSystem.delete`、`FileSystem.create`、`FileSystem.list`、`FileSystem.exists`（判断文件/目录是否存在，需 `KERNEL_DISK_LIST`）。路径格式为 `盘符:/路径`，如 `D:/app/data.txt`。详见 [NodeTree.md - 程序用文件 API（FileSystem.*）](./NodeTree.md#程序用文件-apifilesystem)。
 - **文件关联**：`FileAssoc.get`（按扩展名查默认打开程序，不需权限）、`FileAssoc.list`（列出全部关联，不需权限）、`FileAssoc.set`（设置扩展名默认打开程序，需 `FILE_ASSOC_MANAGE`）、`FileAssoc.clear`（清除扩展名关联，需 `FILE_ASSOC_MANAGE`）。数据持久化在系统存储 `system.fileAssoc`（LocalSData.json）。扩展名需带前导点（如 `.zom`）。文件管理器「打开方式」子窗口会据此优先用默认程序打开文件。
 - **通知**：`Notification.create`（需 `SYSTEM_NOTIFICATION`，参数 `[{ type, title, content }]`）、`Notification.remove`。详见 [NotificationManager](./NotificationManager.md)。
 - **网络**：`Network.request`、`Network.fetch`（需 `NETWORK_ACCESS`，普通权限）；`Network.Port.register` / `unregister` / `getStatus` / `list` / `send`。详见 [NetworkPort](./NetworkPort.md)。
