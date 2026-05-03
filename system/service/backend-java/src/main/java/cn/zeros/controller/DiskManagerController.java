@@ -7,26 +7,36 @@ import cn.zeros.service.IDiskManagerService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
 import java.io.IOException;
 import java.util.Map;
-import java.util.function.Function;
 
+/**
+ * 磁盘管理控制器。
+ *
+ * <p>提供 DISKMANAGER 兼容接口，负责将 action 参数分发给磁盘服务层，并保持 PHP 端已有的
+ * write_data 禁用语义。
+ *
+ * @author zeros
+ */
 @Slf4j
 @RestController
 @RequestMapping("/DISKMANAGER")
 public class DiskManagerController {
 
     private final IDiskManagerService diskManagerService;
-    private final Map<DiskManagerActionType, Function<ActionContext, Map<String, Object>>> executors;
+    private final Map<DiskManagerActionType, DiskActionExecutor> executors;
 
     public DiskManagerController(IDiskManagerService diskManagerService) {
         this.diskManagerService = diskManagerService;
         this.executors = initExecutors();
     }
 
-    private Map<DiskManagerActionType, Function<ActionContext, Map<String, Object>>> initExecutors() {
+    private Map<DiskManagerActionType, DiskActionExecutor> initExecutors() {
         return Map.ofEntries(
                 Map.entry(DiskManagerActionType.CHECK, this::executeCheck),
                 Map.entry(DiskManagerActionType.CREATE, this::executeCreate),
@@ -81,16 +91,14 @@ public class DiskManagerController {
 
         try {
             log.info("[DiskManager] action={}", actionType.getCode());
-            Function<ActionContext, Map<String, Object>> executor = executors.get(actionType);
-            Map<String, Object> result = executor.apply(ctx);
+            DiskActionExecutor executor = executors.get(actionType);
+            Map<String, Object> result = executor.execute(ctx);
             return ResponseEntity.ok(ApiResponse.success(buildSuccessMessage(actionType, ctx, result), result));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
+        } catch (IOException e) {
+            return ResponseEntity.internalServerError().body(ApiResponse.error(e.getMessage()));
         } catch (RuntimeException e) {
-            Throwable cause = e.getCause();
-            if (cause instanceof IOException) {
-                return ResponseEntity.internalServerError().body(ApiResponse.error(cause.getMessage()));
-            }
             return ResponseEntity.internalServerError().body(ApiResponse.error(e.getMessage()));
         }
     }
@@ -111,75 +119,48 @@ public class DiskManagerController {
         return diskManagerService.checkPartition(ctx.getPartition());
     }
 
-    private Map<String, Object> executeCreate(ActionContext ctx) {
-        try {
-            return diskManagerService.createPartition(ctx.getPartition());
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+    private Map<String, Object> executeCreate(ActionContext ctx) throws IOException {
+        return diskManagerService.createPartition(ctx.getPartition());
     }
 
-    private Map<String, Object> executeDelete(ActionContext ctx) {
-        try {
-            return diskManagerService.deletePartition(ctx.getPartition(), ctx.isForce());
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+    private Map<String, Object> executeDelete(ActionContext ctx) throws IOException {
+        return diskManagerService.deletePartition(ctx.getPartition(), ctx.isForce());
     }
 
-    private Map<String, Object> executeMerge(ActionContext ctx) {
-        try {
-            return diskManagerService.mergePartitions(ctx.getSource(), ctx.getTarget(), ctx.isDeleteSource());
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+    private Map<String, Object> executeMerge(ActionContext ctx) throws IOException {
+        return diskManagerService.mergePartitions(ctx.getSource(), ctx.getTarget(), ctx.isDeleteSource());
     }
 
     private Map<String, Object> executeList(ActionContext ctx) {
         return diskManagerService.listPartitions();
     }
 
-    private Map<String, Object> executeReadData(ActionContext ctx) {
-        try {
-            return diskManagerService.readDiskData();
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+    private Map<String, Object> executeReadData(ActionContext ctx) throws IOException {
+        return diskManagerService.readDiskData();
     }
 
-    private Map<String, Object> executeSyncData(ActionContext ctx) {
-        try {
-            return diskManagerService.syncDiskData();
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+    private Map<String, Object> executeSyncData(ActionContext ctx) throws IOException {
+        return diskManagerService.syncDiskData();
     }
 
-    private Map<String, Object> executeFormat(ActionContext ctx) {
-        try {
-            return diskManagerService.formatPartition(ctx.getPartition(), ctx.isQuick());
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+    private Map<String, Object> executeFormat(ActionContext ctx) throws IOException {
+        return diskManagerService.formatPartition(ctx.getPartition(), ctx.isQuick());
     }
 
-    private Map<String, Object> executeResize(ActionContext ctx) {
-        try {
-            return diskManagerService.resizePartition(ctx.getPartition(), ctx.getNewSize());
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+    private Map<String, Object> executeResize(ActionContext ctx) throws IOException {
+        return diskManagerService.resizePartition(ctx.getPartition(), ctx.getNewSize());
     }
 
     private Map<String, Object> executeHealth(ActionContext ctx) {
         return diskManagerService.checkHealth();
     }
 
-    private Map<String, Object> executeClone(ActionContext ctx) {
-        try {
-            return diskManagerService.clonePartition(ctx.getSource(), ctx.getTarget());
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+    private Map<String, Object> executeClone(ActionContext ctx) throws IOException {
+        return diskManagerService.clonePartition(ctx.getSource(), ctx.getTarget());
+    }
+
+    @FunctionalInterface
+    private interface DiskActionExecutor {
+        Map<String, Object> execute(ActionContext ctx) throws IOException;
     }
 }

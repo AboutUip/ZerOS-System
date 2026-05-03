@@ -5,12 +5,24 @@ import cn.zeros.service.BootSecurityTokenService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * 程序权限声明控制器。
+ *
+ * <p>维护 BootSecurityToken.json 中的 programPermissionsMap，供 UserToken 请求在
+ * {@code JwtAuthInterceptor} 中按 upid 校验程序声明权限。
+ *
+ * @author zeros
+ */
 @Slf4j
 @RestController
 @RequestMapping("/programPermissions")
@@ -53,7 +65,7 @@ public class ProgramPermissionsController {
         String programName = asString(body.get("programName"));
         String upid = bootSecurityTokenService.registerProgramPermission(programName, permissions);
         if (upid == null) {
-            return ResponseEntity.internalServerError().body(ApiResponse.error("Failed to write security file"));
+            return ResponseEntity.internalServerError().body(ApiResponse.error("写入安全令牌文件失败"));
         }
 
         Map<String, Object> data = new LinkedHashMap<>();
@@ -71,7 +83,7 @@ public class ProgramPermissionsController {
 
         boolean ok = bootSecurityTokenService.reclaimUpid(upid.trim());
         if (!ok) {
-            return ResponseEntity.internalServerError().body(ApiResponse.error("Failed to write security file"));
+            return ResponseEntity.internalServerError().body(ApiResponse.error("写入安全令牌文件失败"));
         }
 
         Map<String, Object> data = new LinkedHashMap<>();
@@ -92,7 +104,7 @@ public class ProgramPermissionsController {
         List<String> permissions = rawPermissions.stream().map(Object::toString).toList();
         boolean ok = bootSecurityTokenService.updateProgramPermissions(upid.trim(), permissions);
         if (!ok) {
-            return ResponseEntity.internalServerError().body(ApiResponse.error("Failed to write security file"));
+            return ResponseEntity.internalServerError().body(ApiResponse.error("写入安全令牌文件失败"));
         }
 
         Map<String, Object> data = new LinkedHashMap<>();

@@ -3,9 +3,19 @@ package cn.zeros.controller;
 import cn.zeros.constant.FileConstants;
 import cn.zeros.constant.HttpConstants;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.*;
+import org.springframework.http.CacheControl;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.http.client.reactive.ReactorClientHttpConnector;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 import reactor.netty.http.client.HttpClient;
@@ -14,6 +24,14 @@ import java.net.URI;
 import java.time.Duration;
 import java.util.Set;
 
+/**
+ * 视频代理控制器。
+ *
+ * <p>代理前端视频资源请求，支持 HTTP/HTTPS 校验、上游重定向、Range 透传和媒体缓存响应头保留，
+ * 用于对齐 PHP 端 video-proxy.php 的播放兼容行为。
+ *
+ * @author zeros
+ */
 @Slf4j
 @RestController
 @RequestMapping("/video-proxy")

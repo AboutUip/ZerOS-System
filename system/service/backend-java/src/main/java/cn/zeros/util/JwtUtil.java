@@ -4,6 +4,7 @@ import cn.zeros.config.JwtProperties;
 import cn.zeros.security.UserContext;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.ExpiredJwtException;
+import io.jsonwebtoken.JwtBuilder;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
@@ -13,7 +14,11 @@ import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
-import java.util.*;
+import java.util.Collections;
+import java.util.Date;
+import java.util.List;
+import java.util.Objects;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
@@ -68,7 +73,7 @@ public class JwtUtil {
      */
     public String generateSecurityToken(String randomValue, String type, String userLevel, List<String> permissions) {
         long now = System.currentTimeMillis();
-        var builder = Jwts.builder()
+        JwtBuilder builder = Jwts.builder()
                 .claim("randomValue", randomValue)
                 .claim("type", type)
                 .claim("generated_at", now / 1000)
@@ -157,13 +162,12 @@ public class JwtUtil {
         return claims.get("type", String.class);
     }
 
-    @SuppressWarnings("unchecked")
     private static List<String> toStringList(Object obj) {
         if (obj == null) {
             return Collections.emptyList();
         }
-        if (obj instanceof List) {
-            return ((List<?>) obj).stream()
+        if (obj instanceof List<?> rawList) {
+            return rawList.stream()
                     .map(o -> o != null ? o.toString() : null)
                     .filter(Objects::nonNull)
                     .collect(Collectors.toList());

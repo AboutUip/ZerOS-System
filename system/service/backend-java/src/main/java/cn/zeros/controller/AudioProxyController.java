@@ -25,6 +25,14 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Set;
 
+/**
+ * 音频代理控制器。
+ *
+ * <p>代理前端音频资源请求，支持 Range 请求透传和上游 206 状态保留，避免浏览器直接访问音频源时
+ * 遇到跨域限制。对 NetEase 音源保留 PHP 端使用的请求头兼容行为。
+ *
+ * @author zeros
+ */
 @RestController
 @RequestMapping("/audio-proxy")
 @Slf4j

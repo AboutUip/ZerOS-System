@@ -64,7 +64,7 @@ const DYNAMIC_MODULES = {
             dependencies: []
         }
     },
-    
+
     // anime.js - 轻量级JavaScript动画库
     "anime": {
         script: "../kernel/dynamicModule/libs/anime-4.2.2/dist/bundles/anime.umd.min.js",
@@ -77,7 +77,7 @@ const DYNAMIC_MODULES = {
             dependencies: [] // 无依赖
         }
     },
-    
+
     // Animate.css - CSS动画库
     "animate-css": {
         styles: "../kernel/dynamicModule/libs/animate.min.css",
@@ -316,7 +316,7 @@ const DYNAMIC_MODULES = {
     //         dependencies: []
     //     }
     // }
-    
+
     // 可以在这里添加更多动态模块
     // 例如：
     // "lodash": {
@@ -335,13 +335,13 @@ const DYNAMIC_MODULES = {
 class DynamicManager {
     // 已加载的模块集合 Set<moduleName>
     static _loadedModules = new Set();
-    
+
     // 加载中的模块 Map<moduleName, Promise>
     static _loadingModules = new Map();
-    
+
     // 模块加载状态 Map<moduleName, { loaded: boolean, error: Error|null, loadTime: number }>
     static _moduleStatus = new Map();
-    
+
     /**
      * 初始化动态模块管理器
      */
@@ -349,18 +349,18 @@ class DynamicManager {
         if (DynamicManager._initialized) {
             return;
         }
-        
+
         DynamicManager._initialized = true;
-        
+
         // 注册到POOL
         DynamicManager._registerToPool();
-        
+
         // 自动加载需要自动加载的模块
         DynamicManager._loadAutoLoadModules();
-        
+
         KernelLogger.info("DynamicManager", "动态模块管理器初始化完成");
     }
-    
+
     /**
      * 注册到POOL
      */
@@ -377,7 +377,7 @@ class DynamicManager {
             }
         }
     }
-    
+
     /**
      * 获取模块定义
      * @param {string} moduleName 模块名称
@@ -387,10 +387,10 @@ class DynamicManager {
         if (!moduleName || typeof moduleName !== 'string') {
             return null;
         }
-        
+
         return DYNAMIC_MODULES[moduleName] || null;
     }
-    
+
     /**
      * 检查模块是否存在
      * @param {string} moduleName 模块名称
@@ -399,7 +399,7 @@ class DynamicManager {
     static hasModule(moduleName) {
         return moduleName in DYNAMIC_MODULES;
     }
-    
+
     /**
      * 检查模块是否已加载
      * @param {string} moduleName 模块名称
@@ -408,7 +408,7 @@ class DynamicManager {
     static isModuleLoaded(moduleName) {
         return DynamicManager._loadedModules.has(moduleName);
     }
-    
+
     /**
      * 获取模块的全局对象
      * @param {string} moduleName 模块名称
@@ -419,32 +419,121 @@ class DynamicManager {
         if (!module) {
             return null;
         }
-        
+
         // CSS 模块没有全局对象
         const moduleType = module.metadata?.type || (module.script ? 'js' : 'css');
         if (moduleType === 'css') {
             return null;
         }
-        
+
         if (!module.metadata || !module.metadata.globalName) {
             return null;
         }
-        
+
         const globalName = module.metadata.globalName;
-        
+
         // 尝试从 window 获取
         if (typeof window !== 'undefined' && window[globalName]) {
             return window[globalName];
         }
-        
+
         // 尝试从 globalThis 获取
         if (typeof globalThis !== 'undefined' && globalThis[globalName]) {
             return globalThis[globalName];
         }
-        
+
         return null;
     }
-    
+
+    /**
+     * 获取前端静态资源所在的 origin。
+     * SystemInformation.getOrigin() 指向后端服务端口，动态模块文件应跟随当前页面的静态服务。
+     * @returns {string} 当前页面 origin，非浏览器环境返回空字符串
+     */
+    static _getStaticResourceOrigin() {
+        if (typeof window !== 'undefined' && window.location && window.location.origin && window.location.origin !== 'null') {
+            return window.location.origin;
+        }
+
+        if (typeof location !== 'undefined' && location.origin && location.origin !== 'null') {
+            return location.origin;
+        }
+
+        if (typeof document !== 'undefined' && document.baseURI) {
+            try {
+                const origin = new URL(document.baseURI).origin;
+                return origin && origin !== 'null' ? origin : '';
+            } catch (e) {
+                return '';
+            }
+        }
+
+        return '';
+    }
+
+    /**
+     * 判断路径是否已经是完整 URL 或浏览器虚拟 URL。
+     * @param {string} path 待判断路径
+     * @returns {boolean} 是否无需再拼接 origin
+     */
+    static _isExternalResourceUrl(path) {
+        return /^(?:[a-z][a-z\d+\-.]*:)?\/\//i.test(path) ||
+            path.startsWith('data:') ||
+            path.startsWith('blob:');
+    }
+
+    /**
+     * 将模块定义中的路径统一转换为项目根路径。
+     * @param {string} path 模块资源路径
+     * @returns {string} 规范化后的路径
+     */
+    static _normalizeModuleResourcePath(path) {
+        if (!path || typeof path !== 'string' || DynamicManager._isExternalResourceUrl(path)) {
+            return path;
+        }
+
+        if (path.startsWith('/')) {
+            return path;
+        }
+
+        if (path.startsWith('../')) {
+            const relativePath = path.replace(/^\.\.\//, '');
+            if (relativePath.startsWith('kernel/')) {
+                return '/' + relativePath;
+            }
+            return '/kernel/dynamicModule/' + relativePath;
+        }
+
+        if (path.startsWith('./')) {
+            return '/kernel/dynamicModule/' + path.substring(2);
+        }
+
+        return '/kernel/dynamicModule/' + path;
+    }
+
+    /**
+     * 解析动态模块静态资源 URL。
+     * @param {string} path 模块资源路径
+     * @returns {string} 可被 script/link/import 使用的 URL
+     */
+    static _resolveModuleResourceUrl(path) {
+        const resourcePath = DynamicManager._normalizeModuleResourcePath(path);
+        if (!resourcePath || DynamicManager._isExternalResourceUrl(resourcePath)) {
+            return resourcePath;
+        }
+
+        const origin = DynamicManager._getStaticResourceOrigin();
+        if (!origin) {
+            return resourcePath;
+        }
+
+        try {
+            return new URL(resourcePath, origin + '/').toString();
+        } catch (e) {
+            return `${origin}${resourcePath.startsWith('/') ? '' : '/'}${resourcePath}`;
+        }
+    }
+
     /**
      * 加载动态模块
      * @param {string} moduleName 模块名称
@@ -453,22 +542,22 @@ class DynamicManager {
      */
     static async loadModule(moduleName, options = {}) {
         const { force = false, checkDependencies = true } = options;
-        
+
         // 检查模块是否存在
         const module = DynamicManager.getModule(moduleName);
         if (!module) {
             throw new Error(`模块 ${moduleName} 不存在`);
         }
-        
+
         const moduleType = module.metadata?.type || (module.script ? 'js' : 'css');
-        
+
         // 如果已加载且不强制重新加载，直接返回
         if (DynamicManager.isModuleLoaded(moduleName) && !force) {
             // CSS 模块直接返回 null
             if (moduleType === 'css') {
                 return null;
             }
-            
+
             const globalObj = DynamicManager.getModuleGlobal(moduleName);
             if (globalObj) {
                 return globalObj;
@@ -477,17 +566,17 @@ class DynamicManager {
                 DynamicManager._loadedModules.delete(moduleName);
             }
         }
-        
+
         // 如果正在加载，等待加载完成
         if (DynamicManager._loadingModules.has(moduleName)) {
             await DynamicManager._loadingModules.get(moduleName);
             return DynamicManager.getModuleGlobal(moduleName);
         }
-        
+
         // 开始加载
         const loadPromise = DynamicManager._doLoadModule(moduleName, module, checkDependencies);
         DynamicManager._loadingModules.set(moduleName, loadPromise);
-        
+
         try {
             const result = await loadPromise;
             DynamicManager._loadingModules.delete(moduleName);
@@ -497,7 +586,7 @@ class DynamicManager {
             throw error;
         }
     }
-    
+
     /**
      * 执行模块加载（内部方法）
      * @param {string} moduleName 模块名称
@@ -508,7 +597,7 @@ class DynamicManager {
     static async _doLoadModule(moduleName, module, checkDependencies) {
         const startTime = Date.now();
         const moduleType = module.metadata?.type || (module.script ? 'js' : 'css');
-        
+
         try {
             // 检查并加载依赖
             if (checkDependencies && module.metadata && module.metadata.dependencies) {
@@ -520,39 +609,39 @@ class DynamicManager {
                     }
                 }
             }
-            
+
             // 处理纯 CSS 模块
             if (moduleType === 'css') {
                 // 验证 CSS 模块定义
                 if (!module.styles) {
                     throw new Error(`CSS模块 ${moduleName} 必须提供 styles 字段`);
                 }
-                
+
                 // 加载样式表
                 const stylePaths = Array.isArray(module.styles) ? module.styles : [module.styles];
                 for (const stylePath of stylePaths) {
                     await DynamicManager._loadStylesheet(stylePath);
                 }
-                
+
                 // 标记为已加载
                 DynamicManager._loadedModules.add(moduleName);
                 const loadTime = Date.now() - startTime;
-                
+
                 DynamicManager._moduleStatus.set(moduleName, {
                     loaded: true,
                     error: null,
                     loadTime: loadTime
                 });
-                
+
                 KernelLogger.info("DynamicManager", `CSS模块 ${moduleName} 加载成功`, {
                     loadTime: `${loadTime}ms`,
                     styles: stylePaths
                 });
-                
+
                 // CSS 模块不返回全局对象
                 return null;
             }
-            
+
             // 处理 JavaScript 模块
             // 加载样式表（如果有）
             if (module.styles && Array.isArray(module.styles)) {
@@ -560,83 +649,38 @@ class DynamicManager {
                     await DynamicManager._loadStylesheet(stylePath);
                 }
             }
-            
+
             // 验证脚本路径
             if (!module.script) {
                 throw new Error(`JavaScript模块 ${moduleName} 必须提供 script 字段`);
             }
-            
+
             // 检查是否是 ES 模块
-           const isESModule = module.script.endsWith('.mjs') || 
-                              (module.metadata && module.metadata.moduleType === 'esm') ||
-                              module.metadata?.moduleType === 'esm';
-           const isCommonJS = module.script.endsWith('.cjs') || 
-                              (module.metadata && module.metadata.moduleType === 'cjs');
-           
-           let globalObj = null;
-           
-           if (isESModule) {
+            const isESModule = module.script.endsWith('.mjs') ||
+                (module.metadata && module.metadata.moduleType === 'esm') ||
+                module.metadata?.moduleType === 'esm';
+            const isCommonJS = module.script.endsWith('.cjs') ||
+                (module.metadata && module.metadata.moduleType === 'cjs');
+
+            let globalObj = null;
+
+            if (isESModule) {
                 // ES 模块使用动态导入
                 // 将 fullUrl 定义在 try 块外，以便在 catch 块中访问
                 let fullUrl = null;
                 try {
-                    // 将相对路径转换为绝对 URL
-                    let moduleUrl = module.script;
-                    if (!moduleUrl.startsWith('http://') && !moduleUrl.startsWith('https://') && !moduleUrl.startsWith('/')) {
-                        // 相对路径，需要转换为绝对路径
-                        // 对于以 ../ 开头的路径，直接手动处理（不依赖 new URL()，因为它会基于当前页面路径解析）
-                        if (moduleUrl.startsWith('../')) {
-                            // 移除开头的 ../
-                            const relativePath = moduleUrl.replace(/^\.\.\//, '');
-                            // 如果 relativePath 以 kernel/ 开头，直接使用
-                            if (relativePath.startsWith('kernel/')) {
-                                moduleUrl = '/' + relativePath;
-                            } else {
-                                // 否则使用默认路径
-                                moduleUrl = '/kernel/dynamicModule/' + relativePath;
-                            }
-                        } else if (moduleUrl.startsWith('./')) {
-                            // 以 ./ 开头的相对路径
-                            moduleUrl = '/kernel/dynamicModule/' + moduleUrl.substring(2);
-                        } else {
-                            // 其他相对路径，尝试使用 new URL() 解析
-                            try {
-                                const baseUrl = (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
-                                    ? SystemInformation.getOrigin() + '/'
-                                    : (typeof window !== 'undefined' && window.location ? window.location.origin + '/' : SystemInformation.DEFAULT_ORIGIN + '/');
-                                const resolvedUrl = new URL(moduleUrl, baseUrl);
-                                moduleUrl = resolvedUrl.pathname;
-                            } catch (urlError) {
-                                // 如果 URL 解析失败，使用默认路径
-                                moduleUrl = '/kernel/dynamicModule/' + moduleUrl;
-                            }
-                        }
-                    }
-                    
-                    // 构建完整 URL
-                    // 对于 ES 模块，直接使用原始路径，不使用代理
-                    // 原因：ES 模块内部的相对路径导入会基于当前模块 URL 解析
-                    // 如果使用代理 URL，相对路径会被错误解析
-                    if (moduleUrl.startsWith('http')) {
-                        fullUrl = moduleUrl;
-                    } else {
-                        const origin = (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
-                            ? SystemInformation.getOrigin()
-                            : (typeof window !== 'undefined' && window.location ? window.location.origin : 'http://localhost:8089');
-                        // ES 模块直接使用原始路径，确保相对导入能正确解析
-                        // 服务器应该已经配置了正确的 MIME 类型（通过 .htaccess 或 router.php）
-                        fullUrl = `${origin}${moduleUrl.startsWith('/') ? '' : '/'}${moduleUrl}`;
-                    }
-                    
+                    // ES 模块直接走前端静态资源地址，避免使用后端服务 origin 导致端口错配。
+                    fullUrl = DynamicManager._resolveModuleResourceUrl(module.script);
+
                     KernelLogger.debug("DynamicManager", `ES 模块动态导入: ${fullUrl}`);
-                    
+
                     // 直接使用 import() 动态导入 ES 模块
                     const moduleExports = await import(fullUrl);
                     const globalName = module.metadata?.globalName;
                     if (globalName) {
                         // 处理不同类型的 ES 模块导出
                         let exportObj = null;
-                        
+
                         // 检查是否有默认导出（如 mediapipe 的 vision 对象）
                         if (moduleExports.default) {
                             exportObj = moduleExports.default;
@@ -649,7 +693,7 @@ class DynamicManager {
                             // 或者通过 vision.HandLandmarker 等方式访问（MediaPipe 的情况）
                             exportObj = moduleExports;
                         }
-                        
+
                         // 将对象挂载到全局作用域
                         if (typeof window !== 'undefined') {
                             window[globalName] = exportObj;
@@ -671,18 +715,18 @@ class DynamicManager {
                         errorName: importError.name,
                         errorMessage: importError.message
                     });
-                    
+
                     // 尝试获取更详细的错误信息
                     let errorDetails = importError.message;
                     if (importError.stack) {
                         errorDetails += '\n' + importError.stack;
                     }
-                    
+
                     // 如果 fullUrl 未设置，说明路径处理阶段就出错了
                     if (!fullUrl) {
                         errorDetails = `路径处理失败: ${module.script}\n${errorDetails}`;
                     }
-                    
+
                     throw new Error(`ES 模块 ${moduleName} 加载失败: ${errorDetails}`);
                 }
             } else {
@@ -690,43 +734,15 @@ class DynamicManager {
                 // 对于 ace 模块（预构建版本），直接加载即可
                 if (moduleName === 'ace') {
                     // 预构建版本直接暴露到 window.ace，无需 CommonJS 环境
-                    let scriptUrl = module.script;
-                        
-                        // 处理相对路径
-                        if (!scriptUrl.startsWith('http://') && !scriptUrl.startsWith('https://')) {
-                            if (scriptUrl.startsWith('../')) {
-                                const relativePath = scriptUrl.replace(/^\.\.\//, '');
-                                if (relativePath.startsWith('kernel/')) {
-                                    scriptUrl = '/' + relativePath;
-                                } else {
-                                    scriptUrl = '/kernel/dynamicModule/' + relativePath;
-                                }
-                            } else if (scriptUrl.startsWith('./')) {
-                                scriptUrl = '/kernel/dynamicModule/' + scriptUrl.substring(2);
-                            } else if (!scriptUrl.startsWith('/')) {
-                                scriptUrl = '/kernel/dynamicModule/' + scriptUrl;
-                            }
-                            
-                            // 构建完整 URL
-                            if (typeof window !== 'undefined') {
-                                const origin = (typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
-                                    ? SystemInformation.getOrigin()
-                                    : (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8089');
-                                scriptUrl = origin + scriptUrl;
-                            } else {
-                                scriptUrl = ((typeof SystemInformation !== 'undefined' && SystemInformation.getOrigin) 
-                                    ? SystemInformation.getOrigin()
-                                    : (typeof window !== 'undefined' && window.location ? window.location.origin : 'http://localhost:8089')) + scriptUrl;
-                            }
-                        }
-                        
+                    const scriptUrl = DynamicManager._resolveModuleResourceUrl(module.script);
+
                     KernelLogger.debug("DynamicManager", `加载 Ace Editor 预构建版本: ${scriptUrl}`);
-                    
+
                     // 预构建版本直接暴露到 window.ace，无需 CommonJS 环境
                     const script = document.createElement('script');
                     script.src = scriptUrl;
                     script.async = false; // 同步加载，确保顺序
-                    
+
                     const loadPromise = new Promise((resolve, reject) => {
                         script.onload = () => {
                             // 等待脚本执行完成
@@ -734,14 +750,14 @@ class DynamicManager {
                                 // 预构建版本直接暴露到 window.ace
                                 if (typeof window !== 'undefined' && window.ace) {
                                     // 验证关键方法是否存在
-                                    if (typeof window.ace.edit === 'function' && 
+                                    if (typeof window.ace.edit === 'function' &&
                                         typeof window.ace.createEditSession === 'function') {
                                         resolve();
                                     } else {
                                         // 再等待一下，可能还在加载中
                                         setTimeout(() => {
-                                            if (window.ace && 
-                                                typeof window.ace.edit === 'function' && 
+                                            if (window.ace &&
+                                                typeof window.ace.edit === 'function' &&
                                                 typeof window.ace.createEditSession === 'function') {
                                                 resolve();
                                             } else {
@@ -758,10 +774,10 @@ class DynamicManager {
                             reject(new Error('加载 ace.js 失败'));
                         };
                     });
-                    
+
                     document.head.appendChild(script);
                     await loadPromise;
-                    
+
                     // 从 window.ace 获取对象
                     if (typeof window !== 'undefined' && window.ace) {
                         // 同时设置到 globalThis
@@ -775,13 +791,13 @@ class DynamicManager {
                 } else {
                     // 其他 CommonJS 或传统脚本
                     await DynamicManager._loadScript(module.script, module.metadata);
-                    
+
                     // 等待一小段时间，让脚本完全执行
                     await new Promise(resolve => setTimeout(resolve, 200));
-                    
+
                     // 验证模块是否已加载到全局作用域
                     globalObj = DynamicManager.getModuleGlobal(moduleName);
-                    
+
                     // 如果直接获取失败，尝试多种方式
                     if (!globalObj) {
                         const globalName = module.metadata?.globalName;
@@ -798,26 +814,26 @@ class DynamicManager {
                     }
                 }
             }
-            
+
             if (!globalObj) {
                 throw new Error(`模块 ${moduleName} 加载后未在全局作用域中找到 (globalName: ${module.metadata?.globalName || 'unknown'})`);
             }
-            
+
             // 标记为已加载
             DynamicManager._loadedModules.add(moduleName);
             const loadTime = Date.now() - startTime;
-            
+
             DynamicManager._moduleStatus.set(moduleName, {
                 loaded: true,
                 error: null,
                 loadTime: loadTime
             });
-            
+
             KernelLogger.info("DynamicManager", `模块 ${moduleName} 加载成功`, {
                 loadTime: `${loadTime}ms`,
                 globalName: module.metadata?.globalName
             });
-            
+
             return globalObj;
         } catch (error) {
             // 报告异常
@@ -843,7 +859,7 @@ class DynamicManager {
             throw error;
         }
     }
-    
+
     /**
      * 加载脚本文件
      * @param {string} path 脚本路径
@@ -851,43 +867,47 @@ class DynamicManager {
      */
     static _loadScript(path, moduleMetadata = null) {
         return new Promise((resolve, reject) => {
+            const scriptUrl = DynamicManager._resolveModuleResourceUrl(path);
+
             // 检查是否已经加载过
-            const existingScript = document.querySelector(`script[src="${path}"]`);
+            const existingScript = Array.from(document.scripts || []).find(script => {
+                return script.src === scriptUrl || script.getAttribute('src') === path;
+            });
             if (existingScript) {
-                KernelLogger.debug("DynamicManager", `脚本已加载: ${path}`);
+                KernelLogger.debug("DynamicManager", `脚本已加载: ${scriptUrl}`);
                 resolve();
                 return;
             }
-            
+
             // 检查是否是 ES 模块
-            const isESModule = path.endsWith('.mjs') || 
-                              (moduleMetadata && moduleMetadata.moduleType === 'esm') ||
-                              (path.endsWith('.js') && moduleMetadata && moduleMetadata.moduleType === 'esm');
-            
+            const isESModule = path.endsWith('.mjs') ||
+                (moduleMetadata && moduleMetadata.moduleType === 'esm') ||
+                (path.endsWith('.js') && moduleMetadata && moduleMetadata.moduleType === 'esm');
+
             const script = document.createElement('script');
-            script.src = path;
+            script.src = scriptUrl;
             script.async = true;
             script.crossOrigin = 'anonymous'; // 支持跨域加载
-            
+
             // 如果是 ES 模块，设置 type="module"
             if (isESModule) {
                 script.type = 'module';
             }
-            
+
             script.onload = () => {
-                KernelLogger.debug("DynamicManager", `脚本加载成功: ${path} (${isESModule ? 'ES Module' : 'Script'})`);
+                KernelLogger.debug("DynamicManager", `脚本加载成功: ${scriptUrl} (${isESModule ? 'ES Module' : 'Script'})`);
                 resolve();
             };
-            
+
             script.onerror = () => {
-                KernelLogger.error("DynamicManager", `脚本加载失败: ${path}`);
-                reject(new Error(`Failed to load script: ${path}`));
+                KernelLogger.error("DynamicManager", `脚本加载失败: ${scriptUrl}`);
+                reject(new Error(`Failed to load script: ${scriptUrl}`));
             };
-            
+
             document.head.appendChild(script);
         });
     }
-    
+
     /**
      * 加载样式表
      * @param {string} path 样式表路径
@@ -895,63 +915,67 @@ class DynamicManager {
      */
     static _loadStylesheet(path) {
         return new Promise((resolve, reject) => {
+            const stylesheetUrl = DynamicManager._resolveModuleResourceUrl(path);
+
             // 检查是否已经加载过
-            const existingLink = document.querySelector(`link[href="${path}"]`);
+            const existingLink = Array.from(document.querySelectorAll('link[rel="stylesheet"]')).find(link => {
+                return link.href === stylesheetUrl || link.getAttribute('href') === path;
+            });
             if (existingLink) {
-                KernelLogger.debug("DynamicManager", `样式表已加载: ${path}`);
+                KernelLogger.debug("DynamicManager", `样式表已加载: ${stylesheetUrl}`);
                 resolve();
                 return;
             }
-            
+
             const link = document.createElement('link');
             link.rel = 'stylesheet';
             link.type = 'text/css';
-            link.href = path;
+            link.href = stylesheetUrl;
             link.crossOrigin = 'anonymous';
-            
+
             link.onload = () => {
-                KernelLogger.debug("DynamicManager", `样式表加载成功: ${path}`);
+                KernelLogger.debug("DynamicManager", `样式表加载成功: ${stylesheetUrl}`);
                 resolve();
             };
-            
+
             link.onerror = () => {
-                KernelLogger.warn("DynamicManager", `样式表加载失败: ${path}（非致命错误）`);
+                KernelLogger.warn("DynamicManager", `样式表加载失败: ${stylesheetUrl}（非致命错误）`);
                 // 样式表加载失败不影响模块加载
                 resolve();
             };
-            
+
             document.head.appendChild(link);
         });
     }
-    
+
     /**
      * 自动加载需要自动加载的模块
      */
     static async _loadAutoLoadModules() {
         const autoLoadModules = [];
-        
+
         for (const [moduleName, module] of Object.entries(DYNAMIC_MODULES)) {
             if (module.metadata && module.metadata.autoLoad === true) {
                 autoLoadModules.push(moduleName);
             }
         }
-        
+
         if (autoLoadModules.length > 0) {
             KernelLogger.info("DynamicManager", `发现 ${autoLoadModules.length} 个需要自动加载的模块`, {
                 modules: autoLoadModules
             });
-            
+
             // 并行加载所有自动加载的模块
-            const loadPromises = autoLoadModules.map(moduleName => 
+            const loadPromises = autoLoadModules.map(moduleName =>
                 DynamicManager.loadModule(moduleName).catch(error => {
                     KernelLogger.warn("DynamicManager", `自动加载模块 ${moduleName} 失败: ${error.message}`);
                 })
             );
-            
+
             await Promise.all(loadPromises);
         }
     }
-    
+
     /**
      * 获取模块加载状态
      * @param {string} moduleName 模块名称
@@ -960,7 +984,7 @@ class DynamicManager {
     static getModuleStatus(moduleName) {
         return DynamicManager._moduleStatus.get(moduleName) || null;
     }
-    
+
     /**
      * 列出所有模块
      * @returns {Array<string>} 模块名称数组
@@ -968,7 +992,7 @@ class DynamicManager {
     static listModules() {
         return Object.keys(DYNAMIC_MODULES);
     }
-    
+
     /**
      * 列出已加载的模块
      * @returns {Array<string>} 已加载的模块名称数组
@@ -976,7 +1000,7 @@ class DynamicManager {
     static listLoadedModules() {
         return Array.from(DynamicManager._loadedModules);
     }
-    
+
     /**
      * 获取所有模块信息
      * @returns {Array<Object>} 模块信息数组
@@ -995,7 +1019,7 @@ class DynamicManager {
             };
         });
     }
-    
+
     /**
      * 卸载模块（从内存中移除，但脚本仍在DOM中）
      * @param {string} moduleName 模块名称
@@ -1004,13 +1028,13 @@ class DynamicManager {
         if (!DynamicManager.isModuleLoaded(moduleName)) {
             return;
         }
-        
+
         DynamicManager._loadedModules.delete(moduleName);
         DynamicManager._moduleStatus.delete(moduleName);
-        
+
         KernelLogger.info("DynamicManager", `模块 ${moduleName} 已卸载（从内存中移除）`);
     }
-    
+
     /**
      * 获取统计信息
      * @returns {Object} 统计信息
@@ -1018,7 +1042,7 @@ class DynamicManager {
     static getStats() {
         const allModules = DynamicManager.listModules();
         const loadedModules = DynamicManager.listLoadedModules();
-        
+
         return {
             totalModules: allModules.length,
             loadedModules: loadedModules.length,
@@ -1026,7 +1050,7 @@ class DynamicManager {
             loaded: loadedModules
         };
     }
-    
+
     // 初始化标志
     static _initialized = false;
 }
@@ -1083,4 +1107,3 @@ if (typeof DependencyConfig !== 'undefined' && DependencyConfig && typeof Depend
         }, 0);
     }
 }
-

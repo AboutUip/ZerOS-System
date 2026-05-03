@@ -1,8 +1,14 @@
 package cn.zeros.controller;
 
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.*;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
@@ -54,14 +60,10 @@ public class DashScopeAiProxyController {
      *             _auth 格式: { "apiKey": "sk-xxx" }
      */
     @PostMapping
-    @SuppressWarnings("unchecked")
     public Mono<ResponseEntity<byte[]>> proxy(@RequestBody Map<String, Object> body) {
         log.info("[DashScopeAiProxy] proxy request");
         // 从请求体中提取鉴权信息
-        Map<String, Object> auth = null;
-        if (body.containsKey("_auth") && body.get("_auth") instanceof Map) {
-            auth = (Map<String, Object>) body.get("_auth");
-        }
+        Map<String, Object> auth = toObjectMap(body.get("_auth"));
 
         String apiKey = "";
         if (auth != null) {
@@ -94,5 +96,17 @@ public class DashScopeAiProxyController {
                             .contentType(MediaType.APPLICATION_JSON)
                             .body(error.getBytes()));
                 });
+    }
+
+    private Map<String, Object> toObjectMap(Object value) {
+        if (!(value instanceof Map<?, ?> rawMap)) {
+            return Map.of();
+        }
+
+        return rawMap.entrySet().stream()
+                .filter(entry -> entry.getKey() != null)
+                .collect(java.util.stream.Collectors.toMap(
+                        entry -> entry.getKey().toString(),
+                        Map.Entry::getValue));
     }
 }

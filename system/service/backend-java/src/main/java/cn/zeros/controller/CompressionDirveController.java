@@ -8,20 +8,29 @@ import cn.zeros.model.ApiResponse;
 import cn.zeros.service.ICompressionDirveService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Callable;
 import java.util.function.Function;
 
 /**
- * 压缩驱动控制器
- * 使用函数式映射替代 switch 语句，代码更简洁
+ * 压缩驱动控制器。
+ *
+ * <p>保持与 PHP 端 CompressionDirve 参数风格兼容，同时通过动作映射集中分发压缩、解压和列表操作。
  *
  * @author zeros
- * @date 2026-01-16
  */
 @RestController
 @RequestMapping("/CompressionDirve")
@@ -30,6 +39,7 @@ public class CompressionDirveController {
 
     private final ICompressionDirveService compressionService;
     private final Map<CompressionActionType, Function<ActionContext, Map<String, Object>>> executors;
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     public CompressionDirveController(ICompressionDirveService compressionService) {
         this.compressionService = compressionService;
@@ -138,16 +148,10 @@ public class CompressionDirveController {
                 finalTargetPath = (String) requestBody.get("targetPath");
             }
             if (requestBody.containsKey("sourcePaths")) {
-                @SuppressWarnings("unchecked")
-                List<String> sps = (List<String>) requestBody.get("sourcePaths");
-                sourcePaths = sps;
+                sourcePaths = toStringList(requestBody.get("sourcePaths"));
             }
             if (requestBody.containsKey("options")) {
-                @SuppressWarnings("unchecked")
-                Map<String, Object> opts = (Map<String, Object>) requestBody.get("options");
-                if (opts != null) {
-                    options.putAll(opts);
-                }
+                options.putAll(toObjectMap(requestBody.get("options")));
             }
         }
 
@@ -182,12 +186,10 @@ public class CompressionDirveController {
         String value = raw.trim();
         if (value.startsWith("[") && value.endsWith("]")) {
             try {
-                com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
-                @SuppressWarnings("unchecked")
-                List<Object> parsed = mapper.readValue(value, List.class);
+                List<Object> parsed = OBJECT_MAPPER.readValue(value, new TypeReference<>() {});
                 return parsed.stream().map(Object::toString).toList();
-            } catch (Exception ignored) {
-                // Fall through to comma parsing.
+            } catch (JsonProcessingException e) {
+                log.debug("列表参数不是合法 JSON 数组，按逗号分隔处理: {}", raw);
             }
         }
         List<String> result = new ArrayList<>();
@@ -200,170 +202,133 @@ public class CompressionDirveController {
         return result;
     }
 
+    private List<String> toStringList(Object value) {
+        if (!(value instanceof List<?> rawList)) {
+            return null;
+        }
+        return rawList.stream().map(Object::toString).toList();
+    }
+
+    private Map<String, Object> toObjectMap(Object value) {
+        if (!(value instanceof Map<?, ?> rawMap)) {
+            return Map.of();
+        }
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        for (Map.Entry<?, ?> entry : rawMap.entrySet()) {
+            if (entry.getKey() != null) {
+                result.put(entry.getKey().toString(), entry.getValue());
+            }
+        }
+        return result;
+    }
+
     // ============ ZIP 操作执行器 ============
 
     private Map<String, Object> executeCompressZip(ActionContext ctx) {
-        try {
-            return compressionService.compressZip(ctx.getTargetPath(), ctx.getSourcePath(),
-                    ctx.getSourcePaths(), ctx.getOptionsOrEmpty());
-        } catch (Exception e) {
-            throw new BusinessException(ErrorCode.INTERNAL_ERROR, e.getMessage());
-        }
+        return executeCompression(() -> compressionService.compressZip(ctx.getTargetPath(), ctx.getSourcePath(),
+                ctx.getSourcePaths(), ctx.getOptionsOrEmpty()));
     }
 
     private Map<String, Object> executeExtractZip(ActionContext ctx) {
-        try {
-            return compressionService.extractZip(ctx.getSourcePath(), ctx.getTargetPath(),
-                    ctx.getOptionsOrEmpty());
-        } catch (Exception e) {
-            throw new BusinessException(ErrorCode.INTERNAL_ERROR, e.getMessage());
-        }
+        return executeCompression(() -> compressionService.extractZip(ctx.getSourcePath(), ctx.getTargetPath(),
+                ctx.getOptionsOrEmpty()));
     }
 
     private Map<String, Object> executeListZip(ActionContext ctx) {
-        try {
-            return compressionService.listZip(ctx.getSourcePath());
-        } catch (Exception e) {
-            throw new BusinessException(ErrorCode.INTERNAL_ERROR, e.getMessage());
-        }
+        return executeCompression(() -> compressionService.listZip(ctx.getSourcePath()));
     }
 
     // ============ 加密 ZIP 操作执行器 ============
 
     private Map<String, Object> executeCompressZipEncrypted(ActionContext ctx) {
-        try {
-            return compressionService.compressZipEncrypted(ctx.getTargetPath(), ctx.getSourcePath(),
-                    ctx.getSourcePaths(), ctx.getOptionsOrEmpty());
-        } catch (Exception e) {
-            throw new BusinessException(ErrorCode.INTERNAL_ERROR, e.getMessage());
-        }
+        return executeCompression(() -> compressionService.compressZipEncrypted(ctx.getTargetPath(), ctx.getSourcePath(),
+                ctx.getSourcePaths(), ctx.getOptionsOrEmpty()));
     }
 
     private Map<String, Object> executeExtractZipEncrypted(ActionContext ctx) {
-        try {
-            return compressionService.extractZipEncrypted(ctx.getSourcePath(), ctx.getTargetPath(),
-                    ctx.getOptionsOrEmpty());
-        } catch (Exception e) {
-            throw new BusinessException(ErrorCode.INTERNAL_ERROR, e.getMessage());
-        }
+        return executeCompression(() -> compressionService.extractZipEncrypted(ctx.getSourcePath(), ctx.getTargetPath(),
+                ctx.getOptionsOrEmpty()));
     }
 
     // ============ RAR 操作执行器 ============
 
     private Map<String, Object> executeCompressRar(ActionContext ctx) {
-        try {
-            return compressionService.compressRar(ctx.getSourcePath(), ctx.getTargetPath(),
-                    ctx.getOptionsOrEmpty());
-        } catch (Exception e) {
-            throw new BusinessException(ErrorCode.INTERNAL_ERROR, e.getMessage());
-        }
+        return executeCompression(() -> compressionService.compressRar(ctx.getSourcePath(), ctx.getTargetPath(),
+                ctx.getOptionsOrEmpty()));
     }
 
     private Map<String, Object> executeExtractRar(ActionContext ctx) {
-        try {
-            return compressionService.extractRar(ctx.getSourcePath(), ctx.getTargetPath(),
-                    ctx.getOptionsOrEmpty());
-        } catch (Exception e) {
-            throw new BusinessException(ErrorCode.INTERNAL_ERROR, e.getMessage());
-        }
+        return executeCompression(() -> compressionService.extractRar(ctx.getSourcePath(), ctx.getTargetPath(),
+                ctx.getOptionsOrEmpty()));
     }
 
     private Map<String, Object> executeListRar(ActionContext ctx) {
-        try {
-            return compressionService.listRar(ctx.getSourcePath());
-        } catch (Exception e) {
-            throw new BusinessException(ErrorCode.INTERNAL_ERROR, e.getMessage());
-        }
+        return executeCompression(() -> compressionService.listRar(ctx.getSourcePath()));
     }
 
     // ============ 7Z 操作执行器 ============
 
     private Map<String, Object> executeCompress7z(ActionContext ctx) {
-        try {
-            return compressionService.compress7z(ctx.getTargetPath(), ctx.getSourcePath(),
-                    ctx.getSourcePaths(), ctx.getOptionsOrEmpty());
-        } catch (Exception e) {
-            throw new BusinessException(ErrorCode.INTERNAL_ERROR, e.getMessage());
-        }
+        return executeCompression(() -> compressionService.compress7z(ctx.getTargetPath(), ctx.getSourcePath(),
+                ctx.getSourcePaths(), ctx.getOptionsOrEmpty()));
     }
 
     private Map<String, Object> executeExtract7z(ActionContext ctx) {
-        try {
-            return compressionService.extract7z(ctx.getSourcePath(), ctx.getTargetPath(),
-                    ctx.getOptionsOrEmpty());
-        } catch (Exception e) {
-            throw new BusinessException(ErrorCode.INTERNAL_ERROR, e.getMessage());
-        }
+        return executeCompression(() -> compressionService.extract7z(ctx.getSourcePath(), ctx.getTargetPath(),
+                ctx.getOptionsOrEmpty()));
     }
 
     private Map<String, Object> executeList7z(ActionContext ctx) {
-        try {
-            return compressionService.list7z(ctx.getSourcePath());
-        } catch (Exception e) {
-            throw new BusinessException(ErrorCode.INTERNAL_ERROR, e.getMessage());
-        }
+        return executeCompression(() -> compressionService.list7z(ctx.getSourcePath()));
     }
 
     // ============ TAR 操作执行器 ============
 
     private Map<String, Object> executeCompressTar(ActionContext ctx) {
-        try {
-            return compressionService.compressTar(ctx.getTargetPath(), ctx.getSourcePath(),
-                    ctx.getSourcePaths(), ctx.getOptionsOrEmpty());
-        } catch (Exception e) {
-            throw new BusinessException(ErrorCode.INTERNAL_ERROR, e.getMessage());
-        }
+        return executeCompression(() -> compressionService.compressTar(ctx.getTargetPath(), ctx.getSourcePath(),
+                ctx.getSourcePaths(), ctx.getOptionsOrEmpty()));
     }
 
     private Map<String, Object> executeExtractTar(ActionContext ctx) {
-        try {
-            return compressionService.extractTar(ctx.getSourcePath(), ctx.getTargetPath(),
-                    ctx.getOptionsOrEmpty());
-        } catch (Exception e) {
-            throw new BusinessException(ErrorCode.INTERNAL_ERROR, e.getMessage());
-        }
+        return executeCompression(() -> compressionService.extractTar(ctx.getSourcePath(), ctx.getTargetPath(),
+                ctx.getOptionsOrEmpty()));
     }
 
     private Map<String, Object> executeListTar(ActionContext ctx) {
-        try {
-            return compressionService.listTar(ctx.getSourcePath());
-        } catch (Exception e) {
-            throw new BusinessException(ErrorCode.INTERNAL_ERROR, e.getMessage());
-        }
+        return executeCompression(() -> compressionService.listTar(ctx.getSourcePath()));
     }
 
     // ============ TAR.GZ 操作执行器 ============
 
     private Map<String, Object> executeCompressTarGz(ActionContext ctx) {
-        try {
-            return compressionService.compressTarGz(ctx.getTargetPath(), ctx.getSourcePath(),
-                    ctx.getSourcePaths(), ctx.getOptionsOrEmpty());
-        } catch (Exception e) {
-            throw new BusinessException(ErrorCode.INTERNAL_ERROR, e.getMessage());
-        }
+        return executeCompression(() -> compressionService.compressTarGz(ctx.getTargetPath(), ctx.getSourcePath(),
+                ctx.getSourcePaths(), ctx.getOptionsOrEmpty()));
     }
 
     private Map<String, Object> executeExtractTarGz(ActionContext ctx) {
-        try {
-            return compressionService.extractTarGz(ctx.getSourcePath(), ctx.getTargetPath(),
-                    ctx.getOptionsOrEmpty());
-        } catch (Exception e) {
-            throw new BusinessException(ErrorCode.INTERNAL_ERROR, e.getMessage());
-        }
+        return executeCompression(() -> compressionService.extractTarGz(ctx.getSourcePath(), ctx.getTargetPath(),
+                ctx.getOptionsOrEmpty()));
     }
 
     private Map<String, Object> executeListTarGz(ActionContext ctx) {
-        try {
-            return compressionService.listTarGz(ctx.getSourcePath());
-        } catch (Exception e) {
-            throw new BusinessException(ErrorCode.INTERNAL_ERROR, e.getMessage());
-        }
+        return executeCompression(() -> compressionService.listTarGz(ctx.getSourcePath()));
     }
 
     // ============ 其他操作执行器 ============
 
     private Map<String, Object> executeCheckSupport(ActionContext ctx) {
         return compressionService.checkSupport();
+    }
+
+    private Map<String, Object> executeCompression(Callable<Map<String, Object>> operation) {
+        try {
+            return operation.call();
+        } catch (BusinessException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new BusinessException(ErrorCode.INTERNAL_ERROR, e.getMessage());
+        }
     }
 
     @RequestMapping(method = RequestMethod.OPTIONS)

@@ -5,6 +5,7 @@ import lombok.Data;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * 动作上下文类
@@ -155,20 +156,15 @@ public class ActionContext {
     /**
      * 获取选项值，如果不存在返回默认值
      */
-    @SuppressWarnings("unchecked")
-    public <T> T getOption(String key, T defaultValue) {
+    public <T> T getOption(String key, Class<T> type, T defaultValue) {
         if (options == null || !options.containsKey(key)) {
             return defaultValue;
         }
         Object value = options.get(key);
-        if (value == null) {
-            return defaultValue;
-        }
-        try {
-            return (T) value;
-        } catch (ClassCastException e) {
-            return defaultValue;
-        }
+        return Optional.ofNullable(value)
+                .filter(type::isInstance)
+                .map(type::cast)
+                .orElse(defaultValue);
     }
 
     /**

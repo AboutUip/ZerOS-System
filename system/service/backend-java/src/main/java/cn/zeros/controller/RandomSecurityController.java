@@ -8,7 +8,11 @@ import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -17,6 +21,14 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * 随机安全令牌控制器。
+ *
+ * <p>负责签发 SystemToken/UserToken，并通过 boot commit 文件约束 SystemToken 的启动期签发流程，
+ * 与 PHP 端 randomSecurity 服务保持兼容。
+ *
+ * @author zeros
+ */
 @Slf4j
 @RestController
 @RequestMapping("/randomSecurity")
@@ -61,7 +73,7 @@ public class RandomSecurityController {
         boolean cleared = bootSecurityTokenService.clearTokens();
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("cleared", cleared);
-        data.put("error", cleared ? null : "Failed to clear JWT records");
+        data.put("error", cleared ? null : "清理 JWT 记录失败");
         return ResponseEntity.ok(ApiResponse.success("JWT cleared", data));
     }
 
@@ -145,7 +157,7 @@ public class RandomSecurityController {
         responseData.put("expiration", 0);
         responseData.put("expires_at", null);
         responseData.put("recorded", saved);
-        responseData.put("record_error", saved ? null : "Failed to write token file");
+        responseData.put("record_error", saved ? null : "写入令牌文件失败");
         responseData.put("current_count", updatedTokens.size());
         responseData.put("max_count", BootSecurityTokenService.MAX_TOKEN_COUNT);
 

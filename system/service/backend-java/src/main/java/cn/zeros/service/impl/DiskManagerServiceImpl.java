@@ -11,9 +11,19 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
-import java.nio.file.*;
+import java.nio.file.DirectoryStream;
+import java.nio.file.FileVisitResult;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.SimpleFileVisitor;
+import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.BasicFileAttributes;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.zip.ZipEntry;
@@ -64,8 +74,7 @@ public class DiskManagerServiceImpl implements IDiskManagerService {
 
                 // 获取配置的磁盘大小
                 Map<String, Object> diskData = readDiskDataInternal();
-                @SuppressWarnings("unchecked")
-                Map<String, Object> partitions = (Map<String, Object>) diskData.get("partitions");
+                Map<String, Object> partitions = objectMap(diskData.get("partitions"));
                 if (partitions != null && partitions.containsKey(partition)) {
                     long configuredSize = ((Number) partitions.get(partition)).longValue();
                     long actualSize = stats.getTotalSize();
@@ -235,8 +244,7 @@ public class DiskManagerServiceImpl implements IDiskManagerService {
         Map<String, Long> partitionSizes = new HashMap<>();
         try {
             Map<String, Object> diskData = readDiskDataInternal();
-            @SuppressWarnings("unchecked")
-            Map<String, Object> partitions = (Map<String, Object>) diskData.get("partitions");
+            Map<String, Object> partitions = objectMap(diskData.get("partitions"));
             if (partitions != null) {
                 for (Map.Entry<String, Object> entry : partitions.entrySet()) {
                     partitionSizes.put(entry.getKey(), ((Number) entry.getValue()).longValue());
@@ -333,8 +341,7 @@ public class DiskManagerServiceImpl implements IDiskManagerService {
         // 扫描物理目录，确保配置中包含所有存在的分区
         Path basePath = diskConfig.getDiskBasePath();
         if (Files.isDirectory(basePath)) {
-            @SuppressWarnings("unchecked")
-            Map<String, Object> partitions = (Map<String, Object>) data.computeIfAbsent("partitions", k -> new LinkedHashMap<>());
+            Map<String, Object> partitions = mutableObjectMap(data, "partitions");
 
             try (DirectoryStream<Path> stream = Files.newDirectoryStream(basePath)) {
                 for (Path path : stream) {
@@ -430,8 +437,7 @@ public class DiskManagerServiceImpl implements IDiskManagerService {
                 }
             }
 
-            @SuppressWarnings("unchecked")
-            Map<String, Object> partitions = (Map<String, Object>) data.computeIfAbsent("partitions", k -> new LinkedHashMap<>());
+            Map<String, Object> partitions = mutableObjectMap(data, "partitions");
 
             // 只有分区不存在时才设置新的大小
             String key = partitionName.contains(":") ? partitionName : partitionName + ":";
@@ -466,12 +472,12 @@ public class DiskManagerServiceImpl implements IDiskManagerService {
                 return;
             }
 
-            @SuppressWarnings("unchecked")
-            Map<String, Object> partitions = (Map<String, Object>) data.get("partitions");
+            Map<String, Object> partitions = objectMap(data.get("partitions"));
             String key = partitionName.contains(":") ? partitionName : partitionName + ":";
 
             if (partitions.containsKey(key)) {
                 partitions.remove(key);
+                data.put("partitions", partitions);
                 data.put("partitionCount", partitions.size());
                 objectMapper.writerWithDefaultPrettyPrinter().writeValue(diskDataFile.toFile(), data);
             }
@@ -686,8 +692,7 @@ public class DiskManagerServiceImpl implements IDiskManagerService {
                 Map<String, Object> existingData = objectMapper.readValue(diskDataFile.toFile(), new TypeReference<>() {});
                 if (existingData != null) {
                     data = existingData;
-                    @SuppressWarnings("unchecked")
-                    Map<String, Object> partitions = (Map<String, Object>) data.get("partitions");
+                    Map<String, Object> partitions = objectMap(data.get("partitions"));
                     if (partitions != null && partitions.containsKey(partition)) {
                         oldSize = ((Number) partitions.get(partition)).longValue();
                     }
@@ -698,8 +703,7 @@ public class DiskManagerServiceImpl implements IDiskManagerService {
         }
 
         // 更新分区大小
-        @SuppressWarnings("unchecked")
-        Map<String, Object> partitions = (Map<String, Object>) data.computeIfAbsent("partitions", k -> new LinkedHashMap<>());
+        Map<String, Object> partitions = mutableObjectMap(data, "partitions");
         partitions.put(partition, newSize);
         data.put("partitionCount", partitions.size());
 
@@ -739,8 +743,7 @@ public class DiskManagerServiceImpl implements IDiskManagerService {
         Map<String, Long> partitionSizes = new HashMap<>();
         try {
             Map<String, Object> diskData = readDiskDataInternal();
-            @SuppressWarnings("unchecked")
-            Map<String, Object> partitions = (Map<String, Object>) diskData.get("partitions");
+            Map<String, Object> partitions = objectMap(diskData.get("partitions"));
             if (partitions != null) {
                 for (Map.Entry<String, Object> entry : partitions.entrySet()) {
                     partitionSizes.put(entry.getKey(), ((Number) entry.getValue()).longValue());
@@ -872,8 +875,7 @@ public class DiskManagerServiceImpl implements IDiskManagerService {
         // 获取源分区的配置大小，并为目标分区设置相同大小
         try {
             Map<String, Object> diskData = readDiskDataInternal();
-            @SuppressWarnings("unchecked")
-            Map<String, Object> partitions = (Map<String, Object>) diskData.get("partitions");
+            Map<String, Object> partitions = objectMap(diskData.get("partitions"));
             long partitionSize = DiskConstants.DEFAULT_PARTITION_SIZE;
             if (partitions != null && partitions.containsKey(source)) {
                 partitionSize = ((Number) partitions.get(source)).longValue();
@@ -935,5 +937,25 @@ public class DiskManagerServiceImpl implements IDiskManagerService {
         }
 
         return null;
+    }
+
+    private Map<String, Object> mutableObjectMap(Map<String, Object> data, String key) {
+        Map<String, Object> map = objectMap(data.get(key));
+        data.put(key, map);
+        return map;
+    }
+
+    private Map<String, Object> objectMap(Object value) {
+        if (!(value instanceof Map<?, ?> rawMap)) {
+            return new LinkedHashMap<>();
+        }
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        for (Map.Entry<?, ?> entry : rawMap.entrySet()) {
+            if (entry.getKey() != null) {
+                result.put(entry.getKey().toString(), entry.getValue());
+            }
+        }
+        return result;
     }
 }

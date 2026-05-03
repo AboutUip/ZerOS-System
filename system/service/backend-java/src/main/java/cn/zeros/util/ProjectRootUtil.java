@@ -5,12 +5,17 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 
 /**
- * Resolves the ZerOS repository root from common Spring Boot launch locations.
+ * ZerOS 项目根目录解析工具。
+ *
+ * <p>Spring Boot 可能从仓库根目录或 backend-java 目录启动，模块代理和 Node 服务需要
+ * 稳定定位仓库根路径，避免使用易受工作目录影响的相对路径。
+ *
+ * @author zeros
  */
 public final class ProjectRootUtil {
 
     private ProjectRootUtil() {
-        throw new UnsupportedOperationException("Utility class");
+        throw new UnsupportedOperationException("工具类不允许实例化");
     }
 
     public static Path resolveProjectRoot() {

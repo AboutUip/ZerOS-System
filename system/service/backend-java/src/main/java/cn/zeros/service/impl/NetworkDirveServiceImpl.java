@@ -8,13 +8,22 @@ import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
-import java.io.*;
-import java.net.*;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.net.BindException;
+import java.net.InetSocketAddress;
+import java.net.Socket;
 import java.nio.ByteBuffer;
-import java.nio.channels.*;
+import java.nio.channels.ServerSocketChannel;
+import java.nio.channels.SocketChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -374,7 +383,9 @@ public class NetworkDirveServiceImpl implements INetworkDirveService {
     }
 
     private Map<String, Object> readJson(Path path) throws IOException {
-        if (!Files.exists(path)) return null;
+        if (!Files.exists(path)) {
+            return null;
+        }
         return objectMapper.readValue(path.toFile(), new TypeReference<>() {});
     }
 
@@ -392,7 +403,9 @@ public class NetworkDirveServiceImpl implements INetworkDirveService {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("success", true);
         result.put("message", message);
-        if (data != null) result.put("data", data);
+        if (data != null) {
+            result.put("data", data);
+        }
         return result;
     }
 

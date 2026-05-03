@@ -5,8 +5,17 @@ import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
-import org.springframework.http.*;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
@@ -236,8 +245,12 @@ public class BrowserProxyController {
         Elements elements = doc.select(selector + "[" + attr + "]");
         for (Element el : elements) {
             String value = el.attr(attr);
-            if (shouldSkipUrl(value)) continue;
-            if (value.contains("BrowserProxy")) continue;  // 已经是代理 URL
+            if (shouldSkipUrl(value)) {
+                continue;
+            }
+            if (value.contains("BrowserProxy")) {
+                continue;
+            }
 
             String absoluteUrl = resolveUrl(value, pageUrl);
             if (absoluteUrl != null && !absoluteUrl.contains("data:")) {
@@ -319,7 +332,9 @@ public class BrowserProxyController {
      * 判断是否应该跳过某个 URL（内联协议、锚点等不需要代理）
      */
     private boolean shouldSkipUrl(String url) {
-        if (url == null || url.isBlank()) return true;
+        if (url == null || url.isBlank()) {
+            return true;
+        }
         String lower = url.trim().toLowerCase();
         return lower.startsWith("data:") || lower.startsWith("javascript:")
                 || lower.startsWith("mailto:") || lower.startsWith("tel:")
@@ -331,12 +346,18 @@ public class BrowserProxyController {
      * 将相对 URL 解析为绝对 URL
      */
     private String resolveUrl(String url, String baseUrl) {
-        if (url == null || url.isBlank()) return null;
+        if (url == null || url.isBlank()) {
+            return null;
+        }
         url = url.trim();
-        if (shouldSkipUrl(url)) return null;
+        if (shouldSkipUrl(url)) {
+            return null;
+        }
 
         // 已经是绝对 URL
-        if (url.matches("^https?://.*")) return url;
+        if (url.matches("^https?://.*")) {
+            return url;
+        }
 
         // 协议相对 URL（//example.com/path）
         if (url.startsWith("//")) {
@@ -365,7 +386,9 @@ public class BrowserProxyController {
         for (int i = 0; i < 5; i++) {
             try {
                 String next = URLDecoder.decode(decoded, StandardCharsets.UTF_8);
-                if (next.equals(decoded)) break;
+                if (next.equals(decoded)) {
+                    break;
+                }
                 decoded = next;
             } catch (Exception e) {
                 break;

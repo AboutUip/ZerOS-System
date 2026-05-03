@@ -18,9 +18,14 @@ import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.apache.commons.compress.compressors.gzip.GzipCompressorInputStream;
 import org.apache.commons.compress.compressors.gzip.GzipCompressorOutputStream;
 import lombok.extern.slf4j.Slf4j;
+import net.lingala.zip4j.model.FileHeader;
 import org.springframework.stereotype.Service;
 
-import java.io.*;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -626,7 +631,7 @@ public class CompressionDirveServiceImpl implements ICompressionDirveService {
         try (ZipFile zipFile = new ZipFile(sourceRealPath.toFile(), password.toCharArray())) {
             zipFile.extractAll(targetRealPath.toString());
 
-            for (var header : zipFile.getFileHeaders()) {
+            for (FileHeader header : zipFile.getFileHeaders()) {
                 if (!header.isDirectory()) {
                     extractedFiles.add(header.getFileName());
                 }

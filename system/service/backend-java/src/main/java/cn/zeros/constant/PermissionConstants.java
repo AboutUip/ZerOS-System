@@ -112,10 +112,18 @@ public final class PermissionConstants {
      * @return 服务名称，不属于任何受保护服务时返回 null
      */
     public static String extractServiceName(String path) {
-        if (path == null) return null;
-        if (path.contains("/FSDirve")) return "FSDirve";
-        if (path.contains("/CompressionDirve")) return "CompressionDirve";
-        if (path.contains("/DISKMANAGER")) return "DISKMANAGER";
+        if (path == null) {
+            return null;
+        }
+        if (path.contains("/FSDirve")) {
+            return "FSDirve";
+        }
+        if (path.contains("/CompressionDirve")) {
+            return "CompressionDirve";
+        }
+        if (path.contains("/DISKMANAGER")) {
+            return "DISKMANAGER";
+        }
         return null;
     }
 
@@ -127,9 +135,13 @@ public final class PermissionConstants {
      * @return 所需权限名称，未配置时返回 null（表示不限制）
      */
     public static String getRequiredPermission(String serviceName, String action) {
-        if (serviceName == null || action == null) return null;
+        if (serviceName == null || action == null) {
+            return null;
+        }
         Map<String, String> serviceMap = ACTION_PERMISSION_MAP.get(serviceName);
-        if (serviceMap == null) return null;
+        if (serviceMap == null) {
+            return null;
+        }
         return serviceMap.get(action);
     }
 

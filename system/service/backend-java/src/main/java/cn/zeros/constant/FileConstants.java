@@ -24,7 +24,7 @@ public final class FileConstants {
     );
 
     /**
-     * Video extensions that should be treated as binary content.
+     * 需要按二进制内容处理的视频扩展名
      */
     public static final List<String> VIDEO_EXTENSIONS = Arrays.asList(
             "mp4", "webm", "ogg", "mov", "avi", "mkv"
@@ -45,7 +45,7 @@ public final class FileConstants {
     );
 
     /**
-     * Video file Content-Type mapping.
+     * 视频文件 Content-Type 映射
      */
     public static final Map<String, String> VIDEO_CONTENT_TYPES = Map.of(
             "mp4", "video/mp4",
@@ -72,7 +72,7 @@ public final class FileConstants {
     public static final String DEFAULT_AUDIO_CONTENT_TYPE = "audio/wav";
 
     /**
-     * Default video Content-Type.
+     * 默认视频 Content-Type
      */
     public static final String DEFAULT_VIDEO_CONTENT_TYPE = "video/mp4";
     
@@ -85,6 +85,10 @@ public final class FileConstants {
      * 图片文件魔数签名（用于检测文件类型）
      */
     public static final class ImageMagicNumbers {
+        private ImageMagicNumbers() {
+            throw new UnsupportedOperationException("工具类不允许实例化");
+        }
+
         public static final byte[] JPEG = {(byte) 0xFF, (byte) 0xD8, (byte) 0xFF};
         public static final byte[] PNG = {(byte) 0x89, 0x50, 0x4E, 0x47};
         public static final byte[] GIF = {0x47, 0x49, 0x46, 0x38};

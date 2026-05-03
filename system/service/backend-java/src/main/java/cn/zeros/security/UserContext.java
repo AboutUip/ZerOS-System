@@ -62,9 +62,13 @@ public class UserContext {
     }
 
     public boolean hasAnyRole(String... roles) {
-        if (this.roles == null || roles == null) return false;
+        if (this.roles == null || roles == null) {
+            return false;
+        }
         for (String role : roles) {
-            if (this.roles.contains(role)) return true;
+            if (this.roles.contains(role)) {
+                return true;
+            }
         }
         return false;
     }

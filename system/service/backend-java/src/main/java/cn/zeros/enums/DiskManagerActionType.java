@@ -3,6 +3,13 @@ package cn.zeros.enums;
 import cn.zeros.model.ActionContext;
 import lombok.Getter;
 
+/**
+ * 磁盘管理动作枚举。
+ *
+ * <p>集中维护 DISKMANAGER 支持的 action、参数要求和默认成功文案，避免控制器中散落字符串判断。
+ *
+ * @author zeros
+ */
 @Getter
 public enum DiskManagerActionType {
 

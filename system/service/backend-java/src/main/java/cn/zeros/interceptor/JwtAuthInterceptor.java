@@ -8,6 +8,7 @@ import cn.zeros.security.UserContext;
 import cn.zeros.security.UserContextHolder;
 import cn.zeros.service.BootSecurityTokenService;
 import cn.zeros.util.JwtUtil;
+import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.JwtException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -76,7 +77,7 @@ public class JwtAuthInterceptor implements HandlerInterceptor {
         }
 
         try {
-            var claims = jwtUtil.parseAndValidate(token);
+            Claims claims = jwtUtil.parseAndValidate(token);
             UserContext context = jwtUtil.buildUserContext(claims);
             String tokenType = context.getTokenType();
 

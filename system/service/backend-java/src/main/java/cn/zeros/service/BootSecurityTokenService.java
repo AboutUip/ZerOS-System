@@ -16,7 +16,12 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Random;
+import java.util.Set;
 import java.util.function.Consumer;
 
 /**
@@ -89,9 +94,13 @@ public class BootSecurityTokenService {
         }
         try {
             String content = Files.readString(path);
-            if (content.isBlank()) return createDefaultData();
+            if (content.isBlank()) {
+                return createDefaultData();
+            }
             Map<String, Object> data = objectMapper.readValue(content, new TypeReference<>() {});
-            if (data == null) return createDefaultData();
+            if (data == null) {
+                return createDefaultData();
+            }
             data.putIfAbsent("tokens", new ArrayList<>());
             data.putIfAbsent("count", 0);
             data.putIfAbsent("max_count", MAX_TOKEN_COUNT);
@@ -110,7 +119,6 @@ public class BootSecurityTokenService {
      * @param modifier 修改函数，接收当前数据 Map 进行原地修改
      * @return 是否保存成功
      */
-    @SuppressWarnings("unchecked")
     public boolean loadModifySave(Consumer<Map<String, Object>> modifier) {
         Path path = getTokenFilePath();
         try {
@@ -132,7 +140,9 @@ public class BootSecurityTokenService {
                 raf.readFully(bytes);
                 String content = new String(bytes);
                 data = objectMapper.readValue(content, new TypeReference<>() {});
-                if (data == null) data = createDefaultData();
+                if (data == null) {
+                    data = createDefaultData();
+                }
             } else {
                 data = createDefaultData();
             }
@@ -144,7 +154,7 @@ public class BootSecurityTokenService {
             modifier.accept(data);
 
             // 3. 自动更新 count 字段
-            List<Map<String, Object>> tokens = (List<Map<String, Object>>) data.get("tokens");
+            List<Map<String, Object>> tokens = tokenRecords(data.get("tokens"));
             data.put("count", tokens != null ? tokens.size() : 0);
             data.put("max_count", MAX_TOKEN_COUNT);
 
@@ -163,14 +173,9 @@ public class BootSecurityTokenService {
     /**
      * 获取当前令牌列表
      */
-    @SuppressWarnings("unchecked")
     public List<Map<String, Object>> getTokens() {
         Map<String, Object> data = loadData();
-        Object tokens = data.get("tokens");
-        if (tokens instanceof List) {
-            return (List<Map<String, Object>>) tokens;
-        }
-        return new ArrayList<>();
+        return tokenRecords(data.get("tokens"));
     }
 
     /**
@@ -179,7 +184,9 @@ public class BootSecurityTokenService {
      */
     public boolean clearTokens() {
         Path path = getTokenFilePath();
-        if (!Files.exists(path)) return true;
+        if (!Files.exists(path)) {
+            return true;
+        }
         return loadModifySave(data -> {
             data.put("tokens", new ArrayList<>());
             data.put("count", 0);
@@ -193,15 +200,10 @@ public class BootSecurityTokenService {
      *
      * @param tokenRecord 令牌记录 Map，包含 token、type、randomValue 等字段
      */
-    @SuppressWarnings("unchecked")
     public boolean addToken(Map<String, Object> tokenRecord) {
         String type = (String) tokenRecord.get("type");
         return loadModifySave(data -> {
-            List<Map<String, Object>> tokens = (List<Map<String, Object>>) data.get("tokens");
-            if (tokens == null) {
-                tokens = new ArrayList<>();
-                data.put("tokens", tokens);
-            }
+            List<Map<String, Object>> tokens = mutableTokenRecords(data);
 
             // SystemToken 签发时清空所有已有令牌
             if ("SystemToken".equals(type)) {
@@ -222,25 +224,22 @@ public class BootSecurityTokenService {
      *
      * @return 程序权限映射表，key 为 upid，value 为权限列表
      */
-    @SuppressWarnings("unchecked")
     public Map<String, List<String>> loadProgramPermissionsMap() {
         Map<String, Object> data = loadData();
-        Object map = data.get("programPermissionsMap");
-        if (map instanceof Map) {
-            Map<String, Object> raw = (Map<String, Object>) map;
-            Map<String, List<String>> result = new LinkedHashMap<>();
-            for (Map.Entry<String, Object> entry : raw.entrySet()) {
-                if (entry.getValue() instanceof List) {
-                    List<String> perms = new ArrayList<>();
-                    for (Object item : (List<?>) entry.getValue()) {
-                        if (item != null) perms.add(item.toString());
+        Map<String, Object> raw = objectMap(data.get("programPermissionsMap"));
+        Map<String, List<String>> result = new LinkedHashMap<>();
+        for (Map.Entry<String, Object> entry : raw.entrySet()) {
+            if (entry.getValue() instanceof List<?> rawPermissions) {
+                List<String> permissions = new ArrayList<>();
+                for (Object item : rawPermissions) {
+                    if (item != null) {
+                        permissions.add(item.toString());
                     }
-                    result.put(entry.getKey(), perms);
                 }
+                result.put(entry.getKey(), permissions);
             }
-            return result;
         }
-        return new LinkedHashMap<>();
+        return result;
     }
 
     /**
@@ -250,15 +249,10 @@ public class BootSecurityTokenService {
      * @param permissions 程序声明的权限列表
      * @return 生成的 32 位十六进制 upid，失败返回 null
      */
-    @SuppressWarnings("unchecked")
     public String registerProgramPermission(String programName, List<String> permissions) {
         final String[] upidHolder = new String[1];
         boolean ok = loadModifySave(data -> {
-            Map<String, Object> map = (Map<String, Object>) data.get("programPermissionsMap");
-            if (map == null) {
-                map = new LinkedHashMap<>();
-                data.put("programPermissionsMap", map);
-            }
+            Map<String, Object> map = mutableObjectMap(data, "programPermissionsMap");
             String upid = generateUpid(programName, map.keySet());
             map.put(upid, permissions);
             upidHolder[0] = upid;
@@ -271,27 +265,22 @@ public class BootSecurityTokenService {
      *
      * @param upid 要回收的用户进程 ID
      */
-    @SuppressWarnings("unchecked")
     public boolean reclaimUpid(String upid) {
         return loadModifySave(data -> {
-            Map<String, Object> map = (Map<String, Object>) data.get("programPermissionsMap");
-            if (map != null) {
-                map.remove(upid);
-            }
+            Map<String, Object> map = mutableObjectMap(data, "programPermissionsMap");
+            map.remove(upid);
         });
     }
 
     /**
-     * Update or create the permission list for an existing upid.
+     * 更新或创建指定 upid 的权限列表。
+     *
+     * <p>前端可能在程序注册后追加权限声明，因此该方法保持与 PHP 端 update 行为一致：
+     * upid 已存在时替换权限列表，不存在时创建新记录。
      */
-    @SuppressWarnings("unchecked")
     public boolean updateProgramPermissions(String upid, List<String> permissions) {
         return loadModifySave(data -> {
-            Map<String, Object> map = (Map<String, Object>) data.get("programPermissionsMap");
-            if (map == null) {
-                map = new LinkedHashMap<>();
-                data.put("programPermissionsMap", map);
-            }
+            Map<String, Object> map = mutableObjectMap(data, "programPermissionsMap");
             map.put(upid, permissions != null ? permissions : new ArrayList<String>());
         });
     }
@@ -355,5 +344,47 @@ public class BootSecurityTokenService {
         data.put("max_count", MAX_TOKEN_COUNT);
         data.put("programPermissionsMap", new LinkedHashMap<>());
         return data;
+    }
+
+    private List<Map<String, Object>> tokenRecords(Object value) {
+        List<Map<String, Object>> records = new ArrayList<>();
+        if (!(value instanceof List<?> rawList)) {
+            return records;
+        }
+        for (Object item : rawList) {
+            if (item instanceof Map<?, ?> rawMap) {
+                records.add(toStringKeyMap(rawMap));
+            }
+        }
+        return records;
+    }
+
+    private List<Map<String, Object>> mutableTokenRecords(Map<String, Object> data) {
+        List<Map<String, Object>> tokens = tokenRecords(data.get("tokens"));
+        data.put("tokens", tokens);
+        return tokens;
+    }
+
+    private Map<String, Object> mutableObjectMap(Map<String, Object> data, String key) {
+        Map<String, Object> map = objectMap(data.get(key));
+        data.put(key, map);
+        return map;
+    }
+
+    private Map<String, Object> objectMap(Object value) {
+        if (!(value instanceof Map<?, ?> rawMap)) {
+            return new LinkedHashMap<>();
+        }
+        return toStringKeyMap(rawMap);
+    }
+
+    private Map<String, Object> toStringKeyMap(Map<?, ?> rawMap) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        for (Map.Entry<?, ?> entry : rawMap.entrySet()) {
+            if (entry.getKey() != null) {
+                result.put(entry.getKey().toString(), entry.getValue());
+            }
+        }
+        return result;
     }
 }
