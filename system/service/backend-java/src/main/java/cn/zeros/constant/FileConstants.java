@@ -22,6 +22,13 @@ public final class FileConstants {
     public static final List<String> IMAGE_EXTENSIONS = Arrays.asList(
             "jpg", "jpeg", "png", "gif", "bmp", "webp", "svg", "ico"
     );
+
+    /**
+     * Video extensions that should be treated as binary content.
+     */
+    public static final List<String> VIDEO_EXTENSIONS = Arrays.asList(
+            "mp4", "webm", "ogg", "mov", "avi", "mkv"
+    );
     
     /**
      * 音频文件Content-Type映射
@@ -33,8 +40,18 @@ public final class FileConstants {
             "m4a", "audio/mp4",
             "aac", "audio/aac",
             "flac", "audio/flac",
-            "webp", "audio/webm",
+            "webm", "audio/webm",
             "opus", "audio/opus"
+    );
+
+    /**
+     * Video file Content-Type mapping.
+     */
+    public static final Map<String, String> VIDEO_CONTENT_TYPES = Map.of(
+            "mp4", "video/mp4",
+            "webm", "video/webm",
+            "ogg", "video/ogg",
+            "m3u8", "application/vnd.apple.mpegurl"
     );
     
     /**
@@ -53,6 +70,11 @@ public final class FileConstants {
      * 默认音频Content-Type
      */
     public static final String DEFAULT_AUDIO_CONTENT_TYPE = "audio/wav";
+
+    /**
+     * Default video Content-Type.
+     */
+    public static final String DEFAULT_VIDEO_CONTENT_TYPE = "video/mp4";
     
     /**
      * 默认图片Content-Type

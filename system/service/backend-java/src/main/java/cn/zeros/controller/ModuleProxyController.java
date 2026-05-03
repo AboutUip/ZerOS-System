@@ -1,5 +1,6 @@
 package cn.zeros.controller;
 
+import cn.zeros.util.ProjectRootUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
@@ -7,7 +8,6 @@ import org.springframework.web.bind.annotation.*;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -59,7 +59,7 @@ public class ModuleProxyController {
             String filePath = path.startsWith("/") ? path.substring(1) : path;
             
             // 获取项目根目录（从当前工作目录开始）
-            Path projectRoot = Paths.get("").toAbsolutePath().normalize();
+            Path projectRoot = ProjectRootUtil.resolveProjectRoot();
             
             // 构建完整路径
             Path fullPath = projectRoot.resolve(filePath).normalize();

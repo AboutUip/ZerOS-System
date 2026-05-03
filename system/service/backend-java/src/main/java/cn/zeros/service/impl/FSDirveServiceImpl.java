@@ -3,7 +3,11 @@ package cn.zeros.service.impl;
 import cn.zeros.config.DiskConfig;
 import cn.zeros.constant.CommonConstants;
 import cn.zeros.constant.DiskConstants;
+import cn.zeros.constant.ErrorCode;
 import cn.zeros.constant.FileConstants;
+import cn.zeros.exception.BusinessException;
+import cn.zeros.security.UserContext;
+import cn.zeros.security.UserContextHolder;
 import cn.zeros.service.IFSDirveService;
 import cn.zeros.util.PathUtil;
 import lombok.extern.slf4j.Slf4j;
@@ -32,6 +36,13 @@ public class FSDirveServiceImpl implements IFSDirveService {
 
     private final DiskConfig diskConfig;
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern(CommonConstants.DATE_TIME_FORMAT);
+    private static final Set<String> D_ROOT_SENSITIVE_FILES = Set.of(
+            "LocalSData.json",
+            "LocalSData_backup.json",
+            "ApplicationTable.json",
+            "LocalCache.json",
+            "BootSecurityToken.json"
+    );
 
     public FSDirveServiceImpl(DiskConfig diskConfig) {
         this.diskConfig = diskConfig;
@@ -275,6 +286,7 @@ public class FSDirveServiceImpl implements IFSDirveService {
         log.info("[FSDirve] createFile path={} fileName={}", path, fileName);
         Path dirPath = PathUtil.convertVirtualPath(path, diskConfig);
         Path filePath = dirPath.resolve(fileName).normalize();
+        guardSensitiveDRootFile(path, fileName);
         
         // 验证文件名
         if (fileName == null || fileName.isEmpty() || fileName.contains("/") || fileName.contains("\\")) {
@@ -314,9 +326,10 @@ public class FSDirveServiceImpl implements IFSDirveService {
         // 检测文件类型，如果是二进制文件（图片等），自动使用base64编码
         String fileExt = getFileExtension(fileName).toLowerCase();
         boolean isImage = FileConstants.IMAGE_EXTENSIONS.contains(fileExt);
+        boolean isVideo = FileConstants.VIDEO_EXTENSIONS.contains(fileExt);
         
         // 如果请求base64编码，或者是图片文件，则使用base64编码
-        boolean shouldEncodeBase64 = asBase64 || isImage;
+        boolean shouldEncodeBase64 = asBase64 || isImage || isVideo;
         
         BasicFileAttributes attrs = Files.readAttributes(filePath, BasicFileAttributes.class);
         
@@ -344,6 +357,7 @@ public class FSDirveServiceImpl implements IFSDirveService {
         log.info("[FSDirve] writeFile path={} fileName={} mode={}", path, fileName, writeMod);
         Path dirPath = PathUtil.convertVirtualPath(path, diskConfig);
         Path filePath = dirPath.resolve(fileName).normalize();
+        guardSensitiveDRootFile(path, fileName);
         
         // 验证文件名
         if (fileName == null || fileName.isEmpty() || fileName.contains("/") || fileName.contains("\\")) {
@@ -406,6 +420,7 @@ public class FSDirveServiceImpl implements IFSDirveService {
         log.info("[FSDirve] deleteFile path={} fileName={}", path, fileName);
         Path dirPath = PathUtil.convertVirtualPath(path, diskConfig);
         Path filePath = dirPath.resolve(fileName).normalize();
+        guardSensitiveDRootFile(path, fileName);
         
         if (!Files.exists(filePath) || !Files.isRegularFile(filePath)) {
             throw new IOException("文件不存在: " + path + "/" + fileName);
@@ -424,6 +439,8 @@ public class FSDirveServiceImpl implements IFSDirveService {
         Path dirPath = PathUtil.convertVirtualPath(path, diskConfig);
         Path oldFilePath = dirPath.resolve(oldFileName).normalize();
         Path newFilePath = dirPath.resolve(newFileName).normalize();
+        guardSensitiveDRootFile(path, oldFileName);
+        guardSensitiveDRootFile(path, newFileName);
         
         if (!Files.exists(oldFilePath) || !Files.isRegularFile(oldFilePath)) {
             throw new IOException("文件不存在: " + path + "/" + oldFileName);
@@ -450,6 +467,8 @@ public class FSDirveServiceImpl implements IFSDirveService {
         Path sourceFilePath = sourceDirPath.resolve(sourceFileName).normalize();
         String finalTargetFileName = targetFileName != null ? targetFileName : sourceFileName;
         Path targetFilePath = targetDirPath.resolve(finalTargetFileName).normalize();
+        guardSensitiveDRootFile(sourcePath, sourceFileName);
+        guardSensitiveDRootFile(targetPath, finalTargetFileName);
         
         if (!Files.exists(sourceFilePath) || !Files.isRegularFile(sourceFilePath)) {
             throw new IOException("源文件不存在: " + sourcePath + "/" + sourceFileName);
@@ -479,6 +498,8 @@ public class FSDirveServiceImpl implements IFSDirveService {
         Path sourceFilePath = sourceDirPath.resolve(sourceFileName).normalize();
         String finalTargetFileName = targetFileName != null ? targetFileName : sourceFileName;
         Path targetFilePath = targetDirPath.resolve(finalTargetFileName).normalize();
+        guardSensitiveDRootFile(sourcePath, sourceFileName);
+        guardSensitiveDRootFile(targetPath, finalTargetFileName);
         
         if (!Files.exists(sourceFilePath) || !Files.isRegularFile(sourceFilePath)) {
             throw new IOException("源文件不存在: " + sourcePath + "/" + sourceFileName);
@@ -623,6 +644,31 @@ public class FSDirveServiceImpl implements IFSDirveService {
     private String getFileExtension(String fileName) {
         int lastDot = fileName.lastIndexOf('.');
         return lastDot > 0 ? fileName.substring(lastDot + 1) : "";
+    }
+
+    private void guardSensitiveDRootFile(String virtualPath, String fileName) {
+        if (!isUserTokenRequest()) {
+            return;
+        }
+        if (isDRoot(virtualPath) && D_ROOT_SENSITIVE_FILES.contains(fileName)) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "UserToken cannot modify sensitive files in D root");
+        }
+    }
+
+    private boolean isUserTokenRequest() {
+        UserContext context = UserContextHolder.get();
+        return context != null && context.isUserToken();
+    }
+
+    private boolean isDRoot(String virtualPath) {
+        if (virtualPath == null) {
+            return false;
+        }
+        String normalized = virtualPath.trim()
+                .replace("\\", "/")
+                .replaceFirst("^/", "")
+                .replaceAll("/+", "/");
+        return "D:".equals(normalized) || "D:/".equals(normalized);
     }
     
     private String formatDateTime(Instant instant) {

@@ -1,5 +1,5 @@
 server:
-  port: 8080
+  port: 8000
   servlet:
     context-path: /system/service
 
@@ -22,7 +22,8 @@ spring:
 # 如果从项目根目录运行，需要修改为 system/service/DISK
 # 如果作为 jar 包运行，建议使用绝对路径或相对于 jar 包位置的路径
 disk:
-  base-path: ../DISK
+  #base-path: ../DISK
+  base-path: system/service/DISK
   system-partition: D
   system-resource-zip: ../test/assets/SYSTEMRESOURCE.zip
 

@@ -43,6 +43,8 @@ public class JwtProperties {
             "/dashscope-ai-proxy/**",
             "/BrowserProxy",
             "/BrowserProxy/**",
+            "/video-proxy",
+            "/video-proxy/**",
             "/test",
             "/test/**",
             "/error",

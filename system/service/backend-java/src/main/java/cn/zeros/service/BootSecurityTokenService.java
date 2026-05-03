@@ -282,6 +282,21 @@ public class BootSecurityTokenService {
     }
 
     /**
+     * Update or create the permission list for an existing upid.
+     */
+    @SuppressWarnings("unchecked")
+    public boolean updateProgramPermissions(String upid, List<String> permissions) {
+        return loadModifySave(data -> {
+            Map<String, Object> map = (Map<String, Object>) data.get("programPermissionsMap");
+            if (map == null) {
+                map = new LinkedHashMap<>();
+                data.put("programPermissionsMap", map);
+            }
+            map.put(upid, permissions != null ? permissions : new ArrayList<String>());
+        });
+    }
+
+    /**
      * upid 生成算法（与 PHP 端 programPermissions.php 完全一致）：
      * 1. 生成 2 个随机 16 位整数 rand1、rand2
      * 2. hash1 = SHA-256(rand1 + programName)

@@ -10,6 +10,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -78,10 +80,17 @@ public class CompressionDirveController {
             @RequestParam String action,
             @RequestParam(required = false) String sourcePath,
             @RequestParam(required = false) String targetPath,
+            @RequestParam(required = false) String sourcePaths,
+            @RequestParam(required = false) String exclude,
+            @RequestParam(required = false) Integer compressionLevel,
+            @RequestParam(required = false) String files,
+            @RequestParam(required = false) Boolean overwrite,
+            @RequestParam(required = false) String password,
             @RequestBody(required = false) Map<String, Object> requestBody) {
 
         // 构建上下文
-        ActionContext ctx = buildContext(sourcePath, targetPath, requestBody);
+        ActionContext ctx = buildContext(sourcePath, targetPath, sourcePaths, exclude,
+                compressionLevel, files, overwrite, password, requestBody);
 
         // 验证操作类型
         CompressionActionType actionType = CompressionActionType.getByCode(action);
@@ -107,11 +116,19 @@ public class CompressionDirveController {
     /**
      * 构建动作上下文
      */
-    private ActionContext buildContext(String sourcePath, String targetPath, Map<String, Object> requestBody) {
+    private ActionContext buildContext(String sourcePath,
+                                       String targetPath,
+                                       String sourcePathsQuery,
+                                       String exclude,
+                                       Integer compressionLevel,
+                                       String files,
+                                       Boolean overwrite,
+                                       String password,
+                                       Map<String, Object> requestBody) {
         String finalSourcePath = sourcePath;
         String finalTargetPath = targetPath;
         List<String> sourcePaths = null;
-        Map<String, Object> options = null;
+        Map<String, Object> options = new LinkedHashMap<>();
 
         if (requestBody != null) {
             if (requestBody.containsKey("sourcePath") && finalSourcePath == null) {
@@ -128,16 +145,59 @@ public class CompressionDirveController {
             if (requestBody.containsKey("options")) {
                 @SuppressWarnings("unchecked")
                 Map<String, Object> opts = (Map<String, Object>) requestBody.get("options");
-                options = opts;
+                if (opts != null) {
+                    options.putAll(opts);
+                }
             }
+        }
+
+        if (sourcePaths == null && sourcePathsQuery != null && !sourcePathsQuery.isBlank()) {
+            sourcePaths = parseStringList(sourcePathsQuery);
+        }
+        if (exclude != null && !exclude.isBlank()) {
+            options.put("exclude", parseStringList(exclude));
+        }
+        if (compressionLevel != null) {
+            options.put("compressionLevel", compressionLevel);
+        }
+        if (files != null && !files.isBlank()) {
+            options.put("files", parseStringList(files));
+        }
+        if (overwrite != null) {
+            options.put("overwrite", overwrite);
+        }
+        if (password != null) {
+            options.put("password", password);
         }
 
         return ActionContext.builder()
                 .sourcePath(finalSourcePath)
                 .targetPath(finalTargetPath)
                 .sourcePaths(sourcePaths)
-                .options(options)
+                .options(options.isEmpty() ? null : options)
                 .build();
+    }
+
+    private List<String> parseStringList(String raw) {
+        String value = raw.trim();
+        if (value.startsWith("[") && value.endsWith("]")) {
+            try {
+                com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+                @SuppressWarnings("unchecked")
+                List<Object> parsed = mapper.readValue(value, List.class);
+                return parsed.stream().map(Object::toString).toList();
+            } catch (Exception ignored) {
+                // Fall through to comma parsing.
+            }
+        }
+        List<String> result = new ArrayList<>();
+        for (String part : value.split(",")) {
+            String item = part.trim();
+            if (!item.isEmpty()) {
+                result.add(item);
+            }
+        }
+        return result;
     }
 
     // ============ ZIP 操作执行器 ============

@@ -5,6 +5,7 @@ import cn.zeros.model.ActionContext;
 import cn.zeros.model.ApiResponse;
 import cn.zeros.service.IDiskManagerService;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -12,13 +13,6 @@ import java.io.IOException;
 import java.util.Map;
 import java.util.function.Function;
 
-/**
- * 磁盘管理控制器
- * 使用函数式映射替代 switch 语句，代码更简洁
- *
- * @author zeros
- * @date 2026-01-16
- */
 @Slf4j
 @RestController
 @RequestMapping("/DISKMANAGER")
@@ -32,9 +26,6 @@ public class DiskManagerController {
         this.executors = initExecutors();
     }
 
-    /**
-     * 初始化操作执行器映射
-     */
     private Map<DiskManagerActionType, Function<ActionContext, Map<String, Object>>> initExecutors() {
         return Map.ofEntries(
                 Map.entry(DiskManagerActionType.CHECK, this::executeCheck),
@@ -62,14 +53,17 @@ public class DiskManagerController {
             @RequestParam(required = false, defaultValue = "false") boolean quick,
             @RequestParam(required = false, defaultValue = "0") long newSize) {
 
-        // 验证操作类型
         DiskManagerActionType actionType = DiskManagerActionType.getByCode(action);
         if (actionType == null) {
             return ResponseEntity.badRequest()
-                    .body(ApiResponse.error("未知的操作: " + action + " (支持的操作: check, create, delete, merge, list, read_data, sync_data, format, resize, health, clone)"));
+                    .body(ApiResponse.error("Unknown action: " + action
+                            + " (supported: check, create, delete, merge, list, read_data, write_data, sync_data, format, resize, health, clone)"));
+        }
+        if (actionType == DiskManagerActionType.WRITE_DATA) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(ApiResponse.error("write_data is not allowed through API"));
         }
 
-        // 构建上下文
         ActionContext ctx = ActionContext.builder()
                 .partition(partition)
                 .source(source)
@@ -80,57 +74,38 @@ public class DiskManagerController {
                 .newSize(newSize)
                 .build();
 
-        // 验证参数
         String validationError = actionType.validate(ctx);
         if (validationError != null) {
             return ResponseEntity.badRequest().body(ApiResponse.error(validationError));
         }
 
         try {
-            log.info("执行磁盘管理操作: {}", actionType.getDescription());
-            // 执行操作
+            log.info("[DiskManager] action={}", actionType.getCode());
             Function<ActionContext, Map<String, Object>> executor = executors.get(actionType);
             Map<String, Object> result = executor.apply(ctx);
-
-            // 构建成功消息
-            String message = buildSuccessMessage(actionType, ctx, result);
-            return ResponseEntity.ok(ApiResponse.success(message, result));
-
+            return ResponseEntity.ok(ApiResponse.success(buildSuccessMessage(actionType, ctx, result), result));
         } catch (IllegalArgumentException e) {
-            log.warn("磁盘管理参数异常: {}", e.getMessage());
             return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
         } catch (RuntimeException e) {
-            // 处理包装的 IOException
             Throwable cause = e.getCause();
             if (cause instanceof IOException) {
-                log.error("磁盘管理 IO 异常: {}", cause.getMessage(), cause);
                 return ResponseEntity.internalServerError().body(ApiResponse.error(cause.getMessage()));
             }
-            log.error("磁盘管理系统异常: {}", e.getMessage(), e);
             return ResponseEntity.internalServerError().body(ApiResponse.error(e.getMessage()));
         }
     }
 
-    /**
-     * 构建成功消息（某些操作需要动态消息）
-     */
     private String buildSuccessMessage(DiskManagerActionType actionType, ActionContext ctx, Map<String, Object> result) {
-        switch (actionType) {
-            case DELETE:
-                return ctx.isForce() ? "分区已强制删除: " + ctx.getPartition() : "分区已删除: " + ctx.getPartition();
-            case MERGE:
-                boolean sourceDeleted = ctx.isDeleteSource() && Boolean.TRUE.equals(result.get("sourceDeleted"));
-                return sourceDeleted ? "分区合并成功，源分区已删除" : "分区合并成功";
-            case FORMAT:
-                return ctx.isQuick() ? "分区快速格式化成功: " + ctx.getPartition() : "分区格式化成功: " + ctx.getPartition();
-            case RESIZE:
-                return "分区大小调整成功: " + ctx.getPartition();
-            default:
-                return actionType.getSuccessMessage();
-        }
+        return switch (actionType) {
+            case DELETE -> ctx.isForce() ? "Partition force deleted: " + ctx.getPartition() : "Partition deleted: " + ctx.getPartition();
+            case MERGE -> ctx.isDeleteSource() && Boolean.TRUE.equals(result.get("sourceDeleted"))
+                    ? "Partitions merged and source deleted"
+                    : "Partitions merged";
+            case FORMAT -> ctx.isQuick() ? "Partition quick formatted: " + ctx.getPartition() : "Partition formatted: " + ctx.getPartition();
+            case RESIZE -> "Partition resized: " + ctx.getPartition();
+            default -> actionType.getSuccessMessage();
+        };
     }
-
-    // ============ 操作执行器 ============
 
     private Map<String, Object> executeCheck(ActionContext ctx) {
         return diskManagerService.checkPartition(ctx.getPartition());

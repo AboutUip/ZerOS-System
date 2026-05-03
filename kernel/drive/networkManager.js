@@ -337,6 +337,22 @@
                 logJWT(`${src} 已注入 ${tokenLabel}`, { url: url || '' });
             }
         }
+        /**
+         * 拦截全局 fetch API,放开本地相同源地址
+         */
+        _isTrustedBackendOrigin(url) {
+            try {
+                if (typeof SystemInformation === 'undefined' || typeof SystemInformation.getOrigin !== 'function') {
+                    return false;
+                }
+
+                const requestUrl = new URL(url);
+                const backendUrl = new URL(SystemInformation.getOrigin());
+                return requestUrl.origin === backendUrl.origin;
+            } catch (e) {
+                return false;
+            }
+        }
 
         /**
          * 拦截全局 fetch API
@@ -411,6 +427,9 @@
                     }
                 } catch (e) {
                     // URL 解析失败时仍按原逻辑注入
+                }
+                if (isCrossOrigin && self._isTrustedBackendOrigin(url)) {
+                    isCrossOrigin = false;
                 }
                 if (!isCrossOrigin) {
                     try {
@@ -570,6 +589,9 @@
                             xhrCrossOrigin = true;
                         }
                     } catch (e) {}
+                    if (xhrCrossOrigin && self._isTrustedBackendOrigin(requestUrl)) {
+                        xhrCrossOrigin = false;
+                    }
                     if (!xhrCrossOrigin) {
                         try {
                             const hasJwt = self._headersHasJWT(requestHeaders);
