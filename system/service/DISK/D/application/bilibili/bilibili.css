@@ -1,0 +1,536 @@
+.bilibili-window {
+    width: min(1380px, calc(100vw - 56px));
+    height: min(860px, calc(100vh - 56px));
+    min-width: min(900px, calc(100vw - 32px));
+    min-height: min(560px, calc(100vh - 32px));
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: #f6f7f8;
+    color: #18191c;
+}
+
+.bili-app {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    background:
+        radial-gradient(circle at 16% -8%, rgba(0, 174, 236, 0.16), transparent 26%),
+        radial-gradient(circle at 90% 0%, rgba(251, 114, 153, 0.16), transparent 24%),
+        #f6f7f8;
+}
+
+.bili-topbar {
+    flex: 0 0 auto;
+    display: grid;
+    grid-template-columns: 230px minmax(260px, 560px) minmax(120px, 1fr);
+    align-items: center;
+    gap: 18px;
+    padding: 14px 20px;
+    background: rgba(255, 255, 255, 0.92);
+    border-bottom: 1px solid rgba(227, 229, 231, 0.95);
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+    backdrop-filter: blur(14px);
+}
+
+.bili-brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+}
+
+.bili-brand-icon {
+    width: 54px;
+    height: 34px;
+    display: grid;
+    place-items: center;
+    border-radius: 10px;
+    background: #fb7299;
+    color: #fff;
+    font-size: 15px;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+    box-shadow: 0 10px 22px rgba(251, 114, 153, 0.28);
+}
+
+.bili-brand strong,
+.bili-brand span {
+    display: block;
+}
+
+.bili-brand strong {
+    font-size: 17px;
+}
+
+.bili-brand span {
+    margin-top: 2px;
+    color: #9499a0;
+    font-size: 12px;
+}
+
+.bili-search {
+    display: flex;
+    min-width: 0;
+    height: 40px;
+    border: 1px solid #e3e5e7;
+    border-radius: 999px;
+    overflow: hidden;
+    background: #f1f2f3;
+}
+
+.bili-search input {
+    min-width: 0;
+    flex: 1;
+    border: 0;
+    background: transparent;
+    color: #18191c;
+    padding: 0 16px;
+    outline: none;
+}
+
+.bili-search input:focus {
+    background: #fff;
+}
+
+.bili-search button {
+    width: 74px;
+    border: 0;
+    background: #00aeec;
+    color: #fff;
+    cursor: pointer;
+    font-weight: 700;
+}
+
+.bili-status {
+    justify-self: end;
+    max-width: 100%;
+    color: #61666d;
+    font-size: 12px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.bili-status.is-error {
+    color: #ff4d4f;
+}
+
+.bili-body {
+    flex: 1;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: 188px minmax(360px, 1fr) minmax(330px, 420px);
+    gap: 16px;
+    padding: 16px;
+}
+
+.bili-rail,
+.bili-feed,
+.bili-watch {
+    min-height: 0;
+}
+
+.bili-rail {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.bili-rail > button,
+.bili-up-search,
+.bili-hero,
+.bili-player-wrap,
+.bili-detail {
+    border: 1px solid #e3e5e7;
+    background: rgba(255, 255, 255, 0.96);
+    box-shadow: 0 10px 30px rgba(15, 23, 42, 0.05);
+}
+
+.bili-rail > button {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 3px;
+    border-radius: 14px;
+    color: #18191c;
+    padding: 12px 14px;
+    cursor: pointer;
+    transition: border-color 0.16s ease, color 0.16s ease, transform 0.16s ease, box-shadow 0.16s ease;
+}
+
+.bili-rail > button span {
+    font-weight: 800;
+}
+
+.bili-rail > button small {
+    color: #9499a0;
+}
+
+.bili-rail > button:hover,
+.bili-rail > button.is-active {
+    border-color: rgba(0, 174, 236, 0.4);
+    color: #00aeec;
+    transform: translateY(-1px);
+    box-shadow: 0 14px 34px rgba(0, 174, 236, 0.12);
+}
+
+.bili-up-search {
+    margin-top: 4px;
+    border-radius: 16px;
+    padding: 14px;
+}
+
+.bili-up-search label {
+    display: block;
+    margin-bottom: 8px;
+    color: #61666d;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.bili-up-search input {
+    width: 100%;
+    box-sizing: border-box;
+    border: 1px solid #e3e5e7;
+    border-radius: 10px;
+    background: #f6f7f8;
+    color: #18191c;
+    padding: 9px 10px;
+    outline: none;
+}
+
+.bili-up-search div {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.bili-up-search button,
+.bili-detail-actions button {
+    border: 0;
+    border-radius: 10px;
+    background: #e5f6fd;
+    color: #00aeec;
+    padding: 9px 10px;
+    cursor: pointer;
+    font-weight: 700;
+}
+
+.bili-feed {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    overflow: hidden;
+}
+
+.bili-hero {
+    flex: 0 0 auto;
+    display: flex;
+    justify-content: space-between;
+    gap: 18px;
+    border-radius: 18px;
+    padding: 20px;
+    background:
+        linear-gradient(135deg, rgba(0, 174, 236, 0.12), rgba(251, 114, 153, 0.12)),
+        #fff;
+}
+
+.bili-kicker {
+    margin: 0 0 8px;
+    color: #00aeec;
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.bili-hero h1 {
+    margin: 0;
+    font-size: clamp(24px, 3vw, 36px);
+    line-height: 1.1;
+}
+
+.bili-hero p:last-child {
+    margin: 10px 0 0;
+    color: #61666d;
+}
+
+.bili-hero-badge {
+    flex: 0 0 auto;
+    align-self: start;
+    border-radius: 999px;
+    background: #fb7299;
+    color: #fff;
+    padding: 7px 12px;
+    font-size: 12px;
+    font-weight: 800;
+}
+
+.bili-card-grid {
+    flex: 1;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+    align-content: start;
+    gap: 16px;
+    overflow: auto;
+    padding: 2px 4px 8px 2px;
+}
+
+.bili-list-empty {
+    grid-column: 1 / -1;
+    display: grid;
+    place-items: center;
+    min-height: 180px;
+    border: 1px dashed #c9ccd0;
+    border-radius: 18px;
+    color: #9499a0;
+    background: rgba(255, 255, 255, 0.72);
+}
+
+.bili-video-card {
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+    border: 0;
+    border-radius: 14px;
+    background: transparent;
+    color: inherit;
+    padding: 0;
+    text-align: left;
+    cursor: pointer;
+}
+
+.bili-video-card:hover .bili-cover {
+    transform: translateY(-2px);
+    box-shadow: 0 18px 38px rgba(15, 23, 42, 0.16);
+}
+
+.bili-video-card:hover strong {
+    color: #00aeec;
+}
+
+.bili-cover {
+    position: relative;
+    display: block;
+    aspect-ratio: 16 / 10;
+    overflow: hidden;
+    border-radius: 14px;
+    background: linear-gradient(135deg, rgba(0, 174, 236, 0.18), rgba(251, 114, 153, 0.18));
+    transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.bili-cover img,
+.bili-video-cover-placeholder {
+    width: 100%;
+    height: 100%;
+    display: grid;
+    place-items: center;
+    object-fit: cover;
+    color: #fff;
+    font-weight: 800;
+}
+
+.bili-cover em {
+    position: absolute;
+    right: 8px;
+    bottom: 8px;
+    border-radius: 6px;
+    background: rgba(0, 0, 0, 0.62);
+    color: #fff;
+    padding: 2px 6px;
+    font-style: normal;
+    font-size: 12px;
+}
+
+.bili-video-card-body {
+    display: block;
+    min-width: 0;
+}
+
+.bili-video-card-body strong {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    color: #18191c;
+    line-height: 1.38;
+    font-size: 14px;
+}
+
+.bili-card-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 7px;
+    color: #61666d;
+    font-size: 12px;
+}
+
+.bili-video-card-body small {
+    display: block;
+    margin-top: 5px;
+    color: #9499a0;
+    font-size: 12px;
+}
+
+.bili-watch {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    overflow: hidden;
+}
+
+.bili-player-wrap {
+    position: relative;
+    flex: 0 0 min(46vh, 330px);
+    min-height: 230px;
+    overflow: hidden;
+    border-radius: 18px;
+    background: #000;
+}
+
+.bili-player-wrap iframe {
+    width: 100%;
+    height: 100%;
+    border: 0;
+    background: #000;
+}
+
+.bili-empty {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    align-content: center;
+    gap: 8px;
+    padding: 24px;
+    color: rgba(255, 255, 255, 0.7);
+    text-align: center;
+    pointer-events: none;
+}
+
+.bili-empty strong {
+    color: #fff;
+    font-size: 18px;
+}
+
+.bili-empty span {
+    max-width: 280px;
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.bili-detail {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    border-radius: 18px;
+    padding: 16px;
+}
+
+.bili-detail-placeholder {
+    display: grid;
+    gap: 8px;
+    color: #61666d;
+}
+
+.bili-detail-placeholder strong {
+    color: #18191c;
+    font-size: 18px;
+}
+
+.bili-detail h2 {
+    margin: 0 0 12px;
+    color: #18191c;
+    font-size: 18px;
+    line-height: 1.35;
+}
+
+.bili-detail p {
+    margin: 12px 0 0;
+    color: #61666d;
+    line-height: 1.6;
+}
+
+.bili-meta,
+.bili-stats,
+.bili-detail-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 10px 0;
+}
+
+.bili-meta span,
+.bili-stats span {
+    border-radius: 999px;
+    background: #f1f2f3;
+    color: #61666d;
+    padding: 5px 9px;
+    font-size: 12px;
+}
+
+.bili-detail-actions button:hover,
+.bili-up-search button:hover {
+    background: #00aeec;
+    color: #fff;
+}
+
+.bili-extra {
+    max-height: 170px;
+    overflow: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+    color: #006f99;
+    background: #f6f7f8;
+    border-radius: 12px;
+    padding: 10px;
+}
+
+.bili-live-cover {
+    max-width: 100%;
+    border-radius: 14px;
+    margin-top: 10px;
+}
+
+@media (max-width: 1180px) {
+    .bili-body {
+        grid-template-columns: 160px minmax(320px, 1fr) minmax(300px, 360px);
+    }
+
+    .bili-topbar {
+        grid-template-columns: 200px minmax(220px, 1fr);
+    }
+
+    .bili-status {
+        display: none;
+    }
+}
+
+@media (max-width: 980px) {
+    .bili-body {
+        grid-template-columns: 140px minmax(0, 1fr);
+    }
+
+    .bili-watch {
+        display: none;
+    }
+}
+
+@media (max-height: 660px) {
+    .bili-topbar {
+        padding: 10px 14px;
+    }
+
+    .bili-hero {
+        display: none;
+    }
+
+    .bili-body {
+        padding: 12px;
+    }
+}

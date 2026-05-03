@@ -23,5 +23,26 @@
       "supportsPreview": true,
       "category": "utility"
     }
+  },
+  "bilibili": {
+    "script": "D:/application/bilibili/bilibili.js",
+    "styles": [
+      "D:/application/bilibili/bilibili.css"
+    ],
+    "icon": "D:/application/bilibili/assets/icon.svg",
+    "assets": [
+      "D:/application/bilibili/assets/icon.svg"
+    ],
+    "metadata": {
+      "description": "Bilibili 原生 ZerOS 客户端：搜索、榜单、视频播放与详情查看",
+      "version": "1.0.0",
+      "type": "GUI",
+      "autoStart": false,
+      "priority": 13,
+      "alwaysShowInTaskbar": false,
+      "allowMultipleInstances": false,
+      "supportsPreview": true,
+      "category": "media"
+    }
   }
 }

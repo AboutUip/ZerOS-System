@@ -77,17 +77,70 @@
         }
 
         function isCollectUrl(u) {
-            return /\/log\//.test(u) || /data\.bilibili\.com.*log/.test(u) || /cm\.bilibili\.com\/cm\/api\//.test(u);
+            return /\/log\//.test(u)
+                || /data\.bilibili\.com.*log/.test(u)
+                || /cm\.bilibili\.com\/cm\/api\//.test(u)
+                || /api\.bilibili\.com\/x\/internal\/gaia-gateway\//.test(u)
+                || /api\.bilibili\.com\/x\/report\//.test(u)
+                || /api\.bilibili\.com\/x\/web-frontend\/data\/collector/.test(u)
+                || /api\.bilibili\.com\/bapis\/bilibili\.api\.ticket\.v1\.Ticket\/GenWebTicket/.test(u);
+        }
+        function isOptionalDataUrl(u) {
+            return isCollectUrl(u)
+                || /manga\.bilibili\.com\/twirp\//.test(u);
+        }
+        function isImageUrl(u) {
+            return /\.(png|jpe?g|gif|webp|avif|svg)(@[^/?#]*)?(\?|#|$)/i.test(u)
+                || /\/bfs\/(sycp|vc|archive|face|article|static|svg-next)\//i.test(u);
+        }
+        function isJsonUrl(u) {
+            return /\.json(\?|#|$)/i.test(u);
+        }
+        function emptyJsonResponse() {
+            return new Response(JSON.stringify({
+                code: 0,
+                message: '0',
+                data: {
+                    feeds: [],
+                    items: [],
+                    list: [],
+                    cards: [],
+                    modules: [],
+                    result: []
+                }
+            }), {
+                status: 200,
+                headers: { 'Content-Type': 'application/json' }
+            });
+        }
+        function transparentImageResponse() {
+            const png = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=';
+            const binary = atob(png);
+            const bytes = new Uint8Array(binary.length);
+            for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+            return new Response(bytes, {
+                status: 200,
+                headers: { 'Content-Type': 'image/png' }
+            });
         }
         event.respondWith(fetch(proxyTarget, init).then(function(res) {
             // 代理返回 5xx 时，采集类请求统一当 200 空体，避免 bili-collect 等刷 502
-            if (res.status >= 500 && isCollectUrl(url)) {
-                return new Response(req.method === 'POST' ? '{}' : '', { status: 200, headers: { 'Content-Type': 'application/json' } });
+            if (res.status >= 500 && isOptionalDataUrl(url)) {
+                return emptyJsonResponse();
+            }
+            if (res.status >= 500 && (isImageUrl(url) || req.destination === 'image')) {
+                return transparentImageResponse();
+            }
+            if (res.status >= 500 && isJsonUrl(url)) {
+                return emptyJsonResponse();
             }
             return res;
         }).catch(function(err) {
-            if (isCollectUrl(url)) {
-                return new Response(req.method === 'POST' ? '{}' : '', { status: 200, headers: { 'Content-Type': 'application/json' } });
+            if (isOptionalDataUrl(url) || isJsonUrl(url)) {
+                return emptyJsonResponse();
+            }
+            if (isImageUrl(url) || req.destination === 'image') {
+                return transparentImageResponse();
             }
             return new Response('', { status: 502, statusText: 'Proxy error' });
         }));

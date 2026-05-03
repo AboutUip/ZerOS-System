@@ -26,20 +26,20 @@
     "TaskbarManager": {
       "weather:中原": {
         "value": null,
-        "expiresAt": 1777803163566,
-        "createdAt": 1777759963566,
-        "updatedAt": 1777759963566,
-        "size": 2754,
+        "expiresAt": 1777846706340,
+        "createdAt": 1777803506340,
+        "updatedAt": 1777803506340,
+        "size": 2801,
         "isFileBacked": true
       }
     },
     "exploit": {
       "system.dailyQuote": {
-        "value": "欣赏夏日雨后的天空，在花园里为你摘下一朵小花。穿过小径，那里是另外一个世界，蝴蝶在空中飞舞，然而有人在那里等我吗？",
+        "value": "不管有多痛多受伤，真正受伤的人一定不是你自己。",
         "expiresAt": 0,
-        "createdAt": 1777762170966,
-        "updatedAt": 1777762170966,
-        "size": 173,
+        "createdAt": 1777819646120,
+        "updatedAt": 1777819646120,
+        "size": 71,
         "isFileBacked": false
       }
     }

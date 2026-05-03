@@ -12,6 +12,7 @@
 | CompressionDirve | [CompressionDrive.md](./CompressionDrive.md) | ZIP/RAR 压缩解压 |
 | DISKMANAGER | [DISKMANAGER.md](./DISKMANAGER.md) | 磁盘分区管理（创建、删除、合并） |
 | BrowserProxy | [BrowserProxy.md](./BrowserProxy.md) | 浏览器网页代理（绕过 iframe 限制） |
+| BilibiliProxy | [BilibiliProxy.md](./BilibiliProxy.md) | Bilibili API 代理（原生客户端使用） |
 | ImageProxy | [ImageProxy.md](./ImageProxy.md) | 图片代理（跨域图片加载） |
 | audio-proxy | [audioProxy.md](./audioProxy.md) | 音频代理（跨域音频加载） |
 | video-proxy | [videoProxy.md](./videoProxy.md) | 视频代理（跨域视频加载，支持 Range） |

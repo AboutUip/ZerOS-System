@@ -43,7 +43,14 @@ $split = preg_split('#\r?\n\r?\n#', $raw, 2);
 $headers = $split[0];
 $body = isset($split[1]) ? $split[1] : '';
 // 不转发 Transfer-Encoding，避免与后端 chunked 冲突导致 ERR_INVALID_CHUNKED_ENCODING；用 Content-Length 输出
-$skipHeaders = ['transfer-encoding', 'connection', 'content-length'];
+$skipHeaders = [
+    'transfer-encoding',
+    'connection',
+    'content-length',
+    'access-control-allow-origin',
+    'access-control-allow-methods',
+    'access-control-allow-headers'
+];
 foreach (preg_split('#\r?\n#', $headers) as $line) {
     if (preg_match('#^HTTP/#', $line)) {
         if (preg_match('#^HTTP/\S+\s+(\d+)#', $line, $m)) {
@@ -56,7 +63,7 @@ foreach (preg_split('#\r?\n#', $headers) as $line) {
         if (in_array($name, $skipHeaders, true)) {
             continue;
         }
-        header($m[1] . ': ' . $m[2], false);
+        header($m[1] . ': ' . $m[2], true);
     }
 }
 header('Content-Length: ' . strlen($body));

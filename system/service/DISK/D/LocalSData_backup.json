@@ -10,6 +10,20 @@
         "PROCESS_BACKGROUND",
         "SCHEDULE_TASK_CREATE"
       ],
+      "taskmanager": [
+        "GUI_WINDOW_CREATE",
+        "KERNEL_DISK_READ",
+        "SYSTEM_NOTIFICATION",
+        "EVENT_LISTENER"
+      ],
+      "ps": [
+        "EVENT_LISTENER"
+      ],
+      "bilibili": [
+        "GUI_WINDOW_CREATE",
+        "EVENT_LISTENER",
+        "NETWORK_ACCESS"
+      ],
       "terminal": [
         "GEOGRAPHY_LOCATION",
         "GUI_WINDOW_CREATE",
@@ -17,12 +31,6 @@
         "KERNEL_DISK_LIST",
         "EVENT_LISTENER",
         "ENVIRONMENT_READ"
-      ],
-      "taskmanager": [
-        "GUI_WINDOW_CREATE",
-        "KERNEL_DISK_READ",
-        "SYSTEM_NOTIFICATION",
-        "EVENT_LISTENER"
       ],
       "themeanimator": [
         "SYSTEM_STORAGE_READ",
@@ -72,9 +80,6 @@
         "PROCESS_BACKGROUND",
         "CACHE_READ",
         "CACHE_WRITE"
-      ],
-      "ps": [
-        "EVENT_LISTENER"
       ],
       "setup": [
         "KERNEL_DISK_READ",
@@ -521,17 +526,17 @@
         "password": "61b249bf6d604d14120821f43625e84e",
         "avatar": "avatar_root_1766272534753.jpg",
         "createdAt": 1766271155991,
-        "lastLogin": 1777762174150
+        "lastLogin": 1777803507182
       },
       "TestUser": {
         "level": "USER",
         "password": null,
         "avatar": null,
         "createdAt": 1766271155991,
-        "lastLogin": 1771410960788
+        "lastLogin": 1777819656327
       }
     },
-    "userControl.currentUser": "root",
+    "userControl.currentUser": "TestUser",
     "system.lockscreenTimeComponent": true,
     "system.lockscreenBackground": "D:/cache/lockscreen/lockscreen_local_D__cache_wallpaper_community_3802_mp4_wallpaper_community_3802.mp4",
     "system.lockscreenRandomBg": false,
@@ -590,9 +595,9 @@
         "triggerConfig": {},
         "enabled": true,
         "createdAt": 1773477739546,
-        "updatedAt": 1777762174997,
-        "lastRunAt": 1777762174997,
-        "runCount": 75,
+        "updatedAt": 1777819657228,
+        "lastRunAt": 1777819657228,
+        "runCount": 87,
         "createdBy": "servicemanager",
         "requiresStartupPermission": true,
         "serviceId": "office",
@@ -605,9 +610,9 @@
         "triggerConfig": {},
         "enabled": true,
         "createdAt": 1776701053408,
-        "updatedAt": 1777761968886,
-        "lastRunAt": 1777761968886,
-        "runCount": 12,
+        "updatedAt": 1777819657449,
+        "lastRunAt": 1777819657449,
+        "runCount": 26,
         "createdBy": "cursorstyle",
         "requiresStartupPermission": false,
         "programName": "cursorstyle",
@@ -649,7 +654,7 @@
     "system.volume": 1,
     "nodeLibExpansion": {
       "nodeAvailable": true,
-      "lastCheck": 1777762168484,
+      "lastCheck": 1777819644174,
       "intervalSeconds": 1,
       "scriptId": "perf",
       "nodeDependencies": [
