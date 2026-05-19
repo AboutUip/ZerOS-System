@@ -364,7 +364,7 @@ if (!canGrant) {
 
 #### `getGrantablePermissions()`
 
-获取当前用户可授权的所有权限列表（JSON 数组格式），供 UserToken JWT 载荷等使用。
+获取当前用户可授权的所有权限列表（与内核授权 UI 一致）。UserToken JWT 内的 `permissions` 由后端按同级别规则生成，不再由前端写入载荷。
 
 **返回值**: `string[]` - 权限名称数组
 
@@ -373,8 +373,8 @@ if (!canGrant) {
 const permissions = UserControl.getGrantablePermissions();
 // 管理员返回全部权限；普通用户返回非高风险权限
 console.log('可授权权限数量:', permissions.length);
-// 用于登录时生成 UserToken
-await RandomSecurity.generateUserToken(userLevel, permissions);
+// 登录成功后由 RandomSecurity 凭用户名/密码请求后端签发 UserToken（载荷由服务端生成）
+await RandomSecurity.generateUserToken('alice', enteredPassword);
 ```
 
 #### `getPermissionGrantMessage(permission)`

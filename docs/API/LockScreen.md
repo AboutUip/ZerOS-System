@@ -354,7 +354,7 @@ TaskbarManager._lockScreen();
 3. **用户头像**: 用户头像通过 `UserControl.getAvatarPath()` 获取，存储在 `D:/cache/` 目录
 4. **密码验证**: 密码验证通过 `UserControl.login()` 进行，使用 MD5 加密
 5. **登录后初始化**: 登录成功后会初始化 `TaskbarManager` 和 `NotificationManager`
-6. **UserToken 生成**: 登录成功后立即调用 `RandomSecurity.generateUserToken(userLevel, permissions)` 生成 UserToken JWT，供应用网络请求自动注入
+6. **UserToken 生成**: 登录成功后调用 `RandomSecurity.generateUserToken(currentUser, password)`，由后端根据 `LocalSData` 写入 JWT 中的 `userLevel`/`permissions`（CVS-ZEROS-017），供 NetworkManager 自动注入
 7. **每日一言缓存**: 使用 `CacheDrive` 进行缓存管理，缓存键为 `system.dailyQuote`
 8. **组件显示控制**: 时间组件和每日一言组件的显示状态通过 LStorage 设置控制
 9. **背景路径转换**: 所有本地文件路径（如 `D:/cache/...`）在显示前会自动转换为 PHP 服务路径（`/system/service/DISK/D/cache/...`）

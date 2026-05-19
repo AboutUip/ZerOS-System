@@ -171,7 +171,16 @@
                 })
                 .then(function (response) {
                     if (!response.ok) {
-                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                        return response.text().then(function (text) {
+                            var detail = '';
+                            try {
+                                var j = JSON.parse(text);
+                                if (j && j.message) {
+                                    detail = ': ' + j.message;
+                                }
+                            } catch (ignore) { }
+                            throw new Error('HTTP ' + response.status + ': ' + response.statusText + detail);
+                        });
                     }
                     return response.json();
                 })
@@ -263,30 +272,29 @@
     });
 
     /**
-     * 用户登录时生成 UserToken JWT
-     * type 固定为 UserToken，payload 包含 userLevel、permissions（当前用户可授权的权限列表，JSON 数组）
-     * @param {string} userLevel 用户级别（如 USER、ADMIN、DEFAULT_ADMIN）
-     * @param {string[]} [permissions] 当前用户可授权的权限列表，供后端处理
+     * 用户登录后生成 UserToken JWT（CVS-ZEROS-017：userLevel/permissions 由 randomSecurity.php 根据 LocalSData 与密码签发，不信任客户端声明）
+     * @param {string} username 当前登录用户名（与 UserControl.login 一致）
+     * @param {string|null|undefined} [password] 登录所用明文密码；无密码用户可省略或传 null
      * @returns {Promise<string|null>} JWT Token 或 null
      */
-    function generateUserToken(userLevel, permissions) {
+    function generateUserToken(username, password) {
         return new Promise(function (resolve, reject) {
-            if (!userLevel || typeof userLevel !== 'string') {
+            if (!username || typeof username !== 'string' || !String(username).trim()) {
                 if (typeof KernelLogger !== 'undefined') {
-                    KernelLogger.warn("RandomSecurity", "generateUserToken: userLevel 无效");
+                    KernelLogger.warn("RandomSecurity", "generateUserToken: username 无效");
                 }
                 resolve(null);
                 return;
             }
 
             var randomValue = generateRandomSecurityValue();
-            var extraPayload = { userLevel: userLevel };
-            if (Array.isArray(permissions)) {
-                extraPayload.permissions = permissions;
+            var extraPayload = { username: String(username).trim() };
+            if (password !== undefined && password !== null) {
+                extraPayload.password = typeof password === 'string' ? password : String(password);
             }
 
             if (typeof KernelLogger !== 'undefined') {
-                KernelLogger.info("RandomSecurity", `用户登录，正在生成 UserToken（userLevel: ${userLevel}, permissions: ${Array.isArray(permissions) ? permissions.length : 0} 项）`);
+                KernelLogger.info("RandomSecurity", '用户登录，正在向后端请求签发 UserToken（username: ' + extraPayload.username + '）');
             }
 
             getJWTFromBackend(randomValue, 'UserToken', extraPayload)

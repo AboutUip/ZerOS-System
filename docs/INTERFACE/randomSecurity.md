@@ -2,7 +2,7 @@
 
 ## 概述
 
-RandomSecurity 是 ZerOS 的**后端 JWT 签发服务**，接收前端传入的随机字符串、类型、用户级别等，生成 JWT Token 并返回。与内核 `RandomSecurity` 模块配合使用。**支持多后端**：本文档以 PHP 实现为准；若使用 Java 后端，路径为 `/system/service/randomSecurity`（无 `.php`），端口由 SystemInformation 的 SpringBoot 配置决定。
+RandomSecurity 是 ZerOS 的**后端 JWT 签发服务**，接收前端传入的随机字符串与类型等，生成 JWT Token 并返回；**UserToken** 的 `userLevel`/`permissions` 由服务端根据 `LocalSData.json` 与密码生成（CVS-ZEROS-017）。与内核 `RandomSecurity` 模块配合使用。**支持多后端**：本文档以 PHP 实现为准；若使用 Java 后端，路径为 `/system/service/randomSecurity`（无 `.php`），端口由 SystemInformation 的 SpringBoot 配置决定。
 
 - **类型**：后端服务（PHP 实现：`system/service/randomSecurity.php`；Java 实现：SpringBoot `/randomSecurity`）
 - **调用方**：内核 RandomSecurity（引导时签发 SystemToken、登录时签发 UserToken）
@@ -29,15 +29,17 @@ Body: { "randomValue": "xxx", "type": "xxx", ... }
 |------|------|------|------|
 | randomValue | string | 是 | 32 位十六进制字符（128 位），前端生成的随机特征符 |
 | type | string | 否 | `SystemToken` / `UserToken`，未传则为 Unknown |
-| userLevel | string | UserToken 时 | 用户级别（USER、ADMIN、DEFAULT_ADMIN） |
-| permissions | array | UserToken 时 | 当前用户可授权的权限列表 |
+| username | string | **UserToken 时必填** | 登录用户名；与 `LocalSData` 中 `userControl.users` 一致 |
+| password | string | UserToken 时按需 | 明文密码；无密码用户可省略或空字符串 |
 | action | string | 否 | `clear`：清空所有 JWT；`commit_for_system`：提交 randomValue 用于本次引导签发 SystemToken（CVS-ZEROS-016） |
+
+**UserToken 说明**：须 **POST JSON**；服务端**忽略**客户端传入的 `userLevel`、`permissions`（若存在）。GET 仅用于 `SystemToken` 等，不得用于签发 UserToken。
 
 ## 操作
 
 ### 1. 签发 JWT
 
-**请求**：POST 或 GET，携带 `randomValue`（`type`、`userLevel`、`permissions` 可选）。
+**请求**：`SystemToken` 可为 POST 或 GET；**`UserToken` 必须为 POST JSON**，且含 `username`（及按需的 `password`）。
 
 **响应**（成功）：
 ```json

@@ -57,21 +57,21 @@ if (typeof RandomSecurity !== 'undefined') {
 
 ### User JWT
 
-#### `generateUserToken(userLevel, permissions)`
+#### `generateUserToken(username, password?)`
 
-用户登录时生成 UserToken JWT。`type` 固定为 `UserToken`，payload 包含 `userLevel` 和 `permissions`。
+用户登录成功后生成 UserToken JWT。`type` 固定为 `UserToken`；**`userLevel` 与 `permissions` 由后端 `randomSecurity.php` 根据 `LocalSData.json` 与密码生成**（CVS-ZEROS-017），请求体不再信任客户端声明的等级与权限列表。
 
 **参数**:
-- `userLevel` (string): 用户级别（如 `USER`、`ADMIN`、`DEFAULT_ADMIN`）
-- `permissions` (string[], 可选): 当前用户可授权的权限列表，供后端处理
+- `username` (string): 已通过 `UserControl.login` 验证的用户名
+- `password` (string | null | undefined, 可选): 本次登录使用的明文密码；无密码用户可省略
 
 **返回值**: `Promise<string | null>` - JWT Token 或 `null`
 
 **示例**:
 ```javascript
-const userLevel = UserControl.getCurrentUserLevel();
-const permissions = UserControl.getGrantablePermissions();
-await RandomSecurity.generateUserToken(userLevel, permissions);
+await RandomSecurity.generateUserToken('root', plainPassword);
+// 无密码用户
+await RandomSecurity.generateUserToken('GuestUser', null);
 ```
 
 #### `getUserJWT()`

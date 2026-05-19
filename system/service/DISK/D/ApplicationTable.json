@@ -1,29 +1,4 @@
 {
-  "cursorstyle": {
-    "script": "D:/application/cursorstyle/cursorstyle.js",
-    "styles": [
-      "D:/application/cursorstyle/cursorstyle.css"
-    ],
-    "icon": "D:/application/cursorstyle/assets/icon.svg",
-    "assets": [
-      "D:/application/cursorstyle/assets/cursors/default.svg",
-      "D:/application/cursorstyle/assets/cursors/neon.svg",
-      "D:/application/cursorstyle/assets/cursors/minimal.svg",
-      "D:/application/cursorstyle/assets/cursors/bubble.svg",
-      "D:/application/cursorstyle/assets/cursors/reticle.svg"
-    ],
-    "metadata": {
-      "description": "ZerOS 鼠标指针主题：多套 SVG 样式、引导配置、任务栏后台与右键菜单",
-      "version": "1.0.0",
-      "type": "GUI",
-      "autoStart": false,
-      "priority": 12,
-      "alwaysShowInTaskbar": false,
-      "allowMultipleInstances": false,
-      "supportsPreview": true,
-      "category": "utility"
-    }
-  },
   "bilibili": {
     "script": "D:/application/bilibili/bilibili.js",
     "styles": [
@@ -43,6 +18,27 @@
       "allowMultipleInstances": false,
       "supportsPreview": true,
       "category": "media"
+    }
+  },
+  "strawberry-security": {
+    "script": "D:/application/strawberry-security/securityCenter.js",
+    "styles": [
+      "D:/application/strawberry-security/securityCenter.css"
+    ],
+    "icon": "D:/application/strawberry-security/assets/icon.svg",
+    "assets": [
+      "D:/application/strawberry-security/assets/icon.svg"
+    ],
+    "metadata": {
+      "description": "草莓安全软件：ZerOS 安全中心与 ZOM 安装网关",
+      "version": "0.1.0",
+      "type": "GUI",
+      "autoStart": true,
+      "priority": 5,
+      "alwaysShowInTaskbar": false,
+      "allowMultipleInstances": false,
+      "supportsPreview": true,
+      "category": "system"
     }
   }
 }

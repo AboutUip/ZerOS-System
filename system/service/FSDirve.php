@@ -89,11 +89,7 @@ function validatePath($path) {
         return false;
     }
     
-    // 检查路径中是否包含危险字符（防止目录遍历攻击）
-    if (strpos($relativePath, '..') !== false) {
-        return false;
-    }
-    
+    // 虚拟路径允许含 ..、/、\；最终是否越界由 realpath + 分区根校验（CVS-ZEROS-018）
     return ['disk' => $disk, 'path' => $relativePath];
 }
 
@@ -188,6 +184,136 @@ function getDirPath($virtualPath) {
 }
 
 /**
+ * 将相对片段拼在已解析的目录路径下；禁止空串、NUL、Windows 盘符绝对路径（CVS-ZEROS-018）
+ */
+function fsDirveJoinUnderDir($dirPath, $subPath) {
+    if (!is_string($subPath) || strpos($subPath, "\0") !== false) {
+        sendResponse(false, '路径无效', null, 400);
+    }
+    $subPath = trim($subPath);
+    if ($subPath === '') {
+        sendResponse(false, '路径无效', null, 400);
+    }
+    $subPath = str_replace('\\', '/', $subPath);
+    if (preg_match('#^[A-Za-z]:(/|$)#', $subPath)) {
+        sendResponse(false, '路径无效', null, 400);
+    }
+    $subPath = preg_replace('#/+#', '/', $subPath);
+    $subPath = ltrim($subPath, '/');
+    $dirPath = rtrim(str_replace('\\', '/', $dirPath), '/');
+    return str_replace('/', DIRECTORY_SEPARATOR, $dirPath . '/' . $subPath);
+}
+
+/**
+ * 虚拟路径对应分区物理根 …/DISK/{Letter}
+ */
+function fsDirvePartitionRootPhysicalFromVirtual($virtualPath) {
+    $validated = validatePath($virtualPath);
+    if (!$validated) {
+        return null;
+    }
+    $p = getPartitionPath($validated['disk']);
+    if ($p === null) {
+        return null;
+    }
+    $rp = @realpath($p);
+    return $rp !== false ? $rp : $p;
+}
+
+function fsDirveNormKey($absPath) {
+    $rp = @realpath($absPath);
+    if ($rp === false) {
+        return false;
+    }
+    return strtolower(str_replace('\\', '/', $rp));
+}
+
+function fsDirveKeyIsUnderRoot($pathKey, $rootKey) {
+    if ($pathKey === $rootKey) {
+        return true;
+    }
+    $len = strlen((string) $rootKey);
+    return strlen($pathKey) > $len && substr($pathKey, 0, $len + 1) === $rootKey . '/';
+}
+
+/**
+ * 解析后的绝对路径必须落在给定分区根之下（含符号链接展开）
+ */
+function fsDirveAssertWithinPartitionRoot($absolutePath, $partitionRootPhysical) {
+    if ($partitionRootPhysical === null || $partitionRootPhysical === '') {
+        sendResponse(false, '无效的分区路径', null, 400);
+    }
+    $rootKey = fsDirveNormKey($partitionRootPhysical);
+    if ($rootKey === false) {
+        sendResponse(false, '分区根路径不可用', null, 500);
+    }
+    $targetKey = fsDirveNormKey($absolutePath);
+    if ($targetKey !== false) {
+        if (!fsDirveKeyIsUnderRoot($targetKey, $rootKey)) {
+            sendResponse(false, '路径超出虚拟分区范围', null, 400);
+        }
+        return;
+    }
+    $p = str_replace('\\', '/', $absolutePath);
+    $p = preg_replace('#/+#', '/', $p);
+    $dir = $p;
+    for ($i = 0; $i < 4096; $i++) {
+        $key = fsDirveNormKey(str_replace('/', DIRECTORY_SEPARATOR, $dir));
+        if ($key !== false) {
+            if (!fsDirveKeyIsUnderRoot($key, $rootKey)) {
+                sendResponse(false, '路径超出虚拟分区范围', null, 400);
+            }
+            return;
+        }
+        $next = dirname($dir);
+        if ($next === $dir) {
+            break;
+        }
+        $dir = $next;
+    }
+    sendResponse(false, '路径无效或无法解析到分区内', null, 400);
+}
+
+function fsDirvePhysicalPathUnderDRootMatchesSensitive($resolvedRealPath) {
+    $dRoot = @realpath(getPartitionPath('D'));
+    if ($dRoot === false) {
+        return false;
+    }
+    $pkParent = fsDirveNormKey(dirname($resolvedRealPath));
+    $rkRoot = fsDirveNormKey($dRoot);
+    if ($pkParent === false || $rkRoot === false || $pkParent !== $rkRoot) {
+        return false;
+    }
+    $base = strtolower(basename(str_replace('\\', '/', $resolvedRealPath)));
+    foreach (getSensitiveFileNamesOnDRoot() as $s) {
+        if ($base === strtolower($s)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+function fsDirveLogicalPathTargetsSensitiveDRootFile($absoluteFilePath) {
+    $rpDir = @realpath(dirname($absoluteFilePath));
+    $dRoot = @realpath(getPartitionPath('D'));
+    if ($rpDir === false || $dRoot === false) {
+        return false;
+    }
+    $normParent = strtolower(str_replace('\\', '/', rtrim($rpDir, '/\\')));
+    $normRoot = strtolower(str_replace('\\', '/', rtrim($dRoot, '/\\')));
+    if ($normParent !== $normRoot) {
+        return false;
+    }
+    $base = basename(str_replace('\\', '/', $absoluteFilePath));
+    foreach (getSensitiveFileNamesOnDRoot() as $s) {
+        if (strcasecmp($base, $s) === 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/**
  * 创建目录
  */
 function createDirectory($path, $name) {
@@ -195,13 +321,11 @@ function createDirectory($path, $name) {
     if (!$dirPath) {
         sendResponse(false, '无效的路径格式', null, 400);
     }
+    $partRoot = fsDirvePartitionRootPhysicalFromVirtual($path);
+    fsDirveAssertWithinPartitionRoot($dirPath, $partRoot);
     
-    $newDirPath = $dirPath . '/' . $name;
-    
-    // 验证目录名
-    if (empty($name) || strpos($name, '/') !== false || strpos($name, '\\') !== false) {
-        sendResponse(false, '无效的目录名', null, 400);
-    }
+    $newDirPath = fsDirveJoinUnderDir($dirPath, $name);
+    fsDirveAssertWithinPartitionRoot($newDirPath, $partRoot);
     
     // 检查父目录是否存在
     if (!is_dir($dirPath)) {
@@ -239,6 +363,8 @@ function deleteDirectory($path) {
     if (!$dirPath) {
         sendResponse(false, '无效的路径格式', null, 400);
     }
+    $partRoot = fsDirvePartitionRootPhysicalFromVirtual($path);
+    fsDirveAssertWithinPartitionRoot($dirPath, $partRoot);
     
     // 检查目录是否存在
     if (!is_dir($dirPath)) {
@@ -281,6 +407,7 @@ function listDirectory($path) {
     if (!$dirPath) {
         sendResponse(false, '无法获取目录路径: ' . $path, null, 400);
     }
+    fsDirveAssertWithinPartitionRoot($dirPath, fsDirvePartitionRootPhysicalFromVirtual($path));
     
     // 检查目录是否存在
     if (!is_dir($dirPath)) {
@@ -340,18 +467,16 @@ function createFile($path, $fileName, $content = '') {
     if (!$dirPath) {
         sendResponse(false, '无效的路径格式', null, 400);
     }
-    
-    // 验证文件名
-    if (empty($fileName) || strpos($fileName, '/') !== false || strpos($fileName, '\\') !== false) {
-        sendResponse(false, '无效的文件名', null, 400);
-    }
+    $partRoot = fsDirvePartitionRootPhysicalFromVirtual($path);
+    fsDirveAssertWithinPartitionRoot($dirPath, $partRoot);
     
     // 检查父目录是否存在
     if (!is_dir($dirPath)) {
         sendResponse(false, '父目录不存在: ' . $path, null, 404);
     }
     
-    $filePath = $dirPath . '/' . $fileName;
+    $filePath = fsDirveJoinUnderDir($dirPath, $fileName);
+    fsDirveAssertWithinPartitionRoot($filePath, $partRoot);
     
     // 文件已存在时返回成功，由后续 write_file 负责覆盖（避免 409 导致壁纸保存配置等流程失败）
     if (file_exists($filePath) && is_file($filePath)) {
@@ -383,8 +508,11 @@ function readFileContent($path, $fileName, $asBase64 = false) {
     if (!$dirPath) {
         sendResponse(false, '无效的路径格式', null, 400);
     }
+    $partRoot = fsDirvePartitionRootPhysicalFromVirtual($path);
+    fsDirveAssertWithinPartitionRoot($dirPath, $partRoot);
     
-    $filePath = $dirPath . '/' . $fileName;
+    $filePath = fsDirveJoinUnderDir($dirPath, $fileName);
+    fsDirveAssertWithinPartitionRoot($filePath, $partRoot);
     
     // 检查文件是否存在
     if (!file_exists($filePath)) {
@@ -450,33 +578,30 @@ function writeFile($path, $fileName, $content, $writeMod = 'overwrite', $isBase6
     if (!$dirPath) {
         sendResponse(false, '无效的路径格式', null, 400);
     }
-    
-    // 验证文件名
-    if (empty($fileName) || strpos($fileName, '/') !== false || strpos($fileName, '\\') !== false) {
-        sendResponse(false, '无效的文件名', null, 400);
-    }
-    
-    // UserToken 收紧：仅允许 SystemToken 写入 D 盘根目录下的系统关键文件（CVS-ZEROS-012）
-    $validated = validatePath($path);
-    if ($validated && $validated['disk'] === 'D' && $validated['path'] === '') {
-        $token = jwtVerifyExtractToken();
-        if ($token !== null && $token !== '') {
-            $payload = JWT::decode($token);
-            if ($payload !== false && (($payload['type'] ?? '') === 'UserToken')) {
-                $sensitiveNames = getSensitiveFileNamesOnDRoot();
-                if (in_array($fileName, $sensitiveNames, true)) {
-                    sendResponse(false, '禁止使用 UserToken 写入 D 盘根目录下的系统关键文件，请通过前端系统模块（如 LStorage）操作', null, 403);
-                }
-            }
-        }
-    }
+    $partRoot = fsDirvePartitionRootPhysicalFromVirtual($path);
+    fsDirveAssertWithinPartitionRoot($dirPath, $partRoot);
     
     // 检查父目录是否存在
     if (!is_dir($dirPath)) {
         sendResponse(false, '父目录不存在: ' . $path, null, 404);
     }
     
-    $filePath = $dirPath . '/' . $fileName;
+    $filePath = fsDirveJoinUnderDir($dirPath, $fileName);
+    fsDirveAssertWithinPartitionRoot($filePath, $partRoot);
+    
+    // UserToken 收紧：解析后的真实路径落在 D 根且为系统关键文件时禁止写入（CVS-ZEROS-012 + 018）
+    $validated = validatePath($path);
+    if ($validated && $validated['disk'] === 'D') {
+        $token = jwtVerifyExtractToken();
+        if ($token !== null && $token !== '') {
+            $payload = JWT::decode($token);
+            if ($payload !== false && (($payload['type'] ?? '') === 'UserToken')) {
+                if (fsDirveLogicalPathTargetsSensitiveDRootFile($filePath)) {
+                    sendResponse(false, '禁止使用 UserToken 写入 D 盘根目录下的系统关键文件，请通过前端系统模块（如 LStorage）操作', null, 403);
+                }
+            }
+        }
+    }
     $fileExists = file_exists($filePath);
     
     // 如果内容是 base64 编码，则解码
@@ -522,8 +647,11 @@ function deleteFile($path, $fileName) {
     if (!$dirPath) {
         sendResponse(false, '无效的路径格式', null, 400);
     }
+    $partRoot = fsDirvePartitionRootPhysicalFromVirtual($path);
+    fsDirveAssertWithinPartitionRoot($dirPath, $partRoot);
     
-    $filePath = $dirPath . '/' . $fileName;
+    $filePath = fsDirveJoinUnderDir($dirPath, $fileName);
+    fsDirveAssertWithinPartitionRoot($filePath, $partRoot);
     
     // 检查文件是否存在
     if (!file_exists($filePath)) {
@@ -542,15 +670,15 @@ function deleteFile($path, $fileName) {
         sendResponse(false, '路径不是文件: ' . $fileName, null, 400);
     }
     
-    // UserToken 收紧：禁止删除 D 盘根目录下的系统关键文件（CVS-ZEROS-015）
+    // UserToken 收紧：解析后位于 D 根的系统关键文件禁止删除（CVS-ZEROS-015 + 018）
     $validated = validatePath($path);
-    if ($validated && $validated['disk'] === 'D' && $validated['path'] === '') {
+    if ($validated && $validated['disk'] === 'D') {
         $token = jwtVerifyExtractToken();
         if ($token !== null && $token !== '') {
             $payload = JWT::decode($token);
             if ($payload !== false && (($payload['type'] ?? '') === 'UserToken')) {
-                $sensitiveNames = getSensitiveFileNamesOnDRoot();
-                if (in_array($fileName, $sensitiveNames, true)) {
+                $rp = @realpath($filePath);
+                if ($rp !== false && fsDirvePhysicalPathUnderDRootMatchesSensitive($rp)) {
                     sendResponse(false, '禁止使用 UserToken 在 D 盘根目录对系统关键文件执行该操作，请通过前端系统模块（如 LStorage）操作', null, 403);
                 }
             }
@@ -576,34 +704,34 @@ function renameFile($path, $oldFileName, $newFileName) {
     if (!$dirPath) {
         sendResponse(false, '无效的路径格式', null, 400);
     }
+    $partRoot = fsDirvePartitionRootPhysicalFromVirtual($path);
+    fsDirveAssertWithinPartitionRoot($dirPath, $partRoot);
     
     // 验证文件名
     if (empty($oldFileName) || empty($newFileName)) {
         sendResponse(false, '文件名不能为空', null, 400);
     }
     
-    if (strpos($oldFileName, '/') !== false || strpos($newFileName, '/') !== false ||
-        strpos($oldFileName, '\\') !== false || strpos($newFileName, '\\') !== false) {
-        sendResponse(false, '无效的文件名', null, 400);
-    }
+    $oldFilePath = fsDirveJoinUnderDir($dirPath, $oldFileName);
+    $newFilePath = fsDirveJoinUnderDir($dirPath, $newFileName);
+    fsDirveAssertWithinPartitionRoot($oldFilePath, $partRoot);
+    fsDirveAssertWithinPartitionRoot($newFilePath, $partRoot);
     
-    // UserToken 收紧：D 根下涉及敏感文件名时禁止重命名（CVS-ZEROS-015）
+    // UserToken 收紧：解析后涉及 D 根系统关键文件时禁止重命名（CVS-ZEROS-015 + 018）
     $validated = validatePath($path);
-    if ($validated && $validated['disk'] === 'D' && $validated['path'] === '') {
+    if ($validated && $validated['disk'] === 'D') {
         $token = jwtVerifyExtractToken();
         if ($token !== null && $token !== '') {
             $payload = JWT::decode($token);
             if ($payload !== false && (($payload['type'] ?? '') === 'UserToken')) {
-                $sensitiveNames = getSensitiveFileNamesOnDRoot();
-                if (in_array($oldFileName, $sensitiveNames, true) || in_array($newFileName, $sensitiveNames, true)) {
+                $rpOld = @realpath($oldFilePath);
+                if (($rpOld !== false && fsDirvePhysicalPathUnderDRootMatchesSensitive($rpOld))
+                    || fsDirveLogicalPathTargetsSensitiveDRootFile($newFilePath)) {
                     sendResponse(false, '禁止使用 UserToken 在 D 盘根目录对系统关键文件执行该操作，请通过前端系统模块（如 LStorage）操作', null, 403);
                 }
             }
         }
     }
-    
-    $oldFilePath = $dirPath . '/' . $oldFileName;
-    $newFilePath = $dirPath . '/' . $newFileName;
     
     // 检查源文件是否存在
     if (!file_exists($oldFilePath)) {
@@ -637,6 +765,10 @@ function moveFile($sourcePath, $sourceFileName, $targetPath, $targetFileName = n
     if (!$sourceDirPath || !$targetDirPath) {
         sendResponse(false, '无效的路径格式', null, 400);
     }
+    $sourceRoot = fsDirvePartitionRootPhysicalFromVirtual($sourcePath);
+    $targetRoot = fsDirvePartitionRootPhysicalFromVirtual($targetPath);
+    fsDirveAssertWithinPartitionRoot($sourceDirPath, $sourceRoot);
+    fsDirveAssertWithinPartitionRoot($targetDirPath, $targetRoot);
     
     // 如果没有指定目标文件名，使用源文件名
     if ($targetFileName === null) {
@@ -648,8 +780,10 @@ function moveFile($sourcePath, $sourceFileName, $targetPath, $targetFileName = n
         sendResponse(false, '文件名不能为空', null, 400);
     }
     
-    $sourceFilePath = $sourceDirPath . '/' . $sourceFileName;
-    $targetFilePath = $targetDirPath . '/' . $targetFileName;
+    $sourceFilePath = fsDirveJoinUnderDir($sourceDirPath, $sourceFileName);
+    $targetFilePath = fsDirveJoinUnderDir($targetDirPath, $targetFileName);
+    fsDirveAssertWithinPartitionRoot($sourceFilePath, $sourceRoot);
+    fsDirveAssertWithinPartitionRoot($targetFilePath, $targetRoot);
     
     // 检查源文件是否存在
     if (!file_exists($sourceFilePath)) {
@@ -666,12 +800,14 @@ function moveFile($sourcePath, $sourceFileName, $targetPath, $targetFileName = n
         sendResponse(false, '目标文件已存在: ' . $targetFileName, null, 409);
     }
     
-    // UserToken 收紧：D 根下涉及敏感文件名时禁止移动（CVS-ZEROS-015）
-    $sensitiveNames = getSensitiveFileNamesOnDRoot();
+    // UserToken 收紧：解析后涉及 D 根系统关键文件时禁止移动（CVS-ZEROS-015 + 018）
     $sourceValidated = validatePath($sourcePath);
     $targetValidated = validatePath($targetPath);
-    $sourceIsDRootSensitive = $sourceValidated && $sourceValidated['disk'] === 'D' && $sourceValidated['path'] === '' && in_array($sourceFileName, $sensitiveNames, true);
-    $targetIsDRootSensitive = $targetValidated && $targetValidated['disk'] === 'D' && $targetValidated['path'] === '' && in_array($targetFileName, $sensitiveNames, true);
+    $rpSrc = @realpath($sourceFilePath);
+    $sourceIsDRootSensitive = $sourceValidated && $sourceValidated['disk'] === 'D'
+        && $rpSrc !== false && fsDirvePhysicalPathUnderDRootMatchesSensitive($rpSrc);
+    $targetIsDRootSensitive = $targetValidated && $targetValidated['disk'] === 'D'
+        && fsDirveLogicalPathTargetsSensitiveDRootFile($targetFilePath);
     if ($sourceIsDRootSensitive || $targetIsDRootSensitive) {
         $token = jwtVerifyExtractToken();
         if ($token !== null && $token !== '') {
@@ -705,6 +841,10 @@ function copyFile($sourcePath, $sourceFileName, $targetPath, $targetFileName = n
     if (!$sourceDirPath || !$targetDirPath) {
         sendResponse(false, '无效的路径格式', null, 400);
     }
+    $sourceRoot = fsDirvePartitionRootPhysicalFromVirtual($sourcePath);
+    $targetRoot = fsDirvePartitionRootPhysicalFromVirtual($targetPath);
+    fsDirveAssertWithinPartitionRoot($sourceDirPath, $sourceRoot);
+    fsDirveAssertWithinPartitionRoot($targetDirPath, $targetRoot);
     
     // 如果没有指定目标文件名，使用源文件名
     if ($targetFileName === null) {
@@ -716,8 +856,10 @@ function copyFile($sourcePath, $sourceFileName, $targetPath, $targetFileName = n
         sendResponse(false, '文件名不能为空', null, 400);
     }
     
-    $sourceFilePath = $sourceDirPath . '/' . $sourceFileName;
-    $targetFilePath = $targetDirPath . '/' . $targetFileName;
+    $sourceFilePath = fsDirveJoinUnderDir($sourceDirPath, $sourceFileName);
+    $targetFilePath = fsDirveJoinUnderDir($targetDirPath, $targetFileName);
+    fsDirveAssertWithinPartitionRoot($sourceFilePath, $sourceRoot);
+    fsDirveAssertWithinPartitionRoot($targetFilePath, $targetRoot);
     
     // 检查源文件是否存在
     if (!file_exists($sourceFilePath)) {
@@ -734,15 +876,14 @@ function copyFile($sourcePath, $sourceFileName, $targetPath, $targetFileName = n
         sendResponse(false, '目标文件已存在: ' . $targetFileName, null, 409);
     }
     
-    // UserToken 收紧：禁止在 D 根生成/覆盖系统关键文件（CVS-ZEROS-015）
+    // UserToken 收紧：目标解析后落在 D 根系统关键文件时禁止复制（CVS-ZEROS-015 + 018）
     $targetValidated = validatePath($targetPath);
-    if ($targetValidated && $targetValidated['disk'] === 'D' && $targetValidated['path'] === '') {
+    if ($targetValidated && $targetValidated['disk'] === 'D') {
         $token = jwtVerifyExtractToken();
         if ($token !== null && $token !== '') {
             $payload = JWT::decode($token);
             if ($payload !== false && (($payload['type'] ?? '') === 'UserToken')) {
-                $sensitiveNames = getSensitiveFileNamesOnDRoot();
-                if (in_array($targetFileName, $sensitiveNames, true)) {
+                if (fsDirveLogicalPathTargetsSensitiveDRootFile($targetFilePath)) {
                     sendResponse(false, '禁止使用 UserToken 在 D 盘根目录对系统关键文件执行该操作，请通过前端系统模块（如 LStorage）操作', null, 403);
                 }
             }
@@ -770,8 +911,11 @@ function getFileInfo($path, $fileName) {
     if (!$dirPath) {
         sendResponse(false, '无效的路径格式', null, 400);
     }
+    $partRoot = fsDirvePartitionRootPhysicalFromVirtual($path);
+    fsDirveAssertWithinPartitionRoot($dirPath, $partRoot);
     
-    $filePath = $dirPath . '/' . $fileName;
+    $filePath = fsDirveJoinUnderDir($dirPath, $fileName);
+    fsDirveAssertWithinPartitionRoot($filePath, $partRoot);
     
     // 检查文件是否存在
     if (!file_exists($filePath)) {
@@ -803,19 +947,18 @@ function renameDirectory($path, $oldName, $newName) {
     if (!$dirPath) {
         sendResponse(false, '无效的路径格式', null, 400);
     }
+    $partRoot = fsDirvePartitionRootPhysicalFromVirtual($path);
+    fsDirveAssertWithinPartitionRoot($dirPath, $partRoot);
     
     // 验证目录名
     if (empty($oldName) || empty($newName)) {
         sendResponse(false, '目录名不能为空', null, 400);
     }
     
-    if (strpos($oldName, '/') !== false || strpos($newName, '/') !== false ||
-        strpos($oldName, '\\') !== false || strpos($newName, '\\') !== false) {
-        sendResponse(false, '无效的目录名', null, 400);
-    }
-    
-    $oldDirPath = $dirPath . '/' . $oldName;
-    $newDirPath = $dirPath . '/' . $newName;
+    $oldDirPath = fsDirveJoinUnderDir($dirPath, $oldName);
+    $newDirPath = fsDirveJoinUnderDir($dirPath, $newName);
+    fsDirveAssertWithinPartitionRoot($oldDirPath, $partRoot);
+    fsDirveAssertWithinPartitionRoot($newDirPath, $partRoot);
     
     // 检查源目录是否存在
     if (!is_dir($oldDirPath)) {
@@ -845,11 +988,15 @@ function renameDirectory($path, $oldName, $newName) {
 function moveDirectory($sourcePath, $targetPath) {
     $sourceDirPath = getDirPath($sourcePath);
     $targetParentPath = getDirPath(dirname($targetPath));
-    $targetName = basename($targetPath);
+    $targetName = basename(str_replace('\\', '/', $targetPath));
     
     if (!$sourceDirPath || !$targetParentPath) {
         sendResponse(false, '无效的路径格式', null, 400);
     }
+    $sourceRoot = fsDirvePartitionRootPhysicalFromVirtual($sourcePath);
+    $targetRoot = fsDirvePartitionRootPhysicalFromVirtual($targetPath);
+    fsDirveAssertWithinPartitionRoot($sourceDirPath, $sourceRoot);
+    fsDirveAssertWithinPartitionRoot($targetParentPath, $targetRoot);
     
     // 检查源目录是否存在
     if (!is_dir($sourceDirPath)) {
@@ -861,7 +1008,8 @@ function moveDirectory($sourcePath, $targetPath) {
         sendResponse(false, '目标父目录不存在: ' . dirname($targetPath), null, 404);
     }
     
-    $targetDirPath = $targetParentPath . '/' . $targetName;
+    $targetDirPath = fsDirveJoinUnderDir($targetParentPath, $targetName);
+    fsDirveAssertWithinPartitionRoot($targetDirPath, $targetRoot);
     
     // 检查目标目录是否已存在
     if (is_dir($targetDirPath)) {
@@ -885,11 +1033,15 @@ function moveDirectory($sourcePath, $targetPath) {
 function copyDirectory($sourcePath, $targetPath) {
     $sourceDirPath = getDirPath($sourcePath);
     $targetParentPath = getDirPath(dirname($targetPath));
-    $targetName = basename($targetPath);
+    $targetName = basename(str_replace('\\', '/', $targetPath));
     
     if (!$sourceDirPath || !$targetParentPath) {
         sendResponse(false, '无效的路径格式', null, 400);
     }
+    $sourceRoot = fsDirvePartitionRootPhysicalFromVirtual($sourcePath);
+    $targetRoot = fsDirvePartitionRootPhysicalFromVirtual($targetPath);
+    fsDirveAssertWithinPartitionRoot($sourceDirPath, $sourceRoot);
+    fsDirveAssertWithinPartitionRoot($targetParentPath, $targetRoot);
     
     // 检查源目录是否存在
     if (!is_dir($sourceDirPath)) {
@@ -901,7 +1053,8 @@ function copyDirectory($sourcePath, $targetPath) {
         sendResponse(false, '目标父目录不存在: ' . dirname($targetPath), null, 404);
     }
     
-    $targetDirPath = $targetParentPath . '/' . $targetName;
+    $targetDirPath = fsDirveJoinUnderDir($targetParentPath, $targetName);
+    fsDirveAssertWithinPartitionRoot($targetDirPath, $targetRoot);
     
     // 检查目标目录是否已存在
     if (is_dir($targetDirPath)) {
@@ -961,6 +1114,7 @@ function deleteDirectoryRecursive($path) {
     if (!$dirPath) {
         sendResponse(false, '无效的路径格式', null, 400);
     }
+    fsDirveAssertWithinPartitionRoot($dirPath, fsDirvePartitionRootPhysicalFromVirtual($path));
     
     // 检查目录是否存在
     if (!is_dir($dirPath)) {
@@ -1010,6 +1164,7 @@ function checkPathExists($path) {
     if (!$realPath) {
         sendResponse(false, '无效的路径格式', null, 400);
     }
+    fsDirveAssertWithinPartitionRoot($realPath, fsDirvePartitionRootPhysicalFromVirtual($path));
     
     $exists = file_exists($realPath);
     $isDir = $exists && is_dir($realPath);

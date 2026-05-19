@@ -7,8 +7,8 @@
 ## 漏洞统计
 
 - **总计**: 23 个漏洞/测试程序
-- **已修复**: 14 个
-- **待修复**: 8 个
+- **已修复**: 16 个
+- **待修复**: 6 个
 - **安全测试程序**: 1 个
 - **严重漏洞**: 14 个
 - **高/中高危漏洞**: 4 个
@@ -36,14 +36,14 @@
 | [CVS-ZEROS-013](CVS_ZEROS_013.md) | LStorage 未将 userControl.currentUser 列为危险键 | 中高 (5.5) | 2026-03-09 | 2026-03-16 |
 | [CVS-ZEROS-015](CVS_ZEROS_015.md) | FSDirve rename/move/copy/delete 未限制 D 根敏感文件名导致 012 被绕过 | 严重 (9.0) | 2026-03-15 | 2026-03-16 |
 | [CVS-ZEROS-016](CVS_ZEROS_016.md) | RandomSecurity 未校验来源即签发 SystemToken | 严重 (9.8) | 2026-03-15 | 2026-03-16 |
+| [CVS-ZEROS-017](CVS_ZEROS_017.md) | RandomSecurity 信任客户端声明 UserToken 权限导致权限伪造 | 严重 (9.8) | 2026-05-04 | 2026-05-06 |
+| [CVS-ZEROS-018](CVS_ZEROS_018.md) | FSDirve 文件名参数未校验导致路径穿越 | 严重 (9.1) | 2026-05-04 | 2026-05-06 |
 
 ### 待修复漏洞
 
 | 编号 | 漏洞名称 | 严重程度 | 发现日期 | 说明 |
 |------|---------|---------|---------|------|
 | [CVS-ZEROS-011](CVS_ZEROS_011.md) | 密码使用弱哈希算法漏洞 | 低危 (3.5) | 2026-03-09 | 变体 MD5 无法使用标准彩虹表，需1年以上建立新彩虹表 |
-| [CVS-ZEROS-017](CVS_ZEROS_017.md) | RandomSecurity 信任客户端声明 UserToken 权限导致权限伪造 | 严重 (9.8) | 2026-05-04 | 可伪造管理员级 UserToken 并注册任意程序权限 |
-| [CVS-ZEROS-018](CVS_ZEROS_018.md) | FSDirve 文件名参数未校验导致路径穿越 | 严重 (9.1) | 2026-05-04 | read/delete/copy/move 等文件名参数可用 ../ 越出虚拟盘 |
 | [CVS-ZEROS-019](CVS_ZEROS_019.md) | 多个开放代理接口缺少目标限制导致 SSRF | 高 (8.8) | 2026-05-04 | Browser/Audio/Video/Image 代理可访问内网目标且关闭 TLS 校验 |
 | [CVS-ZEROS-020](CVS_ZEROS_020.md) | NetworkDirve 未接入服务级权限映射导致网络能力越权 | 高 (8.1) | 2026-05-04 | UserToken 只需携带 upid 即可调用端口监听和 TCP 发送能力 |
 | [CVS-ZEROS-021](CVS_ZEROS_021.md) | RandomSecurity commit_for_system 无认证导致 SystemToken 仍可被未认证获取 | 严重 (9.8) | 2026-05-04 | 016 修复不完整，攻击者两步请求仍可获得 SystemToken |
@@ -80,11 +80,11 @@
 - [CVS-ZEROS-008](CVS_ZEROS_008.md): FSDirve 未授权远程文件操作漏洞 ✅ (已完成)
 - [CVS-ZEROS-009](CVS_ZEROS_009.md): ProcessManager 内核 API 调用 PID 欺骗导致权限提升 ✅ (已完成)
 - [CVS-ZEROS-010](CVS_ZEROS_010.md): 进程绑定内核 API 令牌可读导致权限提升漏洞 ✅ (已完成)
+- [CVS-ZEROS-017](CVS_ZEROS_017.md): RandomSecurity 信任客户端声明 UserToken 权限导致权限伪造 ✅ (已完成)
+- [CVS-ZEROS-018](CVS_ZEROS_018.md): FSDirve 文件名参数未校验导致路径穿越 ✅ (已完成)
 
 ### P0 - 立即修复（待处理）
 
-- [CVS-ZEROS-017](CVS_ZEROS_017.md): RandomSecurity 信任客户端声明 UserToken 权限导致权限伪造
-- [CVS-ZEROS-018](CVS_ZEROS_018.md): FSDirve 文件名参数未校验导致路径穿越
 - [CVS-ZEROS-021](CVS_ZEROS_021.md): RandomSecurity commit_for_system 无认证导致 SystemToken 仍可被未认证获取
 - [CVS-ZEROS-022](CVS_ZEROS_022.md): D/server 服务脚本可写入并自动加载导致持久化提权
 - [CVS-ZEROS-023](CVS_ZEROS_023.md): Cache API 命名空间可控导致锁屏缓存投毒与系统上下文提权
@@ -121,8 +121,8 @@
 6. ✅ **CVS-ZEROS-013 已修复**: LStorage 未将 userControl.currentUser 列为危险键已修复，已将该键列入 DANGEROUS_KEYS、要求 SYSTEM_STORAGE_WRITE_USER_CONTROL，并仅允许 UserControl 模块通过调用栈校验写入
 7. ✅ **CVS-ZEROS-015 已修复**: FSDirve rename/move/copy/delete 未限制 D 根敏感文件名已修复，对 D 根敏感名单（与 012 一致）在 rename/move/copy/delete 时施加 UserToken 403，禁止“写非敏感名+重命名”绕过
 8. ✅ **CVS-ZEROS-016 已修复**: RandomSecurity 未校验即签发 SystemToken 已修复，后端要求先通过 action=commit_for_system 提交 randomValue（每 IP 仅一笔未消费），再签发 SystemToken；401 触发蓝屏补充防护保留
-9. ⚠️ **CVS-ZEROS-017 待修复**: UserToken 的 userLevel/permissions 必须由服务端可信登录态生成，不能信任客户端声明；programPermissions 应收紧为 SystemToken-only 或服务级权限映射
-10. ⚠️ **CVS-ZEROS-018 待修复**: FSDirve 所有文件名参数必须统一校验并用 realpath 确认最终路径不越出分区根目录
+9. ✅ **CVS-ZEROS-017 已修复**: UserToken 由 `randomSecurity.php` 根据 `LocalSData.json` 与 username/password 签发 userLevel/permissions；`programPermissions.php` 仅允许 SystemToken；前端 `randomSecurity.js` / `lockscreen.js` 已对齐
+10. ✅ **CVS-ZEROS-018 已修复**: FSDirve 已统一 `fsDirveJoinUnderDir` 拼接，并以 `realpath` + 分区根断言（`fsDirveAssertWithinPartitionRoot`）约束最终物理路径，防止 `../` 穿越；012/015 敏感文件判定结合解析后真实路径
 11. ⚠️ **CVS-ZEROS-019 待修复**: 代理接口应增加鉴权、目标域名白名单、私网 IP 禁止、重定向后复验并开启 TLS 校验
 12. ⚠️ **CVS-ZEROS-020 待修复**: NetworkDirve 应加入 jwtVerify 服务级权限映射，并将端口资源绑定到创建者 upid
 13. ⚠️ **CVS-ZEROS-021 待修复**: commit_for_system 不能作为 SystemToken 签发凭据，应改为服务端可信引导 secret 或彻底移除公开签发
@@ -173,8 +173,8 @@
 | 系统令牌未校验 | CVS-ZEROS-016 | ✅ 已修复：SystemToken 须先 commit_for_system 提交 randomValue（每 IP 一笔未消费），再签发 |
 | 权限伪造 | CVS-ZEROS-013 | ✅ 已修复：userControl.currentUser 列入危险键并仅允许 UserControl 模块写入 |
 | **程序提权** | **CVS-ZEROS-014** | **✅ 已修复：后端 register 仅接收前端实际授予的权限（getGrantedPermissions），不再信任 __info__.permissions** |
-| UserToken 权限伪造 | CVS-ZEROS-017 | ⚠️ 待修复：RandomSecurity 仍信任客户端声明 userLevel/permissions |
-| 文件路径穿越 | CVS-ZEROS-018 | ⚠️ 待修复：FSDirve 文件名参数可携带 ../ 越出虚拟盘目录 |
+| UserToken 权限伪造 | CVS-ZEROS-017 | ✅ 已修复：服务端校验密码后写入 claims；programPermissions 仅 SystemToken；`type=UserToken` 大小写不敏感均走同一认证分支 |
+| 文件路径穿越 | CVS-ZEROS-018 | ✅ 已修复：`fsDirveJoinUnderDir` + 分区根 `realpath` 断言，文件名穿越无法越出 `DISK/{Letter}` |
 | SSRF | CVS-ZEROS-019 | ⚠️ 待修复：多个代理接口缺少目标限制并关闭 TLS 校验 |
 | 网络能力越权 | CVS-ZEROS-020 | ⚠️ 待修复：NetworkDirve 未接入服务级权限映射 |
 | SystemToken 签发绕过 | CVS-ZEROS-021 | ⚠️ 待修复：commit_for_system 无认证，攻击者两步请求仍可获得 SystemToken |
@@ -184,5 +184,5 @@
 
 ---
 
-**最后更新**: 2026-05-04  
+**最后更新**: 2026-05-12  
 **维护者**: ZerOS 安全团队

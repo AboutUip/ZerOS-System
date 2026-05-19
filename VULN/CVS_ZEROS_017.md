@@ -2,10 +2,10 @@
 
 **漏洞编号**: CVS-ZEROS-017  
 **发现日期**: 2026-05-04  
-**修复日期**: 待修复  
+**修复日期**: 2026-05-06  
 **严重程度**: 严重 (CVSS 9.8)  
 **CWE分类**: CWE-287 (身份验证不当), CWE-284 (不恰当的访问控制), CWE-863 (授权不正确)  
-**状态**: 待修复
+**状态**: 已修复
 
 ---
 
@@ -13,7 +13,31 @@
 
 `system/service/randomSecurity.php` 在签发 `UserToken` 时信任客户端传入的 `userLevel` 和 `permissions` 字段，并生成永不过期 JWT。攻击者可以直接构造请求签发带 `DEFAULT_ADMIN` 或任意权限列表的 `UserToken`。同时 `system/service/programPermissions.php` 仅调用 `requireJWTVerify()`，没有传入服务名进行 action 到权限映射校验，持有伪造 `UserToken` 的请求可注册任意程序权限，进而调用 `FSDirve.php` 等受保护接口。
 
-## 漏洞描述
+---
+
+## 修复说明（2026-05-06）
+
+1. **`randomSecurity.php`（PHP）**  
+   - 签发 **UserToken** 时**不再**采用请求中的 `userLevel` / `permissions`。  
+   - **必须 POST JSON**，且含 `username`；`password` 按用户是否有密码校验（与 `UserControl.login` 一致，密码为 **MD5(明文)** 与 `LocalSData.json` 中 `system["userControl.users"]` 比对）。  
+   - `userLevel` 取自存储中的 `level`；`permissions` 由服务端按 `UserControl.getGrantablePermissions` 语义生成（与 `jwtVerify` 高风险列表一致）。  
+   - **`type` 为 UserToken 时大小写不敏感**（`strcasecmp`），均走同一认证分支，避免变体类型绕过。  
+   - UserToken **仍不设 `exp`**（与产品要求一致）。
+
+2. **`programPermissions.php`（PHP）**  
+   - 改为 **`requireSystemTokenOnly()`**，禁止用 UserToken 写入 `programPermissionsMap`（与内核 `NetworkManager` 对 `/system/service/` 注入 SystemToken 的路径一致）。
+
+3. **前端对齐**  
+   - `kernel/core/safemode/randomSecurity.js`：`generateUserToken(username, password)`。  
+   - `system/ui/lockscreen.js`：登录成功后传入 `LockScreen.currentUser` 与密码。
+
+4. **残余风险（非本编号范围）**  
+   - **`jwtVerify.php`** 在其它接口上「服务名为空仍跳过映射」的行为未在本条一并改造；**021**（SystemToken 两步绕过）若存在，攻击者仍可能持 SystemToken 调用已放行接口。  
+   - **Python/Java 等其它后端**若仍按旧协议签发 UserToken，部署到这些端口时仍存在同类风险，需单独对齐实现。
+
+---
+
+## 漏洞描述（历史）
 
 ### 攻击链
 
@@ -30,7 +54,7 @@
 
 ---
 
-## 技术细节
+## 技术细节（历史）
 
 ### 漏洞位置
 
@@ -41,25 +65,7 @@
 | `system/service/jwtVerify.php` | 服务名为空时跳过 action 到权限映射校验 |
 | `system/service/JWT.php` | 默认密钥硬编码，且支持永不过期 token |
 
-### 相关代码
-
-```php
-// randomSecurity.php
-$userLevel = $inputData['userLevel'] ?? null;
-$permissions = isset($inputData['permissions']) && is_array($inputData['permissions']) ? $inputData['permissions'] : null;
-// ...
-if ($resolvedType === 'UserToken' && $userLevel !== null && $userLevel !== '') {
-    $payload['userLevel'] = $userLevel;
-}
-if ($resolvedType === 'UserToken' && $permissions !== null && is_array($permissions)) {
-    $payload['permissions'] = $permissions;
-}
-```
-
-```php
-// programPermissions.php
-requireJWTVerify(); // 未传入服务名，UserToken+upid 不会执行 action 权限映射
-```
+---
 
 ## 影响评估
 
@@ -80,10 +86,10 @@ requireJWTVerify(); // 未传入服务名，UserToken+upid 不会执行 action �
 
 ---
 
-## 修复建议
+## 修复建议（历史记录；已实现项见上文「修复说明」）
 
 1. `randomSecurity.php` 不应接收客户端声明的 `userLevel`、`permissions`；应由服务端根据已认证用户会话、登录结果或可信用户数据库生成。
-2. `UserToken` 应设置较短有效期，并支持撤销/刷新；避免默认永不过期。
+2. `UserToken` 应设置较短有效期，并支持撤销/刷新；避免默认永不过期。（**产品决策**：当前版本仍保留永不过期 UserToken。）
 3. `programPermissions.php` 应改为 SystemToken-only，或新增独立服务权限映射并要求当前用户、程序、授权记录三方一致。
 4. `jwtVerify.php` 对未知服务名或空服务名不应静默跳过高风险 action 的权限校验。
 5. `JWT.php` 默认密钥应迁移到部署配置，并要求生产环境强制覆盖。
@@ -96,7 +102,9 @@ requireJWTVerify(); // 未传入服务名，UserToken+upid 不会执行 action �
 - `system/service/programPermissions.php`
 - `system/service/jwtVerify.php`
 - `system/service/JWT.php`
+- `kernel/core/safemode/randomSecurity.js`
+- `system/ui/lockscreen.js`
 
 ---
 
-**修复状态**: 待修复
+**修复状态**: 已修复

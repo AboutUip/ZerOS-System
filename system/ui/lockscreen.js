@@ -46,6 +46,8 @@ KernelLogger.info("LockScreen", "模块初始化");
         static _clickHandler = null; // 容器点击事件处理器引用（用于移除监听器）
         static _userSwitchKeydownHandler = null; // 用户切换快捷键处理器引用（用于移除监听器）
         static _keyPressed = false; // 是否已按下任意键（用于首次按键显示登录界面）
+        /** 防止 Enter 连发/重复 keydown 导致并发登录与重复请求 randomSecurity */
+        static _loginInProgress = false;
         static _powerButton = null; // 电源按钮
         static _powerMenu = null; // 电源菜单
         static _powerMenuVisible = false; // 电源菜单是否可见
@@ -2031,6 +2033,10 @@ KernelLogger.info("LockScreen", "模块初始化");
             if (!LockScreen.currentUser) {
                 return;
             }
+            if (LockScreen._loginInProgress) {
+                return;
+            }
+            LockScreen._loginInProgress = true;
             
             // 显示加载蒙版
             const loadingMessage = LockScreen.isPasswordMode 
@@ -2048,19 +2054,16 @@ KernelLogger.info("LockScreen", "模块初始化");
                 LockScreen._hideLoadingOverlay();
                 
                 if (success) {
-                    // 登录成功，立即将用户级别与可授权权限列表传递给安全模块生成 UserToken JWT（type 固定为 UserToken）
-                    if (typeof RandomSecurity !== 'undefined' && typeof RandomSecurity.generateUserToken === 'function') {
-                        const userLevel = typeof UserControl !== 'undefined' && typeof UserControl.getCurrentUserLevel === 'function'
-                            ? UserControl.getCurrentUserLevel() : null;
-                        const permissions = typeof UserControl !== 'undefined' && typeof UserControl.getGrantablePermissions === 'function'
-                            ? UserControl.getGrantablePermissions() : [];
-                        if (userLevel) {
-                            try {
-                                await RandomSecurity.generateUserToken(userLevel, permissions);
-                            } catch (e) {
-                                if (typeof KernelLogger !== 'undefined') {
-                                    KernelLogger.warn('LockScreen', `生成 UserToken 失败: ${e.message}`);
-                                }
+                    // 登录成功：由 RandomSecurity 携带 username/password 请求后端签发 UserToken（CVS-ZEROS-017，服务端写入 userLevel/permissions）
+                    if (typeof RandomSecurity !== 'undefined' && typeof RandomSecurity.generateUserToken === 'function' && LockScreen.currentUser) {
+                        try {
+                            const sessionUser = (typeof UserControl !== 'undefined' && UserControl._currentUser)
+                                ? UserControl._currentUser
+                                : LockScreen.currentUser;
+                            await RandomSecurity.generateUserToken(sessionUser, password);
+                        } catch (e) {
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.warn('LockScreen', `生成 UserToken 失败: ${e.message}`);
                             }
                         }
                     }
@@ -2178,6 +2181,8 @@ KernelLogger.info("LockScreen", "模块初始化");
                         hintText.style.color = 'rgba(255, 255, 255, 0.85)';
                     }, 2000);
                 }
+            } finally {
+                LockScreen._loginInProgress = false;
             }
         }
         
@@ -2385,8 +2390,11 @@ KernelLogger.info("LockScreen", "模块初始化");
                     LockScreen.passwordInput.style.display !== 'none' &&
                     document.activeElement === LockScreen.passwordInput) {
                     
-                    // Enter 提交登录
+                    // Enter 提交登录（忽略长按产生的 repeat，避免并发两次 randomSecurity）
                     if (e.key === 'Enter') {
+                        if (e.repeat) {
+                            return;
+                        }
                         e.preventDefault();
                         e.stopPropagation();
                         const password = LockScreen.passwordInput.value;

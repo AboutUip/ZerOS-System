@@ -1,77 +1,6 @@
 {
   "system": {
     "permissionManager.permissions": {
-      "cursorstyle": [
-        "GUI_WINDOW_CREATE",
-        "EVENT_LISTENER",
-        "SYSTEM_NOTIFICATION",
-        "SYSTEM_STORAGE_READ",
-        "SYSTEM_STORAGE_WRITE",
-        "PROCESS_BACKGROUND",
-        "SCHEDULE_TASK_CREATE"
-      ],
-      "kiteengine": [
-        "GUI_WINDOW_CREATE",
-        "EVENT_LISTENER",
-        "KERNEL_DISK_READ",
-        "KERNEL_DISK_LIST"
-      ],
-      "ps": [
-        "EVENT_LISTENER"
-      ],
-      "bilibili": [
-        "GUI_WINDOW_CREATE",
-        "EVENT_LISTENER",
-        "NETWORK_ACCESS"
-      ],
-      "terminal": [
-        "GEOGRAPHY_LOCATION",
-        "GUI_WINDOW_CREATE",
-        "KERNEL_DISK_READ",
-        "KERNEL_DISK_LIST",
-        "EVENT_LISTENER",
-        "ENVIRONMENT_READ"
-      ],
-      "taskmanager": [
-        "GUI_WINDOW_CREATE",
-        "KERNEL_DISK_READ",
-        "SYSTEM_NOTIFICATION",
-        "EVENT_LISTENER"
-      ],
-      "themeanimator": [
-        "SYSTEM_STORAGE_READ",
-        "SYSTEM_STORAGE_WRITE"
-      ],
-      "zominstall": [
-        "KERNEL_DISK_READ",
-        "KERNEL_DISK_DELETE",
-        "APPLICATION_INSTALL"
-      ],
-      "settings": [
-        "SYSTEM_NOTIFICATION",
-        "APPLICATION_UNINSTALL",
-        "GUI_WINDOW_CREATE",
-        "EVENT_LISTENER",
-        "SYSTEM_STORAGE_READ",
-        "SYSTEM_STORAGE_WRITE",
-        "ENVIRONMENT_READ",
-        "ENVIRONMENT_WRITE",
-        "THEME_READ",
-        "LANGUAGES_READ",
-        "LANGUAGES_WRITE",
-        "KERNEL_DISK_READ"
-      ],
-      "filemanager": [
-        "SYSTEM_STORAGE_WRITE_DESKTOP",
-        "GUI_WINDOW_CREATE",
-        "KERNEL_DISK_READ",
-        "KERNEL_DISK_DELETE",
-        "KERNEL_DISK_LIST",
-        "SYSTEM_NOTIFICATION",
-        "EVENT_LISTENER",
-        "SYSTEM_STORAGE_READ",
-        "SYSTEM_STORAGE_WRITE"
-      ],
       "strawberry-security": [
         "SCHEDULE_TASK_STARTUP",
         "SERVER_SERVICE_MANAGE",
@@ -87,17 +16,6 @@
         "CACHE_READ",
         "CACHE_WRITE"
       ],
-      "setup": [
-        "KERNEL_DISK_READ",
-        "KERNEL_DISK_WRITE",
-        "SCHEDULE_TASK_STARTUP",
-        "SERVER_SERVICE_MANAGE"
-      ],
-      "scheduletask": [
-        "SYSTEM_NOTIFICATION",
-        "SCHEDULE_TASK_MANAGE",
-        "SYSTEM_STORAGE_WRITE"
-      ],
       "servicemanager": [
         "SERVER_SERVICE_MANAGE",
         "SCHEDULE_TASK_MANAGE",
@@ -106,6 +24,107 @@
         "EVENT_LISTENER",
         "SCHEDULE_TASK_STARTUP",
         "SYSTEM_NOTIFICATION"
+      ],
+      "terminal": [
+        "GEOGRAPHY_LOCATION",
+        "GUI_WINDOW_CREATE",
+        "KERNEL_DISK_READ",
+        "KERNEL_DISK_LIST",
+        "EVENT_LISTENER",
+        "ENVIRONMENT_READ"
+      ],
+      "cron": [
+        "SYSTEM_NOTIFICATION"
+      ],
+      "scheduletask": [
+        "SYSTEM_NOTIFICATION",
+        "SCHEDULE_TASK_MANAGE",
+        "SYSTEM_STORAGE_WRITE",
+        "KERNEL_DISK_READ",
+        "SCHEDULE_TASK_STARTUP"
+      ],
+      "zominstall": [
+        "KERNEL_DISK_READ",
+        "KERNEL_DISK_DELETE",
+        "APPLICATION_INSTALL"
+      ],
+      "taskmanager": [
+        "GUI_WINDOW_CREATE",
+        "KERNEL_DISK_READ",
+        "SYSTEM_NOTIFICATION",
+        "EVENT_LISTENER"
+      ],
+      "ps": [
+        "EVENT_LISTENER"
+      ],
+      "vulnrepro": [
+        "EVENT_LISTENER",
+        "CACHE_READ",
+        "CACHE_WRITE"
+      ],
+      "cursorstyle": [
+        "SYSTEM_NOTIFICATION",
+        "GUI_WINDOW_CREATE",
+        "EVENT_LISTENER",
+        "SYSTEM_STORAGE_READ",
+        "SYSTEM_STORAGE_WRITE",
+        "PROCESS_BACKGROUND",
+        "SCHEDULE_TASK_CREATE",
+        "SCHEDULE_TASK_MANAGE"
+      ],
+      "settings": [
+        "SYSTEM_NOTIFICATION",
+        "APPLICATION_UNINSTALL",
+        "GUI_WINDOW_CREATE",
+        "EVENT_LISTENER",
+        "SYSTEM_STORAGE_READ",
+        "SYSTEM_STORAGE_WRITE",
+        "ENVIRONMENT_READ",
+        "ENVIRONMENT_WRITE",
+        "THEME_READ",
+        "LANGUAGES_READ",
+        "LANGUAGES_WRITE",
+        "KERNEL_DISK_READ"
+      ],
+      "kiteengine": [
+        "GUI_WINDOW_CREATE",
+        "EVENT_LISTENER",
+        "KERNEL_DISK_READ",
+        "KERNEL_DISK_LIST"
+      ],
+      "musicplayer": [
+        "KERNEL_DISK_LIST",
+        "GUI_WINDOW_CREATE",
+        "NETWORK_ACCESS",
+        "CACHE_READ",
+        "CACHE_WRITE",
+        "KERNEL_DISK_DELETE"
+      ],
+      "bilibili": [
+        "GUI_WINDOW_CREATE",
+        "EVENT_LISTENER",
+        "NETWORK_ACCESS"
+      ],
+      "themeanimator": [
+        "SYSTEM_STORAGE_READ",
+        "SYSTEM_STORAGE_WRITE"
+      ],
+      "filemanager": [
+        "SYSTEM_STORAGE_WRITE_DESKTOP",
+        "GUI_WINDOW_CREATE",
+        "KERNEL_DISK_READ",
+        "KERNEL_DISK_DELETE",
+        "KERNEL_DISK_LIST",
+        "SYSTEM_NOTIFICATION",
+        "EVENT_LISTENER",
+        "SYSTEM_STORAGE_READ",
+        "SYSTEM_STORAGE_WRITE"
+      ],
+      "setup": [
+        "KERNEL_DISK_READ",
+        "KERNEL_DISK_WRITE",
+        "SCHEDULE_TASK_STARTUP",
+        "SERVER_SERVICE_MANAGE"
       ],
       "regedit": [
         "EVENT_LISTENER",
@@ -128,14 +147,6 @@
         "EVENT_LISTENER",
         "SYSTEM_STORAGE_READ",
         "SYSTEM_STORAGE_WRITE"
-      ],
-      "musicplayer": [
-        "KERNEL_DISK_LIST",
-        "GUI_WINDOW_CREATE",
-        "NETWORK_ACCESS",
-        "CACHE_READ",
-        "CACHE_WRITE",
-        "KERNEL_DISK_DELETE"
       ],
       "hellogui": [
         "GUI_WINDOW_CREATE",
@@ -523,17 +534,17 @@
     "userControl.users": {
       "root": {
         "level": "DEFAULT_ADMIN",
-        "password": "61b249bf6d604d14120821f43625e84e",
+        "password": "0230ff8a1ff622b1a7b45273876be61e",
         "avatar": "avatar_root_1766272534753.jpg",
         "createdAt": 1766271155991,
-        "lastLogin": 1777835096551
+        "lastLogin": 1778764756622
       },
       "TestUser": {
         "level": "USER",
         "password": null,
         "avatar": null,
         "createdAt": 1766271155991,
-        "lastLogin": 1777819656327
+        "lastLogin": 1778022174825
       }
     },
     "userControl.currentUser": "root",
@@ -595,9 +606,9 @@
         "triggerConfig": {},
         "enabled": true,
         "createdAt": 1773477739546,
-        "updatedAt": 1777835097500,
-        "lastRunAt": 1777835097500,
-        "runCount": 89,
+        "updatedAt": 1778764757698,
+        "lastRunAt": 1778764757698,
+        "runCount": 108,
         "createdBy": "servicemanager",
         "requiresStartupPermission": true,
         "serviceId": "office",
@@ -608,14 +619,44 @@
         "taskType": "program",
         "triggerType": "SYSTEM_STARTUP",
         "triggerConfig": {},
-        "enabled": true,
+        "enabled": false,
         "createdAt": 1776701053408,
-        "updatedAt": 1777835097697,
-        "lastRunAt": 1777835097697,
-        "runCount": 28,
+        "updatedAt": 1778764278315,
+        "lastRunAt": 1778046458438,
+        "runCount": 36,
         "createdBy": "cursorstyle",
         "requiresStartupPermission": false,
         "programName": "cursorstyle",
+        "runInBackground": true
+      },
+      {
+        "id": "task_1778046780197_sqgawqsph",
+        "taskType": "service",
+        "triggerType": "SYSTEM_STARTUP",
+        "triggerConfig": {},
+        "enabled": true,
+        "createdAt": 1778046780197,
+        "updatedAt": 1778764757821,
+        "lastRunAt": 1778764757821,
+        "runCount": 11,
+        "createdBy": "setup",
+        "requiresStartupPermission": true,
+        "serviceId": "strawberrysecurity",
+        "serviceAction": "start"
+      },
+      {
+        "id": "task_1778764713072_vwxl4l7a1",
+        "taskType": "program",
+        "triggerType": "SYSTEM_STARTUP",
+        "triggerConfig": {},
+        "enabled": true,
+        "createdAt": 1778764713072,
+        "updatedAt": 1778764757986,
+        "lastRunAt": 1778764757986,
+        "runCount": 1,
+        "createdBy": "scheduletask",
+        "requiresStartupPermission": true,
+        "programName": "strawberry-security",
         "runInBackground": true
       }
     ],
@@ -654,7 +695,7 @@
     "system.volume": 1,
     "nodeLibExpansion": {
       "nodeAvailable": true,
-      "lastCheck": 1777835092061,
+      "lastCheck": 1778764750679,
       "intervalSeconds": 1,
       "scriptId": "perf",
       "nodeDependencies": [

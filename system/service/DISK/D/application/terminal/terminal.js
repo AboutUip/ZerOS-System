@@ -8925,7 +8925,6 @@ function escapeHtml(s){
                 (async () => {
                     // 验证命令名是否有效
                     if (!cmd || typeof cmd !== 'string' || cmd.trim() === '') {
-                        payload.write(`${cmd || ''} command not found`);
                         return;
                     }
                     

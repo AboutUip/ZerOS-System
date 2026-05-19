@@ -21,7 +21,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit;
 }
 
-requireJWTVerify();
+// CVS-ZEROS-017：programPermissionsMap 仅允许内核持有的 SystemToken 写入（与 NetworkManager 对 /system/service/ 注入一致）
+requireSystemTokenOnly();
 
 function sendResponse($success, $message, $data = null, $code = 200) {
     http_response_code($code);

@@ -26,20 +26,20 @@
     "TaskbarManager": {
       "weather:中原": {
         "value": null,
-        "expiresAt": 1777846706340,
-        "createdAt": 1777803506340,
-        "updatedAt": 1777803506340,
-        "size": 2801,
+        "expiresAt": 1778807095748,
+        "createdAt": 1778763895748,
+        "updatedAt": 1778763895748,
+        "size": 2729,
         "isFileBacked": true
       }
     },
     "exploit": {
       "system.dailyQuote": {
-        "value": "树上的鸟儿成双对，对面的冤家你想掐死谁。",
+        "value": "不知道该做什么，所以即使是知道了也没用的事情还是想知道，心里总是很焦急、很焦急，焦急得不得了。",
         "expiresAt": 0,
-        "createdAt": 1777835093876,
-        "updatedAt": 1777835093876,
-        "size": 62,
+        "createdAt": 1778764755553,
+        "updatedAt": 1778764755553,
+        "size": 143,
         "isFileBacked": false
       }
     }
