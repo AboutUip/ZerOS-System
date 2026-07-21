@@ -1,0 +1,18 @@
+{
+    "name": "zeroshub",
+    "version": "1.0.0",
+    "description": "ZerOS DevBridge - 远程开发者桥接器，为外部开发工具提供安全、可控的 ZerOS 系统访问通道",
+    "author": "ZerOS Developer",
+    "copyright": "© 2026",
+    "type": "GUI",
+    "script": "zeroshub.js",
+    "styles": ["zeroshub.css"],
+    "icon": "assets/icon.svg",
+    "assets": ["assets/icon.svg"],
+    "autoStart": false,
+    "priority": 10,
+    "alwaysShowInTaskbar": false,
+    "allowMultipleInstances": false,
+    "supportsPreview": true,
+    "category": "system"
+}

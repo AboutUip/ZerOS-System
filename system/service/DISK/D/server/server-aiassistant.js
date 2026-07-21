@@ -946,49 +946,105 @@
                 if (typeof ProcessManager !== 'undefined' && typeof ProcessManager.callKernelAPI === 'function') {
                     ProcessManager.callKernelAPI(_pid, 'Geography.getCurrentPosition', [{ enableHighAccuracy: false, timeout: 10000 }])
                         .then(function (loc) {
-                            if (loc && loc.name && typeof loc.name === 'string' && loc.name.trim()) {
+                            var candidates;
+                            if (typeof GeographyDrive !== 'undefined' && typeof GeographyDrive.getWeatherCityCandidates === 'function') {
+                                candidates = GeographyDrive.getWeatherCityCandidates(loc);
+                                cityName = GeographyDrive.resolveWeatherCityName(loc) || '北京';
+                            } else if (loc && loc.city && typeof loc.city === 'string' && loc.city.trim()) {
+                                cityName = loc.city.trim();
+                                candidates = [cityName, null];
+                            } else if (loc && loc.name && typeof loc.name === 'string' && loc.name.trim()) {
                                 cityName = loc.name.trim();
+                                candidates = [cityName, null];
                             } else {
-                                cityName = '北京'; // 默认城市
+                                cityName = '北京';
+                                candidates = [cityName, null];
                             }
-                            fetchWeatherData(cityName);
+                            fetchWeatherDataWithFallback(candidates);
                         })
                         .catch(function (e) {
                             if (typeof KernelLogger !== 'undefined') {
                                 KernelLogger.debug('server-aiassistant', '获取定位城市失败，使用默认城市: ' + (e && e.message ? e.message : '未知错误'));
                             }
                             cityName = '北京'; // 默认城市
-                            fetchWeatherData(cityName);
+                            fetchWeatherDataWithFallback([cityName, null]);
                         });
                 } else {
                     cityName = '北京'; // 默认城市
-                    fetchWeatherData(cityName);
+                    fetchWeatherDataWithFallback([cityName, null]);
                 }
             } else {
-                fetchWeatherData(cityName);
+                fetchWeatherDataWithFallback(
+                    (typeof GeographyDrive !== 'undefined' && typeof GeographyDrive.getWeatherCityCandidates === 'function')
+                        ? GeographyDrive.getWeatherCityCandidates(cityName)
+                        : [cityName, null]
+                );
             }
             
-            function fetchWeatherData(requestCity) {
+            function fetchWeatherDataWithFallback(candidates) {
+                var list = Array.isArray(candidates) && candidates.length ? candidates.slice() : [cityName || null];
+                var index = 0;
+                
+                function tryNext() {
+                    if (index >= list.length) {
+                        var errorMsg = isZh
+                            ? ('查询天气失败：未找到可用城市')
+                            : ('Weather query failed: location not found');
+                        reject(new Error(errorMsg));
+                        return;
+                    }
+                    var requestCity = list[index++];
+                    fetchWeatherData(requestCity, tryNext);
+                }
+                
+                tryNext();
+            }
+            
+            function fetchWeatherData(requestCity, onLocationMiss) {
                 // 使用 Uapi (uapis.cn) 天气 API，与任务栏组件一致
-                var weatherUrl = 'https://uapis.cn/api/v1/misc/weather?city=' + encodeURIComponent(requestCity) + '&extended=true&indices=true&forecast=true';
+                var weatherUrl = requestCity
+                    ? ('https://uapis.cn/api/v1/misc/weather?city=' + encodeURIComponent(requestCity) + '&extended=true&indices=true&forecast=true')
+                    : 'https://uapis.cn/api/v1/misc/weather?extended=true&indices=true&forecast=true';
                 
                 fetch(weatherUrl, {
                     method: 'GET',
                     headers: { 'Accept': 'application/json' }
                 })
                     .then(function (response) {
-                        if (!response.ok) {
-                            throw new Error('HTTP ' + response.status);
-                        }
-                        return response.json();
+                        return response.text().then(function (text) {
+                            var data = null;
+                            try {
+                                data = JSON.parse(text);
+                            } catch (e) {
+                                data = null;
+                            }
+                            if (data && data.error === 'LOCATION_NOT_FOUND') {
+                                if (typeof onLocationMiss === 'function') {
+                                    onLocationMiss();
+                                    return null;
+                                }
+                                throw new Error('LOCATION_NOT_FOUND');
+                            }
+                            if (!response.ok) {
+                                if (response.status === 404 && typeof onLocationMiss === 'function') {
+                                    onLocationMiss();
+                                    return null;
+                                }
+                                throw new Error('HTTP ' + response.status);
+                            }
+                            return data;
+                        });
                     })
                     .then(function (data) {
+                        if (data == null) {
+                            return;
+                        }
                         if (!data || typeof data !== 'object') {
                             throw new Error('天气数据格式错误');
                         }
                         
                         // 解析 Uapi 响应格式
-                        var cityDisplay = data.city ? (data.province ? data.province + ' ' + data.city : data.city) : requestCity;
+                        var cityDisplay = data.city ? (data.province ? data.province + ' ' + data.city : data.city) : (requestCity || '当前位置');
                         var temp = data.temperature != null ? data.temperature : 'N/A';
                         var desc = data.weather || '未知';
                         var humidity = data.humidity != null ? data.humidity : 'N/A';
@@ -1002,6 +1058,10 @@
                         resolve(weatherText);
                     })
                     .catch(function (e) {
+                        if (typeof onLocationMiss === 'function' && e && /LOCATION_NOT_FOUND|404/.test(String(e.message || e))) {
+                            onLocationMiss();
+                            return;
+                        }
                         var errorMsg = isZh
                             ? ('查询天气失败：' + (e && e.message ? e.message : '网络错误'))
                             : ('Weather query failed: ' + (e && e.message ? e.message : 'Network error'));

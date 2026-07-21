@@ -5134,6 +5134,7 @@ class TaskbarManager {
      */
     static _normalizeUapisWeatherData(raw) {
         if (!raw || typeof raw !== 'object') return null;
+        if (raw.error) return null;
         const forecastList = Array.isArray(raw.forecast) ? raw.forecast : [];
         const today = forecastList[0] || {};
         const cityDisplay = raw.city ? (raw.province ? `${raw.province} ${raw.city}` : raw.city) : '未知城市';
@@ -5160,6 +5161,83 @@ class TaskbarManager {
             wind_power: raw.wind_power || null,
             humidity: raw.humidity != null ? raw.humidity : null
         };
+    }
+    
+    /**
+     * 按候选城市名请求天气 API（区县失败时回退到市级 / IP 识别）
+     * @param {Array<string|null>} cityCandidates
+     * @returns {Promise<{raw: Object, cityName: string|null}>}
+     */
+    static async _fetchUapisWeatherWithCandidates(cityCandidates) {
+        const candidates = Array.isArray(cityCandidates) && cityCandidates.length > 0
+            ? cityCandidates
+            : [null];
+        let lastError = null;
+        
+        for (const candidate of candidates) {
+            const cityParam = candidate ? `city=${encodeURIComponent(candidate)}&` : '';
+            const weatherUrl = `${TaskbarManager.WEATHER_API_URL}?${cityParam}extended=true&indices=true&forecast=true`;
+            try {
+                KernelLogger.debug("TaskbarManager", `请求天气 API: ${candidate || '(IP自动识别)'}`);
+                const weatherResponse = await fetch(weatherUrl);
+                const weatherText = await weatherResponse.text();
+                const weatherContentType = weatherResponse.headers.get('content-type') || '';
+                const isWeatherJson = weatherContentType.includes('application/json');
+                
+                let rawWeather = null;
+                if (isWeatherJson) {
+                    try {
+                        rawWeather = JSON.parse(weatherText);
+                    } catch (jsonError) {
+                        lastError = new Error(`天气 API 返回了无效的 JSON 响应`);
+                        KernelLogger.error("TaskbarManager", `天气 API JSON 解析失败，响应内容: ${weatherText.substring(0, 500)}`);
+                        continue;
+                    }
+                } else if (!weatherResponse.ok) {
+                    lastError = new Error(`获取天气信息失败: ${weatherResponse.status}`);
+                    if (weatherResponse.status === 404) {
+                        KernelLogger.debug("TaskbarManager", `城市未找到: ${candidate}，尝试下一候选`);
+                        continue;
+                    }
+                    continue;
+                } else {
+                    lastError = new Error(`天气 API 返回了非 JSON 响应 (可能是服务器错误)`);
+                    KernelLogger.error("TaskbarManager", `天气 API 返回了非 JSON 响应 (Content-Type: ${weatherContentType})，响应内容: ${weatherText.substring(0, 500)}`);
+                    continue;
+                }
+                
+                if (rawWeather && rawWeather.error === 'LOCATION_NOT_FOUND') {
+                    lastError = new Error(`LOCATION_NOT_FOUND: ${candidate}`);
+                    KernelLogger.debug("TaskbarManager", `城市未找到: ${candidate}，尝试下一候选`);
+                    continue;
+                }
+                
+                if (!weatherResponse.ok) {
+                    lastError = new Error(`获取天气信息失败: ${weatherResponse.status}`);
+                    if (weatherResponse.status === 404) {
+                        continue;
+                    }
+                    continue;
+                }
+                
+                const normalizedData = TaskbarManager._normalizeUapisWeatherData(rawWeather);
+                if (!normalizedData || !normalizedData.today) {
+                    lastError = new Error('天气数据无效');
+                    continue;
+                }
+                
+                return {
+                    raw: rawWeather,
+                    normalized: normalizedData,
+                    cityName: candidate || (rawWeather.city != null ? String(rawWeather.city) : null)
+                };
+            } catch (fetchError) {
+                lastError = fetchError;
+                KernelLogger.debug("TaskbarManager", `天气请求异常 (${candidate}): ${fetchError.message}`);
+            }
+        }
+        
+        throw lastError || new Error('获取天气信息失败');
     }
     
     /**
@@ -5358,9 +5436,7 @@ class TaskbarManager {
                                     GeographyDrive.getCurrentPosition({ enableHighAccuracy: false }),
                                     new Promise((_, reject) => setTimeout(() => reject(new Error('超时')), 2000))
                                 ]);
-                                if (location && location.name) {
-                                    requestCityName = location.name;
-                                }
+                                requestCityName = GeographyDrive.resolveWeatherCityName(location);
                             } catch (e) {
                                 // 超时或失败，通过IP自动识别
                             }
@@ -5404,6 +5480,7 @@ class TaskbarManager {
                 KernelLogger.debug("TaskbarManager", "实时获取地理位置");
                         
                         let requestCityName = null;
+                        let weatherCityCandidates = [null];
                         
                         // 使用 GeographyDrive 获取城市名称（低精度定位，不触发浏览器权限请求）
                         try {
@@ -5413,9 +5490,10 @@ class TaskbarManager {
                                     enableHighAccuracy: false  // 使用低精度定位，不触发浏览器权限请求
                                 });
                                 
-                                if (location && location.name) {
-                                    requestCityName = location.name;
-                                    KernelLogger.info("TaskbarManager", `从 GeographyDrive 获取城市名称: ${requestCityName}`);
+                                requestCityName = GeographyDrive.resolveWeatherCityName(location);
+                                weatherCityCandidates = GeographyDrive.getWeatherCityCandidates(location);
+                                if (requestCityName) {
+                                    KernelLogger.info("TaskbarManager", `从 GeographyDrive 获取天气城市: ${requestCityName}（区县: ${location && location.name ? location.name : '无'}）`);
                                 } else {
                                     throw new Error('GeographyDrive 返回的城市名称为空');
                                 }
@@ -5438,9 +5516,10 @@ class TaskbarManager {
                                 maximumAge: 0
                             });
                             
-                            if (location && location.name) {
-                                requestCityName = location.name;
-                                KernelLogger.debug("TaskbarManager", `通过 BOM 方法获取城市名称: ${requestCityName}`);
+                            requestCityName = GeographyDrive.resolveWeatherCityName(location);
+                            weatherCityCandidates = GeographyDrive.getWeatherCityCandidates(location);
+                            if (requestCityName) {
+                                KernelLogger.debug("TaskbarManager", `通过 BOM 方法获取天气城市: ${requestCityName}`);
                             } else {
                                 throw new Error('BOM 方法未返回城市名称');
                             }
@@ -5474,13 +5553,32 @@ class TaskbarManager {
                             if (!cityData || typeof cityData !== 'object') {
                                 throw new Error('城市信息数据无效');
                             }
-                            requestCityName = (cityData.district != null ? String(cityData.district).trim() : null) || (cityData.region != null ? String(cityData.region).trim() : null);
-                            if (!requestCityName) {
-                                throw new Error('城市信息缺少 district/region');
+                            const fallbackLocation = {
+                                name: cityData.district != null ? String(cityData.district).trim() : null,
+                                district: cityData.district != null ? String(cityData.district).trim() : null,
+                                region: cityData.region != null ? String(cityData.region).trim() : null,
+                                address: cityData.region != null ? String(cityData.region).trim() : null,
+                                city: (typeof GeographyDrive !== 'undefined')
+                                    ? GeographyDrive._extractCityFromRegion(
+                                        cityData.region != null ? String(cityData.region).trim() : null,
+                                        cityData.district != null ? String(cityData.district).trim() : null
+                                    )
+                                    : null
+                            };
+                            if (typeof GeographyDrive !== 'undefined') {
+                                requestCityName = GeographyDrive.resolveWeatherCityName(fallbackLocation);
+                                weatherCityCandidates = GeographyDrive.getWeatherCityCandidates(fallbackLocation);
+                            } else {
+                                requestCityName = fallbackLocation.city || fallbackLocation.district || null;
+                                weatherCityCandidates = [requestCityName, null].filter((v, i, a) => a.indexOf(v) === i);
+                            }
+                            if (!requestCityName && !weatherCityCandidates.length) {
+                                throw new Error('城市信息缺少可用城市名');
                             }
                         } catch (cityApiError) {
                             // 城市信息 API 也失败，通过IP自动识别
                             requestCityName = null; // 不设置默认城市，让API通过IP自动识别
+                            weatherCityCandidates = [null];
                             KernelLogger.warn("TaskbarManager", `所有获取城市名称的方法都失败，将通过IP自动识别天气`);
                         }
                     }
@@ -5490,6 +5588,9 @@ class TaskbarManager {
                 if (!requestCityName) {
                     // 最后的后备方案：通过IP自动识别
                     requestCityName = null;
+                    if (!weatherCityCandidates || weatherCityCandidates.length === 0) {
+                        weatherCityCandidates = [null];
+                    }
                     KernelLogger.warn("TaskbarManager", `城市名称为空，将通过IP自动识别天气`);
                 }
                 
@@ -5534,43 +5635,20 @@ class TaskbarManager {
                 KernelLogger.debug("TaskbarManager", `从API获取天气数据: ${requestCityName}（失败次数: ${TaskbarManager._weatherApiFailureCount}/${TaskbarManager.WEATHER_API_MAX_FAILURES}）`);
                 
                 try {
-                    const cityParam = requestCityName ? `city=${encodeURIComponent(requestCityName)}&` : '';
-                    const weatherUrl = `${TaskbarManager.WEATHER_API_URL}?${cityParam}extended=true&indices=true&forecast=true`;
-                    const weatherResponse = await fetch(weatherUrl);
-                    if (!weatherResponse.ok) {
-                        throw new Error(`获取天气信息失败: ${weatherResponse.status}`);
-                    }
-                    
-                    const weatherText = await weatherResponse.text();
-                    const weatherContentType = weatherResponse.headers.get('content-type') || '';
-                    const isWeatherJson = weatherContentType.includes('application/json');
-                    
-                    let rawWeather;
-                    if (isWeatherJson) {
-                        try {
-                            rawWeather = JSON.parse(weatherText);
-                        } catch (jsonError) {
-                            KernelLogger.error("TaskbarManager", `天气 API JSON 解析失败，响应内容: ${weatherText.substring(0, 500)}`);
-                            throw new Error(`天气 API 返回了无效的 JSON 响应`);
-                        }
-                    } else {
-                        KernelLogger.error("TaskbarManager", `天气 API 返回了非 JSON 响应 (Content-Type: ${weatherContentType})，响应内容: ${weatherText.substring(0, 500)}`);
-                        throw new Error(`天气 API 返回了非 JSON 响应 (可能是服务器错误)`);
-                    }
-                    
-                    const normalizedData = TaskbarManager._normalizeUapisWeatherData(rawWeather);
-                    if (!normalizedData || !normalizedData.today) {
-                        throw new Error('天气数据无效');
-                    }
+                    const fetchResult = await TaskbarManager._fetchUapisWeatherWithCandidates(weatherCityCandidates);
+                    const normalizedData = fetchResult.normalized;
+                    requestCityName = fetchResult.cityName || requestCityName;
                     
                     const requestWeatherData = { code: 200, data: normalizedData };
                     
                     TaskbarManager._weatherApiFailureCount = 0;
                     KernelLogger.debug("TaskbarManager", `天气API请求成功，重置失败计数器`);
                     
+                    const cacheKeyAfterResolve = `${TaskbarManager.WEATHER_CACHE_PREFIX}${requestCityName}`;
+                    
                     if (typeof CacheDrive !== 'undefined') {
                         try {
-                            await CacheDrive.set(cacheKey, requestWeatherData, {
+                            await CacheDrive.set(cacheKeyAfterResolve, requestWeatherData, {
                                 programName: 'TaskbarManager',
                                 ttl: TaskbarManager.WEATHER_CACHE_TTL
                             });
@@ -5580,7 +5658,7 @@ class TaskbarManager {
                         }
                     }
                     
-                    TaskbarManager._weatherMemoryCache.set(cacheKey, {
+                    TaskbarManager._weatherMemoryCache.set(cacheKeyAfterResolve, {
                         data: requestWeatherData,
                         city: requestCityName,
                         expiresAt: Date.now() + 5 * 60 * 1000

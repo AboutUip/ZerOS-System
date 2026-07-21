@@ -1,67 +1,13 @@
 {
   "system": {
     "permissionManager.permissions": {
-      "strawberry-security": [
-        "SCHEDULE_TASK_STARTUP",
-        "SERVER_SERVICE_MANAGE",
-        "KERNEL_DISK_WRITE",
-        "FILE_ASSOC_MANAGE",
-        "PROCESS_MANAGE",
-        "GUI_WINDOW_CREATE",
-        "EVENT_LISTENER",
-        "KERNEL_DISK_READ",
-        "SYSTEM_STORAGE_READ",
-        "SYSTEM_STORAGE_WRITE",
-        "PROCESS_BACKGROUND",
-        "CACHE_READ",
-        "CACHE_WRITE"
-      ],
-      "terminal": [
-        "GEOGRAPHY_LOCATION",
-        "GUI_WINDOW_CREATE",
-        "KERNEL_DISK_READ",
-        "KERNEL_DISK_LIST",
-        "EVENT_LISTENER",
-        "ENVIRONMENT_READ"
-      ],
-      "cron": [
-        "SYSTEM_NOTIFICATION"
-      ],
-      "scheduletask": [
-        "SYSTEM_NOTIFICATION",
-        "SCHEDULE_TASK_MANAGE",
-        "SYSTEM_STORAGE_WRITE",
-        "KERNEL_DISK_READ",
-        "SCHEDULE_TASK_STARTUP"
-      ],
-      "zominstall": [
-        "KERNEL_DISK_READ",
-        "KERNEL_DISK_DELETE",
-        "APPLICATION_INSTALL"
-      ],
-      "taskmanager": [
-        "GUI_WINDOW_CREATE",
-        "KERNEL_DISK_READ",
-        "SYSTEM_NOTIFICATION",
-        "EVENT_LISTENER"
-      ],
       "ps": [
         "EVENT_LISTENER"
       ],
-      "vulnrepro": [
+      "hello": [
         "EVENT_LISTENER",
         "CACHE_READ",
         "CACHE_WRITE"
-      ],
-      "cursorstyle": [
-        "SYSTEM_NOTIFICATION",
-        "GUI_WINDOW_CREATE",
-        "EVENT_LISTENER",
-        "SYSTEM_STORAGE_READ",
-        "SYSTEM_STORAGE_WRITE",
-        "PROCESS_BACKGROUND",
-        "SCHEDULE_TASK_CREATE",
-        "SCHEDULE_TASK_MANAGE"
       ],
       "settings": [
         "SYSTEM_NOTIFICATION",
@@ -77,11 +23,13 @@
         "LANGUAGES_WRITE",
         "KERNEL_DISK_READ"
       ],
-      "kiteengine": [
+      "terminal": [
+        "GEOGRAPHY_LOCATION",
         "GUI_WINDOW_CREATE",
-        "EVENT_LISTENER",
         "KERNEL_DISK_READ",
-        "KERNEL_DISK_LIST"
+        "KERNEL_DISK_LIST",
+        "EVENT_LISTENER",
+        "ENVIRONMENT_READ"
       ],
       "musicplayer": [
         "KERNEL_DISK_LIST",
@@ -90,6 +38,102 @@
         "CACHE_READ",
         "CACHE_WRITE",
         "KERNEL_DISK_DELETE"
+      ],
+      "kiteengine": [
+        "GUI_WINDOW_CREATE",
+        "EVENT_LISTENER",
+        "KERNEL_DISK_READ",
+        "KERNEL_DISK_LIST",
+        "SERVER_SERVICE_MANAGE"
+      ],
+      "zominstall": [
+        "KERNEL_DISK_READ",
+        "KERNEL_DISK_DELETE",
+        "APPLICATION_INSTALL"
+      ],
+      "scheduletask": [
+        "SYSTEM_NOTIFICATION",
+        "SCHEDULE_TASK_MANAGE",
+        "SYSTEM_STORAGE_WRITE",
+        "KERNEL_DISK_READ",
+        "SCHEDULE_TASK_STARTUP"
+      ],
+      "cursorstyle": [
+        "SYSTEM_NOTIFICATION",
+        "GUI_WINDOW_CREATE",
+        "EVENT_LISTENER",
+        "SYSTEM_STORAGE_READ",
+        "SYSTEM_STORAGE_WRITE",
+        "PROCESS_BACKGROUND",
+        "SCHEDULE_TASK_CREATE",
+        "SCHEDULE_TASK_MANAGE"
+      ],
+      "uninstall": [
+        "SCHEDULE_TASK_MANAGE",
+        "SYSTEM_STORAGE_WRITE",
+        "KERNEL_DISK_READ",
+        "KERNEL_DISK_DELETE",
+        "KERNEL_DISK_LIST"
+      ],
+      "strawberry-security": [
+        "SYSTEM_STORAGE_WRITE_DESKTOP",
+        "SYSTEM_STORAGE_WRITE",
+        "SYSTEM_STORAGE_READ",
+        "SCHEDULE_TASK_STARTUP",
+        "SERVER_SERVICE_MANAGE",
+        "KERNEL_DISK_WRITE",
+        "FILE_ASSOC_MANAGE",
+        "PROCESS_MANAGE",
+        "GUI_WINDOW_CREATE",
+        "EVENT_LISTENER",
+        "KERNEL_DISK_READ",
+        "PROCESS_BACKGROUND",
+        "CACHE_READ",
+        "CACHE_WRITE"
+      ],
+      "wallpaperengine": [
+        "SYSTEM_NOTIFICATION",
+        "SERVER_SERVICE_MANAGE",
+        "SCHEDULE_TASK_MANAGE",
+        "SCHEDULE_TASK_STARTUP",
+        "GUI_WINDOW_CREATE",
+        "EVENT_LISTENER",
+        "PROCESS_BACKGROUND",
+        "KERNEL_DISK_READ",
+        "KERNEL_DISK_DELETE",
+        "KERNEL_DISK_LIST",
+        "KERNEL_DISK_CREATE",
+        "KERNEL_DISK_WRITE"
+      ],
+      "regedit": [
+        "EVENT_LISTENER",
+        "GUI_WINDOW_CREATE",
+        "CACHE_READ",
+        "CACHE_WRITE",
+        "SYSTEM_STORAGE_READ",
+        "SYSTEM_STORAGE_READ_USER_CONTROL",
+        "SYSTEM_STORAGE_READ_PERMISSION_CONTROL",
+        "SYSTEM_STORAGE_WRITE",
+        "SYSTEM_STORAGE_WRITE_USER_CONTROL",
+        "SYSTEM_STORAGE_WRITE_PERMISSION_CONTROL",
+        "APPLICATION_INSTALL",
+        "APPLICATION_UNINSTALL",
+        "KERNEL_DISK_READ",
+        "KERNEL_DISK_LIST"
+      ],
+      "cron": [
+        "SYSTEM_NOTIFICATION"
+      ],
+      "taskmanager": [
+        "GUI_WINDOW_CREATE",
+        "KERNEL_DISK_READ",
+        "SYSTEM_NOTIFICATION",
+        "EVENT_LISTENER"
+      ],
+      "vulnrepro": [
+        "EVENT_LISTENER",
+        "CACHE_READ",
+        "CACHE_WRITE"
       ],
       "bilibili": [
         "GUI_WINDOW_CREATE",
@@ -126,22 +170,6 @@
         "SCHEDULE_TASK_STARTUP",
         "SYSTEM_NOTIFICATION"
       ],
-      "regedit": [
-        "EVENT_LISTENER",
-        "GUI_WINDOW_CREATE",
-        "CACHE_READ",
-        "CACHE_WRITE",
-        "SYSTEM_STORAGE_READ",
-        "SYSTEM_STORAGE_READ_USER_CONTROL",
-        "SYSTEM_STORAGE_READ_PERMISSION_CONTROL",
-        "SYSTEM_STORAGE_WRITE",
-        "SYSTEM_STORAGE_WRITE_USER_CONTROL",
-        "SYSTEM_STORAGE_WRITE_PERMISSION_CONTROL",
-        "APPLICATION_INSTALL",
-        "APPLICATION_UNINSTALL",
-        "KERNEL_DISK_READ",
-        "KERNEL_DISK_LIST"
-      ],
       "counterstriketest": [
         "GUI_WINDOW_CREATE",
         "EVENT_LISTENER",
@@ -170,20 +198,6 @@
         "KERNEL_DISK_READ",
         "KERNEL_DISK_DELETE"
       ],
-      "wallpaperengine": [
-        "SYSTEM_NOTIFICATION",
-        "SERVER_SERVICE_MANAGE",
-        "SCHEDULE_TASK_MANAGE",
-        "SCHEDULE_TASK_STARTUP",
-        "GUI_WINDOW_CREATE",
-        "EVENT_LISTENER",
-        "PROCESS_BACKGROUND",
-        "KERNEL_DISK_READ",
-        "KERNEL_DISK_DELETE",
-        "KERNEL_DISK_LIST",
-        "KERNEL_DISK_CREATE",
-        "KERNEL_DISK_WRITE"
-      ],
       "cvs014": [
         "EVENT_LISTENER",
         "KERNEL_DISK_READ"
@@ -194,10 +208,6 @@
         "NETWORK_ACCESS",
         "PROCESS_BACKGROUND"
       ],
-      "uninstall": [
-        "SCHEDULE_TASK_MANAGE",
-        "SYSTEM_STORAGE_WRITE"
-      ],
       "notepad": [
         "SYSTEM_NOTIFICATION",
         "DRAG_ELEMENT"
@@ -207,6 +217,17 @@
       ],
       "permissioncontrol": [
         "SYSTEM_LOG_READ"
+      ],
+      "handtracker": [
+        "MEDIA_ACCESS",
+        "SYSTEM_STORAGE_WRITE"
+      ],
+      "zeroshub": [
+        "KERNEL_DISK_WRITE",
+        "SERVER_SERVICE_MANAGE"
+      ],
+      "sparkai": [
+        "SPEECH_RECOGNITION"
       ]
     },
     "system.style": "macos",
@@ -246,6 +267,15 @@
         "description": "系统服务管理",
         "position": null,
         "createdAt": 1772382156071
+      },
+      {
+        "id": 13,
+        "programName": "cursorstyle",
+        "name": "ZerOS 鼠标指针主题：多套 SVG 样式、引导配置、任务栏后台与右键菜单",
+        "icon": "D:/application/cursorstyle/assets/icon.svg",
+        "description": "ZerOS 鼠标指针主题：多套 SVG 样式、引导配置、任务栏后台与右键菜单",
+        "position": null,
+        "createdAt": 1781518952420
       }
     ],
     "musicplayer.settings": {
@@ -417,7 +447,7 @@
         "lyrics": "[00:14.010]我不知为何\n[00:15.390]疯狂对你执着\n[00:18.330]我们之间的温存还不多\n[00:19.800]这回忆的漩涡\n[00:20.220]快要把我吞莫\n[00:20.640]求你别离开我噢噢\n[00:21.900]因为我\n[00:22.440]欠你太多\n[00:24.900]手松开的沉默\n[00:26.220]连接我这颗心也死了\n[00:27.750]对于你是解脱\n[00:29.040]而我如此落魄\n[00:30.240]求你别离开我\n[00:31.560]从不轻易示弱\n[00:32.430]我们的过往\n[00:33.300]分分合合太多\n[00:34.110]挽留的话难说\n[00:35.460]却强装很洒脱\n[00:36.300]曾经的那些铭记过的温暖与苦涩\n[00:38.280]就像凋零的花\n[00:42.540]寒风吹打着沙\n[00:44.130]我仍对你情恨深种\n[00:47.340]我站在檐下\n[00:48.660]说最动人的话\n[00:50.760]即便是岁月的懵懂\n[00:54.000]但是我们越走越远\n[00:56.280]慢慢锁上心事的枷锁\n[00:58.830]默契在匆匆解释后崩塌\n[01:06.390]我不知为何\n[01:11.340]拼命对你执着\n[01:13.470]我们之间的温存还不多\n[01:17.760]这回忆的浪波\n[01:20.820]快要将我吞莫\n[01:24.090]求你别丢下我噢噢\n[01:31.050]因为我\n[01:34.380]欠你太多\n[01:37.530]手放开的沉默\n[01:39.900]困住我这颗心也死了\n[01:44.160]对于你是洒脱\n[01:47.220]而我只剩落寞\n[01:50.490]求你别丢下我\n[02:00.000]凋零的花\n[02:01.350]霜也覆盖着沙\n[02:03.330]我仍对你满心牵挂\n[02:06.450]我等你留下\n[02:07.830]说最深情的话\n[02:09.900]即便是岁月的懵懂\n[02:13.200]但是我们越走越远\n[02:15.330]逐渐锁上现实的枷锁\n[02:18.000]真心在匆匆解释后崩塌\n[02:25.590]我不知为何\n[02:30.330]疯狂对你牵挂\n[02:32.610]我们之间的情节还不多\n[02:36.960]这回忆的浪波\n[02:40.020]快要将我吞莫\n[02:43.290]求你别丢下我噢噢\n[02:50.310]因为我\n[02:53.580]欠你太多\n[02:56.700]肩并肩的沉默\n[02:59.100]困住我这颗心也死了\n[03:03.330]对于你是洒脱\n[03:06.420]而我只剩落寞\n[03:09.660]求你别丢下我\n[03:11.580]我拼了命的隐藏伤疤\n[03:15.480]努力逞强想让你回头\n[03:18.630]被遗憾缠绕的是一场梦\n[03:21.300]我在隐藏我的脆弱\n[03:25.050]黎明还会不会来\n[03:29.730]这是我的独白\n[03:38.160]我不知为何\n[03:42.900]疯狂对你牵挂\n[03:45.240]我们之间的情节还不多\n[03:49.740]回忆的浪波\n[03:52.560]快要将我吞莫\n[03:55.860]求你别丢下我噢噢\n[04:02.820]因为我\n[04:06.120]欠你太多\n[04:09.570]话到口的沉默\n[04:11.670]困住我这颗心也死了\n[04:15.900]对于你是洒脱\n[04:18.990]而我只剩落寞\n[04:22.230]求你别丢下我\n"
       }
     },
-    "system.desktopBackground": "local_D__cache_wallpaper_community_3802_mp4",
+    "system.desktopBackground": "local_D__cache_wallpaper_community_62019_mp4",
     "system.localDesktopBackgrounds": [
       {
         "id": "local_C___back2_png",
@@ -537,7 +567,7 @@
         "password": "0230ff8a1ff622b1a7b45273876be61e",
         "avatar": "avatar_root_1766272534753.jpg",
         "createdAt": 1766271155991,
-        "lastLogin": 1778764756622
+        "lastLogin": 1784302181186
       },
       "TestUser": {
         "level": "USER",
@@ -604,11 +634,11 @@
         "taskType": "service",
         "triggerType": "SYSTEM_STARTUP",
         "triggerConfig": {},
-        "enabled": true,
+        "enabled": false,
         "createdAt": 1773477739546,
-        "updatedAt": 1778764757698,
-        "lastRunAt": 1778764757698,
-        "runCount": 108,
+        "updatedAt": 1781619428065,
+        "lastRunAt": 1781619408572,
+        "runCount": 115,
         "createdBy": "servicemanager",
         "requiresStartupPermission": true,
         "serviceId": "office",
@@ -621,39 +651,24 @@
         "triggerConfig": {},
         "enabled": false,
         "createdAt": 1776701053408,
-        "updatedAt": 1778764278315,
-        "lastRunAt": 1778046458438,
-        "runCount": 36,
+        "updatedAt": 1781622135195,
+        "lastRunAt": 1781622123501,
+        "runCount": 43,
         "createdBy": "cursorstyle",
         "requiresStartupPermission": false,
         "programName": "cursorstyle",
         "runInBackground": true
       },
       {
-        "id": "task_1778046780197_sqgawqsph",
-        "taskType": "service",
-        "triggerType": "SYSTEM_STARTUP",
-        "triggerConfig": {},
-        "enabled": true,
-        "createdAt": 1778046780197,
-        "updatedAt": 1778764757821,
-        "lastRunAt": 1778764757821,
-        "runCount": 11,
-        "createdBy": "setup",
-        "requiresStartupPermission": true,
-        "serviceId": "strawberrysecurity",
-        "serviceAction": "start"
-      },
-      {
         "id": "task_1778764713072_vwxl4l7a1",
         "taskType": "program",
         "triggerType": "SYSTEM_STARTUP",
         "triggerConfig": {},
-        "enabled": true,
+        "enabled": false,
         "createdAt": 1778764713072,
-        "updatedAt": 1778764757986,
-        "lastRunAt": 1778764757986,
-        "runCount": 1,
+        "updatedAt": 1781619434382,
+        "lastRunAt": 1781518909594,
+        "runCount": 8,
         "createdBy": "scheduletask",
         "requiresStartupPermission": true,
         "programName": "strawberry-security",
@@ -661,15 +676,12 @@
       }
     ],
     "registry": {
-      "environment": {
-        "_server_gesturecontrol_config": "{\"maxHands\":2,\"precisionSpeed\":\"balanced\",\"useMultithreading\":true,\"gestureActions\":{\"Victory\":\"none\",\"Pointing_Up\":\"none\",\"Closed_Fist\":\"close_program\",\"Open_Palm\":\"none\",\"Thumb_Up\":\"none\",\"Thumb_Down\":\"none\",\"ILoveYou\":\"none\",\"Thumb_Left\":\"none\",\"Thumb_Right\":\"none\"}}"
-      },
+      "environment": {},
       "brightness": 100
     },
     "applicationTable": {},
     "permissionManager.denialCounts": {
-      "zominstall_KERNEL_DISK_DELETE": 1,
-      "handtracker_MEDIA_ACCESS": 1
+      "zominstall_KERNEL_DISK_DELETE": 1
     },
     "bios.logLevel": 0,
     "exceptionHandler.kernelExceptionFlag": false,
@@ -695,7 +707,7 @@
     "system.volume": 1,
     "nodeLibExpansion": {
       "nodeAvailable": true,
-      "lastCheck": 1778764750679,
+      "lastCheck": 1784302173342,
       "intervalSeconds": 1,
       "scriptId": "perf",
       "nodeDependencies": [

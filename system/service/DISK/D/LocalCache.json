@@ -23,23 +23,33 @@
         "size": 161
       }
     },
+    "hello": {
+      "hello.lastRun": {
+        "value": "1783143644130",
+        "expiresAt": 0,
+        "createdAt": 1783143644148,
+        "updatedAt": 1783143644148,
+        "size": 15,
+        "isFileBacked": false
+      }
+    },
     "TaskbarManager": {
-      "weather:中原": {
+      "weather:郑州": {
         "value": null,
-        "expiresAt": 1778807095748,
-        "createdAt": 1778763895748,
-        "updatedAt": 1778763895748,
-        "size": 2729,
+        "expiresAt": 1784344111493,
+        "createdAt": 1784300911493,
+        "updatedAt": 1784300911493,
+        "size": 2715,
         "isFileBacked": true
       }
     },
     "exploit": {
       "system.dailyQuote": {
-        "value": "不知道该做什么，所以即使是知道了也没用的事情还是想知道，心里总是很焦急、很焦急，焦急得不得了。",
+        "value": "一个人吃饭，太寂寞了。",
         "expiresAt": 0,
-        "createdAt": 1778764755553,
-        "updatedAt": 1778764755553,
-        "size": 143,
+        "createdAt": 1784302177848,
+        "updatedAt": 1784302177848,
+        "size": 35,
         "isFileBacked": false
       }
     }

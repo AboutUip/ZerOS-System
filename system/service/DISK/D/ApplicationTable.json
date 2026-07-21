@@ -20,21 +20,67 @@
       "category": "media"
     }
   },
-  "strawberry-security": {
-    "script": "D:/application/strawberry-security/securityCenter.js",
+  "wallpaperengine": {
+    "script": "D:/application/wallpaperengine/WallpaperEngine.js",
     "styles": [
-      "D:/application/strawberry-security/securityCenter.css"
+      "D:/application/wallpaperengine/wallpaperengine.css"
     ],
-    "icon": "D:/application/strawberry-security/assets/icon.svg",
+    "icon": "D:/application/wallpaperengine/icon.svg",
     "assets": [
-      "D:/application/strawberry-security/assets/icon.svg"
+      "D:/application/wallpaperengine/assets/server-wallpaperengine.js"
     ],
     "metadata": {
-      "description": "草莓安全软件：ZerOS 安全中心与 ZOM 安装网关",
-      "version": "0.1.0",
+      "description": "壁纸引擎",
+      "version": "1.0.0",
       "type": "GUI",
-      "autoStart": true,
+      "autoStart": false,
       "priority": 5,
+      "alwaysShowInTaskbar": false,
+      "allowMultipleInstances": true,
+      "supportsPreview": true,
+      "category": "other"
+    }
+  },
+  "cursorstyle": {
+    "script": "D:/application/cursorstyle/cursorstyle.js",
+    "styles": [
+      "D:/application/cursorstyle/cursorstyle.css"
+    ],
+    "icon": "D:/application/cursorstyle/assets/icon.svg",
+    "assets": [
+      "D:/application/cursorstyle/assets/cursors/default.svg",
+      "D:/application/cursorstyle/assets/cursors/neon.svg",
+      "D:/application/cursorstyle/assets/cursors/minimal.svg",
+      "D:/application/cursorstyle/assets/cursors/bubble.svg",
+      "D:/application/cursorstyle/assets/cursors/reticle.svg"
+    ],
+    "metadata": {
+      "description": "ZerOS 鼠标指针主题：多套 SVG 样式、引导配置、任务栏后台与右键菜单",
+      "version": "1.0.0",
+      "type": "GUI",
+      "autoStart": false,
+      "priority": 12,
+      "alwaysShowInTaskbar": false,
+      "allowMultipleInstances": false,
+      "supportsPreview": true,
+      "category": "utility"
+    }
+  },
+  "zeroshub": {
+    "script": "D:/application/zeroshub/zeroshub.js",
+    "styles": [
+      "D:/application/zeroshub/zeroshub.css"
+    ],
+    "icon": "D:/application/zeroshub/assets/icon.svg",
+    "assets": [
+      "D:/application/zeroshub/assets/icon.svg"
+    ],
+    "metadata": {
+      "description": "ZerOS DevBridge - 远程开发者桥接器，为外部开发工具提供安全、可控的 ZerOS 系统访问通道",
+      "version": "1.0.0",
+      "type": "GUI",
+      "autoStart": false,
+      "priority": 10,
       "alwaysShowInTaskbar": false,
       "allowMultipleInstances": false,
       "supportsPreview": true,

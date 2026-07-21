@@ -1,0 +1,309 @@
+/* WallpaperEngine 程序样式 */
+/* 使用主题变量以兼容 ThemeManager */
+
+.wallpaperengine-window.zos-gui-window {
+    background: var(--theme-background-elevated, #1a202c);
+    color: var(--theme-text-primary, #e2e8f0);
+}
+
+.wallpaperengine-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 16px;
+    box-sizing: border-box;
+    overflow: auto;
+}
+
+.wallpaperengine-section {
+    margin-bottom: 16px;
+}
+
+.wallpaperengine-section-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--theme-text-secondary, #a0aec0);
+    margin-bottom: 8px;
+}
+
+.wallpaperengine-btn {
+    padding: 8px 14px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    background: var(--theme-primary, rgba(108, 142, 255, 0.3));
+    color: var(--theme-text-primary, #e2e8f0);
+}
+
+.wallpaperengine-btn:hover {
+    background: var(--theme-primary-hover, rgba(108, 142, 255, 0.5));
+}
+
+.wallpaperengine-status {
+    font-size: 12px;
+    color: var(--theme-text-tertiary, #718096);
+    margin-top: 8px;
+}
+
+/* Load 阶段：圆环旋转 */
+.wallpaperengine-spinner {
+    width: 28px;
+    height: 28px;
+    border: 3px solid var(--theme-background-elevated, #2d3748);
+    border-top-color: var(--theme-primary, rgba(108, 142, 255, 0.8));
+    border-radius: 50%;
+    animation: wallpaperengine-spin 0.8s linear infinite;
+}
+
+@keyframes wallpaperengine-spin {
+    to { transform: rotate(360deg); }
+}
+
+/* 文档窗口：树 + 内容区 */
+.wallpaperengine-doc-layout {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+.wallpaperengine-doc-sidebar {
+    width: 200px;
+    min-width: 160px;
+    border-right: 1px solid var(--theme-border, rgba(255,255,255,0.08));
+    overflow-y: auto;
+    background: var(--theme-background, rgba(0,0,0,0.2));
+}
+.wallpaperengine-doc-tree-root {
+    padding: 8px 0;
+    font-size: 12px;
+}
+.wallpaperengine-doc-tree-item {
+    padding: 4px 12px;
+    cursor: pointer;
+    color: var(--theme-text-secondary, #a0aec0);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    user-select: none;
+}
+.wallpaperengine-doc-tree-item:hover {
+    background: rgba(255,255,255,0.06);
+    color: var(--theme-text-primary, #e2e8f0);
+}
+.wallpaperengine-doc-tree-item.active {
+    background: var(--theme-primary, rgba(108, 142, 255, 0.25));
+    color: var(--theme-text-primary, #e2e8f0);
+}
+.wallpaperengine-doc-tree-item.folder {
+    font-weight: 500;
+}
+.wallpaperengine-doc-tree-item .tree-arrow {
+    width: 14px;
+    text-align: center;
+    transition: transform 0.15s ease;
+}
+.wallpaperengine-doc-tree-item .tree-arrow.expanded {
+    transform: rotate(90deg);
+}
+.wallpaperengine-doc-tree-item .tree-arrow.empty {
+    visibility: hidden;
+}
+.wallpaperengine-doc-tree-children {
+    padding-left: 12px;
+}
+.wallpaperengine-doc-body {
+    flex: 1;
+    overflow: auto;
+    padding: 16px 20px;
+    box-sizing: border-box;
+}
+.wallpaperengine-doc-content h1,
+.wallpaperengine-doc-content h2,
+.wallpaperengine-doc-content h3,
+.wallpaperengine-doc-content h4,
+.wallpaperengine-doc-content h5,
+.wallpaperengine-doc-content h6 {
+    margin: 1em 0 0.5em;
+    color: var(--theme-text-primary, #e2e8f0);
+}
+.wallpaperengine-doc-content h1 { font-size: 1.4em; border-bottom: 1px solid rgba(255,255,255,0.12); padding-bottom: 0.3em; }
+.wallpaperengine-doc-content h2 { font-size: 1.2em; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 0.2em; }
+.wallpaperengine-doc-content h3 { font-size: 1.1em; }
+.wallpaperengine-doc-content h4, .wallpaperengine-doc-content h5, .wallpaperengine-doc-content h6 { font-size: 1em; }
+.wallpaperengine-doc-content pre { background: rgba(0,0,0,0.35); padding: 12px; border-radius: 6px; overflow-x: auto; margin: 10px 0; font-size: 12px; line-height: 1.4; }
+.wallpaperengine-doc-content code { font-family: ui-monospace, monospace; }
+.wallpaperengine-doc-content table { border-collapse: collapse; width: 100%; margin: 10px 0; font-size: 13px; }
+.wallpaperengine-doc-content th, .wallpaperengine-doc-content td { border: 1px solid rgba(255,255,255,0.15); padding: 6px 10px; text-align: left; }
+.wallpaperengine-doc-content th { background: rgba(255,255,255,0.06); font-weight: 600; }
+.wallpaperengine-doc-content blockquote { border-left: 3px solid var(--theme-primary, #6c8eff); padding-left: 12px; margin: 10px 0; color: var(--theme-text-secondary, #a0aec0); }
+.wallpaperengine-doc-content ul, .wallpaperengine-doc-content ol { margin: 8px 0; padding-left: 24px; }
+.wallpaperengine-doc-content li { margin: 4px 0; }
+.wallpaperengine-doc-content hr { border: none; border-top: 1px solid rgba(255,255,255,0.12); margin: 16px 0; }
+.wallpaperengine-doc-content a { color: var(--theme-primary, #6c8eff); text-decoration: none; }
+.wallpaperengine-doc-content a:hover { text-decoration: underline; }
+.wallpaperengine-doc-content .inline-code { background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 3px; font-size: 0.9em; }
+
+/* 库左侧：方块卡片网格，以壁纸大图为主 */
+.wallpaperengine-library-list-items.wallpaperengine-library-cards {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    padding: 12px;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 12px;
+    align-content: start;
+}
+.wallpaperengine-library-list-item.wallpaperengine-library-card {
+    position: relative;
+    aspect-ratio: 1;
+    border-radius: 10px;
+    overflow: hidden;
+    cursor: pointer;
+    background: var(--theme-background-secondary, #2d3748);
+    border: 2px solid transparent;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.wallpaperengine-library-list-item.wallpaperengine-library-card:hover {
+    border-color: var(--theme-border, rgba(139, 92, 246, 0.25));
+}
+.wallpaperengine-library-list-item.wallpaperengine-library-card.wallpaperengine-library-card-selected {
+    border-color: var(--theme-primary, rgba(139, 92, 246, 0.9));
+    box-shadow: 0 0 0 1px var(--theme-primary, rgba(139, 92, 246, 0.5));
+}
+.wallpaperengine-library-card-pic {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: var(--theme-background-secondary, #2d3748);
+}
+.wallpaperengine-library-card-pic img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+.wallpaperengine-library-card-name {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    padding: 20px 8px 8px;
+    font-size: 12px;
+    color: #fff;
+    background: linear-gradient(to top, rgba(0,0,0,0.75), transparent);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+/* 库无壁纸时的占位项跨整行 */
+.wallpaperengine-library-list-items.wallpaperengine-library-cards > .wallpaperengine-library-list-item:not(.wallpaperengine-library-card) {
+    grid-column: 1 / -1;
+    padding: 14px 12px;
+    border-radius: 8px;
+    color: var(--theme-text-secondary, #a0aec0);
+    font-size: 13px;
+}
+
+/* 库详情：壁纸信息与配置区 */
+.wallpaperengine-detail-section {
+    background: var(--theme-background, rgba(0,0,0,0.2));
+    border: 1px solid var(--theme-border, rgba(255,255,255,0.08));
+    border-radius: 8px;
+    padding: 14px 16px;
+}
+.wallpaperengine-detail-section h3 {
+    margin: 0 0 12px 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--theme-text-primary, #e2e8f0);
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--theme-border, rgba(255,255,255,0.08));
+}
+.wallpaperengine-config-section .wallpaperengine-config-options {
+    margin-top: 12px;
+}
+.wallpaperengine-config-options-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--theme-text-secondary, #a0aec0);
+    margin-bottom: 12px;
+    display: block;
+}
+.wallpaperengine-config-row {
+    margin-bottom: 14px;
+    padding: 10px 12px;
+    background: rgba(255,255,255,0.03);
+    border-radius: 6px;
+    border: 1px solid transparent;
+    transition: border-color 0.15s ease, background 0.15s ease;
+}
+.wallpaperengine-config-row:hover {
+    background: rgba(255,255,255,0.05);
+    border-color: var(--theme-border, rgba(255,255,255,0.06));
+}
+.wallpaperengine-config-row label {
+    display: block;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--theme-text-primary, #e2e8f0);
+    margin-bottom: 4px;
+}
+.wallpaperengine-config-row .wallpaperengine-config-desc {
+    font-size: 11px;
+    color: var(--theme-text-tertiary, #718096);
+    margin-bottom: 6px;
+    line-height: 1.35;
+}
+.wallpaperengine-config-row input[type="text"],
+.wallpaperengine-config-row input[type="number"],
+.wallpaperengine-config-row select {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 6px 10px;
+    font-size: 13px;
+    border: 1px solid var(--theme-border, rgba(255,255,255,0.12));
+    border-radius: 6px;
+    background: var(--theme-background-elevated, #2d3748);
+    color: var(--theme-text-primary, #e2e8f0);
+    margin-top: 2px;
+}
+.wallpaperengine-config-row input[type="text"]:focus,
+.wallpaperengine-config-row input[type="number"]:focus,
+.wallpaperengine-config-row select:focus {
+    outline: none;
+    border-color: var(--theme-primary, rgba(108, 142, 255, 0.6));
+    box-shadow: 0 0 0 2px rgba(108, 142, 255, 0.15);
+}
+.wallpaperengine-config-row input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    margin-right: 8px;
+    vertical-align: middle;
+    accent-color: var(--theme-primary, #6c8eff);
+}
+.wallpaperengine-config-row label.wallpaperengine-config-label-inline {
+    display: inline-flex;
+    align-items: center;
+    margin-bottom: 0;
+    cursor: pointer;
+}
+.wallpaperengine-config-save {
+    margin-top: 14px;
+    padding: 8px 18px;
+    cursor: pointer;
+    background: var(--theme-primary, rgba(139, 92, 246, 0.35));
+    color: var(--theme-text-primary, #e2e8f0);
+    border: 1px solid var(--theme-border, rgba(139, 92, 246, 0.5));
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 500;
+    transition: background 0.15s ease, border-color 0.15s ease;
+}
+.wallpaperengine-config-save:hover {
+    background: var(--theme-primary-hover, rgba(139, 92, 246, 0.5));
+    border-color: rgba(139, 92, 246, 0.7);
+}

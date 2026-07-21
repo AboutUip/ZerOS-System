@@ -318,21 +318,27 @@ class GeographyDrive {
                 throw new Error('API 响应数据格式错误');
             }
             
-            // uapis.cn myip 响应: ip, region, isp, latitude, longitude, district 等，核心数据为 district
-            const name = data.district != null ? String(data.district).trim() : (data.region != null ? String(data.region).trim() : null);
+            // uapis.cn myip 响应: ip, region("中国 省 市 区"), district, latitude, longitude 等
+            const district = data.district != null ? String(data.district).trim() : null;
+            const region = data.region != null ? String(data.region).trim() : null;
+            const city = GeographyDrive._extractCityFromRegion(region, district);
+            // name 保留区县级（兼容旧逻辑）；city 为天气等场景使用的市级名
+            const name = district || city || null;
             const geo = (data.latitude != null && data.longitude != null)
                 ? { latitude: Number(data.latitude), longitude: Number(data.longitude) }
                 : null;
-            const address = data.region != null ? String(data.region).trim() : null;
             
-            if (!name && !geo) {
+            if (!name && !city && !geo) {
                 throw new Error('API 响应缺少有效位置数据（district/region 或 latitude/longitude）');
             }
             
             return {
                 name: name || null,
+                city: city || null,
+                district: district || null,
+                region: region || null,
                 geo: geo,
-                address: address || null,
+                address: region || null,
                 source: nativeLocation ? GeographyDrive.ACCURACY.HIGH : GeographyDrive.ACCURACY.LOW
             };
         } catch (error) {
@@ -422,6 +428,9 @@ class GeographyDrive {
             
             return {
                 name: cityName,
+                city: cityName || null,
+                district: (data.address && (data.address.suburb || data.address.district || data.address.city_district)) || null,
+                region: data.display_name || null,
                 geo: {
                     latitude: nativeLocation.latitude,
                     longitude: nativeLocation.longitude
@@ -434,6 +443,113 @@ class GeographyDrive {
             KernelLogger.debug("GeographyDrive", `反向地理编码失败: ${error.message}`);
             throw error;
         }
+    }
+    
+    /**
+     * 从 myip region 字符串解析市级地名
+     * region 格式通常为: "中国 河南 郑州 管城" → "郑州"
+     * @param {string|null} region
+     * @param {string|null} district
+     * @returns {string|null}
+     */
+    static _extractCityFromRegion(region, district = null) {
+        if (!region || typeof region !== 'string') {
+            return null;
+        }
+        const parts = region.trim().split(/\s+/).filter(Boolean);
+        if (parts.length >= 3) {
+            // 国家 省 市 [区...] → 取市级（第 3 段）
+            return parts[2];
+        }
+        if (parts.length === 2) {
+            return parts[1];
+        }
+        if (parts.length === 1) {
+            return parts[0];
+        }
+        return null;
+    }
+    
+    /**
+     * 解析适合天气 API 的城市名（优先市级，避免区县级导致 LOCATION_NOT_FOUND）
+     * @param {Object|string|null} locationOrName - 定位对象或城市字符串
+     * @returns {string|null}
+     */
+    static resolveWeatherCityName(locationOrName) {
+        if (!locationOrName) {
+            return null;
+        }
+        if (typeof locationOrName === 'string') {
+            const t = locationOrName.trim();
+            return t || null;
+        }
+        if (locationOrName.city && typeof locationOrName.city === 'string' && locationOrName.city.trim()) {
+            return locationOrName.city.trim();
+        }
+        const regionStr = (typeof locationOrName.region === 'string' && locationOrName.region.trim())
+            ? locationOrName.region.trim()
+            : (typeof locationOrName.address === 'string' && locationOrName.address.trim()
+                ? locationOrName.address.trim()
+                : null);
+        const extracted = GeographyDrive._extractCityFromRegion(
+            regionStr,
+            locationOrName.district || locationOrName.name || null
+        );
+        if (extracted) {
+            return extracted;
+        }
+        if (locationOrName.name && typeof locationOrName.name === 'string' && locationOrName.name.trim()) {
+            return locationOrName.name.trim();
+        }
+        if (locationOrName.district && typeof locationOrName.district === 'string' && locationOrName.district.trim()) {
+            return locationOrName.district.trim();
+        }
+        return null;
+    }
+    
+    /**
+     * 生成天气查询候选城市名（市级优先，含后缀剥离与 IP 自动识别兜底）
+     * @param {Object|string|null} locationOrName
+     * @returns {Array<string|null>}
+     */
+    static getWeatherCityCandidates(locationOrName) {
+        const candidates = [];
+        const add = (value) => {
+            if (value === null) {
+                if (!candidates.includes(null)) {
+                    candidates.push(null);
+                }
+                return;
+            }
+            if (typeof value !== 'string') {
+                return;
+            }
+            const t = value.trim();
+            if (!t || candidates.includes(t)) {
+                return;
+            }
+            candidates.push(t);
+            const stripped = t.replace(/(特别行政区|自治区|自治州|地区|盟|回族区|市|区|县|旗)$/u, '');
+            if (stripped && stripped !== t && !candidates.includes(stripped)) {
+                candidates.push(stripped);
+            }
+        };
+        
+        if (typeof locationOrName === 'string') {
+            add(locationOrName);
+        } else if (locationOrName && typeof locationOrName === 'object') {
+            add(locationOrName.city);
+            add(GeographyDrive.resolveWeatherCityName(locationOrName));
+            const regionStr = (typeof locationOrName.region === 'string')
+                ? locationOrName.region
+                : (typeof locationOrName.address === 'string' ? locationOrName.address : null);
+            add(GeographyDrive._extractCityFromRegion(regionStr, locationOrName.district || locationOrName.name));
+            add(locationOrName.name);
+            add(locationOrName.district);
+        }
+        // 最后尝试不传 city，由天气 API 按 IP 识别
+        add(null);
+        return candidates;
     }
     
     /**
@@ -452,6 +568,9 @@ class GeographyDrive {
             
             // 扩展信息（来自第三方 API）
             name: null,
+            city: null,
+            district: null,
+            region: null,
             address: null,
             
             // 高精度信息（来自原生 API）
@@ -485,6 +604,9 @@ class GeographyDrive {
             
             // 补充地址信息
             location.name = apiLocation.name;
+            location.city = apiLocation.city || null;
+            location.district = apiLocation.district || null;
+            location.region = apiLocation.region || null;
             location.address = apiLocation.address;
         }
         

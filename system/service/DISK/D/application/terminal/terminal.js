@@ -135,6 +135,65 @@
         return baseParts.join('/');
     }
 
+    /**
+     * 判断命令是否为路径型输入（应相对 cwd / 绝对路径执行，而非按命令名查 D:/bin）
+     * 例如: ./test.js、../app/foo.js、D:/bin/test.js、test.js
+     */
+    function isPathLikeCommand(cmd) {
+        if (!cmd || typeof cmd !== 'string') return false;
+        const c = cmd.trim().replace(/\\/g, '/');
+        if (!c) return false;
+        if (/^[A-Z]:\//.test(c)) return true;
+        if (c.startsWith('./') || c.startsWith('../') || c.startsWith('/')) return true;
+        if (c.includes('/')) return true;
+        if (/\.js$/i.test(c)) return true;
+        return false;
+    }
+
+    function basenameFromPath(filePath) {
+        const normalized = String(filePath || '').replace(/\\/g, '/');
+        const parts = normalized.split('/').filter(Boolean);
+        return parts.length ? parts[parts.length - 1] : normalized;
+    }
+
+    /** 裸命令名目录搜索时始终置于最高优先级的硬编码 bin */
+    const HARDCODED_COMMAND_BIN = 'D:/bin';
+
+    function normalizeSearchDir(dir) {
+        if (!dir || typeof dir !== 'string') return null;
+        let d = dir.trim().replace(/\\/g, '/');
+        if (!d) return null;
+        d = d.replace(/\/+$/, '');
+        return d || null;
+    }
+
+    /**
+     * 构建裸命令搜索目录列表：D:/bin 硬编码置顶，再追加 PATH 中的目录（去重）
+     * PATH 使用 ; 分隔（兼容 ZerOS 盘符路径，避免把 D: 拆开）
+     * @param {string|null|undefined} pathEnvValue
+     * @returns {string[]}
+     */
+    function buildCommandSearchDirs(pathEnvValue) {
+        const dirs = [];
+        const seen = new Set();
+        const add = (dir) => {
+            const normalized = normalizeSearchDir(dir);
+            if (!normalized) return;
+            const key = normalized.toUpperCase();
+            if (seen.has(key)) return;
+            seen.add(key);
+            dirs.push(normalized);
+        };
+        add(HARDCODED_COMMAND_BIN);
+        if (pathEnvValue && typeof pathEnvValue === 'string') {
+            const parts = pathEnvValue.split(';');
+            for (let i = 0; i < parts.length; i++) {
+                add(parts[i]);
+            }
+        }
+        return dirs;
+    }
+
     // 标签页管理器
     class TabManager {
         constructor(pid = null) {
@@ -7720,7 +7779,10 @@ function escapeHtml(s){
                                 }
                                 payload.write('---');
                                 payload.write(`名称/地区 (name): ${loc.name != null ? loc.name : '(无)'}`);
-                                payload.write(`地址 (address): ${loc.address != null ? loc.address : '(无)'}`);
+                                payload.write(`城市 (city): ${loc.city != null ? loc.city : '(无)'}`);
+                                payload.write(`区县 (district): ${loc.district != null ? loc.district : '(无)'}`);
+                                payload.write(`区域串 (region): ${loc.region != null ? loc.region : '(无)'}`);
+                                payload.write(`地址 (address): ${loc.address != null ? (typeof loc.address === 'string' ? loc.address : JSON.stringify(loc.address)) : '(无)'}`);
                                 payload.write(`纬度 (latitude): ${loc.latitude != null ? loc.latitude : '(无)'}`);
                                 payload.write(`经度 (longitude): ${loc.longitude != null ? loc.longitude : '(无)'}`);
                                 payload.write(`精度来源 (source): ${loc.source || '(无)'}`);
@@ -7745,39 +7807,75 @@ function escapeHtml(s){
                             }
                             try {
                                 let cityName = cityArg;
+                                let weatherCandidates = null;
                                 if (!cityName && typeof ProcessManager !== 'undefined' && typeof ProcessManager.callKernelAPI === 'function' && terminalPid) {
                                     payload.write('正在获取定位城市...');
                                     try {
                                         const loc = await ProcessManager.callKernelAPI(terminalPid, 'Geography.getCurrentPosition', [{ enableHighAccuracy: false, timeout: 10000 }]);
-                                        cityName = (loc && loc.name) ? loc.name : null;
+                                        if (typeof GeographyDrive !== 'undefined' && typeof GeographyDrive.resolveWeatherCityName === 'function') {
+                                            cityName = GeographyDrive.resolveWeatherCityName(loc);
+                                            weatherCandidates = GeographyDrive.getWeatherCityCandidates(loc);
+                                            if (loc && loc.name && cityName && loc.name !== cityName) {
+                                                payload.write(`定位区县: ${loc.name} → 天气城市: ${cityName}`);
+                                            }
+                                        } else {
+                                            cityName = (loc && (loc.city || loc.name)) ? (loc.city || loc.name) : null;
+                                        }
                                     } catch (e) {
                                         cityName = null;
                                     }
                                 }
-                                if (!cityName) {
+                                if (!cityName && !(weatherCandidates && weatherCandidates.length)) {
                                     cityName = '北京';
                                     payload.write(`未指定 --city 且定位失败，使用默认城市: ${cityName}`);
                                 }
-                                const weatherUrl = `https://uapis.cn/api/v1/misc/weather?city=${encodeURIComponent(cityName)}&extended=true&indices=true&forecast=true`;
+                                if (!weatherCandidates || weatherCandidates.length === 0) {
+                                    weatherCandidates = cityName ? [cityName, null] : [null];
+                                }
                                 payload.write('Weather 调试');
                                 payload.write('---');
-                                payload.write(`请求城市: ${cityName}`);
-                                payload.write(`请求: ${weatherUrl}`);
+                                payload.write(`请求城市候选: ${weatherCandidates.map(c => c == null ? '(IP)' : c).join(' → ')}`);
                                 payload.write('请求中...');
-                                const resp = await fetch(weatherUrl);
-                                if (!resp.ok) {
-                                    payload.write(`HTTP 错误: ${resp.status} ${resp.statusText}`);
+                                let data = null;
+                                let usedCity = null;
+                                let lastErr = null;
+                                for (const candidate of weatherCandidates) {
+                                    const weatherUrl = candidate
+                                        ? `https://uapis.cn/api/v1/misc/weather?city=${encodeURIComponent(candidate)}&extended=true&indices=true&forecast=true`
+                                        : `https://uapis.cn/api/v1/misc/weather?extended=true&indices=true&forecast=true`;
+                                    payload.write(`尝试: ${candidate == null ? '(IP自动识别)' : candidate}`);
+                                    try {
+                                        const resp = await fetch(weatherUrl);
+                                        const text = await resp.text();
+                                        let parsed;
+                                        try {
+                                            parsed = JSON.parse(text);
+                                        } catch (e) {
+                                            lastErr = new Error('响应不是有效 JSON');
+                                            continue;
+                                        }
+                                        if (parsed && parsed.error === 'LOCATION_NOT_FOUND') {
+                                            lastErr = new Error('LOCATION_NOT_FOUND');
+                                            continue;
+                                        }
+                                        if (!resp.ok) {
+                                            lastErr = new Error(`HTTP ${resp.status}`);
+                                            if (resp.status === 404) continue;
+                                            continue;
+                                        }
+                                        data = parsed;
+                                        usedCity = candidate;
+                                        break;
+                                    } catch (e) {
+                                        lastErr = e;
+                                    }
+                                }
+                                if (!data) {
+                                    payload.write(`请求失败: ${lastErr ? lastErr.message : '未知错误'}`);
                                     return;
                                 }
-                                const text = await resp.text();
-                                let data;
-                                try {
-                                    data = JSON.parse(text);
-                                } catch (e) {
-                                    payload.write('响应不是有效 JSON');
-                                    if (hasRaw) payload.write(text.substring(0, 500));
-                                    return;
-                                }
+                                cityName = usedCity || data.city || cityName;
+                                payload.write(`实际使用城市: ${cityName == null ? '(IP自动识别)' : cityName}`);
                                 if (hasRaw) {
                                     payload.write('---');
                                     payload.write(JSON.stringify(data, null, 2).substring(0, 3000));
@@ -8298,6 +8396,8 @@ function escapeHtml(s){
                 payload.write(' - power <action>         : 系统电源管理（reboot/shutdown/help）');
                 payload.write(' - debug <action> [args]   : 调试工具。exception/geography/weather/translate/services/systemexpansion（debug 查看帮助）');
                 payload.write('Notes: 路径格式以盘符开头如 C:/path，或相对于当前工作目录使用 ../ 和 ./ 。');
+                payload.write('运行脚本: ./test.js、test.js、D:/app/foo.js（路径型）；裸命令名先查注册表，再按 D:/bin → PATH 目录搜索 {name}.js。');
+                payload.write('PATH 示例: setenv PATH "D:/scripts;C:/tools"（以 ; 分隔；D:/bin 始终最高优先且硬编码存在）。');
                 break;
             case 'diskmanger':
             case 'diskmgr':
@@ -8917,9 +9017,10 @@ function escapeHtml(s){
             default:
                 // 命令处理优先级：
                 // 1. 内置命令（已在 switch case 中处理）
-                // 2. D/bin/ 目录下的 .js 文件
+                // 2. 路径型命令（./test.js、D:/app/foo.js 等，相对 cwd 解析后直接执行）
                 // 3. 程序注册表中的程序（ApplicationAssetManager）
-                // 4. 环境变量中的值（作为程序名执行）
+                // 4. 目录搜索：硬编码 D:/bin（最高优先）→ PATH 环境变量中的目录
+                // 5. 环境变量中的值（作为程序名或路径别名执行）
                 
                 // 使用异步函数统一处理所有步骤
                 (async () => {
@@ -8931,13 +9032,132 @@ function escapeHtml(s){
                     let isCLIProgram = false;
                     let programInfo = null;
                     let programName = cmd;  // 默认使用命令名作为程序名
-                    let foundInBin = false;  // 标记是否在 D/bin/ 中找到文件
+                    let foundInBin = false;  // 标记是否在 D:/bin 或 PATH 目录搜索中找到并启动
                     let foundInRegistry = false;  // 标记是否在程序注册表中找到
                     let foundInEnv = false;  // 标记是否在环境变量中找到
                     let registryProgramType = null;  // 程序注册表中的类型（GUI/CLI等）
                     let registryLookupAvailable = false;  // 标记程序注册表是否可用于判断命令有效性
                     
-                    // 步骤0: 先检查程序注册表（如果程序已注册，跳过 D:/bin 检查，避免不必要的 404 请求）
+                    // 步骤0: 路径型命令 — 用 resolvePath 解析后直接读文件启动（不查命令名）
+                    if (isPathLikeCommand(cmd)) {
+                        try {
+                            let ProcessMgr = null;
+                            if (typeof ProcessManager !== 'undefined') {
+                                ProcessMgr = ProcessManager;
+                            } else if (typeof safePoolGet === 'function') {
+                                try {
+                                    ProcessMgr = safePoolGet('KERNEL_GLOBAL_POOL', 'ProcessManager');
+                                } catch (e) {
+                                    if (typeof KernelLogger !== 'undefined') {
+                                        KernelLogger.error('Terminal', '获取ProcessManager失败', e);
+                                    }
+                                }
+                            }
+
+                            if (!ProcessMgr || typeof ProcessMgr.callKernelAPI !== 'function' || typeof ProcessMgr.startProgram !== 'function') {
+                                payload.write(`${cmd}: 无法启动（ProcessManager 不可用）`);
+                                return;
+                            }
+
+                            const terminalPid = terminalInstance.pid || (terminalInstance.tabManager && terminalInstance.tabManager.pid);
+                            if (!terminalPid) {
+                                payload.write(`${cmd}: 无法启动（无法获取终端进程 ID）`);
+                                return;
+                            }
+
+                            const cwd = (payload.env && payload.env.cwd) ? payload.env.cwd : 'D:';
+                            const normalizedInput = cmd.trim().replace(/\\/g, '/');
+                            let resolvedPath = resolvePath(cwd, normalizedInput);
+                            let existsInfo = await ProcessMgr.callKernelAPI(terminalPid, 'FileSystem.exists', [resolvedPath]);
+
+                            // 未写 .js 时尝试自动补全扩展名（如 ./test → ./test.js）
+                            if (!(existsInfo && existsInfo.exists && existsInfo.type === 'file') && !/\.js$/i.test(resolvedPath)) {
+                                const withJs = `${resolvedPath}.js`;
+                                const existsWithJs = await ProcessMgr.callKernelAPI(terminalPid, 'FileSystem.exists', [withJs]);
+                                if (existsWithJs && existsWithJs.exists && existsWithJs.type === 'file') {
+                                    resolvedPath = withJs;
+                                    existsInfo = existsWithJs;
+                                }
+                            }
+
+                            if (!(existsInfo && existsInfo.exists && existsInfo.type === 'file')) {
+                                payload.write(`${cmd}: 没有那个文件或目录 (${resolvedPath})`);
+                                return;
+                            }
+
+                            const fileContent = await ProcessMgr.callKernelAPI(terminalPid, 'FileSystem.read', [resolvedPath]);
+                            if (!fileContent || typeof fileContent !== 'string') {
+                                payload.write(`${cmd}: 无法读取文件 (${resolvedPath})`);
+                                return;
+                            }
+
+                            const fileName = basenameFromPath(resolvedPath);
+                            const programNameFromPath = fileName.replace(/\.js$/i, '') || fileName;
+
+                            if (ProcessMgr.validateProgramFile && typeof ProcessMgr.validateProgramFile === 'function') {
+                                const validation = ProcessMgr.validateProgramFile(fileContent, fileName);
+                                if (!validation.valid) {
+                                    payload.write(`${cmd}: 不是有效的 ZerOS 程序 (${resolvedPath})`);
+                                    if (validation.errors && validation.errors.length > 0) {
+                                        validation.errors.forEach(err => {
+                                            payload.write(`  错误: ${err}`);
+                                        });
+                                    }
+                                    return;
+                                }
+                            }
+
+                            const tempAsset = {
+                                script: fileContent,
+                                styles: [],
+                                icon: null,
+                                metadata: {
+                                    name: programNameFromPath,
+                                    type: 'CLI',
+                                    allowMultipleInstances: true
+                                }
+                            };
+
+                            terminalInstance._setBusy(true);
+                            try {
+                                const pid = await ProcessMgr.startProgram(programNameFromPath, {
+                                    terminal: terminalInstance,
+                                    args: payload.args.slice(1),
+                                    env: payload.env,
+                                    cwd: payload.env.cwd,
+                                    tempAsset: tempAsset
+                                });
+                                terminalInstance._currentCliPid = pid;
+
+                                const checkProgramStatus = setInterval(() => {
+                                    const processInfo = ProcessMgr.PROCESS_TABLE.get(pid);
+                                    if (!processInfo || processInfo.status !== 'running') {
+                                        clearInterval(checkProgramStatus);
+                                        if (terminalInstance.busy) {
+                                            terminalInstance._setBusy(false);
+                                        }
+                                        if (terminalInstance._currentCliPid === pid) {
+                                            terminalInstance._currentCliPid = null;
+                                        }
+                                    }
+                                }, 100);
+                                return;
+                            } catch (error) {
+                                terminalInstance._setBusy(false);
+                                terminalInstance._currentCliPid = null;
+                                payload.write(`${cmd}: 程序启动失败: ${error.message || error}`);
+                                return;
+                            }
+                        } catch (error) {
+                            payload.write(`${cmd}: 启动失败: ${error.message || error}`);
+                            if (typeof KernelLogger !== 'undefined') {
+                                KernelLogger.debug('Terminal', `路径型命令启动失败: ${cmd}`, error);
+                            }
+                            return;
+                        }
+                    }
+                    
+                    // 步骤1: 先检查程序注册表（如果程序已注册，跳过 D:/bin 检查，避免不必要的 404 请求）
                     let AssetManager = null;
                     if (typeof ApplicationAssetManager !== 'undefined') {
                         AssetManager = ApplicationAssetManager;
@@ -8960,15 +9180,14 @@ function escapeHtml(s){
                             isCLIProgram = registryProgramType === 'CLI';
                             programName = cmd;
                             if (typeof KernelLogger !== 'undefined') {
-                                KernelLogger.debug('Terminal', `从程序注册表找到程序: ${cmd}, 类型: ${registryProgramType || 'UNKNOWN'}, 跳过 D:/bin 检查`);
+                                KernelLogger.debug('Terminal', `从程序注册表找到程序: ${cmd}, 类型: ${registryProgramType || 'UNKNOWN'}, 跳过目录搜索`);
                             }
                         }
                     }
                     
-                    // 步骤1: 如果程序注册表中没找到，尝试从 D/bin/ 目录查找同名 .js 文件
+                    // 步骤2: 目录搜索 — D:/bin（硬编码最高优先）→ PATH 各目录，查找 {dir}/{cmd}.js
                     if (!foundInRegistry) {
                         try {
-                            // 通过内核 FileSystem API 检查 D:/bin，避免直接请求 PHP 产生 404 或绕过 upid 权限链路。
                             let ProcessMgr = null;
                             if (typeof ProcessManager !== 'undefined') {
                                 ProcessMgr = ProcessManager;
@@ -8983,127 +9202,140 @@ function escapeHtml(s){
                             }
 
                             if (ProcessMgr && typeof ProcessMgr.callKernelAPI === 'function' && cmd && typeof cmd === 'string' && cmd.trim() !== '') {
-                                const binProgramPath = `D:/bin/${cmd}.js`;
                                 const terminalPid = terminalInstance.pid || (terminalInstance.tabManager && terminalInstance.tabManager.pid);
-                                const existsInfo = await ProcessMgr.callKernelAPI(terminalPid, 'FileSystem.exists', [binProgramPath]);
+                                if (!terminalPid) {
+                                    if (typeof KernelLogger !== 'undefined') {
+                                        KernelLogger.debug('Terminal', `跳过目录搜索: 无法获取终端进程ID (${cmd})`);
+                                    }
+                                } else {
+                                    let pathEnvValue = null;
+                                    try {
+                                        pathEnvValue = await ProcessMgr.callKernelAPI(terminalPid, 'Environment.get', ['PATH']);
+                                    } catch (pathErr) {
+                                        if (typeof KernelLogger !== 'undefined') {
+                                            KernelLogger.debug('Terminal', `读取 PATH 失败，仅搜索硬编码 D:/bin: ${pathErr.message}`);
+                                        }
+                                    }
+                                    if ((!pathEnvValue || typeof pathEnvValue !== 'string') && payload.env && typeof payload.env.PATH === 'string') {
+                                        pathEnvValue = payload.env.PATH;
+                                    }
 
-                                if (existsInfo && existsInfo.exists && existsInfo.type === 'file') {
-                                    const fileContent = await ProcessMgr.callKernelAPI(terminalPid, 'FileSystem.read', [binProgramPath]);
-                                    if (fileContent && typeof fileContent === 'string') {
-                                        // 文件存在，标记为已找到
-                                        foundInBin = true;
+                                    const searchDirs = buildCommandSearchDirs(pathEnvValue);
+                                    if (typeof KernelLogger !== 'undefined') {
+                                        KernelLogger.debug('Terminal', `命令目录搜索 (${cmd}): ${searchDirs.join(' ; ')}`);
+                                    }
 
-                                        if (typeof ProcessMgr.startProgram !== 'function') {
-                                            // ProcessManager 不可用，静默继续后续查找
-                                            foundInBin = false;
-                                        } else {
-                                            // 验证文件是否是有效的 ZerOS 程序
-                                            let isValidProgram = true;
+                                    for (let di = 0; di < searchDirs.length; di++) {
+                                        const searchDir = searchDirs[di];
+                                        const programPath = `${searchDir}/${cmd}.js`;
+                                        try {
+                                            const existsInfo = await ProcessMgr.callKernelAPI(terminalPid, 'FileSystem.exists', [programPath]);
+                                            if (!(existsInfo && existsInfo.exists && existsInfo.type === 'file')) {
+                                                continue;
+                                            }
+
+                                            const fileContent = await ProcessMgr.callKernelAPI(terminalPid, 'FileSystem.read', [programPath]);
+                                            if (!fileContent || typeof fileContent !== 'string') {
+                                                continue;
+                                            }
+
+                                            if (typeof ProcessMgr.startProgram !== 'function') {
+                                                continue;
+                                            }
+
                                             if (ProcessMgr.validateProgramFile && typeof ProcessMgr.validateProgramFile === 'function') {
                                                 const validation = ProcessMgr.validateProgramFile(fileContent, `${cmd}.js`);
                                                 if (!validation.valid) {
-                                                    // 文件不是有效的 ZerOS 程序，静默继续后续查找
-                                                    isValidProgram = false;
-                                                    foundInBin = false;
+                                                    if (typeof KernelLogger !== 'undefined') {
+                                                        KernelLogger.debug('Terminal', `${programPath} 不是有效程序，继续下一目录`);
+                                                    }
+                                                    continue;
                                                 }
                                             }
 
-                                            if (isValidProgram) {
-                                                // 使用 tempAsset 启动程序
-                                                const tempAsset = {
-                                                    script: fileContent,
-                                                    styles: [],
-                                                    icon: null,  // 使用默认图标
-                                                    metadata: {
-                                                        name: cmd,
-                                                        type: 'CLI',  // 默认作为 CLI 程序
-                                                        allowMultipleInstances: true
-                                                    }
-                                                };
+                                            foundInBin = true;
+                                            const tempAsset = {
+                                                script: fileContent,
+                                                styles: [],
+                                                icon: null,
+                                                metadata: {
+                                                    name: cmd,
+                                                    type: 'CLI',
+                                                    allowMultipleInstances: true
+                                                }
+                                            };
 
-                                                // 立即设置 busy 状态，隐藏命令输入
-                                                terminalInstance._setBusy(true);
+                                            terminalInstance._setBusy(true);
+                                            try {
+                                                const pid = await ProcessMgr.startProgram(cmd, {
+                                                    terminal: terminalInstance,
+                                                    args: payload.args.slice(1),
+                                                    env: payload.env,
+                                                    cwd: payload.env.cwd,
+                                                    tempAsset: tempAsset
+                                                });
+                                                terminalInstance._currentCliPid = pid;
 
-                                                // 尝试启动程序（异步）
-                                                try {
-                                                    const pid = await ProcessMgr.startProgram(cmd, {
-                                                        terminal: terminalInstance,
-                                                        args: payload.args.slice(1),
-                                                        env: payload.env,
-                                                        cwd: payload.env.cwd,
-                                                        tempAsset: tempAsset
-                                                    });
-                                                    // 启动成功
-                                                    // 保存当前运行的 CLI 程序 PID，用于 Ctrl+C 中断
-                                                    terminalInstance._currentCliPid = pid;
-
-                                                    // 监听程序退出，自动恢复 busy 状态
-                                                    const checkProgramStatus = setInterval(() => {
-                                                        const processInfo = ProcessMgr.PROCESS_TABLE.get(pid);
-                                                        if (!processInfo || processInfo.status !== 'running') {
-                                                            clearInterval(checkProgramStatus);
-                                                            // 程序已退出，恢复 busy 状态
-                                                            if (terminalInstance.busy) {
-                                                                terminalInstance._setBusy(false);
-                                                            }
-                                                            // 清除保存的 PID
-                                                            if (terminalInstance._currentCliPid === pid) {
-                                                                terminalInstance._currentCliPid = null;
-                                                            }
+                                                const checkProgramStatus = setInterval(() => {
+                                                    const processInfo = ProcessMgr.PROCESS_TABLE.get(pid);
+                                                    if (!processInfo || processInfo.status !== 'running') {
+                                                        clearInterval(checkProgramStatus);
+                                                        if (terminalInstance.busy) {
+                                                            terminalInstance._setBusy(false);
                                                         }
-                                                    }, 100);
-
-                                                    // 注意：不输出启动消息，让程序自己输出
-                                                    return;
-                                                } catch (error) {
-                                                    // 启动失败，恢复 busy 状态
-                                                    terminalInstance._setBusy(false);
-                                                    terminalInstance._currentCliPid = null;
-
-                                                    // 启动失败，检查进程是否已经被创建
-                                                    // 如果进程已经被创建（即使初始化失败），不应该继续查找
-                                                    let processCreated = false;
-                                                    if (ProcessMgr && typeof ProcessMgr.getProcessInfo === 'function') {
-                                                        // 检查是否有同名进程（可能是刚创建的）
-                                                        const allProcesses = ProcessMgr.getProcessInfo();
-                                                        if (Array.isArray(allProcesses)) {
-                                                            const recentProcess = allProcesses.find(p =>
-                                                                p.programName === cmd &&
-                                                                (p.status === 'loading' || p.status === 'exited' || p.status === 'running')
-                                                            );
-                                                            if (recentProcess) {
-                                                                processCreated = true;
-                                                                // 进程已创建但初始化失败，输出错误信息
-                                                                payload.write(`${cmd}: 程序启动失败: ${error.message || error}`);
-                                                                return;
-                                                            }
+                                                        if (terminalInstance._currentCliPid === pid) {
+                                                            terminalInstance._currentCliPid = null;
                                                         }
                                                     }
+                                                }, 100);
+                                                return;
+                                            } catch (error) {
+                                                terminalInstance._setBusy(false);
+                                                terminalInstance._currentCliPid = null;
 
-                                                    // 如果进程没有被创建，继续后续查找
-                                                    if (!processCreated) {
-                                                        if (typeof KernelLogger !== 'undefined') {
-                                                            KernelLogger.debug('Terminal', `D:/bin/${cmd}.js 启动失败，继续查找其他位置`, error);
+                                                let processCreated = false;
+                                                if (ProcessMgr && typeof ProcessMgr.getProcessInfo === 'function') {
+                                                    const allProcesses = ProcessMgr.getProcessInfo();
+                                                    if (Array.isArray(allProcesses)) {
+                                                        const recentProcess = allProcesses.find(p =>
+                                                            p.programName === cmd &&
+                                                            (p.status === 'loading' || p.status === 'exited' || p.status === 'running')
+                                                        );
+                                                        if (recentProcess) {
+                                                            processCreated = true;
+                                                            payload.write(`${cmd}: 程序启动失败: ${error.message || error}`);
+                                                            return;
                                                         }
-                                                        foundInBin = false;
                                                     }
                                                 }
+
+                                                if (!processCreated) {
+                                                    if (typeof KernelLogger !== 'undefined') {
+                                                        KernelLogger.debug('Terminal', `${programPath} 启动失败，继续下一目录`, error);
+                                                    }
+                                                    foundInBin = false;
+                                                } else {
+                                                    return;
+                                                }
+                                            }
+                                        } catch (dirErr) {
+                                            if (typeof KernelLogger !== 'undefined') {
+                                                KernelLogger.debug('Terminal', `检查 ${programPath} 失败`, dirErr);
                                             }
                                         }
                                     }
                                 }
                             }
                         } catch (error) {
-                            // 读取文件失败，继续后续判断（不输出错误，因为可能是文件不存在）
                             if (typeof KernelLogger !== 'undefined') {
-                                KernelLogger.debug('Terminal', `检查 D:/bin/${cmd}.js 失败`, error);
+                                KernelLogger.debug('Terminal', `目录搜索失败 (${cmd})`, error);
                             }
                         }
                     }
                     
-                    // 步骤2: 如果程序注册表中没找到且 D/bin/ 中也没找到，步骤2 已在步骤0 中处理（程序注册表检查）
+                    // 步骤3: 程序注册表已在步骤1处理；此处继续步骤4：环境变量别名
                     
-                    // 步骤3: 如果程序注册表中找不到，尝试从环境变量查找
+                    // 步骤4: 如果程序注册表中找不到，尝试从环境变量查找
                     if (!foundInBin && !foundInRegistry) {
                         // 获取 ProcessManager（用于调用内核 API）
                         let ProcessMgr = null;
