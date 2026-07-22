@@ -266,7 +266,7 @@ KernelLogger.info("LockScreen", "模块初始化");
                     if (typeof KernelLogger !== 'undefined') {
                         KernelLogger.debug('LockScreen', '从缓存读取每日一言成功');
                     }
-                    quoteText.innerHTML = quote.trim();
+                    quoteText.textContent = quote.trim();
                     
                     // 使用后删除缓存
                     if (typeof ProcessManager !== 'undefined') {
@@ -306,7 +306,7 @@ KernelLogger.info("LockScreen", "模块初始化");
                         if (typeof KernelLogger !== 'undefined') {
                             KernelLogger.debug('LockScreen', '从API获取每日一言成功');
                         }
-                        quoteText.innerHTML = apiQuote.trim();
+                        quoteText.textContent = apiQuote.trim();
                     } else {
                         if (typeof KernelLogger !== 'undefined') {
                             KernelLogger.debug('LockScreen', 'API返回空内容，使用默认文本');

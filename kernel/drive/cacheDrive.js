@@ -983,6 +983,16 @@ class CacheDrive {
     }
 
     /**
+     * 检查pid
+     * @param {number} pid 可信pid
+     * @param {string} programName 待检查程序名称
+     * @returns {boolean}
+     */
+    static async check(pid, programName = '') {
+       return (ProcessManager.PROCESS_TABLE.get(pid).programName) === programName;
+    }
+
+    /**
      * 设置缓存值
      * @param {string} key 缓存键
      * @param {any} value 缓存值
