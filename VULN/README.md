@@ -38,6 +38,7 @@
 | [CVS-ZEROS-016](CVS_ZEROS_016.md) | RandomSecurity 未校验来源即签发 SystemToken | 严重 (9.8) | 2026-03-15 | 2026-03-16 |
 | [CVS-ZEROS-017](CVS_ZEROS_017.md) | RandomSecurity 信任客户端声明 UserToken 权限导致权限伪造 | 严重 (9.8) | 2026-05-04 | 2026-05-06 |
 | [CVS-ZEROS-018](CVS_ZEROS_018.md) | FSDirve 文件名参数未校验导致路径穿越 | 严重 (9.1) | 2026-05-04 | 2026-05-06 |
+| [CVS-ZEROS-023](CVS_ZEROS_023.md) | Cache API 命名空间可控导致锁屏缓存投毒与系统上下文提权 | 严重 (9.0) | 2026-05-04 | 2026-07-21 |
 
 ### 待修复漏洞
 
@@ -48,7 +49,7 @@
 | [CVS-ZEROS-020](CVS_ZEROS_020.md) | NetworkDirve 未接入服务级权限映射导致网络能力越权 | 高 (8.1) | 2026-05-04 | UserToken 只需携带 upid 即可调用端口监听和 TCP 发送能力 |
 | [CVS-ZEROS-021](CVS_ZEROS_021.md) | RandomSecurity commit_for_system 无认证导致 SystemToken 仍可被未认证获取 | 严重 (9.8) | 2026-05-04 | 016 修复不完整，攻击者两步请求仍可获得 SystemToken |
 | [CVS-ZEROS-022](CVS_ZEROS_022.md) | D/server 服务脚本可写入并自动加载导致持久化提权 | 严重 (9.0) | 2026-05-04 | KERNEL_DISK_WRITE 可写入自加载服务脚本并借 SERVER_SERVICE_PID 获得内核权限 |
-| [CVS-ZEROS-023](CVS_ZEROS_023.md) | Cache API 命名空间可控导致锁屏缓存投毒与系统上下文提权 | 严重 (9.0) | 2026-05-04 | 普通应用可投毒 EXPLOIT_PID 缓存，锁屏 innerHTML 渲染后触发系统 UI XSS |
+
 
 ### 安全测试程序
 
