@@ -6,12 +6,12 @@
 
 ## 漏洞统计
 
-- **总计**: 23 个漏洞/测试程序
+- **总计**: 26 个漏洞/测试程序
 - **已修复**: 16 个
-- **待修复**: 6 个
+- **待修复**: 9 个
 - **安全测试程序**: 1 个
-- **严重漏洞**: 14 个
-- **高/中高危漏洞**: 4 个
+- **严重漏洞**: 16 个
+- **高/中高危漏洞**: 5 个
 - **低危漏洞**: 1 个
 
 ---
@@ -49,6 +49,9 @@
 | [CVS-ZEROS-021](CVS_ZEROS_021.md) | RandomSecurity commit_for_system 无认证导致 SystemToken 仍可被未认证获取 | 严重 (9.8) | 2026-05-04 | 016 修复不完整，攻击者两步请求仍可获得 SystemToken |
 | [CVS-ZEROS-022](CVS_ZEROS_022.md) | D/server 服务脚本可写入并自动加载导致持久化提权 | 严重 (9.0) | 2026-05-04 | KERNEL_DISK_WRITE 可写入自加载服务脚本并借 SERVER_SERVICE_PID 获得内核权限 |
 | [CVS-ZEROS-023](CVS_ZEROS_023.md) | Cache API 命名空间可控导致锁屏缓存投毒与系统上下文提权 | 严重 (9.0) | 2026-05-04 | 普通应用可投毒 EXPLOIT_PID 缓存，锁屏 innerHTML 渲染后触发系统 UI XSS |
+| [CVS-ZEROS-024](CVS_ZEROS_024.md) | 终端 tempAsset 程序名冲突导致缓存命名空间劫持 | 高 (7.7) | 2026-07-27 | tempAsset 加载同名文件获得系统程序缓存空间读写权 |
+| [CVS-ZEROS-025](CVS_ZEROS_025.md) | POOL.__ADD__ 零访问控制导致内核模块全局劫持 | 严重 (9.3) | 2026-07-27 | 任意代码可覆盖 KERNEL_GLOBAL_POOL 中全部 50+ 内核模块 |
+| [CVS-ZEROS-026](CVS_ZEROS_026.md) | 完整攻击链: 浏览器沙箱→宿主机Shell→内网横向 | 严重 (9.8) | 2026-07-27 | 023+024+025+NetworkManager 组合链实现宿主机完全控制 |
 
 ### 安全测试程序
 
@@ -88,6 +91,9 @@
 - [CVS-ZEROS-021](CVS_ZEROS_021.md): RandomSecurity commit_for_system 无认证导致 SystemToken 仍可被未认证获取
 - [CVS-ZEROS-022](CVS_ZEROS_022.md): D/server 服务脚本可写入并自动加载导致持久化提权
 - [CVS-ZEROS-023](CVS_ZEROS_023.md): Cache API 命名空间可控导致锁屏缓存投毒与系统上下文提权
+- [CVS-ZEROS-024](CVS_ZEROS_024.md): 终端 tempAsset 程序名冲突导致缓存命名空间劫持
+- [CVS-ZEROS-025](CVS_ZEROS_025.md): POOL.__ADD__ 零访问控制导致内核模块全局劫持
+- [CVS-ZEROS-026](CVS_ZEROS_026.md): 完整攻击链: 浏览器沙箱→宿主机Shell→内网横向移动
 
 ### P1 - 高优先级（已完成）
 - [CVS-ZEROS-001](CVS_ZEROS_001.md): 权限提升漏洞
@@ -180,9 +186,12 @@
 | SystemToken 签发绕过 | CVS-ZEROS-021 | ⚠️ 待修复：commit_for_system 无认证，攻击者两步请求仍可获得 SystemToken |
 | 持久化服务提权 | CVS-ZEROS-022 | ⚠️ 待修复：D/server 可写服务脚本会被自动加载并借 SERVER_SERVICE_PID 全权限执行 |
 | 缓存投毒提权 | CVS-ZEROS-023 | ⚠️ 待修复：Cache API 命名空间可控，锁屏读取投毒缓存并 innerHTML 渲染导致系统 UI XSS |
+| 缓存命名空间劫持 | CVS-ZEROS-024 | ⚠️ 待修复：终端 tempAsset 程序名取自文件名，同名文件可冒充系统程序缓存命名空间 |
+| POOL 零访问控制 | CVS-ZEROS-025 | ⚠️ 待修复：POOL.__ADD__ 无任何访问控制，任意代码可覆盖 KERNEL_GLOBAL_POOL 内核模块 |
+| 全攻击链: 浏览器→宿主机 | CVS-ZEROS-026 | ⚠️ 待修复：023+024+025 + NetworkManager 0.0.0.0 端口 + D/server 自动加载 + proc_open 实现宿主机完全控制 |
 | 程序/注入提权 | 见 CVS-ZEROS-001/009/010 | 已修复的进程表/PID/令牌相关提权 |
 
 ---
 
-**最后更新**: 2026-05-12  
+**最后更新**: 2026-07-27  
 **维护者**: ZerOS 安全团队
