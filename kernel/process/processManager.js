@@ -6179,8 +6179,15 @@ class ProcessManager {
                 if (!key || typeof key !== 'string') {
                     throw new Error('Cache.set: key 必须是字符串');
                 }
+
                 // 如果 options 中没有指定 pid，使用调用者的 pid
                 const finalOptions = typeof options === 'object' && options !== null ? { ...options } : {};
+
+                // 检查来源
+                if(!(await CacheDrive.check(pid,finalOptions.programName))){
+                    throw new Error('CacheDrive 传递的进程名称和PID不一致');
+                }
+                
                 if (pid !== null && pid !== undefined && finalOptions.pid === undefined) {
                     finalOptions.pid = pid;
                 }
@@ -6193,8 +6200,15 @@ class ProcessManager {
                 if (!key || typeof key !== 'string') {
                     throw new Error('Cache.get: key 必须是字符串');
                 }
+
                 // 如果 options 中没有指定 pid，使用调用者的 pid
                 const finalOptions = typeof options === 'object' && options !== null ? { ...options } : {};
+
+                // 检查来源
+                if(!(await CacheDrive.check(pid,finalOptions.programName))){
+                    throw new Error('CacheDrive 传递的进程名称和PID不一致');
+                }
+
                 if (pid !== null && pid !== undefined && finalOptions.pid === undefined) {
                     finalOptions.pid = pid;
                 }
@@ -6207,8 +6221,15 @@ class ProcessManager {
                 if (!key || typeof key !== 'string') {
                     throw new Error('Cache.has: key 必须是字符串');
                 }
+                
                 // 如果 options 中没有指定 pid，使用调用者的 pid
                 const finalOptions = typeof options === 'object' && options !== null ? { ...options } : {};
+
+                // 检查来源
+                if(!(await CacheDrive.check(pid,finalOptions.programName))){
+                    throw new Error('CacheDrive 传递的进程名称和PID不一致');
+                }
+
                 if (pid !== null && pid !== undefined && finalOptions.pid === undefined) {
                     finalOptions.pid = pid;
                 }
@@ -6223,6 +6244,12 @@ class ProcessManager {
                 }
                 // 如果 options 中没有指定 pid，使用调用者的 pid
                 const finalOptions = typeof options === 'object' && options !== null ? { ...options } : {};
+
+                // 检查来源
+                if(!(await CacheDrive.check(pid,finalOptions.programName))){
+                    throw new Error('CacheDrive 传递的进程名称和PID不一致');
+                }
+
                 if (pid !== null && pid !== undefined && finalOptions.pid === undefined) {
                     finalOptions.pid = pid;
                 }
@@ -6234,6 +6261,12 @@ class ProcessManager {
                 }
                 // 如果 options 中没有指定 pid，使用调用者的 pid
                 const finalOptions = typeof options === 'object' && options !== null ? { ...options } : {};
+
+                // 检查来源
+                if(!(await CacheDrive.check(pid,finalOptions.programName))){
+                    throw new Error('CacheDrive 传递的进程名称和PID不一致');
+                }
+
                 if (pid !== null && pid !== undefined && finalOptions.pid === undefined) {
                     finalOptions.pid = pid;
                 }
@@ -6251,6 +6284,12 @@ class ProcessManager {
                 }
                 // 如果 options 中没有指定 pid，使用调用者的 pid
                 const finalOptions = typeof options === 'object' && options !== null ? { ...options } : {};
+
+                // 检查来源
+                if(!(await CacheDrive.check(pid,finalOptions.programName))){
+                    throw new Error('CacheDrive 传递的进程名称和PID不一致');
+                }
+
                 if (pid !== null && pid !== undefined && finalOptions.pid === undefined) {
                     finalOptions.pid = pid;
                 }

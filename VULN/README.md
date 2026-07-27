@@ -7,8 +7,8 @@
 ## 漏洞统计
 
 - **总计**: 26 个漏洞/测试程序
-- **已修复**: 16 个
-- **待修复**: 9 个
+- **已修复**: 17 个
+- **待修复**: 8 个
 - **安全测试程序**: 1 个
 - **严重漏洞**: 16 个
 - **高/中高危漏洞**: 5 个
@@ -38,6 +38,7 @@
 | [CVS-ZEROS-016](CVS_ZEROS_016.md) | RandomSecurity 未校验来源即签发 SystemToken | 严重 (9.8) | 2026-03-15 | 2026-03-16 |
 | [CVS-ZEROS-017](CVS_ZEROS_017.md) | RandomSecurity 信任客户端声明 UserToken 权限导致权限伪造 | 严重 (9.8) | 2026-05-04 | 2026-05-06 |
 | [CVS-ZEROS-018](CVS_ZEROS_018.md) | FSDirve 文件名参数未校验导致路径穿越 | 严重 (9.1) | 2026-05-04 | 2026-05-06 |
+| [CVS-ZEROS-023](CVS_ZEROS_023.md) | Cache API 命名空间可控导致锁屏缓存投毒与系统上下文提权 | 严重 (9.0) | 2026-05-04 | 2026-07-21 |
 
 ### 待修复漏洞
 
@@ -48,7 +49,6 @@
 | [CVS-ZEROS-020](CVS_ZEROS_020.md) | NetworkDirve 未接入服务级权限映射导致网络能力越权 | 高 (8.1) | 2026-05-04 | UserToken 只需携带 upid 即可调用端口监听和 TCP 发送能力 |
 | [CVS-ZEROS-021](CVS_ZEROS_021.md) | RandomSecurity commit_for_system 无认证导致 SystemToken 仍可被未认证获取 | 严重 (9.8) | 2026-05-04 | 016 修复不完整，攻击者两步请求仍可获得 SystemToken |
 | [CVS-ZEROS-022](CVS_ZEROS_022.md) | D/server 服务脚本可写入并自动加载导致持久化提权 | 严重 (9.0) | 2026-05-04 | KERNEL_DISK_WRITE 可写入自加载服务脚本并借 SERVER_SERVICE_PID 获得内核权限 |
-| [CVS-ZEROS-023](CVS_ZEROS_023.md) | Cache API 命名空间可控导致锁屏缓存投毒与系统上下文提权 | 严重 (9.0) | 2026-05-04 | 普通应用可投毒 EXPLOIT_PID 缓存，锁屏 innerHTML 渲染后触发系统 UI XSS |
 | [CVS-ZEROS-024](CVS_ZEROS_024.md) | 终端 tempAsset 程序名冲突导致缓存命名空间劫持 | 高 (7.7) | 2026-07-27 | tempAsset 加载同名文件获得系统程序缓存空间读写权 |
 | [CVS-ZEROS-025](CVS_ZEROS_025.md) | POOL.__ADD__ 零访问控制导致内核模块全局劫持 | 严重 (9.3) | 2026-07-27 | 任意代码可覆盖 KERNEL_GLOBAL_POOL 中全部 50+ 内核模块 |
 | [CVS-ZEROS-026](CVS_ZEROS_026.md) | 完整攻击链: 浏览器沙箱→宿主机Shell→内网横向 | 严重 (9.8) | 2026-07-27 | 023+024+025+NetworkManager 组合链实现宿主机完全控制 |
@@ -85,12 +85,12 @@
 - [CVS-ZEROS-010](CVS_ZEROS_010.md): 进程绑定内核 API 令牌可读导致权限提升漏洞 ✅ (已完成)
 - [CVS-ZEROS-017](CVS_ZEROS_017.md): RandomSecurity 信任客户端声明 UserToken 权限导致权限伪造 ✅ (已完成)
 - [CVS-ZEROS-018](CVS_ZEROS_018.md): FSDirve 文件名参数未校验导致路径穿越 ✅ (已完成)
+- [CVS-ZEROS-023](CVS_ZEROS_023.md): Cache API 命名空间可控导致锁屏缓存投毒与系统上下文提权 ✅ (已完成)
 
 ### P0 - 立即修复（待处理）
 
 - [CVS-ZEROS-021](CVS_ZEROS_021.md): RandomSecurity commit_for_system 无认证导致 SystemToken 仍可被未认证获取
 - [CVS-ZEROS-022](CVS_ZEROS_022.md): D/server 服务脚本可写入并自动加载导致持久化提权
-- [CVS-ZEROS-023](CVS_ZEROS_023.md): Cache API 命名空间可控导致锁屏缓存投毒与系统上下文提权
 - [CVS-ZEROS-024](CVS_ZEROS_024.md): 终端 tempAsset 程序名冲突导致缓存命名空间劫持
 - [CVS-ZEROS-025](CVS_ZEROS_025.md): POOL.__ADD__ 零访问控制导致内核模块全局劫持
 - [CVS-ZEROS-026](CVS_ZEROS_026.md): 完整攻击链: 浏览器沙箱→宿主机Shell→内网横向移动
@@ -133,8 +133,9 @@
 12. ⚠️ **CVS-ZEROS-020 待修复**: NetworkDirve 应加入 jwtVerify 服务级权限映射，并将端口资源绑定到创建者 upid
 13. ⚠️ **CVS-ZEROS-021 待修复**: commit_for_system 不能作为 SystemToken 签发凭据，应改为服务端可信引导 secret 或彻底移除公开签发
 14. ⚠️ **CVS-ZEROS-022 待修复**: D/server 应作为系统关键执行目录，禁止 UserToken 写入并要求服务签名/白名单
-15. ⚠️ **CVS-ZEROS-023 待修复**: Cache API 必须将命名空间绑定到真实调用者 PID，系统缓存写入需单独授权；锁屏每日一言应改用 textContent 渲染
+15. ✅ **CVS-ZEROS-023 已修复**: Cache API 已将命名空间绑定到真实调用者 PID；锁屏每日一言已改用 textContent 渲染
 16. **定期安全审计**: 建议每季度进行一次全面的安全审计
+
 17. **代码审查**: 对所有涉及用户输入和权限检查的代码进行审查
 18. **安全测试**: 在发布新版本前进行渗透测试
 19. **最小权限原则**: 所有操作都应该检查用户权限
@@ -185,7 +186,7 @@
 | 网络能力越权 | CVS-ZEROS-020 | ⚠️ 待修复：NetworkDirve 未接入服务级权限映射 |
 | SystemToken 签发绕过 | CVS-ZEROS-021 | ⚠️ 待修复：commit_for_system 无认证，攻击者两步请求仍可获得 SystemToken |
 | 持久化服务提权 | CVS-ZEROS-022 | ⚠️ 待修复：D/server 可写服务脚本会被自动加载并借 SERVER_SERVICE_PID 全权限执行 |
-| 缓存投毒提权 | CVS-ZEROS-023 | ⚠️ 待修复：Cache API 命名空间可控，锁屏读取投毒缓存并 innerHTML 渲染导致系统 UI XSS |
+| 缓存投毒提权 | CVS-ZEROS-023 | ✅ 已修复：Cache API 命名空间绑定真实调用者 PID；锁屏每日一言改用 textContent 渲染 |
 | 缓存命名空间劫持 | CVS-ZEROS-024 | ⚠️ 待修复：终端 tempAsset 程序名取自文件名，同名文件可冒充系统程序缓存命名空间 |
 | POOL 零访问控制 | CVS-ZEROS-025 | ⚠️ 待修复：POOL.__ADD__ 无任何访问控制，任意代码可覆盖 KERNEL_GLOBAL_POOL 内核模块 |
 | 全攻击链: 浏览器→宿主机 | CVS-ZEROS-026 | ⚠️ 待修复：023+024+025 + NetworkManager 0.0.0.0 端口 + D/server 自动加载 + proc_open 实现宿主机完全控制 |
